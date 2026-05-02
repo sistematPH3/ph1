@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pizza Hut - Recuperar Contraseña</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/token.css') }}">
+</head>
+<body>
+    <div class="card">
+        <h2>Recuperar Contraseña</h2>
+        <p class="text-muted">Ingresa el correo asociado a tu cuenta en el sistema.</p>
+        
+        <form id="forgotForm" novalidate>
+            <p id="error-msg" class="error-alert"></p>
+            
+            <input type="email" id="email" placeholder="Ingrese su correo electrónico." required>
+            <button type="submit">Enviar Enlace</button>
+        </form>
+        
+        <p id="mensaje"></p>
+    </div>
+
+    <script>
+        document.getElementById('forgotForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const msj = document.getElementById('mensaje');
+            const errorMsg = document.getElementById('error-msg');
+            
+            errorMsg.style.display = 'none';
+            msj.innerText = '';
+
+            
+            if (!email) {
+                errorMsg.innerText = "Por favor ingrese su correo electrónico.";
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            
+            if (!email.includes('@')) {
+                errorMsg.innerText = `Incluye un signo "@" en la dirección de correo electrónico. La dirección "${email}" no incluye el signo "@".`;
+                errorMsg.style.display = 'block';
+                return; 
+            }
+
+            msj.innerText = "Procesando...";
+            msj.style.color = "#666";
+            
+            fetch(window.location.pathname, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            })
+            .then(res => res.json())
+            .then(data => {
+                msj.innerText = ""; 
+                
+                if (data.error) {
+                    errorMsg.innerText = data.error;
+                    errorMsg.style.display = 'block';
+                } else {
+                    msj.style.color = "green";
+                    msj.innerText = data.message;
+                }
+            })
+            .catch(err => {
+                msj.innerText = "";
+                errorMsg.innerText = "Error de conexión.";
+                errorMsg.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
