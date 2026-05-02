@@ -14,25 +14,43 @@
             <p id="error-msg" class="error-alert"></p>
             
             <input type="email" id="email" placeholder="Ingrese su correo electrónico." required>
+            
             <button type="submit">Enviar Enlace</button>
+            <a href="/auth/login" class="btn-cancel">Cancelar</a>
         </form>
         
         <p id="mensaje"></p>
     </div>
 
     <script>
-        document.getElementById('forgotForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = document.getElementById('email').value.trim();
-            const msj = document.getElementById('mensaje');
-            const errorMsg = document.getElementById('error-msg');
+        const emailInput = document.getElementById('email');
+        const errorMsg = document.getElementById('error-msg');
+        const form = document.getElementById('forgotForm');
+
+        
+        emailInput.addEventListener('input', function() {
+            const email = this.value;
             
-            errorMsg.style.display = 'none';
+            if (email.length > 0 && !email.includes('@')) {
+                errorMsg.innerText = `Incluye un signo "@" en la dirección de correo electrónico.`;
+                errorMsg.style.display = 'block';
+            } else {
+                
+                errorMsg.style.display = 'none';
+            }
+        });
+
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = emailInput.value.trim();
+            const msj = document.getElementById('mensaje');
+            
             msj.innerText = '';
 
             
             if (!email) {
-                errorMsg.innerText = "Por favor ingrese su correo electrónico.";
+                errorMsg.innerText = "Por favor ingrese su correo";
                 errorMsg.style.display = 'block';
                 return;
             }
@@ -44,6 +62,7 @@
                 return; 
             }
 
+            errorMsg.style.display = 'none';
             msj.innerText = "Procesando...";
             msj.style.color = "#666";
             
