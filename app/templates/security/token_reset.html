@@ -13,11 +13,10 @@
             <form id="resetForm" novalidate>
                 <p id="error-msg" class="error-alert"></p>
                 
-               
                 <div class="password-wrapper">
+                    
                     <input type="password" id="new_password" placeholder="Tu nueva contraseña" required minlength="6" maxlength="12">
                     <span class="toggle-password" id="togglePassword" title="Mostrar/Ocultar contraseña">
-                        
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>
                     </span>
                 </div>
@@ -38,31 +37,39 @@
 
     {% if token_valido %}
     <script>
-        
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('new_password');
+        const errorMsg = document.getElementById('error-msg');
+        const form = document.getElementById('resetForm');
 
         togglePassword.addEventListener('click', function () {
-            
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
 
-           
             if (type === 'text') {
-                
                 this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
             } else {
-                
                 this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>';
             }
         });
 
-       
-        document.getElementById('resetForm').addEventListener('submit', function(e) {
+        
+        passwordInput.addEventListener('input', function() {
+            const pwd = this.value;
+            
+            if (pwd.length > 0 && (pwd.length < 6 || pwd.length > 12)) {
+                errorMsg.innerText = `La contraseña debe tener entre 6 y 12 caracteres (actualmente tiene ${pwd.length}).`;
+                errorMsg.style.display = 'block';
+            } else {
+                errorMsg.style.display = 'none';
+            }
+        });
+
+        
+        form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const pwd = document.getElementById('new_password').value;
+            const pwd = passwordInput.value;
             const msj = document.getElementById('mensaje');
-            const errorMsg = document.getElementById('error-msg');
             const container = document.getElementById('mensaje-container');
             
             errorMsg.style.display = 'none';
@@ -77,8 +84,9 @@
                 return;
             }
 
-            if (pwd.length < 6) {
-                errorMsg.innerText = `Aumenta la longitud de este texto a 6 caracteres o más (actualmente, el texto tiene ${pwd.length} carácter${pwd.length === 1 ? '' : 'es'}).`;
+            
+            if (pwd.length < 6 || pwd.length > 12) {
+                errorMsg.innerText = `La contraseña debe tener entre 6 y 12 caracteres (actualmente tiene ${pwd.length}).`;
                 errorMsg.style.display = 'block';
                 return;
             }
@@ -102,14 +110,15 @@
                     msj.style.color = "green";
                     msj.innerText = data.message;
                     
-                    document.getElementById('resetForm').reset();
-                    document.getElementById('resetForm').style.display = 'none';
+                    form.reset();
+                    form.style.display = 'none';
                     
                     const loginBtn = document.createElement('a');
                     loginBtn.href = "/auth/login"; 
                     loginBtn.innerText = "Ir a Iniciar Sesión";
                     loginBtn.className = "login-link";
                     loginBtn.id = "btn-login";
+                    loginBtn.style.display = "block"; 
                     container.appendChild(loginBtn);
                 }
             })
