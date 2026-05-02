@@ -1,8 +1,8 @@
-"""Creación inicial de tablas
+"""Tablas de inventario
 
-Revision ID: 4fa03ef6264e
+Revision ID: f99395b36cd3
 Revises: 
-Create Date: 2026-05-01 21:12:35.172245
+Create Date: 2026-05-01 22:43:33.498208
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '4fa03ef6264e'
+revision = 'f99395b36cd3'
 down_revision = None
 branch_labels = None
 depends_on = None

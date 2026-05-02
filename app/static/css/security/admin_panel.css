@@ -1,0 +1,212 @@
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+:root {
+    --ph-red: #E31837;
+    --ph-black: #000000;
+    --ph-white: #ffffff;
+    --bg-light: #f8f9fa;
+    --text-main: #202124;
+    --text-muted: #5f6368;
+    --border-color: #e0e0e0;
+}
+
+
+body, .admin-container {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-main);
+    background-color: var(--bg-light);
+}
+
+.main-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    background-color: var(--ph-white);
+}
+
+/* 3. BRANDING (PIZZA HUT STYLE) */
+.title-ph {
+    font-weight: 800;
+    color: var(--ph-red);
+    letter-spacing: -0.5px;
+}
+
+.subtitle-ph {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.ph-badge-red {
+    background-color: var(--ph-red);
+    color: var(--ph-white);
+    font-weight: 600;
+    padding: 6px 15px;
+}
+
+
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: #f1f3f4;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: all 0.3s;
+}
+
+.search-box:focus-within {
+    background: white;
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 3px rgba(227, 24, 55, 0.1);
+}
+
+.search-icon-img {
+    position: absolute;
+    left: 15px;
+    width: 18px;
+    height: 18px;
+    opacity: 0.6;
+    z-index: 5;
+}
+
+.search-box input {
+    padding-left: 45px !important;
+    background: transparent;
+}
+
+.search-box input:focus,
+.search-box input:active {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+
+.table-custom {
+    table-layout: auto !important; 
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.table-custom thead th {
+    background-color: #fafafa;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.8px;
+    padding: 18px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+
+.table-custom tbody td {
+    vertical-align: middle !important;
+    padding: 15px 20px;
+    background-color: transparent !important; 
+}
+
+
+.table-hover tbody tr:hover td {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.user-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    white-space: nowrap; 
+}
+
+.avatar-circle {
+    width: 35px;
+    height: 35px;
+    background: linear-gradient(135deg, var(--ph-red), #b2132b);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-size: 0.8rem;
+    flex-shrink: 0; 
+}
+
+.user-email {
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+}
+
+
+.status-pending {
+    background-color: #fef3c7 !important; 
+    color: #92400e !important;          
+    font-weight: 700 !important;          
+    padding: 0.4rem 0.8rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+.btn-action {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid #eee;
+    background: var(--ph-white);
+    padding: 0;
+}
+
+.btn-action img {
+    display: block;
+    pointer-events: none;
+}
+
+.btn-action:focus, .btn-action:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.btn-reject:hover {
+    background-color: #fff1f2;
+    border-color: var(--ph-red);
+    transform: scale(1.05);
+}
+
+.btn-approve:hover {
+    background-color: #f0fdf4;
+    border-color: #16a34a;
+    transform: scale(1.05);
+}
+
+
+.btn-ph-red {
+    background-color: var(--ph-red);
+    color: white;
+    font-weight: 600;
+    border-radius: 25px;
+    padding: 10px 25px;
+    border: none;
+}
+
+.btn-ph-red:hover {
+    background-color: #b2132b;
+    color: white;
+    box-shadow: 0 4px 12px rgba(227, 24, 55, 0.3);
+}
+
+.form-select:focus {
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 0.25rem rgba(227, 24, 55, 0.1);
+}
