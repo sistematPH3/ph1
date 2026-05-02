@@ -46,8 +46,9 @@
 
     <div class="form-group">
     <label>Nombre</label>
-    <input type="text" name="name" class="custom-input" placeholder="Máximo 40 caracteres" 
-       value="{{ request.form.get('name') or '' }}" required> 
+    <input type="text" name="name" id="name-input" class="custom-input" placeholder="Máximo 40 caracteres" maxlength="40" 
+       value="{{ request.form.get('name') or '' }}" required>
+       <div id="name-error" class="error-hint-diego"></div> 
 </div>
     
     <div class="form-group">
@@ -64,7 +65,7 @@
     <label>Contraseña</label>
     <div class="password-wrapper" style="position: relative;">
         <input type="password" name="password" id="password-input" 
-               class="custom-input" placeholder="Ingrese su contraseña" required>
+               class="custom-input" placeholder="Ingrese su contraseña" maxlength="12" required>
         
         <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}" 
              id="toggle-password" 
@@ -94,71 +95,62 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // 1. Referencias de elementos
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name-input');
     const emailInput = document.getElementById('email-input');
-    const emailError = document.getElementById('email-error');
-    const urlCheck = emailInput.getAttribute('data-url'); 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const passwordInput = document.getElementById('password-input');
-const togglePassword = document.getElementById('toggle-password');
-
-const passWrapper = passwordInput.parentElement;
-const passError = document.createElement('div');
-passError.className = 'error-hint-diego';
-passWrapper.appendChild(passError);
-
-passwordInput.addEventListener('input', function() {
-    const pass = passwordInput.value;
+    const togglePassword = document.getElementById('toggle-password');
     
-    if (pass.length === 0) {
-        passError.textContent = "";
-        passError.style.display = 'none';
-        passwordInput.classList.remove('input-error-border');
-    } else if (pass.length < 6) {
-        passError.textContent = "La contraseña debe tener mínimo 6 caracteres.";
-        passError.style.display = 'block';
-        passwordInput.classList.add('input-error-border');
-    } else if (pass.length > 12) {
-        passError.textContent = "La contraseña debe tener máximo 12 caracteres.";
-        passError.style.display = 'block';
-        passwordInput.classList.add('input-error-border');
+    const nameError = document.getElementById('name-error');
+    const emailError = document.getElementById('email-error');
+    
+    // El error de password lo buscamos o lo creamos si no existe
+    let passError = document.querySelector('.password-wrapper + .error-hint-diego');
+    if (!passError) {
+        passError = document.createElement('div');
+        passError.className = 'error-hint-diego';
+        passwordInput.closest('.form-group').appendChild(passError);
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const urlCheck = emailInput.getAttribute('data-url');
+    const urlOpen = togglePassword.getAttribute('data-eye-open');
+    const urlClosed = togglePassword.getAttribute('data-eye-closed');
+
+    // --- FUNCIONES DE APOYO ---
+    function mostrarError(input, divError, mensaje) {
+        divError.textContent = mensaje;
+        divError.style.display = 'block';
+        input.classList.add('input-error-border');
+    }
+
+    function ocultarError(input, divError) {
+        divError.style.display = 'none';
+        input.classList.remove('input-error-border');
+    }
+
+// Nombre: Límite de 40 caracteres
+nameInput.addEventListener('input', function() {
+    const nombre = nameInput.value;
+    
+    if (nombre.length === 0) {
+        ocultarError(nameInput, nameError);
+    } else if (nombre.length === 40) {
+        // Se activa justo cuando llega al límite del maxlength físico
+        mostrarError(nameInput, nameError, "Has alcanzado el límite de 40 caracteres.");
     } else {
-        // Todo correcto
-        passError.style.display = 'none';
-        passwordInput.classList.remove('input-error-border');
+        ocultarError(nameInput, nameError);
     }
 });
 
-
-const urlOpen = togglePassword.getAttribute('data-eye-open');
-const urlClosed = togglePassword.getAttribute('data-eye-closed');
-
-togglePassword.addEventListener('click', function() {
-    
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        
-        togglePassword.src = urlOpen;
-    } else {
-        passwordInput.type = 'password';
-        
-        togglePassword.src = urlClosed;
-    }
-});
-
+    // Correo: Validación de formato y existencia (Blur)
     emailInput.addEventListener('blur', async function() {
-        const valor = emailInput.value;
-        
-        if (valor === "") {
-            emailError.style.display = 'none';
-            emailInput.classList.remove('input-error-border');
-            return;
-        }
+        const valor = emailInput.value.trim();
+        if (valor === "") return;
 
-        
         if (!emailRegex.test(valor)) {
-            emailError.textContent = "El formato del correo electrónico no es válido.";
-            emailError.style.display = 'block';
-            emailInput.classList.add('input-error-border');
+            mostrarError(emailInput, emailError, "El formato del correo no es válido.");
             return;
         }
 
@@ -169,23 +161,54 @@ togglePassword.addEventListener('click', function() {
                 body: JSON.stringify({ email: valor })
             });
             const data = await response.json();
-
             if (data.exists) {
-                emailError.textContent = "Este correo ya está registrado.";
-                emailError.style.display = 'block';
-                emailInput.classList.add('input-error-border');
-            } else {
-                emailError.style.display = 'none';
-                emailInput.classList.remove('input-error-border');
+                mostrarError(emailInput, emailError, "Este correo ya está registrado.");
             }
-        } catch (error) {
-            console.error("Error en la validación:", error);
+        } catch (e) { console.error("Error validando email:", e); }
+    });
+
+    emailInput.addEventListener('input', () => ocultarError(emailInput, emailError));
+
+    // Contraseña: Límite de 12 y longitud mínima
+    passwordInput.addEventListener('input', function() {
+        const pass = passwordInput.value;
+        if (pass.length === 0) {
+            ocultarError(passwordInput, passError);
+        } else if (pass.length < 6) {
+            mostrarError(passwordInput, passError, "La contraseña debe tener mínimo 6 caracteres.");
+        } else if (pass.length === 12) {
+            mostrarError(passwordInput, passError, "Has alcanzado el límite de 12 caracteres.");
+        } else {
+            ocultarError(passwordInput, passError);
         }
     });
-emailInput.addEventListener('input', function() {
-    emailError.style.display = 'none';
-    emailInput.classList.remove('input-error-border');
-});
+
+    // --- FUNCIÓN DEL OJITO ---
+    togglePassword.addEventListener('click', function() {
+        const tipo = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = tipo;
+        togglePassword.src = (tipo === 'text') ? urlOpen : urlClosed;
+    });
+
+    // --- VALIDACIÓN FINAL AL ENVIAR (CAMPOS VACÍOS) ---
+    form.addEventListener('submit', function(e) {
+        let esValido = true;
+
+        if (nameInput.value.trim() === "") {
+            mostrarError(nameInput, nameError, "Por favor, ingresa tu nombre.");
+            esValido = false;
+        }
+        if (emailInput.value.trim() === "") {
+            mostrarError(emailInput, emailError, "El correo es obligatorio.");
+            esValido = false;
+        }
+        if (passwordInput.value.trim() === "") {
+            mostrarError(passwordInput, passError, "Debes crear una contraseña.");
+            esValido = false;
+        }
+
+        if (!esValido) e.preventDefault();
+    });
 });
 </script>
 {%endblock%}

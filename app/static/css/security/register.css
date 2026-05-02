@@ -167,8 +167,12 @@
     border-radius: 50px;
     background-color: #f4f4f4;
     box-sizing: border-box;
-    font-family: 'Agbalumo';
-    src: url('/static/fonts/Agbalumo-Regular.ttf') format('truetype');
+    font-family: 'Inter', sans-serif; /*Gracias a esto, pude cambiar la fuente legible para el usuario*/
+    font-size: 1rem;
+}
+.custom-input::placeholder {
+    font-family: 'Inter', sans-serif;
+    opacity: 0.6;
 }
 
 .button-group {
@@ -237,3 +241,50 @@
 }
 .btn-cancel { background-color: var(--ph-red); color: white; }
 .btn-submit { background-color: #000; color: white; }
+/* Botón Registrar (Negro) */
+.btn-submit {
+    background-color: #000; color: white;
+    color: #fff;
+    border: 1px solid #000;
+    padding: 14px 20px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-family: 'Agbalumo', sans-serif;
+    font-size: 1.1rem;
+    width: 100%;
+    /* AGREGAR ESTO: */
+    transition: all 0.3s ease; 
+}
+
+/* Botón Cancelar (Transparente) */
+.btn-cancel {
+    background-color: var(--ph-red); color: white;
+    color: #fff;
+    border: 1px solid #e1171e;
+    padding: 14px 20px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-family: 'Agbalumo', sans-serif;
+    font-size: 1.1rem;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    /* AGREGAR ESTO: */
+    transition: all 0.3s ease;
+}
+/* Efecto para el botón Registrar */
+.btn-submit:hover {
+    background-color: #e1171e; /* Cambia a rojo Pizza Hut */
+    color: #fff;
+    border-color: #e1171e;
+    transform: scale(1.03);    /* Un pequeño aumento como el de Mariuska */
+    box-shadow: 0px 4px 15px rgba(225, 23, 30, 0.3); /* Sombra rojiza suave */
+}
+
+/* Efecto para el botón Cancelar */
+.btn-cancel:hover {
+    background-color: #000; /* Un gris muy claro de fondo */
+    color: #e1171e;            /* El texto se pone rojo */
+    border-color: #000;     /* El borde se pone negro */
+    transform: scale(1.03);
+}
