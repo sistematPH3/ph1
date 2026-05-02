@@ -1,0 +1,191 @@
+{% extends "auth_base.html" %}
+
+{% block title %}Registro - Pizza Hut{% endblock %}
+
+{% block extra_css %}
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/register.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="register-page-container">
+    
+    
+    <div class="brand-section">
+        <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Pizza Hut" style="width: 200px;">
+        
+        <div class="unete-banner">
+            <h1 class="unete-text">UNETE A<br>NOSOTROS</h1>
+        </div>
+        
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/pizza.png') }}" class="pizza-slice-footer" alt="Pizza">
+    </div>
+
+    
+    <div class="form-section">
+    <div class="register-card">
+    <h2>Crea tu cuenta</h2>
+
+
+    <form action="{{ url_for('security.register') }}" method="POST" novalidate> 
+        {% with messages = get_flashed_messages(category_filter=["warning"]) %}
+    {% if messages %}
+        {% for message in messages %}
+            {% if "contraseña" not in message and "formato" not in message %}
+                <div class="error-hint-diego error-visible" style="text-align: center; margin-bottom: 15px;">
+                    {{ message }}
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+    <div class="form-group">
+    <label>Nombre</label>
+    <input type="text" name="name" class="custom-input" placeholder="Máximo 40 caracteres" 
+       value="{{ request.form.get('name') or '' }}" required> 
+</div>
+    
+    <div class="form-group">
+    <label>Correo</label>
+    <input type="email" name="email" id="email-input" 
+           data-url="{{ url_for('security.check_email') }}"
+           class="custom-input" 
+           placeholder="Ingrese su correo electrónico"
+       value="{{ request.form.get('email') or '' }}" required>
+    <div id="email-error" class="error-hint-diego"></div>
+</div>
+
+    <div class="form-group">
+    <label>Contraseña</label>
+    <div class="password-wrapper" style="position: relative;">
+        <input type="password" name="password" id="password-input" 
+               class="custom-input" placeholder="Ingrese su contraseña" required>
+        
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}" 
+             id="toggle-password" 
+             alt="Mostrar/Ocultar"
+             data-eye-open="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_abierto.png') }}"
+             data-eye-closed="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}"
+             style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; width: 20px;">
+    </div>
+    {% with messages = get_flashed_messages(category_filter=["warning"]) %}
+        {% if messages %}
+            {% for message in messages %}
+                {% if "contraseña" in message %}
+                    <div class="error-hint-diego error-visible">{{ message }}</div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+
+                <div class="button-group">
+                    <a href="{{ url_for('security.login') }}" class="btn-reg btn-cancel">Cancelar</a>
+                    <button type="submit" class="btn-reg btn-submit">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('email-input');
+    const emailError = document.getElementById('email-error');
+    const urlCheck = emailInput.getAttribute('data-url'); 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordInput = document.getElementById('password-input');
+const togglePassword = document.getElementById('toggle-password');
+
+const passWrapper = passwordInput.parentElement;
+const passError = document.createElement('div');
+passError.className = 'error-hint-diego';
+passWrapper.appendChild(passError);
+
+passwordInput.addEventListener('input', function() {
+    const pass = passwordInput.value;
+    
+    if (pass.length === 0) {
+        passError.textContent = "";
+        passError.style.display = 'none';
+        passwordInput.classList.remove('input-error-border');
+    } else if (pass.length < 6) {
+        passError.textContent = "La contraseña debe tener mínimo 6 caracteres.";
+        passError.style.display = 'block';
+        passwordInput.classList.add('input-error-border');
+    } else if (pass.length > 12) {
+        passError.textContent = "La contraseña debe tener máximo 12 caracteres.";
+        passError.style.display = 'block';
+        passwordInput.classList.add('input-error-border');
+    } else {
+        // Todo correcto
+        passError.style.display = 'none';
+        passwordInput.classList.remove('input-error-border');
+    }
+});
+
+
+const urlOpen = togglePassword.getAttribute('data-eye-open');
+const urlClosed = togglePassword.getAttribute('data-eye-closed');
+
+togglePassword.addEventListener('click', function() {
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        
+        togglePassword.src = urlOpen;
+    } else {
+        passwordInput.type = 'password';
+        
+        togglePassword.src = urlClosed;
+    }
+});
+
+    emailInput.addEventListener('blur', async function() {
+        const valor = emailInput.value;
+        
+        if (valor === "") {
+            emailError.style.display = 'none';
+            emailInput.classList.remove('input-error-border');
+            return;
+        }
+
+        
+        if (!emailRegex.test(valor)) {
+            emailError.textContent = "El formato del correo electrónico no es válido.";
+            emailError.style.display = 'block';
+            emailInput.classList.add('input-error-border');
+            return;
+        }
+
+        try {
+            const response = await fetch(urlCheck, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: valor })
+            });
+            const data = await response.json();
+
+            if (data.exists) {
+                emailError.textContent = "Este correo ya está registrado.";
+                emailError.style.display = 'block';
+                emailInput.classList.add('input-error-border');
+            } else {
+                emailError.style.display = 'none';
+                emailInput.classList.remove('input-error-border');
+            }
+        } catch (error) {
+            console.error("Error en la validación:", error);
+        }
+    });
+emailInput.addEventListener('input', function() {
+    emailError.style.display = 'none';
+    emailInput.classList.remove('input-error-border');
+});
+});
+</script>
+{%endblock%}

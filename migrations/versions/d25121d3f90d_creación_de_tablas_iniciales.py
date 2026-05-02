@@ -1,16 +1,8 @@
-<<<<<<<< HEAD:migrations/versions/5b8aad21f3c0_creación_de_tablas_iniciales.py
 """Creación de tablas iniciales
 
-Revision ID: 5b8aad21f3c0
+Revision ID: d25121d3f90d
 Revises: 
-Create Date: 2026-05-01 23:09:35.485010
-========
-"""Tablas de inventario
-
-Revision ID: f99395b36cd3
-Revises: 
-Create Date: 2026-05-01 22:43:33.498208
->>>>>>>> cde57c429a6cddee6eb86c4685cefcc7f65dfc90:migrations/versions/f99395b36cd3_tablas_de_inventario.py
+Create Date: 2026-05-01 23:51:05.969911
 
 """
 from alembic import op
@@ -18,11 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-<<<<<<<< HEAD:migrations/versions/5b8aad21f3c0_creación_de_tablas_iniciales.py
-revision = '5b8aad21f3c0'
-========
-revision = 'f99395b36cd3'
->>>>>>>> cde57c429a6cddee6eb86c4685cefcc7f65dfc90:migrations/versions/f99395b36cd3_tablas_de_inventario.py
+revision = 'd25121d3f90d'
 down_revision = None
 branch_labels = None
 depends_on = None
