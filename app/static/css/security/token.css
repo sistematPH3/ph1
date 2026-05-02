@@ -15,7 +15,6 @@
     font-weight: bold;
 }
 
-
 body { 
     font-family: 'Inter', Arial, sans-serif;
     background-color: #f4f4f4; 
@@ -37,7 +36,6 @@ body {
     text-align: center; 
 }
 
-
 h2 {
     font-family: 'Agbalumo', cursive; 
     color: #000000; 
@@ -47,7 +45,6 @@ h2 {
     font-weight: normal; 
     font-style: normal; 
 }
-
 
 .text-muted {
     color: #666; 
@@ -72,7 +69,6 @@ input {
 input:focus {
     border-color: #E31837;
 }
-
 
 .password-wrapper {
     position: relative;
@@ -101,7 +97,6 @@ input:focus {
     color: #E31837;
 }
 
-
 button { 
     font-family: 'Inter', sans-serif;
     width: 100%; 
@@ -118,6 +113,28 @@ button {
 }
 
 button:hover { 
+    background-color: #c2142e; 
+}
+
+
+.btn-cancel {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #E31837; 
+    color: white; 
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background-color 0.3s;
+    box-sizing: border-box;
+}
+
+.btn-cancel:hover {
     background-color: #c2142e; 
 }
 
