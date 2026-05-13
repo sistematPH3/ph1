@@ -1,0 +1,26 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Agregar esta línea nueva:
+.venv/
+
+*# Entorno virtual (no subir nunca)
+venv/
+env/
+.env/
+
+# Archivos de configuración de entorno (importante no subir contraseñas)
+.env
+
+# Archivos de Python
+__pycache__/
+*.pyc
+
+# Archivos de VS Code
+.vscode/
+
+# Bases de datos locales
+*.db
+*.sqlite3
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
