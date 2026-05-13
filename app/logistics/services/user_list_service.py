@@ -1,4 +1,4 @@
-from app.logistics.repositories.user_repository import UserRepository
+from app.logistics.repositories.user_list_repository import UserRepository
 
 class UserService:
     @staticmethod

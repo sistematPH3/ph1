@@ -1,6 +1,6 @@
 # app/logistics/routes/user_routes.py
 from flask import Blueprint, jsonify
-from app.logistics.services.user_service import UserService
+from app.logistics.services.user_list_service import UserService
 
 # Creamos el blueprint para las rutas de usuarios en logística
 logistics_users_bp = Blueprint('logistics_users', __name__)
