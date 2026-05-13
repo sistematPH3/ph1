@@ -1,0 +1,73 @@
+.container {
+    background: #ffffff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+h2 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+}
+
+tr:hover {
+    background-color: #f1f5f9;
+}
+
+.btn-view {
+    background-color: transparent;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-view:hover {
+    color: #3b82f6;
+    transform: scale(1.1);
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: #e0e7ff;
+    color: #4338ca;
+}
+
+.error-msg {
+    color: #dc2626;
+    background-color: #fee2e2;
+    padding: 1rem;
+    border-radius: 6px;
+    display: none;
+}

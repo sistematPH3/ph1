@@ -1,10 +1,9 @@
-from app.logistics.repositories.user_list_repository import UserRepository
+from app.logistics.repositories.user_list_repository import UserListRepository
 
-class UserService:
+class UserListService:
     @staticmethod
     def get_users_list():
-        users = UserRepository.get_active_users()
-        
+        users = UserListRepository.get_active_users()
         users_data = []
         for user in users:
             users_data.append({
@@ -13,5 +12,4 @@ class UserService:
                 "email": user.email,
                 "role_id": user.role_id
             })
-            
         return users_data

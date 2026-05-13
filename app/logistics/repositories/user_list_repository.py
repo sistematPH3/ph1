@@ -1,7 +1,6 @@
-from app.models import User
+from app.models import User 
 
-class UserRepository:
+class UserListRepository:
     @staticmethod
     def get_active_users():
-      
         return User.query.filter_by(is_active=True).all()

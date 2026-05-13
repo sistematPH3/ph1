@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/user_list.css') }}">
+
+<div class="container">
+    <h2>User Management</h2>
+    <div id="error-container" class="error-msg"></div>
+    <table id="users-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th style="text-align: center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="users-tbody">
+            <tr>
+                <td colspan="5" style="text-align: center; color: #94a3b8;">Loading users...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchUsers();
+    });
+
+    async function fetchUsers() {
+        const tbody = document.getElementById('users-tbody');
+        const errorContainer = document.getElementById('error-container');
+
+        try {
+            const response = await fetch('/users');
+            if (!response.ok) throw new Error(response.status);
+            
+            const jsonResponse = await response.json();
+
+            if (jsonResponse.status === 'success') {
+                const users = jsonResponse.data;
+                tbody.innerHTML = '';
+
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No active users found.</td></tr>';
+                    return;
+                }
+
+                users.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${user.id}</td>
+                        <td><strong>${user.name}</strong></td>
+                        <td>${user.email}</td>
+                        <td><span class="badge">Role ${user.role_id}</span></td>
+                        <td style="text-align: center;">
+                            <button class="btn-view" onclick="viewDetails(${user.id})">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                throw new Error(jsonResponse.message);
+            }
+        } catch (error) {
+            tbody.innerHTML = '';
+            errorContainer.style.display = 'block';
+            errorContainer.textContent = error.message;
+        }
+    }
+
+    function viewDetails(userId) {
+        console.log(userId);
+    }
+</script>
+{% endblock %}
