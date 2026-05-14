@@ -10,7 +10,6 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Extensiones
     db.init_app(app)
     mail.init_app(app)
     login_manager.init_app(app) 
@@ -20,12 +19,10 @@ def create_app():
     login_manager.login_message_category = "info"
 
     app.register_blueprint(security_bp, url_prefix='/auth')
-    
     app.register_blueprint(logistics_bp)
-    
     app.register_blueprint(list_sedes_bp)
     app.register_blueprint(status_location_bp)
-    app.register_blueprint(location_bp, url_prefix='/logistics')
+    app.register_blueprint(location_bp, url_prefix='/logistics', name='location_routes_bp')
 
     print("MIRA AQUÍ ABAJO:")
     print(app.url_map)
