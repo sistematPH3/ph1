@@ -201,21 +201,33 @@ function updateFilter(value, text) {
 }
 
 function filtrarTabla() {
-    let searchText = document.getElementById('searchInput').value.toLowerCase();
+    // Obtenemos los valores de búsqueda y filtros
+    let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
     let statusFilter = document.getElementById('statusFilter').value;
     let rows = document.querySelectorAll('.sede-row');
     let visibleCount = 0;
 
     rows.forEach(row => {
-        let name = row.querySelector('.fw-bold').textContent.toLowerCase();
+        // 1. Extraemos Nombre y Dirección con validación por si el elemento no existe
+        let nameEl = row.querySelector('.fw-bold');
+        let addressEl = row.querySelector('.text-muted.small');
+        
+        let name = nameEl ? nameEl.textContent.toLowerCase() : "";
+        let address = addressEl ? addressEl.textContent.toLowerCase() : "";
+        
+        // 2. Verificamos el estatus mediante la clase de la "pill"
         let statusPill = row.querySelector('.status-pill');
         let isRowActive = statusPill ? statusPill.classList.contains('active') : false;
 
-        let matchesText = name.includes(searchText);
+        // 3. Lógica de coincidencia (Nombre O Dirección)
+        let matchesText = name.includes(searchText) || address.includes(searchText);
+        
+        // 4. Lógica de coincidencia de Estatus
         let matchesStatus = (statusFilter === "all") || 
                             (statusFilter === "active" && isRowActive) || 
                             (statusFilter === "inactive" && !isRowActive);
 
+        // Mostrar u ocultar la fila
         if (matchesText && matchesStatus) {
             row.style.display = "";
             visibleCount++;
@@ -224,9 +236,14 @@ function filtrarTabla() {
         }
     });
 
-    document.getElementById('noResultsRow').style.display = visibleCount === 0 ? "" : "none";
+    // Controlamos el mensaje de "Sin resultados"
+    const noResultsRow = document.getElementById('noResultsRow');
+    if (noResultsRow) {
+        noResultsRow.style.display = visibleCount === 0 ? "" : "none";
+    }
 }
 
+// Evento para filtrar mientras el usuario escribe
 document.getElementById('searchInput').addEventListener('keyup', filtrarTabla);
 </script>
 
