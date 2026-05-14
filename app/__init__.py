@@ -2,6 +2,7 @@ from flask import Flask
 from .extensions import db, mail, login_manager 
 from .config import Config
 from .security import security_bp
+from app.logistics.routes.location_routes import location_bp
 
 def create_app():
     app = Flask(__name__)
@@ -18,6 +19,8 @@ def create_app():
 
     # Registro de Blueprints
     app.register_blueprint(security_bp, url_prefix='/auth')
+    # Registramos el Blueprint con el prefijo /logistics
+    app.register_blueprint(location_bp, url_prefix='/logistics')
 
     with app.app_context():
         from . import models 
