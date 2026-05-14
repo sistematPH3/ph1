@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg border-0" style="max-width: 500px; border-radius: 20px;">
+        <div class="card-body p-5 text-center">
+            {% if location.is_active %}
+                <div class="display-1 text-danger mb-4">
+                    <i class="bi bi-exclamation-octagon-fill"></i>
+                </div>
+                <h3 class="fw-bold">¿Desactivar Sede?</h3>
+                <p class="text-muted">Estás a punto de desactivar la sede <strong>{{ location.name }}</strong>. Los usuarios asignados no podrán gestionar inventario hasta que se reactive.</p>
+            {% else %}
+                <div class="display-1 text-success mb-4">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+                <h3 class="fw-bold">¿Activar Sede?</h3>
+                <p class="text-muted">Vas a reactivar la sede <strong>{{ location.name }}</strong>. Esto permitirá retomar las operaciones de inventario y traslados.</p>
+            {% endif %}
+
+            <div class="d-grid gap-2 mt-4">
+                <form action="{{ url_for('status_location_bp.change_status', id=location.id) }}" method="POST">
+                    <input type="hidden" name="current_status" value="{{ location.is_active }}">
+                    <button type="submit" class="btn {{ 'btn-danger' if location.is_active else 'btn-success' }} btn-lg w-100 mb-2">
+                        Confirmar {{ 'Desactivación' if location.is_active else 'Activación' }}
+                    </button>
+                </form>
+                <a href="{{ url_for('list_sedes_bp.list_sedes') }}" class="btn btn-light text-secondary">Cancelar y volver</a>
+            </div>
+        </div>
+        <div class="card-footer bg-light border-0 py-3 text-center">
+            <small class="text-muted"><i class="bi bi-shield-lock"></i> Esta acción quedará registrada en el historial de auditoría[cite: 1].</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
