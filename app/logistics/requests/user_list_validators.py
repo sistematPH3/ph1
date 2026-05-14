@@ -9,8 +9,13 @@ def validate_sede_assignment(data):
     elif not isinstance(data['user_id'], int):
         errors['user_id'] = 'El ID del usuario debe ser un número entero.'
         
-    if 'location_id' in data and data['location_id'] is not None:
-        if not isinstance(data['location_id'], int):
-            errors['location_id'] = 'El ID de la sede debe ser un número entero.'
+    if 'location_ids' in data:
+        if not isinstance(data['location_ids'], list):
+            errors['location_ids'] = 'Las sedes deben enviarse en formato de lista.'
+        else:
+            for loc_id in data['location_ids']:
+                if not isinstance(loc_id, int):
+                    errors['location_ids'] = 'Todos los IDs de las sedes deben ser números enteros.'
+                    break
 
     return errors

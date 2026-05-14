@@ -55,12 +55,13 @@ def assign_sede():
                 "errors": errors
             }), 400
             
-        success = UserListService.assign_location(data['user_id'], data.get('location_id'))
+        location_ids = data.get('location_ids', [])
+        success = UserListService.assign_locations(data['user_id'], location_ids)
         
         if success:
             return jsonify({
                 "status": "success", 
-                "message": "Sede asignada correctamente"
+                "message": "Sedes actualizadas correctamente"
             }), 200
         else:
             return jsonify({

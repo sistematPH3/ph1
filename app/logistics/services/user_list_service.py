@@ -11,10 +11,10 @@ class UserListService:
                 "name": row.name,
                 "email": row.email,
                 "role_id": row.role_id,
-                "location_id": row.location_id
+                "location_ids": row.location_ids or []
             })
         return users_data
 
     @staticmethod
-    def assign_location(user_id, location_id):
-        return UserListRepository.update_user_location(user_id, location_id)
+    def assign_locations(user_id, location_ids):
+        return UserListRepository.update_user_locations(user_id, location_ids)

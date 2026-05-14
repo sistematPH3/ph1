@@ -23,6 +23,7 @@ async function fetchSedes() {
             sedeList = jsonResponse.data;
         }
     } catch (error) {
+        console.warn("Error cargando sedes:", error);
     } finally {
         fetchUsers();
     }
@@ -39,7 +40,7 @@ async function fetchUsers() {
 
         if (jsonResponse.status === 'success') {
             allUsers = jsonResponse.data;
-            renderTable(allUsers);
+            filterAndRender();
         } else {
             throw new Error(jsonResponse.message);
         }
@@ -74,21 +75,56 @@ function renderTable(users) {
 }
 
 function createSedeAssignmentCell(user) {
-    let select = `<select class="form-select sede-select" onchange="assignSede(${user.id}, this.value)">`;
-    select += `<option value="" ${!user.location_id ? 'selected' : ''}>Sin Asignar</option>`;
-    
-    if (sedeList.length > 0) {
-        sedeList.forEach(sede => {
-            const isSelected = user.location_id == sede.id ? 'selected' : '';
-            select += `<option value="${sede.id}" ${isSelected}>${sede.name}</option>`;
+    let html = '<div class="location-select-container">';
+
+    if (user.location_ids && user.location_ids.length > 0) {
+        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+        user.location_ids.forEach(locId => {
+            const sede = sedeList.find(s => s.id === locId);
+            const sedeName = sede ? sede.name : `Sede #${locId} (Inactiva)`;
+            // Aquí está la etiqueta roja con la "X" para quitar al usuario de esa sede
+            html += `<span class="location-badge">${sedeName} <i class="fas fa-times" style="cursor:pointer;" onclick="removeSede(${user.id}, ${locId})" title="Quitar sede"></i></span>`;
         });
+        html += '</div>';
     }
-    
-    select += '</select>';
-    return select;
+
+    if (sedeList.length === 0) {
+        html += `<select class="form-select sede-select form-select-sm text-muted" disabled>
+                    <option>No hay sedes activas</option>
+                 </select>`;
+    } else {
+        const unassignedSedes = sedeList.filter(s => !(user.location_ids || []).includes(s.id));
+
+        if (unassignedSedes.length > 0) {
+            html += `<select class="form-select sede-select form-select-sm" onchange="addSede(${user.id}, this.value)">
+                        <option value="" selected disabled>+ Asignar nueva sede</option>`;
+            unassignedSedes.forEach(sede => {
+                html += `<option value="${sede.id}">${sede.name}</option>`;
+            });
+            html += `</select>`;
+        } else if (user.location_ids && user.location_ids.length > 0) {
+            html += `<span class="text-muted small">Todas las sedes disponibles asignadas</span>`;
+        }
+    }
+
+    html += '</div>';
+    return html;
 }
 
-async function assignSede(userId, sedeId) {
+async function addSede(userId, sedeId) {
+    if (!sedeId) return;
+    const user = allUsers.find(u => u.id === userId);
+    const newLocationIds = [...(user.location_ids || []), parseInt(sedeId)];
+    await executeUpdate(userId, newLocationIds);
+}
+
+async function removeSede(userId, sedeId) {
+    const user = allUsers.find(u => u.id === userId);
+    const newLocationIds = (user.location_ids || []).filter(id => id !== parseInt(sedeId));
+    await executeUpdate(userId, newLocationIds);
+}
+
+async function executeUpdate(userId, locationIds) {
     const errorContainer = document.getElementById('error-container');
     errorContainer.style.display = 'none';
 
@@ -100,7 +136,7 @@ async function assignSede(userId, sedeId) {
             },
             body: JSON.stringify({
                 user_id: userId,
-                location_id: sedeId ? parseInt(sedeId) : null
+                location_ids: locationIds
             })
         });
         
@@ -109,7 +145,8 @@ async function assignSede(userId, sedeId) {
         if (response.ok && jsonResponse.status === 'success') {
             const userIndex = allUsers.findIndex(u => u.id === userId);
             if (userIndex !== -1) {
-                allUsers[userIndex].location_id = sedeId ? parseInt(sedeId) : null;
+                allUsers[userIndex].location_ids = locationIds;
+                filterAndRender();
             }
         } else {
             throw new Error(jsonResponse.message);
@@ -121,23 +158,39 @@ async function assignSede(userId, sedeId) {
     }
 }
 
-document.getElementById('searchInput').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
+function filterAndRender() {
+    const term = document.getElementById('searchInput').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value;
     
     const filteredUsers = allUsers.filter(user => {
         const roleName = (roleMap[user.role_id] || 'Desconocido').toLowerCase();
         
-        let locationName = 'sin asignar';
-        if (user.location_id) {
-            const sede = sedeList.find(s => s.id == user.location_id);
-            if (sede) locationName = sede.name.toLowerCase();
+        let matchesText = user.name.toLowerCase().includes(term) ||
+                          user.email.toLowerCase().includes(term) ||
+                          roleName.includes(term);
+                          
+        if (!matchesText && user.location_ids) {
+            const assignedNames = user.location_ids.map(id => {
+                const s = sedeList.find(sede => sede.id === id);
+                return s ? s.name.toLowerCase() : '';
+            });
+            matchesText = assignedNames.some(name => name.includes(term));
         }
 
-        return user.name.toLowerCase().includes(term) ||
-               user.email.toLowerCase().includes(term) ||
-               roleName.includes(term) ||
-               locationName.includes(term);
+        let matchesStatus = true;
+        const hasSedes = user.location_ids && user.location_ids.length > 0;
+        
+        if (status === 'asignada') {
+            matchesStatus = hasSedes;
+        } else if (status === 'sin_asignar') {
+            matchesStatus = !hasSedes;
+        }
+
+        return matchesText && matchesStatus;
     });
     
     renderTable(filteredUsers);
-});
+}
+
+document.getElementById('searchInput').addEventListener('input', filterAndRender);
+document.getElementById('statusFilter').addEventListener('change', filterAndRender);
