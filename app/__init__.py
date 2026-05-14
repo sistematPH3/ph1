@@ -2,6 +2,7 @@ from flask import Flask
 from .extensions import db, mail, login_manager 
 from .config import Config
 from .security import security_bp
+from .logistics import logistics_bp
 
 def create_app():
     app = Flask(__name__)
@@ -11,22 +12,23 @@ def create_app():
     mail.init_app(app)
     login_manager.init_app(app) 
 
-   
     login_manager.login_view = 'security.login' 
     login_manager.login_message = "Por favor, inicia sesión para acceder al sistema PH."
     login_manager.login_message_category = "info"
 
-    # Registro de Blueprints
     app.register_blueprint(security_bp, url_prefix='/auth')
+    app.register_blueprint(logistics_bp)
+
+    # IMPRIMIR EL MAPA DE RUTAS EN LA TERMINAL
+    print("MIRA AQUÍ ABAJO:")
+    print(app.url_map)
 
     with app.app_context():
         from . import models 
-        
         from .models.security_model import User
         
         @login_manager.user_loader
         def load_user(user_id):
-           
             return User.query.get(int(user_id))
 
     return app

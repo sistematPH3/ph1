@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PML - Gestión Operativa</title>
-    <!-- Bootstrap 5 local o CDN -->
-   <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <style>
-        .navbar { background-color: rgb(187, 3, 3); } /* Rojo Pizza Hut */
+        .navbar { background-color: rgb(187, 3, 3); }
         .navbar-brand, .nav-link { color: white !important; }
         .sidebar { 
             background: #f8f9fa; 
@@ -19,12 +18,11 @@
     </style>
 </head>
 <body>
-    <!-- Navbar Superior -->
     <nav class="navbar navbar-expand-lg sticky-top mb-0">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">Pizza Master Logistics</a>
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('security.ver_logs') }}">Auditoría</a></li>
+                <li class="nav-item"><a class="nav-link" href="#">Auditoría</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Cerrar Sesión</a></li>
             </ul>
         </div>
@@ -32,19 +30,16 @@
 
     <div class="container-fluid">
         <div class="row">
-            <!-- Barra Lateral (Sidebar) -->
             <nav class="col-md-3 col-lg-2 d-none d-md-block sidebar">
                 <ul class="nav flex-column">
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('inventory.listar_inventario') }}">📦 Inventario</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('waste.registrar_merma') }}">🗑️ Mermas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('alerts.bandeja_alerts') }}">🔔 Alertas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('analytics.dashboard') }}">📊 Analíticas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">📦 Inventario</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">🗑️ Mermas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">🔔 Alertas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">📊 Analíticas</a></li>
                 </ul>
             </nav>
             
-            <!-- Contenido Principal -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 pt-4">
-                <!-- Manejo de Mensajes Flash (Corregido) -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
                     {% for category, message in messages %}
@@ -56,7 +51,6 @@
                   {% endif %}
                 {% endwith %}
 
-                <!-- Aquí se inyecta el contenido de cada módulo -->
                 {% block content %}{% endblock %}
             </main>
         </div>
