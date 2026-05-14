@@ -100,13 +100,13 @@
                                     <i class="bi bi-pencil-square fs-4"></i>
                                 </a>
                                 <button type="button" 
-                class="btn-toggle {{ 'text-danger' if location.is_active else 'text-muted' }}"
-                data-id="{{ location.id }}"
-                data-name="{{ location.name }}"
-                data-active="{{ 'true' if location.is_active else 'false' }}"
-                onclick="prepararModal(this)">
-            <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
-        </button>
+                                    class="btn-toggle {{ 'text-danger' if location.is_active else 'text-muted' }}"
+                                    data-id="{{ location.id }}"
+                                    data-name="{{ location.name }}"
+                                    data-active="{{ 'true' if location.is_active else 'false' }}"
+                                    onclick="prepararModal(this)">
+                                    <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -132,7 +132,10 @@
                 </tbody>
             </table>
         </div>
-    </div> </div> <div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
+    </div> 
+</div> 
+
+<div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 25px; border: none; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.2);">
             <div id="modalAccentBar" style="height: 8px; transition: 0.3s;"></div>
@@ -160,7 +163,6 @@
 
 <script>
 function prepararModal(btn) {
-    // Extraemos los datos del botón usando los atributos 'data'
     const id = btn.getAttribute('data-id');
     const nombre = btn.getAttribute('data-name');
     const estaActiva = btn.getAttribute('data-active') === 'true';
@@ -188,8 +190,7 @@ function prepararModal(btn) {
         confirmBtn.className = "btn btn-success btn-lg w-100 mb-2 shadow-sm text-white";
     }
 
-    // Construcción de la URL segura
-form.action = "/sedes/status/" + id;
+    form.action = "/sedes/status/" + id;
     inputStatus.value = estaActiva;
     modal.show();
 }
@@ -201,33 +202,27 @@ function updateFilter(value, text) {
 }
 
 function filtrarTabla() {
-    // Obtenemos los valores de búsqueda y filtros
     let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
     let statusFilter = document.getElementById('statusFilter').value;
     let rows = document.querySelectorAll('.sede-row');
     let visibleCount = 0;
 
     rows.forEach(row => {
-        // 1. Extraemos Nombre y Dirección con validación por si el elemento no existe
         let nameEl = row.querySelector('.fw-bold');
         let addressEl = row.querySelector('.text-muted.small');
         
         let name = nameEl ? nameEl.textContent.toLowerCase() : "";
         let address = addressEl ? addressEl.textContent.toLowerCase() : "";
         
-        // 2. Verificamos el estatus mediante la clase de la "pill"
         let statusPill = row.querySelector('.status-pill');
         let isRowActive = statusPill ? statusPill.classList.contains('active') : false;
 
-        // 3. Lógica de coincidencia (Nombre O Dirección)
         let matchesText = name.includes(searchText) || address.includes(searchText);
         
-        // 4. Lógica de coincidencia de Estatus
         let matchesStatus = (statusFilter === "all") || 
                             (statusFilter === "active" && isRowActive) || 
                             (statusFilter === "inactive" && !isRowActive);
 
-        // Mostrar u ocultar la fila
         if (matchesText && matchesStatus) {
             row.style.display = "";
             visibleCount++;
@@ -236,14 +231,12 @@ function filtrarTabla() {
         }
     });
 
-    // Controlamos el mensaje de "Sin resultados"
     const noResultsRow = document.getElementById('noResultsRow');
     if (noResultsRow) {
         noResultsRow.style.display = visibleCount === 0 ? "" : "none";
     }
 }
 
-// Evento para filtrar mientras el usuario escribe
 document.getElementById('searchInput').addEventListener('keyup', filtrarTabla);
 </script>
 
