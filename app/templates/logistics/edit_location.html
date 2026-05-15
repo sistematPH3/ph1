@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 2. Validación de duplicados (Debounce de 500ms)
         nameTimeout = setTimeout(async () => {
             if (val.length < 3) return;
-            const response = await fetch("{{ url_for('logistics.check_name') }}", {
+            const response = await fetch("{{ url_for('locations.check_name') }}", {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name: val, location_id: locId})
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 2. Validación de duplicados (Debounce de 500ms)
         phoneTimeout = setTimeout(async () => {
             if (val.length < 11) return; 
-            const response = await fetch("{{ url_for('logistics.check_phone') }}", {
+            const response = await fetch("{{ url_for('locations.check_phone') }}", {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({phone: val, location_id: locId})
