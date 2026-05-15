@@ -26,7 +26,7 @@ def create_app():
         app.register_blueprint(status_location_bp)
         
         from .logistics.routes.location_routes import location_bp
-        app.register_blueprint(location_bp, url_prefix='/logistics', name='location_routes_bp')
+        app.register_blueprint(location_bp, url_prefix='/logistics')
 
         from . import models 
         from .models.security_model import User
