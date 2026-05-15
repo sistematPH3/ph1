@@ -1,7 +1,7 @@
 # app/logistics/requests/location_request.py
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, TextAreaField, HiddenField
-from wtforms.validators import DataRequired, ValidationError
+from wtforms.validators import DataRequired, ValidationError, Length
 from app.logistics.requests.locations_validators import LayoutValidators
 from app.utils.constants import VENEZUELA_STATES
 from app.models import Location
@@ -25,9 +25,10 @@ class LocationForm(FlaskForm):
     
     phone = StringField('Teléfono de Contacto', validators=[
         DataRequired(message="El teléfono es obligatorio"),
+        Length(min=11, max=11, message="El teléfono debe tener exactamente 11 dígitos"),
         LayoutValidators.validate_phone
     ])
-    
+
     def validate_name(self, name):
         # Buscamos si existe una sede con ese nombre
         existing_location = Location.query.filter_by(name=name.data).first()
