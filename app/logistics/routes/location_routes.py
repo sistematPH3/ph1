@@ -24,7 +24,7 @@ def edit_location(location_id):
     
     if not location_data:
         flash("Sede no encontrada", "danger")
-        return redirect(url_for('logistics.register_location'))
+        return redirect(url_for('list_sedes_bp.list_sedes'))
 
     # 2. Instanciamos el formulario
     form = LocationForm()
@@ -44,7 +44,7 @@ def edit_location(location_id):
         success, message = update_location_service(location_id, form)
         if success:
             flash(message, "success")
-            return redirect(url_for('logistics.edit_location', location_id=location_id))
+            return redirect(url_for('list_sedes_bp.list_sedes', location_id=location_id))
         flash(message, "danger")
 
     return render_template('logistics/edit_location.html', form=form, location_id=location_id)

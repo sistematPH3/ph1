@@ -25,7 +25,7 @@
                 </div>
             </div>
             <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <button class="btn btn-ph-red" onclick="location.href='/sedes/registro'">
+                <button class="btn btn-ph-red" onclick="location.href='/logistics/locations'">
                     <i class="bi bi-plus-circle me-2"></i>Nueva Sucursal
                 </button>
             </div>
@@ -96,7 +96,7 @@
                         </td>
                         <td class="text-center pe-4">
                             <div class="d-flex align-items-center justify-content-center gap-3">
-                                <a href="#" class="btn-toggle text-primary" title="Editar Sede">
+                                <a href="{{ url_for('logistics.edit_location', location_id=location.id) }}" class="btn-toggle text-primary" title="Editar Sede">
                                     <i class="bi bi-pencil-square fs-4"></i>
                                 </a>
                                 <button type="button" 
