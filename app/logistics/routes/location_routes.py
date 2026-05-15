@@ -4,8 +4,7 @@ from app.logistics.services.register_location import register_location_service
 from app.logistics.services.query_location import get_location_details
 from app.logistics.services.update_location import update_location_service
 
-# Definimos el Blueprint
-location_bp = Blueprint('logistics', __name__)
+location_bp = Blueprint('location_routes_bp', __name__)
 
 @location_bp.route('/locations/edit/<int:location_id>', methods=['GET', 'POST'])
 def edit_location(location_id):
@@ -54,7 +53,6 @@ def register_location():
     form = LocationForm()
     
     if form.validate_on_submit():
-        # Llamamos a tu lógica de servicio que ya programaste
         success, message = register_location_service(form)
         
         if success:

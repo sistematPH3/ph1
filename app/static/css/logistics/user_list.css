@@ -1,0 +1,208 @@
+body { 
+    background-color: #f7f9fc; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding-top: 30px;
+    margin: 0;
+}
+
+.main-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header-section {
+    display: flex;
+    align-items: center;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 15px;
+}
+
+.header-icon {
+    font-size: 2.8rem;
+    color: #e31b23;
+    margin-right: 18px;
+    background-color: transparent;
+}
+
+.header-title {
+    color: #1a1c1d;
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin: 0;
+}
+
+.header-subtitle {
+    color: #64748b;
+    font-weight: 400;
+    margin: 3px 0 0 0;
+    font-size: 0.95rem;
+}
+
+.user-assignment-container { 
+    background: #ffffff; 
+    padding: 25px; 
+    border-radius: 12px; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.03); 
+}
+
+/* --- Barra de Búsqueda y Filtros --- */
+.search-group {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.search-group .input-group-text {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-right: none;
+    color: #94a3b8;
+}
+
+.search-group .form-control {
+    border: 1px solid #e2e8f0;
+    border-left: none;
+    padding: 12px 15px 12px 0;
+}
+
+.search-group .form-control:focus {
+    box-shadow: none;
+    border-color: #e2e8f0;
+}
+
+.search-group:focus-within {
+    border-radius: 8px;
+    box-shadow: 0 0 0 4px rgba(227, 27, 35, 0.15);
+}
+
+.search-group:focus-within .input-group-text,
+.search-group:focus-within .form-control {
+    border-color: #e31b23;
+}
+
+.form-select {
+    transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+/* --- Tabla de Asignaciones --- */
+.assignment-table {
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    width: 100%;
+}
+
+.assignment-table th,
+.assignment-table td {
+    text-align: left !important;
+    vertical-align: middle;
+}
+
+.assignment-table thead th {
+    color: #ffffff;
+    background-color: #b81d22;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: none;
+    padding: 12px 20px;
+}
+
+.assignment-table thead th:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.assignment-table thead th:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* Filas con efecto de flotación (Hover) */
+.assignment-table tbody tr {
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid transparent;
+}
+
+.assignment-table tbody td {
+    border: none;
+    padding: 15px 20px;
+}
+
+.assignment-table tbody tr:hover {
+    background-color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+    z-index: 1;
+    position: relative;
+}
+
+/* --- Etiquetas de Rol --- */
+.badge.bg-secondary {
+    background-color: #64748b !important;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    letter-spacing: 0.3px;
+    padding: 6px 10px;
+}
+
+/* --- Controles de Sede --- */
+.location-select-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.sede-select {
+    width: 100%;
+    max-width: 280px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    color: #333;
+    background-color: #ffffff;
+    font-size: 0.9rem;
+}
+
+.sede-select:focus {
+    border-color: #e31b23;
+    box-shadow: 0 0 0 0.2rem rgba(227, 27, 35, 0.1);
+}
+
+/* Estilo para cuando no hay sedes activas */
+.sede-select:disabled {
+    background-color: #f8f9fa;
+    color: #94a3b8;
+    cursor: not-allowed;
+    border: 1px dashed #cbd5e1;
+    opacity: 0.8;
+}
+
+.location-badge {
+    background-color: #b81d22;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(184, 29, 34, 0.2);
+    margin-bottom: 5px;
+}
+
+.location-badge i {
+    margin-left: 8px;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.location-badge i:hover {
+    color: #ffcccc;
+    opacity: 1;
+}
