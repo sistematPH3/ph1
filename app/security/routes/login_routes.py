@@ -7,6 +7,11 @@ from ..services.login_service import LoginService
 from ..requests.auth_validators import mensaje_error_generico
 from ..requests.login_validators import validar_formulario_login
 
+# === NUEVAS IMPORTACIONES PARA LA AUDITORÍA ===
+from app.extensions import db
+from app.models import LoginAudit 
+# ==============================================
+
 @security_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -14,19 +19,39 @@ def login():
         es_valido, datos = validar_formulario_login(request.form)
         
         if not es_valido:
-    
             flash(mensaje_error_generico(), 'danger')
             return render_template('security/login.html')
 
-  
         usuario = LoginService.autenticar(datos['email'], datos['password'])
 
         if usuario:
             login_user(usuario)
             flash(f'Bienvenido al sistema PH, {usuario.name}', 'success')
             
+            # =================================================================
+            # REGISTRO DE AUDITORÍA DE INICIO DE SESIÓN
+            # =================================================================
+            # Obtenemos la primera sede asignada al usuario (relación many-to-many)
+            # Si el usuario es 'Guest' nuevo o Dirección, no tendrá sede asignada aún, 
+            # por lo que el valor se mantendrá como None.
+            sede_id = None
+            if usuario.locations: # Si tiene sedes asignadas en user_locations 
+                sede_id = usuario.locations[0].id # Tomamos la primera 
+            
+            # AJUSTE DE IDENTACIÓN: Se ejecuta para todos los usuarios por igual,
+            # permitiendo registrar accesos globales o invitados con sede_id en None.
+            nuevo_ingreso = LoginAudit(
+                user_id=usuario.id,
+                location_id=sede_id,
+                role_id=usuario.role_id, # Se incluye el ID del rol para el modelo relacional
+                action='INICIO_SESION'
+            )
+            db.session.add(nuevo_ingreso)
+            db.session.commit()
+            # =================================================================
+
             # Obtenemos el nombre del rol
-            user_role = usuario.role.name if hasattr(usuario.role, 'name') else usuario.role
+            user_role = usuario.role.name if hasattr(usuario.role, 'name') else usuario.role 
 
             # 1. Si es Jefe, va al panel de aprobación
             roles_jefes = ['Administrator', 'Manager', 'Assistant Manager']
@@ -47,4 +72,5 @@ def login():
             
 @security_bp.route('/waiting-room')
 def waiting_room():
- return render_template('security/waiting_room.html')
+    return render_template('security/waiting_room.html')
+

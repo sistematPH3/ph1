@@ -15,8 +15,17 @@ def create_app():
     login_manager.login_message_category = "info"
 
     with app.app_context():
+        # Importamos y registramos el Blueprint principal de seguridad
         from .security import security_bp
         app.register_blueprint(security_bp, url_prefix='/auth')
+        
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA (Ruta Corregida)
+        # ==========================================================
+        # Como está dentro de la subcarpeta 'routes', añadimos .routes
+        from .security.routes.audit_routes import audit_bp
+        app.register_blueprint(audit_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)
