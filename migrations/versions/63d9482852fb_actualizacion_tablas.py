@@ -1,8 +1,8 @@
-"""migracion_inicial
+"""actualizacion_tablas
 
-Revision ID: f4509c403f0d
+Revision ID: 63d9482852fb
 Revises: 
-Create Date: 2026-05-15 22:31:05.576546
+Create Date: 2026-05-22 21:58:43.360140
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'f4509c403f0d'
+revision = '63d9482852fb'
 down_revision = None
 branch_labels = None
 depends_on = None
