@@ -15,7 +15,7 @@ class LayoutValidators:
         """Valida formato de teléfono (útil para Gestión de Sedes)"""
         pattern = r"^(0414|0424|0412|0416|0426|0212)\d{7}$"
         if field.data and not re.match(pattern, field.data):
-            raise ValidationError("Formato telefonico invalido. Ejm: 02121234567")
+            raise ValidationError("Formato telefonico invalido.")
 
     @staticmethod
     def validate_not_empty(form, field):

@@ -6,15 +6,35 @@
     <title>PML - Gestión Operativa</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <style>
+        /* Fondo de la barra superior */
         .navbar { background-color: rgb(187, 3, 3); }
-        .navbar-brand, .nav-link { color: white !important; }
+        /* Título de la aplicación */
+        .navbar-brand { color: white !important; }
+        /* 1. SEPARACIÓN: Estilo exclusivo para los botones de arriba a la derecha (Navbar) */
+        .navbar-nav .nav-link { color: white !important; }
+        .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.2); /* Un sutil fondo claro al pasar el mouse arriba */
+            color: white !important; }
+        /* 2. SEPARACIÓN: Estilo exclusivo para los botones de la izquierda (Sidebar) */
         .sidebar { 
             background: #f8f9fa; 
             min-height: 100vh; 
             border-right: 1px solid #dee2e6; 
             padding-top: 20px;
         }
-        .nav-link:hover { background-color: #e9ecef; }
+        .sidebar .nav-link { 
+            color: #333333 !important; /* Color oscuro para contraste con fondo blanco */
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin: 2px 10px;
+            display: block;
+        }
+
+        /* 3. SOLUCIÓN AL HOVER: Cambiar el color del texto a blanco cuando el fondo sea oscuro */
+        .sidebar .nav-link:hover { 
+            background-color: #dee2e6 !important; /* Fondo oscuro */
+            color: #303131 !important;             /* ¡Letras blancas para que no se camuflen! */
+        }
     </style>
 </head>
 <body>
