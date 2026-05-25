@@ -9,6 +9,7 @@ def seed_database():
     with app.app_context():
         
         from app.models.security_model import User, Role
+        from app.models.inventory_model import Category
 
         print("--- Iniciando proceso de carga de datos ---")
         
@@ -29,7 +30,29 @@ def seed_database():
         db.session.commit()
         print("✅ Roles sincronizados.")
 
-        # 2. Cargar Usuario Administrador
+        # 2. Listado de categorías base requerido para el módulo de insumos
+        categorias_data = [
+            "Secos",
+            "Lácteos",
+            "Embutidos",
+            "Vegetales Frescos",
+            "Salsas y Líquidos",
+            "Utensilios y Empaques"
+        ]
+
+        print("Sincronizando categorías de productos...")
+        for cat_name in categorias_data:
+            # Buscamos si ya existe por el nombre para evitar duplicados si se corre dos veces
+            exist_cat = Category.query.filter_by(name=cat_name).first()
+            if not exist_cat:
+                nueva_categoria = Category(name=cat_name)
+                db.session.add(nueva_categoria)
+                print(f"Agregando categoría: {cat_name}")
+
+        db.session.commit()
+        print("✅ Categorías parametrizadas con éxito.")
+
+        # 3. Cargar Usuario Administrador
         email_admin = 'sistemat3.ph@gmail.com'
         user_exists = User.query.filter_by(email=email_admin).first()
         
