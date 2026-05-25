@@ -1,22 +1,19 @@
 from app import create_app
 from app.extensions import db
-# ⚠️ Quitamos la importación de User y Role de aquí arriba
+from app.models.security_model import User, Role
 from werkzeug.security import generate_password_hash
 
 app = create_app()
 
 def seed_database():
     with app.app_context():
-        
-        from app.models.security_model import User, Role
-
         print("--- Iniciando proceso de carga de datos ---")
         
         # 1. Cargar Roles
         roles_data = [
             (0, 'Guest'), (1, 'Administrator'), (2, 'Manager'), 
             (3, 'Assistant Manager'), (4, 'Operations'), 
-            (5, 'Audit'), (6, 'Management'), (7, 'Finance')
+             (5, 'Management'), (6, 'Finance')
         ]
         
         for r_id, r_name in roles_data:
@@ -29,7 +26,7 @@ def seed_database():
         db.session.commit()
         print("✅ Roles sincronizados.")
 
-        # 2. Cargar Usuario Administrador
+        # 2. Cargar Usuario Administrador[cite: 1]
         email_admin = 'sistemat3.ph@gmail.com'
         user_exists = User.query.filter_by(email=email_admin).first()
         
@@ -38,7 +35,7 @@ def seed_database():
                 name='Mariuska Admin',
                 email=email_admin,
                 password_hash=generate_password_hash('ph12345'),
-                role_id=1, # Referencia a Administrator
+                role_id=1, # Referencia a Administrator[cite: 1]
                 is_active=True
             )
             db.session.add(admin)
