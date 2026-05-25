@@ -2,12 +2,8 @@ from app.extensions import db
 from flask_login import UserMixin
 from datetime import datetime
 from sqlalchemy.orm import validates
-# Importación limpia desde tu módulo de validadores en la carpeta security
-from app.security.requests.audit_validators import (
-    validar_id_entidad,
-    validar_accion_auditoria,
-    validar_timestamp_auditoria
-)
+
+# ⚠️ SE ELIMINÓ EL IMPORT GLOBAL DE AUDIT_VALIDATORS PARA EVITAR LA IMPORTACIÓN CIRCULAR
 
 # Tabla intermedia para la asignación de múltiples sedes a usuarios
 user_locations = db.Table('user_locations',
@@ -74,51 +70,43 @@ class LoginAudit(db.Model):
     __tablename__ = 'login_audit'
     
     id = db.Column(db.Integer, primary_key=True)
-    
-    # Relación con el usuario (Se elimina en cascada si el usuario es borrado)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    
-    # Cambiado a nullable=True para que permita el acceso de usuarios globales o invitados sin sede
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
-    
-    # === NUEVA RELACIÓN AUTOMATIZADA CON LA TABLA ROLES ===
-    # Asumiendo que tu tabla de roles se llama 'roles' y su clave primaria es 'id'
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id', ondelete='RESTRICT'), nullable=False)
-    # ======================================================
     
     action = db.Column(db.String(50), nullable=False) # 'INICIO_SESION', 'CERRAR_SESION', 'CAMBIO_CONTRASENA'
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relaciones para facilitar consultas en el backend y vistas Jinja
     user = db.relationship('User', backref=db.backref('login_logs', lazy=True))
     location = db.relationship('Location', backref=db.backref('login_logs', lazy=True))
-    
-    # Relación directa con el modelo de Rol (automatiza el acceso a los datos del rol)
-    # Asumiendo que tu modelo se llama 'Role'
     role = db.relationship('Role', backref=db.backref('login_logs', lazy=True))
 
-    # --- DECORADORES DE VALIDACIÓN ASOCIADOS A AUDIT_VALIDATORS ---
+    # --- DECORADORES DE VALIDACIÓN (CON IMPORTS LOCALES) ---
 
     @validates('user_id')
     def validate_user(self, key, value):
+        from app.security.requests.audit_validators import validar_id_entidad
         return validar_id_entidad('user_id', value, obligatorio=True)
 
     @validates('role_id')
     def validate_role(self, key, value):
+        from app.security.requests.audit_validators import validar_id_entidad
         return validar_id_entidad('role_id', value, obligatorio=True)
 
     @validates('location_id')
     def validate_location(self, key, value):
-        # Mantiene la flexibilidad de admitir NULL (None) para accesos globales
+        from app.security.requests.audit_validators import validar_id_entidad
         return validar_id_entidad('location_id', value, obligatorio=False)
 
     @validates('action')
     def validate_action(self, key, value):
+        from app.security.requests.audit_validators import validar_accion_auditoria
         return validar_accion_auditoria(value)
 
     @validates('timestamp')
     def validate_timestamp(self, key, value):
+        from app.security.requests.audit_validators import validar_timestamp_auditoria
         return validar_timestamp_auditoria(value)
 
-    def _repr_(self):
+    def __repr__(self):
         return f'<LoginAudit {self.action} - User ID: {self.user_id} - Role ID: {self.role_id} at {self.timestamp}>'
