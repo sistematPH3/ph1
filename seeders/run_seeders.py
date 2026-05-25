@@ -13,7 +13,7 @@ def seed_database():
         roles_data = [
             (0, 'Guest'), (1, 'Administrator'), (2, 'Manager'), 
             (3, 'Assistant Manager'), (4, 'Operations'), 
-            (5, 'Audit'), (6, 'Management'), (7, 'Finance')
+             (5, 'Management'), (6, 'Finance')
         ]
         
         for r_id, r_name in roles_data:
