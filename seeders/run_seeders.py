@@ -7,6 +7,7 @@ app = create_app()
 
 def seed_database():
     with app.app_context():
+        from app.models import inventory_model
         print("--- Iniciando proceso de carga de datos ---")
         
         # 1. Cargar Roles
@@ -25,6 +26,22 @@ def seed_database():
         
         db.session.commit()
         print("✅ Roles sincronizados.")
+
+        # 2. Cargar listado de Categorias de Productos
+
+        categorias_data = ["Secos", "Lácteos", "Embutidos", "Vegetales Frescos", "Salsas y Líquidos", "Utensilios y Empaques"]
+
+        print("Sincronizando categorías de productos...")
+        for cat_name in categorias_data:
+            
+            exist_cat = inventory_model.Category.query.filter_by(name=cat_name).first()
+            if not exist_cat:
+                nueva_categoria = inventory_model.Category(name=cat_name)
+                db.session.add(nueva_categoria)
+                print(f"Agregando categoría: {cat_name}")
+
+        db.session.commit()
+        print("✅ Categorías parametrizadas con éxito.")
 
         # 2. Cargar Usuario Administrador[cite: 1]
         email_admin = 'sistemat3.ph@gmail.com'
