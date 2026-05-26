@@ -8,44 +8,38 @@ location_bp = Blueprint('locations', __name__)
 
 @location_bp.route('/locations/edit/<int:location_id>', methods=['GET', 'POST'])
 def edit_location(location_id):
-    # 1. Buscamos la sede por ID (Usando tu lógica de query_location.py)
-    from app.logistics.services.query_location import get_location_details
+    # 1. Buscamos los datos de la sede primero
     location_data = get_location_details(location_id)
-    form = LocationForm()
-
-    if form.validate_on_submit():
-        success, message = update_location_service(location_id, form)
-        if success:
-            flash(message, "success")
-            # En lugar de redirect, renderizamos y pasamos success=True
-            return render_template('logistics/edit_location.html', form=form, location_id=location_id, success=True)
-        flash(message, "danger")
-    
     if not location_data:
         flash("Sede no encontrada", "danger")
         return redirect(url_for('list_sedes_bp.list_sedes'))
 
-    # 2. Instanciamos el formulario
+    # 2. Instanciamos el formulario UNA SOLA VEZ
     form = LocationForm()
 
-    # 3. Si es GET, cargamos los datos actuales en los campos
+    # 3. Si es GET (carga inicial), poblamos los campos desde la BD
     if request.method == 'GET':
+        form.location_id.data = location_id
         form.name.data = location_data['name']
         form.state.data = location_data['state']
-        form.address.data = location_data['address']
+        form.address.data = location_data['detailed_address']
         form.phone.data = location_data['phone']
-        # NUEVO: Debes poblar el ID oculto para que el validador lo reconozca
-        form.location_id.data = location_id
+    
+    # 4. Si es POST, procesamos el envío
+    elif request.method == 'POST':
+        if form.validate_on_submit():
+            success, message = update_location_service(location_id, form)
+            if success:
+                flash(message, "success")
+                # Retornamos directamente con success=True para el script de redirección en el template
+                return render_template('logistics/edit_location.html', form=form, location_id=location_id, success=True)
+            
+            flash(message, "danger")
+        else:
+            # Si el formulario no es válido, nos aseguramos de mantener el location_id oculto
+            form.location_id.data = location_id
 
-    # 4. Si es POST y es válido, guardamos los cambios
-    if form.validate_on_submit():
-        # Aquí llamarás a tu nuevo servicio de editar (Paso 2 abajo)
-        success, message = update_location_service(location_id, form)
-        if success:
-            flash(message, "success")
-            return redirect(url_for('list_sedes_bp.list_sedes', location_id=location_id))
-        flash(message, "danger")
-
+    # 5. Renderizado estándar (para GET inicial o si falló la validación del POST)
     return render_template('logistics/edit_location.html', form=form, location_id=location_id)
 
 @location_bp.route('/locations', methods=['GET', 'POST'])

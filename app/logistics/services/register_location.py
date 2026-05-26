@@ -3,16 +3,15 @@ from app.models import Location
 
 def register_location_service(form_data):
     """
-    Lógica para registrar una sede sin alterar la BD.
-    Concatena el estado con la dirección.
+    Lógica para registrar una sede guardando los datos estructurados en la BD.
     """
     try:
-        
-        full_address = f"{form_data.state.data} - {form_data.address.data}"
+        # ELIMINAMOS la variable full_address
         
         new_location = Location(
             name=form_data.name.data,
-            address=full_address,
+            state=form_data.state.data,              # Se guarda directo en su columna
+            detailed_address=form_data.address.data, # El campo 'address' del formulario va a 'detailed_address'
             phone=form_data.phone.data,
             is_active=True
         )
