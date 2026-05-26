@@ -16,8 +16,8 @@ class Product(db.Model):
     # AJUSTE: Relación con la categoría/insumo
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     
-    unit_of_measure = db.Column(db.String(20), nullable=True)
-    technical_description = db.Column(db.Text, nullable=True)  
+    unit_of_measure = db.Column(db.String(20))
+    technical_description = db.Column(db.Text, nullable=True) 
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     inventories = db.relationship('Inventory', backref='product', lazy=True)
 

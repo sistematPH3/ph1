@@ -39,6 +39,8 @@ def create_app():
 
         from . import models 
         from .models.security_model import User
+        from app.models import logistics_model
+        from app.models import inventory_model
         
         @login_manager.user_loader
         def load_user(user_id):

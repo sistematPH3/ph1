@@ -8,11 +8,11 @@ def update_location_service(location_id, form_data):
         if not location:
             return False, "La sede no existe."
 
-        # Concatenamos igual que en el registro
-        full_address = f"{form_data.state.data} - {form_data.address.data}"
+        # ELIMINAMOS la línea de full_address
         
         location.name = form_data.name.data
-        location.address = full_address
+        location.state = form_data.state.data              # Actualiza columna state
+        location.detailed_address = form_data.address.data # El input del formulario va a detailed_address
         location.phone = form_data.phone.data
         
         db.session.commit()

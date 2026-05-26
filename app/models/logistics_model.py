@@ -1,15 +1,26 @@
 from app.extensions import db
 from datetime import datetime
+from sqlalchemy.ext.hybrid import hybrid_property
 
 class Location(db.Model):
     __tablename__ = 'locations'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    address = db.Column(db.Text)
+    detailed_address = db.Column(db.Text)
+    state = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(20))
     is_active = db.Column(db.Boolean, default=True)
     
     inventories = db.relationship('Inventory', backref='location', lazy=True)
+    @hybrid_property
+    def address(self):
+        """
+        Cuando Mariuska llame a 'location.address', esto interceptará 
+        la petición y le devolverá el formato exacto que ella espera.
+        """
+        if self.detailed_address:
+            return f"{self.state} - {self.detailed_address}"
+        return self.state
 
 class Supplier(db.Model):
     __tablename__ = 'suppliers'
