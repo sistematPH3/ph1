@@ -1,9 +1,8 @@
 # app/logistics/requests/location_request.py
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, TextAreaField, HiddenField
+from wtforms import StringField, TextAreaField, HiddenField
 from wtforms.validators import DataRequired, ValidationError, Length
 from app.logistics.requests.locations_validators import LayoutValidators
-from app.utils.constants import VENEZUELA_STATES
 from app.models import Location
 
 class LocationForm(FlaskForm):
@@ -14,7 +13,7 @@ class LocationForm(FlaskForm):
         LayoutValidators.validate_not_empty
     ])
     
-    state = SelectField('Estado', choices=VENEZUELA_STATES, validators=[
+    state = StringField('Estado', validators=[
         DataRequired(message="Debe seleccionar un estado")
     ])
     
