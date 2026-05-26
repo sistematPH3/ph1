@@ -1,5 +1,8 @@
 {% extends "layout.html" %}
 
+{# 1. Importamos la macro desde la carpeta logistics #}
+{% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
+
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
@@ -22,7 +25,8 @@
 
                         <div class="mb-3">
                             <label class="form-label">{{ form.state.label }}</label>
-                            {{ form.state(class="form-select") }}
+                            {# 2. Reemplazamos form.state por nuestra macro limpia #}
+                            {{ render_venezuela_states() }}
                             {% for error in form.state.errors %}
                                 <small class="text-danger d-block">{{ error }}</small>
                             {% endfor %}
