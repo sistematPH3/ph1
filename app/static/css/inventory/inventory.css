@@ -1,0 +1,27 @@
+/* Estilos personalizados para el Módulo de Inventario (Diego) */
+
+.table-insumos-container {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-insumos-container table thead {
+    background-color: #212529;
+}
+
+.badge-status {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    border-radius: 50px;
+    font-weight: 500;
+}
+
+code {
+    color: #d63384;
+    font-size: 0.9em;
+    background-color: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
