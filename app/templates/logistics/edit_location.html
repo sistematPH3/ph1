@@ -1,5 +1,7 @@
-<!-- app/templates/logistics/register_location.html -->
 {% extends "layout.html" %}
+
+{# 1. Importamos la macro desde la carpeta logistics #}
+{% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
 
 {% block content %}
 <div class="container mt-5">
@@ -23,7 +25,8 @@
 
                         <div class="mb-3">
                             <label class="form-label">{{ form.state.label }}</label>
-                            {{ form.state(class="form-select") }}
+                            {# 2. Pasamos el valor actual de la sede para que permanezca seleccionado #}
+                            {{ render_venezuela_states(form.state.data) }}
                             {% for error in form.state.errors %}
                                 <small class="text-danger d-block">{{ error }}</small>
                             {% endfor %}
