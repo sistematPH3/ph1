@@ -17,7 +17,7 @@
                         
                         <div class="mb-3">
                             <label class="form-label">{{ form.name.label }}</label>
-                            {{ form.name(class="form-control", id="name", placeholder="Ej: Pizza Hut Las Mercedes") }}
+                            {{ form.name(class="form-control", id="name", placeholder="Ingrese un nombre") }}
                             {% for error in form.name.errors %}
                                 <small class="text-danger d-block">{{ error }}</small>
                             {% endfor %}
@@ -34,7 +34,7 @@
 
                         <div class="mb-3">
                             <label class="form-label">{{ form.address.label }}</label>
-                            {{ form.address(class="form-control", rows="3", placeholder="Calle, Edificio, Punto de referencia...") }}
+                            {{ form.address(class="form-control", rows="3", placeholder="Ingrese la direccion") }}
                             {% for error in form.address.errors %}
                                 <small class="text-danger d-block">{{ error }}</small>
                             {% endfor %}
