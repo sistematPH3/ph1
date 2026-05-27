@@ -1,8 +1,8 @@
-"""Actualizacion de Tablas
+"""Actualizacion_de_Tablas: Añadida quantity
 
-Revision ID: ca3eebc026e8
+Revision ID: 9104980da99b
 Revises: 
-Create Date: 2026-05-26 01:29:26.102629
+Create Date: 2026-05-27 19:31:01.482738
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'ca3eebc026e8'
+revision = '9104980da99b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -58,6 +58,7 @@ def upgrade():
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('sku', sa.String(length=50), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('unit_of_measure', sa.String(length=20), nullable=True),
     sa.Column('technical_description', sa.Text(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
