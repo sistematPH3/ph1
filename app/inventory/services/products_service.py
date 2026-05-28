@@ -2,7 +2,7 @@ import re
 from app.inventory.repositories.products_repository import ProductRepository
 from app.models.inventory_model import Product
 
-#archivo de Diego
+#archivo de Diego 
 
 class ProductService:
 
@@ -16,7 +16,7 @@ class ProductService:
             cleaned_query = search_query.strip() # Validación tipo Strip
             return ProductRepository.search_by_name_or_sku(cleaned_query)
         return ProductRepository.get_all_active()
-
+#lo que esta abajo de este comentario
     @staticmethod
     def create_product(data):
         raw_sku = data.get('sku', '')
@@ -37,7 +37,7 @@ class ProductService:
         )
 
         return ProductRepository.save(new_product)
-
+#hasta aqui
     @staticmethod
     def update_existing_product(product_id, data):
         """
