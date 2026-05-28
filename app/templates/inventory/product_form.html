@@ -1,122 +1,113 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if product %}Edit Product{% else %}New Product{% endif %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/products.css') }}">
+    <title>{% if product %}Editar Producto{% else %}Nuevo Producto{% endif %}</title>
+    <link rel="stylesheet" href="{{ url_for('inventory.static', filename='css/inventory/products.css') }}">
 </head>
 <body>
     <div class="form-container">
-        <h2>{% if product %}Edit Product{% else %}New Product{% endif %}</h2>
+        <h2>{% if product %}Editar Producto{% else %}Nuevo Producto{% endif %}</h2>
 
         {% if errors and errors.get('general') %}
             <div class="alert alert-error">{{ errors.general }}</div>
         {% endif %}
 
-        <form method="POST" action="{% if product %}{{ url_for('products.edit_product', id=product.id) }}{% else %}{{ url_for('products.create_product') }}{% endif %}">
+        <form method="POST" action="{% if product %}{{ url_for('inventory.edit_product', product_id=product.id) }}{% else %}{{ url_for('inventory.create_product') }}{% endif %}">
             
             <div class="form-group">
-                <label for="name">Product Name</label>
+                <label for="name">Nombre del Producto</label>
                 <input type="text" id="name" name="name" value="{{ data.get('name', '') }}" required>
                 {% if errors and errors.get('name') %}<span class="error-text">{{ errors.name }}</span>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="category_id">Category</label>
-                <select id="category_id" name="category_id" required>
-                    <option value="">Select Category</option>
+                <label for="category_id">Categoría</label>
+                <select id="category_id" name="category_id" data-selected="{{ data.get('category_id', '') }}" required>
+                    <option value="">Seleccione una Categoría</option>
                     {% for category in categories %}
-                        <option value="{{ category.id }}" {% if data.get('category_id') == category.id %}selected{% endif %}>{{ category.name }}</option>
+                        <option value="{{ category.id }}">{{ category.name }}</option>
                     {% endfor %}
                 </select>
                 {% if errors and errors.get('category_id') %}<span class="error-text">{{ errors.category_id }}</span>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="unit_of_measure">Unit of Measure</label>
-                <input type="text" id="unit_of_measure" name="unit_of_measure" value="{{ data.get('unit_of_measure', '') }}" required>
+                <label for="unit_of_measure_select">Unidad de Medida</label>
+                <select id="unit_of_measure_select" name="unit_of_measure_select" data-selected="{{ data.get('unit_of_measure', '') }}" required>
+                    <option value="">Seleccione una Unidad</option>
+                    <option value="KG">Kilogramos (KG)</option>
+                    <option value="LT">Litros (LT)</option>
+                    <option value="UN">Unidades (UN)</option>
+                    <option value="OTHER">Otra...</option>
+                </select>
+                
+                <input type="text" id="unit_of_measure_custom" name="unit_of_measure_custom" 
+                       value="{{ data.get('unit_of_measure', '') }}" 
+                       placeholder="Especifique la nueva unidad (Ej. CAJAS)" 
+                       style="display: none; margin-top: 0.5rem;">
+                       
                 {% if errors and errors.get('unit_of_measure') %}<span class="error-text">{{ errors.unit_of_measure }}</span>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="quantity">Quantity</label>
-                <input type="number" step="0.01" id="quantity" name="quantity" value="{{ data.get('quantity', '') }}">
+                <label for="quantity">Cantidad</label>
+                <input type="number" id="quantity" name="quantity" value="{{ data.get('quantity', '') }}" required>
                 {% if errors and errors.get('quantity') %}<span class="error-text">{{ errors.quantity }}</span>{% endif %}
             </div>
 
-            <div class="form-group sku-group">
+            <div class="form-group">
                 <label for="sku">SKU</label>
-                <div class="sku-input-wrapper">
-                    <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" readonly required>
-                    <button type="button" id="unlock-sku" class="btn-lock">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    </button>
-                </div>
+                <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" placeholder="Ingrese el SKU del producto" required>
                 {% if errors and errors.get('sku') %}<span class="error-text">{{ errors.sku }}</span>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="technical_description">Technical Description</label>
+                <label for="technical_description">Descripción Técnica</label>
                 <textarea id="technical_description" name="technical_description" rows="4">{{ data.get('technical_description', '') }}</textarea>
             </div>
 
             <div class="form-actions">
-                <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary">{% if product %}Update Product{% else %}Save Product{% endif %}</button>
+                <a href="{{ url_for('inventory.list_products') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">{% if product %}Actualizar Producto{% else %}Guardar Producto{% endif %}</button>
             </div>
         </form>
     </div>
 
     <script>
-        const nameInput = document.getElementById('name');
         const categoryInput = document.getElementById('category_id');
-        const unitInput = document.getElementById('unit_of_measure');
-        const skuInput = document.getElementById('sku');
-        const unlockBtn = document.getElementById('unlock-sku');
+        const unitSelect = document.getElementById('unit_of_measure_select');
+        const unitCustom = document.getElementById('unit_of_measure_custom');
 
-        let isSkuLocked = true;
+        document.addEventListener('DOMContentLoaded', () => {
+            const catVal = categoryInput.getAttribute('data-selected');
+            if (catVal) categoryInput.value = catVal;
 
-        function generateSKU() {
-            if (!isSkuLocked) return;
-
-            const nameVal = nameInput.value.replace(/\s+/g, '').substring(0, 3).toUpperCase();
-            
-            let categoryVal = '';
-            if (categoryInput.selectedIndex > 0) {
-                categoryVal = categoryInput.options[categoryInput.selectedIndex].text.replace(/\s+/g, '').substring(0, 3).toUpperCase();
-            }
-
-            const unitVal = unitInput.value.replace(/\s+/g, '').substring(0, 3).toUpperCase();
-
-            if (nameVal || categoryVal || unitVal) {
-                const parts = [categoryVal, nameVal, unitVal].filter(Boolean);
-                skuInput.value = parts.join('-');
-            } else {
-                skuInput.value = '';
-            }
-        }
-
-        nameInput.addEventListener('input', generateSKU);
-        categoryInput.addEventListener('change', generateSKU);
-        unitInput.addEventListener('input', generateSKU);
-
-        unlockBtn.addEventListener('click', () => {
-            isSkuLocked = !isSkuLocked;
-            
-            if (isSkuLocked) {
-                skuInput.setAttribute('readonly', 'readonly');
-                unlockBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
-                generateSKU();
-            } else {
-                skuInput.removeAttribute('readonly');
-                unlockBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path><path d="M12 15v2"></path></svg>';
+            const unitVal = unitSelect.getAttribute('data-selected');
+            if (unitVal) {
+                const standardUnits = ['KG', 'LT', 'UN'];
+                if (standardUnits.includes(unitVal)) {
+                    unitSelect.value = unitVal;
+                    unitCustom.value = ''; 
+                } else {
+                    unitSelect.value = 'OTHER';
+                    unitCustom.style.display = 'block';
+                    unitCustom.setAttribute('required', 'required');
+                }
             }
         });
-        
-        if (!skuInput.value && !('{{ product }}' !== 'None' && '{{ product }}' !== '')) {
-            generateSKU();
-        }
+
+        unitSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'OTHER') {
+                unitCustom.style.display = 'block';
+                unitCustom.setAttribute('required', 'required');
+            } else {
+                unitCustom.style.display = 'none';
+                unitCustom.removeAttribute('required');
+                unitCustom.value = '';
+            }
+        });
     </script>
 </body>
 </html>

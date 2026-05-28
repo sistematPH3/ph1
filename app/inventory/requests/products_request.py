@@ -3,25 +3,32 @@ def validate_product_form(data):
 
     name = data.get('name', '').strip()
     if not name:
-        errors['name'] = 'Name is required.'
+        errors['name'] = 'El nombre del producto es obligatorio.'
 
     sku = data.get('sku', '').strip()
     if not sku:
-        errors['sku'] = 'SKU is required.'
+        errors['sku'] = 'El SKU es obligatorio.'
 
     category_id = data.get('category_id')
     if not category_id or not str(category_id).isdigit():
-        errors['category_id'] = 'Valid category is required.'
+        errors['category_id'] = 'Debe seleccionar una categoría válida.'
 
-    unit_of_measure = data.get('unit_of_measure', '').strip()
-    if not unit_of_measure:
-        errors['unit_of_measure'] = 'Unit of measure is required.'
+    unit_select = data.get('unit_of_measure_select', '')
+    unit_custom = data.get('unit_of_measure_custom', '').strip()
 
-    quantity = data.get('quantity')
-    if quantity and not str(quantity).replace('.', '', 1).isdigit():
-        errors['quantity'] = 'Quantity must be a valid number.'
-    elif not quantity:
-        errors['quantity'] = 'Quantity is required.'
+    if not unit_select:
+        errors['unit_of_measure'] = 'La unidad de medida es obligatoria.'
+    elif unit_select == 'OTHER':
+        if not unit_custom:
+            errors['unit_of_measure'] = 'Debe especificar la nueva unidad de medida.'
+        else:
+            unit_of_measure = unit_custom
+    else:
+        unit_of_measure = unit_select
+
+    quantity = data.get('quantity', '').strip()
+    if not quantity or not quantity.isdigit():
+        errors['quantity'] = 'La cantidad debe ser un número entero válido.'
 
     technical_description = data.get('technical_description', '').strip()
 
@@ -31,12 +38,10 @@ def validate_product_form(data):
         'name': name,
         'sku': sku,
         'category_id': int(category_id) if category_id and str(category_id).isdigit() else None,
-        'unit_of_measure': unit_of_measure,
+        'unit_of_measure': unit_of_measure if is_valid else '',
+        'quantity': int(quantity) if quantity and quantity.isdigit() else 0,
         'technical_description': technical_description,
         'is_active': True
     }
-
-    if quantity and str(quantity).replace('.', '', 1).isdigit():
-        validated_data['quantity'] = float(quantity)
 
     return is_valid, errors, validated_data
