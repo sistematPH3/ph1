@@ -2,11 +2,6 @@ import re
 from app.inventory.repositories.products_repository import ProductRepository
 from app.models.inventory_model import Product
 
-<<<<<<< HEAD
-=======
-#archivo de Diego 
-
->>>>>>> e236efab9242017892edd444ad33c943789413c5
 class ProductService:
 
     @staticmethod
@@ -15,7 +10,7 @@ class ProductService:
             cleaned_query = search_query.strip()
             return ProductRepository.search_by_name_or_sku(cleaned_query)
         return ProductRepository.get_all_active()
-#lo que esta abajo de este comentario
+
     @staticmethod
     def create_product(data):
         raw_sku = data.get('sku', '')
@@ -36,7 +31,7 @@ class ProductService:
         )
 
         return ProductRepository.save(new_product)
-#hasta aqui
+
     @staticmethod
     def update_product(product_id, data):
         product = ProductRepository.find_by_id(product_id)
