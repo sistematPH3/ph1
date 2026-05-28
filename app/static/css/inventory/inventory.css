@@ -1,27 +1,105 @@
-/* Estilos personalizados para el Módulo de Inventario (Diego) */
+/* =========================================================================
+   PALETA DE COLORES CORPORATIVA (Estilo Mariuska - Pizza Hut)
+   ========================================================================= */
+.bg-mariuska-red {
+    background-color: #B31F24 !important;
+}
 
-.table-insumos-container {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.border-mariuska {
+    border-color: #B31F24 !important;
+}
+
+/* Botón Nuevo Insumo (Rojo con Hover Oscuro) */
+.btn-mariuska-red {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    border: none !important;
+    transition: all 0.2s ease-in-out;
+}
+.btn-mariuska-red:hover {
+    background-color: #8a1619 !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+
+/* Cabecera de la Tabla estilo Mariuska */
+.custom-insumos-table thead.table-mariuska-header th {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    border-bottom: none;
+}
+
+/* Botón de Filtro Estilo Oscuro Confortable */
+.btn-filter-dark {
+    background-color: #212529 !important;
+    color: #ffffff !important;
+    border: none !important;
+    transition: background-color 0.2s ease;
+}
+.btn-filter-dark:hover {
+    background-color: #000000 !important;
+}
+
+/* Botón de Acción Editar */
+.btn-action-edit {
+    color: #6c757d !important;
+    transition: color 0.2s ease;
+    text-decoration: none;
+}
+.btn-action-edit:hover {
+    color: #B31F24 !important; /* Cambia a rojo Pizza Hut en hover */
+}
+
+/* =========================================================================
+   INTERACTIVIDAD, FILAS Y ENFASIS AMARILLO (INHABILITADO)
+   ========================================================================= */
+.main-product-row {
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+/* Forzado del Hover Oscurecido sobre Celdas Activas */
+.custom-insumos-table tbody tr.main-product-row:hover td {
+    background-color: #f1f3f5 !important;
+}
+
+/* ENFASIS SEÑALIZADOR: Registro Inhabilitado (Fondo suave + borde de advertencia) */
+.custom-insumos-table tbody tr.main-product-row.row-inhabilitada td {
+    background-color: #fffdf0 !important; /* Fondo amarillo sutil */
+    color: #6c757d; /* Texto ligeramente atenuado */
+}
+
+.main-product-row.row-inhabilitada {
+    border-left: 5px solid #ffc107 !important; /* Borde izquierdo amarillo marcado */
+}
+
+/* Badges de Estado Limpios */
+.bg-success-subtle { background-color: #e6f4ea !important; }
+.bg-warning-subtle { background-color: #fff3cd !important; }
+.text-warning-emphasis { color: #664d03 !important; }
+
+/* Barra de búsqueda */
+.search-input-group {
     border-radius: 8px;
     overflow: hidden;
-}
-
-.table-insumos-container table thead {
-    background-color: #212529;
-}
-
-.badge-status {
-    padding: 6px 14px;
-    font-size: 0.8rem;
-    border-radius: 50px;
-    font-weight: 500;
-}
-
-code {
-    color: #d63384;
-    font-size: 0.9em;
-    background-color: #f8f9fa;
-    padding: 2px 6px;
-    border-radius: 4px;
     border: 1px solid #dee2e6;
+}
+.search-input-group input:focus {
+    background-color: #f8f9fa !important;
+}
+
+/* Misceláneos */
+.cursor-pointer { cursor: pointer; }
+.fs-7 { font-size: 0.8rem !important; }
+.tracking-wider { letter-spacing: 0.06em; }
+
+/* Switch de Mariuska */
+.mariuska-custom-switch:checked {
+    background-color: #B31F24 !important;
+    border-color: #B31F24 !important;
 }

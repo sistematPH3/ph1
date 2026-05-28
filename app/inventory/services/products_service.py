@@ -18,6 +18,27 @@ class ProductService:
         return ProductRepository.get_all_active()
 
     @staticmethod
+    def create_product(data):
+        raw_sku = data.get('sku', '')
+        cleaned_sku = re.sub(r'[^A-Z0-9-]', '', raw_sku.upper())
+
+        existing_product = ProductRepository.find_by_sku(cleaned_sku)
+        if existing_product:
+            raise ValueError(f"El SKU '{cleaned_sku}' ya está registrado.")
+
+        new_product = Product(
+            name=data.get('name', '').strip(),
+            sku=cleaned_sku,
+            category_id=data.get('category_id'),
+            quantity=data.get('quantity', 0),
+            unit_of_measure=data.get('unit_of_measure', '').strip(),
+            technical_description=data.get('technical_description', '').strip(),
+            is_active=True
+        )
+
+        return ProductRepository.save(new_product)
+
+    @staticmethod
     def update_existing_product(product_id, data):
         """
         Lógica de negocio para editar un insumo. Aplica sanitización,
