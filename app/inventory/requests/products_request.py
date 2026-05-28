@@ -4,10 +4,14 @@ def validate_product_form(data):
     name = data.get('name', '').strip()
     if not name:
         errors['name'] = 'El nombre del producto es obligatorio.'
+    elif len(name) > 100:
+        errors['name'] = 'El nombre no puede exceder los 100 caracteres.'
 
     sku = data.get('sku', '').strip()
     if not sku:
         errors['sku'] = 'El SKU es obligatorio.'
+    elif len(sku) > 50:
+        errors['sku'] = 'El SKU no puede exceder los 50 caracteres.'
 
     category_id = data.get('category_id')
     if not category_id or not str(category_id).isdigit():
@@ -21,6 +25,8 @@ def validate_product_form(data):
     elif unit_select == 'OTHER':
         if not unit_custom:
             errors['unit_of_measure'] = 'Debe especificar la nueva unidad de medida.'
+        elif len(unit_custom) > 20:
+            errors['unit_of_measure'] = 'La unidad no puede exceder los 20 caracteres.'
         else:
             unit_of_measure = unit_custom
     else:

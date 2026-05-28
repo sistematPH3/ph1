@@ -18,7 +18,7 @@
             
             <div class="form-group">
                 <label for="name">Nombre del Producto</label>
-                <input type="text" id="name" name="name" value="{{ data.get('name', '') }}" required>
+                <input type="text" id="name" name="name" value="{{ data.get('name', '') }}" maxlength="100" required>
                 {% if errors and errors.get('name') %}<span class="error-text">{{ errors.name }}</span>{% endif %}
             </div>
 
@@ -46,6 +46,7 @@
                 <input type="text" id="unit_of_measure_custom" name="unit_of_measure_custom" 
                        value="{{ data.get('unit_of_measure', '') }}" 
                        placeholder="Especifique la nueva unidad (Ej. CAJAS)" 
+                       maxlength="20"
                        style="display: none; margin-top: 0.5rem;">
                        
                 {% if errors and errors.get('unit_of_measure') %}<span class="error-text">{{ errors.unit_of_measure }}</span>{% endif %}
@@ -59,7 +60,7 @@
 
             <div class="form-group">
                 <label for="sku">SKU</label>
-                <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" placeholder="Ingrese el SKU del producto" required>
+                <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" placeholder="Ingrese el SKU del producto" maxlength="50" required>
                 {% if errors and errors.get('sku') %}<span class="error-text">{{ errors.sku }}</span>{% endif %}
             </div>
 
@@ -70,7 +71,7 @@
 
             <div class="form-actions">
                 <a href="{{ url_for('inventory.list_products') }}" class="btn btn-secondary">Cancelar</a>
-                <button type="submit" class="btn btn-primary">{% if product %}Actualizar Producto{% else %}Guardar Producto{% endif %}</button>
+                <button type="submit" class="btn btn-primary">{% if product %}Actualizar{% else %}Registrar{% endif %}</button>
             </div>
         </form>
     </div>
