@@ -163,6 +163,28 @@
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    // ESCUCHADORES PARA INTERCEPTAR EL DESPLIEGUE DE LAS DESCRIPCIONES TÉCNICAS
+document.querySelectorAll('.collapse').forEach(collapseEl => {
+    
+    // 1. Justo antes de empezar a abrirse, eliminamos el 'display: none' inline del script
+    collapseEl.addEventListener('show.bs.collapse', function () {
+        this.style.setProperty('display', 'table-row', 'important');
+    });
+
+    // 2. Al terminar de abrirse por completo, refrescamos el estado visualizado
+    collapseEl.addEventListener('shown.bs.collapse', function () {
+        if (typeof filtrarYPaginarInsumos === 'function') {
+            filtrarYPaginarInsumos();
+        }
+    });
+
+    // 3. Al cerrarse, volvemos a sincronizar la paginación de la tabla
+    collapseEl.addEventListener('hidden.bs.collapse', function () {
+        if (typeof filtrarYPaginarInsumos === 'function') {
+            filtrarYPaginarInsumos();
+        }
+    });
+});
     const searchInput = document.getElementById('searchInput');
     const statusSelect = document.getElementById('statusSelect');
     const noResultsRow = document.getElementById('noResultsRow');

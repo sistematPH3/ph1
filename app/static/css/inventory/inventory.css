@@ -118,7 +118,7 @@
 }
 
 /* REGISTRO INHABILITADO: Forzado total de variables de Bootstrap 5 */
-.custom-insumos-table tbody tr.main-product-row.row-inhabilitada td {
+.custom-insumos-table tbody tr.main-product-row.row-inhabilitada > td {
     background-color: #fffdf0 !important;
     --bs-table-bg: #fffdf0 !important;       /* Corrección estructural vital para BS5 */
     --bs-table-bg-type: #fffdf0 !important;  /* Evita que Bootstrap ignore tu color */
@@ -127,7 +127,7 @@
 
 /* TRUCO MAESTRO: Usamos 'box-shadow inset' en el primer TD de la fila inhabilitada.
    Esto genera una franja sólida de 5px simulando un borde limpio sin que Bootstrap lo tape. */
-.custom-insumos-table tbody tr.main-product-row.row-inhabilitada td:first-child {
+.custom-insumos-table tbody tr.main-product-row.row-inhabilitada > td:first-child {
     box-shadow: inset 5px 0 0 #ffc107 !important;
     border-left: none !important;            /* Limpiamos el borde viejo que no funcionaba */
 }
