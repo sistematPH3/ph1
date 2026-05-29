@@ -1,6 +1,10 @@
 /* =========================================================================
    PALETA DE COLORES Y BRILLOS CORPORATIVOS (Estilo Mariuska)
    ========================================================================= */
+   body {
+    background-color: #ebedf1 !important; /* Un gris claro ideal para tableros y reportes */
+}
+
 .bg-mariuska-red {
     background-color: #B31F24 !important;
 }
@@ -82,8 +86,7 @@
 .search-input-group {
     border-radius: 50px !important;
     overflow: hidden;
-    border: 1px solid #dee2e6;
-    background-color: #f8f9fa;
+    background-color: #ffffff;
     transition: all 0.3s ease-in-out;
 }
 
@@ -114,16 +117,19 @@
     --bs-table-bg: #f1f3f5 !important;
 }
 
-/* REGISTRO INHABILITADO: Forzamos la variable interna de Bootstrap 5 */
+/* REGISTRO INHABILITADO: Forzado total de variables de Bootstrap 5 */
 .custom-insumos-table tbody tr.main-product-row.row-inhabilitada td {
     background-color: #fffdf0 !important;
-    --bs-table-bg: #fffdf0 !important; /* Corrección vital para BS5 */
-    color: #6c757d !important;
+    --bs-table-bg: #fffdf0 !important;       /* Corrección estructural vital para BS5 */
+    --bs-table-bg-type: #fffdf0 !important;  /* Evita que Bootstrap ignore tu color */
+    color: #6c757d !important;               /* Atenúa el texto para reflejar inactividad */
 }
 
-/* El borde izquierdo solo funciona si se aplica directamente al primer TD de la fila */
+/* TRUCO MAESTRO: Usamos 'box-shadow inset' en el primer TD de la fila inhabilitada.
+   Esto genera una franja sólida de 5px simulando un borde limpio sin que Bootstrap lo tape. */
 .custom-insumos-table tbody tr.main-product-row.row-inhabilitada td:first-child {
-    border-left: 5px solid #ffc107 !important;
+    box-shadow: inset 5px 0 0 #ffc107 !important;
+    border-left: none !important;            /* Limpiamos el borde viejo que no funcionaba */
 }
 
 /* Badges de Estado Limpios */
@@ -137,8 +143,12 @@
     overflow: hidden;
     border: 1px solid #dee2e6;
 }
+/* CORREGIDO: Eliminamos el sombreado azul intruso del foco */
 .search-input-group input:focus {
-    background-color: #f8f9fa !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    background-color: #ffffff !important; /* Cambiado a blanco para que combine con el brillo externo */
 }
 
 /* Misceláneos */
@@ -150,4 +160,76 @@
 .mariuska-custom-switch:checked {
     background-color: #B31F24 !important;
     border-color: #B31F24 !important;
+}
+/* El icono del lápiz cambia de azul suave a un tono ámbar corporativo */
+.row-inhabilitada .btn-action-edit {
+    color: #ffc107 !important;
+}
+.row-inhabilitada .btn-action-edit:hover {
+    color: #db9a04 !important;
+}
+
+/* El switch apagado muestra un borde y fondo sutil color amarillo en lugar de gris */
+.row-inhabilitada .mariuska-custom-switch:not(:checked) {
+    background-color: #fff3cd !important;
+    border-color: #ffc107 !important;
+}
+/* =========================================================================
+   ELIMINAR HALO AZUL DE ENFOQUE EN EL SWITCH DE MARIUSKA
+   ========================================================================= */
+.mariuska-custom-switch:focus,
+.mariuska-custom-switch:active {
+    box-shadow: none !important;
+    outline: 0 !important;
+    border-color: rgba(0, 0, 0, 0.25) !important; /* Mantiene un borde sutil neutro al hacer clic */
+}
+
+/* Evitar también el halo amarillo residual cuando el registro está inhabilitado */
+.row-inhabilitada .mariuska-custom-switch:focus {
+    box-shadow: none !important;
+    outline: 0 !important;
+    border-color: #ffc107 !important; /* Mantiene su borde amarillo corporativo sin resplandor */
+}
+/* =========================================================================
+   SELECTOR DESPLEGABLE ULTRA-REDONDEADO (Estilo Píldora Mariuska)
+   ========================================================================= */
+.mariuska-custom-select {
+    border-radius: 50px !important;
+    border: 1px solid #dee2e6 !important;
+    background-color: #f8f9fa !important;
+    color: #495057 !important;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease-in-out;
+    cursor: pointer;
+}
+
+/* Brillo interactivo de enfoque a juego con la identidad visual */
+.mariuska-custom-select:focus {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    background-color: #ffffff !important;
+    outline: none !important;
+}
+.mariuska-select-group {
+    border-radius: 50px !important;
+    border: 1px solid #dee2e6 !important;
+    background-color: #f8f9fa !important;
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
+}
+
+.mariuska-select-group select {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #495057 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Halo interactivo rojo cuando el usuario despliega las opciones */
+.mariuska-select-group:focus-within {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    background-color: #ffffff !important;
 }
