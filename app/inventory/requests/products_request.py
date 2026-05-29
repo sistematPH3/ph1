@@ -1,4 +1,7 @@
-def validate_product_form(data):
+import re
+from app.inventory.repositories.products_repository import ProductRepository
+
+def validate_product_form(data, current_product_id=None):
     errors = {}
 
     name = data.get('name', '').strip()
@@ -7,11 +10,17 @@ def validate_product_form(data):
     elif len(name) > 100:
         errors['name'] = 'El nombre no puede exceder los 100 caracteres.'
 
-    sku = data.get('sku', '').strip()
-    if not sku:
+    raw_sku = data.get('sku', '').strip()
+    cleaned_sku = re.sub(r'[^A-Z0-9-]', '', raw_sku.upper())
+    
+    if not cleaned_sku:
         errors['sku'] = 'El SKU es obligatorio.'
-    elif len(sku) > 50:
+    elif len(cleaned_sku) > 50:
         errors['sku'] = 'El SKU no puede exceder los 50 caracteres.'
+    else:
+        existing_product = ProductRepository.find_by_sku(cleaned_sku)
+        if existing_product and existing_product.id != current_product_id:
+            errors['sku'] = f"El SKU '{cleaned_sku}' ya está registrado."
 
     category_id = data.get('category_id')
     if not category_id or not str(category_id).isdigit():
@@ -42,7 +51,7 @@ def validate_product_form(data):
 
     validated_data = {
         'name': name,
-        'sku': sku,
+        'sku': cleaned_sku,
         'category_id': int(category_id) if category_id and str(category_id).isdigit() else None,
         'unit_of_measure': unit_of_measure if is_valid else '',
         'quantity': int(quantity) if quantity and quantity.isdigit() else 0,

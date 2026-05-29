@@ -12,6 +12,10 @@ class ProductService:
         return ProductRepository.get_all_active()
 
     @staticmethod
+    def get_product_by_id(product_id):
+        return ProductRepository.find_by_id(product_id)
+
+    @staticmethod
     def create_product(data):
         raw_sku = data.get('sku', '')
         cleaned_sku = re.sub(r'[^A-Z0-9-]', '', raw_sku.upper())

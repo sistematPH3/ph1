@@ -119,7 +119,7 @@
                     </td>
                     <td class="text-center pe-4" style="width: 140px; white-space: nowrap;">
                         <div class="d-flex justify-content-center align-items-center gap-3 flex-nowrap">
-                            <a href="#" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar Insumo">
+                            <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar Insumo">
                                 <i class="bi bi-pencil-square fs-5"></i>
                             </a>
                             <div class="form-check form-switch m-0 p-0 d-inline-flex align-items-center">
@@ -153,32 +153,26 @@
     </div>
 </div>
 <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-5 gap-2" style="display: none !important;">
-    <!-- 1. Los números de páginas primero (en el centro) -->
     <nav aria-label="Paginación de insumos">
         <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
     </nav>
     
-    <!-- 2. El mensaje informativo de registros abajo -->
     <div class="text-muted fs-7 fw-medium text-center" id="paginationInfo"></div>
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // ESCUCHADORES PARA INTERCEPTAR EL DESPLIEGUE DE LAS DESCRIPCIONES TÉCNICAS
 document.querySelectorAll('.collapse').forEach(collapseEl => {
     
-    // 1. Justo antes de empezar a abrirse, eliminamos el 'display: none' inline del script
     collapseEl.addEventListener('show.bs.collapse', function () {
         this.style.setProperty('display', 'table-row', 'important');
     });
 
-    // 2. Al terminar de abrirse por completo, refrescamos el estado visualizado
     collapseEl.addEventListener('shown.bs.collapse', function () {
         if (typeof filtrarYPaginarInsumos === 'function') {
             filtrarYPaginarInsumos();
         }
     });
 
-    // 3. Al cerrarse, volvemos a sincronizar la paginación de la tabla
     collapseEl.addEventListener('hidden.bs.collapse', function () {
         if (typeof filtrarYPaginarInsumos === 'function') {
             filtrarYPaginarInsumos();
@@ -191,11 +185,9 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
     const paginationInfo = document.getElementById('paginationInfo');
     const paginationControls = document.getElementById('paginationControls');
     
-    // CONFIGURACIÓN DE PAGINACIÓN
     let currentPage = 1;
     const rowsPerPage = 10;
 
-    // FUNCIÓN PRINCIPAL: FILTRADO + PAGINACIÓN INTEGRADA
     function filtrarYPaginarInsumos() {
         const searchText = searchInput.value.toLowerCase().trim();
         const selectedStatus = statusSelect.value;
@@ -203,7 +195,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
         
         let matchingRows = [];
 
-        // Paso 1: Filtrar qué filas cumplen con la búsqueda y el estatus
         rows.forEach(row => {
             const rowText = row.textContent.toLowerCase();
             const productStatus = row.getAttribute('data-status') || '';
@@ -222,12 +213,10 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
         const totalMatching = matchingRows.length;
         const totalPages = Math.ceil(totalMatching / rowsPerPage) || 1;
 
-        // Resguardar que la página actual no quede fuera de rango tras un filtro drástico
         if (currentPage > totalPages) {
             currentPage = totalPages;
         }
 
-        // Paso 2: Mostrar solo las filas que corresponden a la página actual
         const startIdx = (currentPage - 1) * rowsPerPage;
         const endIdx = startIdx + rowsPerPage;
 
@@ -235,7 +224,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
             if (index >= startIdx && index < endIdx) {
                 row.style.display = "";
                 
-                // Si la fila tiene los detalles expandidos (clase show), mantenerlos visibles
                 let nextRow = row.nextElementSibling;
                 if (nextRow && nextRow.classList.contains('row-technical-details')) {
                     nextRow.style.display = nextRow.classList.contains('show') ? "" : "none";
@@ -246,11 +234,9 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
             }
         });
 
-        // Paso 3: Renderizar la interfaz de los botones
         actualizarControlesUI(totalMatching, totalPages, startIdx, endIdx);
     }
 
-    // Auxiliar para no romper el despliegue técnico de tus filas
     function ocultarDetallesTecnicos(mainRow) {
         let nextRow = mainRow.nextElementSibling;
         if (nextRow && nextRow.classList.contains('row-technical-details')) {
@@ -258,11 +244,9 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
         }
     }
 
-    // DIBUJAR BOTONES Y TEXTO DE LA PAGINACIÓN
     function actualizarControlesUI(totalMatching, totalPages, startIdx, endIdx) {
         const paginationWrapper = document.getElementById('paginationWrapper');
         
-        // Si no hay resultados, ocultar paginación y mostrar alerta de tabla vacía
         if (totalMatching === 0) {
             paginationWrapper.style.setProperty('display', 'none', 'important');
             if (noResultsRow) noResultsRow.style.display = "";
@@ -270,7 +254,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
         }
         if (noResultsRow) noResultsRow.style.display = "none";
 
-        // REGLA CLAVE: Si hay 1 sola página o menos, esconde por completo los controles
         if (totalPages <= 1) {
             paginationWrapper.style.setProperty('display', 'none', 'important');
             return;
@@ -278,20 +261,17 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
             paginationWrapper.style.setProperty('display', 'flex', 'important');
         }
 
-        // Texto informativo dinámico
         const registroInicial = startIdx + 1;
         const registroFinal = Math.min(endIdx, totalMatching);
         paginationInfo.textContent = `Mostrando registros del ${registroInicial} al ${registroFinal} de un total de ${totalMatching}`;
 
         let htmlBotones = '';
 
-        // Botón Atrás
         htmlBotones += `
             <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
                 <a class="page-link border-0 rounded-pill px-3 mx-1 bg-light text-dark shadow-sm" href="#" data-page="${currentPage - 1}">&laquo;</a>
             </li>`;
 
-        // Números de Páginas
         for (let i = 1; i <= totalPages; i++) {
             const esActiva = currentPage === i;
             htmlBotones += `
@@ -300,7 +280,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
                 </li>`;
         }
 
-        // Botón Siguiente
         htmlBotones += `
             <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                 <a class="page-link border-0 rounded-pill px-3 mx-1 bg-light text-dark shadow-sm" href="#" data-page="${currentPage + 1}">&raquo;</a>
@@ -308,7 +287,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
 
         paginationControls.innerHTML = htmlBotones;
 
-        // Escuchar clics de navegación
         paginationControls.querySelectorAll('a').forEach(boton => {
             boton.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -322,16 +300,11 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
         });
     }
 
-    // Escuchadores para restablecer a la página 1 cuando se escribe o cambia el filtro
     searchInput.addEventListener('input', () => { currentPage = 1; filtrarYPaginarInsumos(); });
     statusSelect.addEventListener('change', () => { currentPage = 1; filtrarYPaginarInsumos(); });
 
-    // Ejecución inicial automática al cargar la vista
     filtrarYPaginarInsumos();
 
-    // =========================================================================
-    // CONTROL DEL SWITCH DE ESTADO (Tu lógica AJAX intacta)
-    // =========================================================================
     const statusSwitches = document.querySelectorAll('.toggle-status-switch');
 
     statusSwitches.forEach(switchInput => {
@@ -356,7 +329,6 @@ document.querySelectorAll('.collapse').forEach(collapseEl => {
                         row.setAttribute('data-status', 'inactive');
                         badgeCell.innerHTML = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>`;
                     }
-                    // Re-calcular la página actual por si el cambio afecta la vista o el conteo
                     filtrarYPaginarInsumos();
                 } else {
                     this.checked = !this.checked;

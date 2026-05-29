@@ -61,7 +61,8 @@
             <div class="form-group">
                 <label for="sku">SKU</label>
                 <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" placeholder="Ingrese el SKU del producto" maxlength="50" required>
-                {% if errors and errors.get('sku') %}<span class="error-text">{{ errors.sku }}</span>{% endif %}
+                <span id="sku-realtime-error" class="error-text" style="display: none;">Este SKU ya se encuentra registrado.</span>
+                {% if errors and errors.get('sku') %}<span class="error-text" id="sku-backend-error">{{ errors.sku }}</span>{% endif %}
             </div>
 
             <div class="form-group">
@@ -71,7 +72,7 @@
 
             <div class="form-actions">
                 <a href="{{ url_for('inventory.list_products') }}" class="btn btn-secondary">Cancelar</a>
-                <button type="submit" class="btn btn-primary">{% if product %}Actualizar{% else %}Registrar{% endif %}</button>
+                <button type="submit" id="btn-submit" class="btn btn-primary">{% if product %}Actualizar{% else %}Registrar{% endif %}</button>
             </div>
         </form>
     </div>
@@ -108,6 +109,45 @@
                 unitCustom.removeAttribute('required');
                 unitCustom.value = '';
             }
+        });
+
+        const skuInput = document.getElementById('sku');
+        const skuRealtimeError = document.getElementById('sku-realtime-error');
+        const skuBackendError = document.getElementById('sku-backend-error');
+        const btnSubmit = document.getElementById('btn-submit');
+        const productId = "{{ product.id if product else '' }}";
+        let debounceTimer;
+
+        skuInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const currentSku = this.value;
+            
+            skuRealtimeError.style.display = 'none';
+            if (skuBackendError) skuBackendError.style.display = 'none';
+            btnSubmit.disabled = false;
+
+            if(currentSku.trim() === '') return;
+
+            debounceTimer = setTimeout(() => {
+                fetch("{{ url_for('inventory.check_sku') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        sku: currentSku,
+                        product_id: productId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        skuRealtimeError.style.display = 'block';
+                        btnSubmit.disabled = true;
+                    }
+                })
+                .catch(error => console.error('Error verificando SKU:', error));
+            }, 400);
         });
     </script>
 </body>
