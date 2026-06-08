@@ -8,10 +8,12 @@ from app.inventory import inventory_bp
 @inventory_bp.route('/products/create', methods=['GET', 'POST'])
 def create_product():
     categories = [
-        type('Category', (), {'id': 1, 'name': 'Vegetales Frescos'}),
-        type('Category', (), {'id': 2, 'name': 'Salsas y Condimentos'}),
-        type('Category', (), {'id': 3, 'name': 'Lácteos y Quesos'}),
-        type('Category', (), {'id': 4, 'name': 'Carnes y Embutidos'})
+        type('Category', (), {'id': 1, 'name': 'Secos'}),
+        type('Category', (), {'id': 2, 'name': 'Lacteos'}),
+        type('Category', (), {'id': 3, 'name': 'Embutidos'}),
+        type('Category', (), {'id': 4, 'name': 'Vegetales Frescos'}),
+        type('Category', (), {'id': 5, 'name': 'Salsas y Liquido'}),
+        type('Category', (), {'id': 6, 'name': 'Utensilios y Empaques'})
     ]
     
     if request.method == 'POST':
@@ -35,10 +37,12 @@ def edit_product(product_id):
     product = ProductService.get_product_by_id(product_id)
     
     categories = [
-        type('Category', (), {'id': 1, 'name': 'Vegetales Frescos'}),
-        type('Category', (), {'id': 2, 'name': 'Salsas y Condimentos'}),
-        type('Category', (), {'id': 3, 'name': 'Lácteos y Quesos'}),
-        type('Category', (), {'id': 4, 'name': 'Carnes y Embutidos'})
+        type('Category', (), {'id': 1, 'name': 'Secos'}),
+        type('Category', (), {'id': 2, 'name': 'Lacteos'}),
+        type('Category', (), {'id': 3, 'name': 'Embutidos'}),
+        type('Category', (), {'id': 4, 'name': 'Vegetales Frescos'}),
+        type('Category', (), {'id': 5, 'name': 'Salsas y Liquido'}),
+        type('Category', (), {'id': 6, 'name': 'Utensilios y Empaques'})
     ]
 
     if not product:
