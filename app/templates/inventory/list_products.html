@@ -161,6 +161,21 @@
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        setTimeout(function() {
+            // Si usas Bootstrap, esto activa la animación de cierre oficial
+            if (window.bootstrap && bootstrap.Alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            } else {
+                // Alternativa nativa con transición suave si Bootstrap no responde
+                alert.style.transition = "opacity 0.5s ease";
+                alert.style.opacity = "0";
+                setTimeout(() => alert.remove(), 500);
+            }
+        }, 2000); // 2000 milisegundos = 2 segundos
+    });
 document.querySelectorAll('.collapse').forEach(collapseEl => {
     
     collapseEl.addEventListener('show.bs.collapse', function () {
