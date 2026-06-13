@@ -12,6 +12,7 @@ class Location(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     
     inventories = db.relationship('Inventory', backref='location', lazy=True)
+    
     @hybrid_property
     def address(self):
         """
@@ -32,6 +33,16 @@ class Supplier(db.Model):
     email = db.Column(db.String(100)) 
     status = db.Column(db.String(20), default='ACTIVO')
 
+
+class ExchangeRateHistory(db.Model):
+    __tablename__ = 'exchange_rate_history'
+    id = db.Column(db.Integer, primary_key=True)
+    currency = db.Column(db.String(5), nullable=False) # Ej. 'USD' o 'EUR'
+    rate = db.Column(db.Numeric(15, 4), nullable=False)
+    source = db.Column(db.String(20), nullable=False) # 'BCV' o 'MANUAL'
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
 class Purchase(db.Model):
     __tablename__ = 'purchases'
     id = db.Column(db.Integer, primary_key=True)
@@ -43,6 +54,9 @@ class Purchase(db.Model):
     invoice_url = db.Column(db.Text, nullable=False) 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     
+    
+    status = db.Column(db.String(20), default='COMPLETED', nullable=False)
+    
     details = db.relationship('PurchaseDetail', backref='purchase', lazy=True)
 
 class PurchaseDetail(db.Model):
@@ -51,9 +65,11 @@ class PurchaseDetail(db.Model):
     purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
-    price_usd = db.Column(db.Numeric(15, 2))
-    exchange_rate_bcv = db.Column(db.Numeric(15, 4))
+    
+    
+    foreign_price = db.Column(db.Numeric(15, 2)) 
     price_bs = db.Column(db.Numeric(15, 2))
+    
 
 class Movement(db.Model):
     __tablename__ = 'movements'
