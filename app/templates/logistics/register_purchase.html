@@ -17,8 +17,13 @@
                 <h5 class="text-secondary border-bottom pb-2">Datos de la Factura</h5>
                 <div class="row mb-4">
                     <div class="col-md-3">
-                        <label class="form-label">ID Proveedor</label>
-                        <input type="number" id="supplier_id" class="form-control" value="1" required>
+                        <label class="form-label">Proveedor</label>
+                        <select id="supplier_id" class="form-select" required>
+                            <option value="" disabled selected>-- Seleccione Proveedor --</option>
+                            {% for s in suppliers %}
+                                <option value="{{ s.id }}">{{ s.name }} ({{ s.tax_id }})</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Moneda</label>
@@ -32,8 +37,13 @@
                         <input type="number" step="0.01" id="exchange_rate" class="form-control" value="36.55" required>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">ID Usuario (Tú)</label>
-                        <input type="number" id="user_id" class="form-control" value="1" required>
+                        <label class="form-label">Usuario / Comprador</label>
+                        <select id="user_id" class="form-select" required>
+                            <option value="" disabled selected>-- Seleccione Usuario --</option>
+                            {% for u in users %}
+                                <option value="{{ u.id }}">{{ u.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
 
@@ -52,7 +62,7 @@
                 <table class="table table-bordered" id="itemsTable">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID Producto</th>
+                            <th>Producto</th>
                             <th>Cantidad</th>
                             <th>Precio Extranjero (Foreign Price)</th>
                             <th>Acción</th>
@@ -60,7 +70,14 @@
                     </thead>
                     <tbody id="itemsContainer">
                         <tr>
-                            <td><input type="number" class="form-control prod-id" value="1" required></td>
+                            <td>
+                                <select class="form-select prod-id" required>
+                                    <option value="" disabled selected>-- Elige un producto --</option>
+                                    {% for p in products %}
+                                        <option value="{{ p.id }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
                             <td><input type="number" step="0.01" class="form-control prod-qty" value="10" required></td>
                             <td><input type="number" step="0.01" class="form-control prod-price" value="5.50" required></td>
                             <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Eliminar</button></td>
@@ -77,24 +94,47 @@
 </div>
 
 <script>
+    // Guardamos las opciones de productos para las filas dinámicas de JS
+    const productOptionsHtml = `
+        <option value="" disabled selected>-- Elige un producto --</option>
+        {% for p in products %}
+            <option value="{{ p.id }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+        {% endfor %}
+    `;
+
     // Función para añadir dinámicamente filas de productos
-    function addProductRow() {
-        const tbody = document.getElementById('itemsContainer');
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><input type="number" class="form-control prod-id" required></td>
-            <td><input type="number" step="0.01" class="form-control prod-qty" required></td>
-            <td><input type="number" step="0.01" class="form-control prod-price" required></td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Eliminar</button></td>
-        `;
-        tbody.appendChild(row);
+function addProductRow() {
+    const tbody = document.getElementById('itemsContainer');
+    
+    // 1. Capturamos las opciones (<option>) del primer select que ya vino renderizado del servidor
+    const firstSelect = document.querySelector('.prod-id');
+    const optionsHtml = firstSelect ? firstSelect.innerHTML : '<option value="">-- Seleccione Producto --</option>';
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>
+            <select class="form-control form-select prod-id" required>
+                ${optionsHtml}
+            </select>
+        </td>
+        <td><input type="number" step="0.01" class="form-control prod-qty" required></td>
+        <td><input type="number" step="0.01" class="form-control prod-price" required></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Eliminar</button></td>
+    `;
+    tbody.appendChild(row);
+
+    // 2. SI ESTÁS USANDO TOM SELECT O SELECT2:
+    // Debes inicializar el componente en el nuevo select recién creado. Por ejemplo, con Tom Select:
+    if (typeof TomSelect !== 'undefined') {
+        new TomSelect(row.querySelector('.prod-id'), {
+            // tus configuraciones actuales aquí si las tienes
+        });
     }
+}
 
-    // Capturar el envío del formulario
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
-        e.preventDefault(); // Evita que la página se recargue
+        e.preventDefault(); 
 
-        // 1. Recolectar datos de la cabecera
         const payload = {
             supplier_id: parseInt(document.getElementById('supplier_id').value),
             currency: document.getElementById('currency').value,
@@ -104,7 +144,6 @@
             items: []
         };
 
-        // 2. Recolectar todos los productos añadidos en la tabla
         const rows = document.querySelectorAll('#itemsContainer tr');
         rows.forEach(row => {
             payload.items.push({
@@ -114,13 +153,10 @@
             });
         });
 
-        // 3. Enviar los datos mediante POST usando Fetch
         try {
             const response = await fetch('/logistics/purchases', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
@@ -128,9 +164,9 @@
 
             if (response.ok) {
                 alert("¡Éxito!: " + result.message + " (ID Compra: " + result.purchase_id + ")");
-                // Opcional: limpiar formulario o redireccionar
+                document.getElementById('purchaseForm').reset();
             } else {
-                alert("Error en validación: " + (result.error || result.message));
+                alert("Error: " + (result.error || result.message));
             }
         } catch (error) {
             console.error("Error en la petición:", error);
