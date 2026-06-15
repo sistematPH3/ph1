@@ -2,12 +2,30 @@
 from flask import Blueprint, request, jsonify, render_template
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
+from flask import Blueprint, request, jsonify, render_template
+from app.logistics.requests.purchase_request import PurchaseRequest
+from app.logistics.services.purchase_service import PurchaseService
+# IMPORTAMOS LOS MODELOS NECESARIOS
+from app.models.inventory_model import Product
+from app.models.logistics_model import Supplier
+from app.models.security_model import User  # Ajusta si Leminyer guardó el modelo en otra ruta de seguridad
 
 purchase_bp = Blueprint('purchase_routes', __name__)
 
 @purchase_bp.route('/purchases/new', methods=['GET'])
 def new_purchase_form():
-    return render_template('logistics/register_purchase.html')
+    # 1. Recuperamos los datos ordenados desde la Base de Datos
+    products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
+    suppliers = Supplier.query.filter_by(status='ACTIVO').order_by(Supplier.name.asc()).all()
+    users = User.query.order_by(User.name.asc()).all()
+    
+    # 2. Se los pasamos a la plantilla HTML
+    return render_template(
+        'logistics/register_purchase.html', 
+        products=products, 
+        suppliers=suppliers, 
+        users=users
+    )
 
 @purchase_bp.route('/purchases', methods=['POST'])
 def create_purchase():
