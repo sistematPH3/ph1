@@ -14,7 +14,7 @@ class PurchaseRequest:
         for field in required_fields:
             if field not in data or data[field] is None:
                 errors[field] = f"El campo '{field}' es obligatorio."
-
+#Validaciones
         # Validar que contenga artículos
         items = data.get('items', [])
         if not isinstance(items, list) or len(items) == 0:
