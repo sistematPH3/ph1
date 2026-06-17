@@ -8,106 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
-    
-    <style>
-        body {
-            background-color: #ebedf1 !important;
-        }
-        .form-label {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #495057;
-            margin-bottom: 0.4rem;
-        }
-        
-        /* DISEÑO DE LA TABLA CON ARMONÍA SIMÉTRICA Y LÍMITES CERRADOS */
-        .custom-insumos-table {
-            border-collapse: separate !important;
-            border-spacing: 0 !important;
-            width: 100%;
-            border-radius: 12px !important;
-            overflow: hidden !important;
-            border: 1px solid #dee2e6 !important; /* Límite perimetral completo que marca la redondez */
-        }
-        
-        /* Ajuste fino del espacio arriba-abajo de los encabezados */
-        .custom-insumos-table thead th {
-            background-color: #B31F24 !important;
-            color: #ffffff !important;
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 0.6rem 1rem !important; /* Espacio vertical calibrado y compacto */
-            border: none !important;
-            vertical-align: middle;
-        }
-
-        /* Celdas del cuerpo de la tabla */
-        .custom-insumos-table td {
-            padding: 0.85rem 0.5rem !important;
-            border-bottom: 1px solid #dee2e6 !important;
-            background-color: #ffffff !important;
-        }
-
-        /* CORRECCIÓN: Quitamos la línea de abajo a TODAS las celdas de la última fila */
-        .custom-insumos-table tbody tr:last-child td {
-            border-bottom: none !important;
-        }
-
-        /* Redondeado de acople perfecto con el borde exterior de la tabla */
-        .custom-insumos-table tbody tr:last-child td:first-child {
-            border-bottom-left-radius: 11px !important;
-        }
-        .custom-insumos-table tbody tr:last-child td:last-child {
-            border-bottom-right-radius: 11px !important;
-        }
-
-        /* ANULACIÓN TOTAL Y ABSOLUTA DEL HOVER DE BOOTSTRAP 5 */
-        .custom-insumos-table tbody tr,
-        .custom-insumos-table tbody tr td,
-        .custom-insumos-table tbody tr:hover,
-        .custom-insumos-table tbody tr:hover td {
-            background-color: #ffffff !important;
-            background: #ffffff !important;
-            color: inherit !important;
-            --bs-table-accent-bg: transparent !important;
-            --bs-table-hover-bg: transparent !important;
-            --bs-table-bg: #ffffff !important;
-        }
-
-        .table-field-wrapper {
-            width: 100%;
-            padding: 0 4px;
-        }
-
-        /* DISEÑO PÍLDORA (Ultra-Redondeado) */
-        .custom-insumos-table .mariuska-select-group, 
-        .custom-insumos-table .search-input-group {
-            border-radius: 50px !important;
-            border: 1px solid #ced4da !important;
-            background-color: #f8f9fa !important;
-            overflow: hidden;
-            transition: all 0.2s ease-in-out;
-        }
-
-        /* Heredar curva de píldora en los elementos internos */
-        .custom-insumos-table .form-control,
-        .custom-insumos-table .form-select,
-        .custom-insumos-table .input-group-text {
-            border-radius: 0 !important;
-        }
-
-        /* Brillo de enfoque interactivo carmesí al hacer clic */
-        .custom-insumos-table .mariuska-select-group:focus-within, 
-        .custom-insumos-table .search-input-group:focus-within {
-            border-color: #B31F24 !important;
-            box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
-            background-color: #ffffff !important;
-        }
-
-        .custom-insumos-table .form-select {
-            padding-left: 1.2rem !important;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}">
 </head>
 <body>
 
@@ -128,10 +29,10 @@
     </div>
 
     <form id="purchaseForm">
-        <div class="row g-4">
+        <div class="row g-4 align-items-start">
             
             <div class="col-lg-8">
-                <div class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden filter-card d-flex flex-column h-100">
+                <div id="productsCard" class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden filter-card d-flex flex-column">
                     
                     <div class="p-4 bg-white border-bottom">
                         <div class="d-flex align-items-center">
@@ -190,7 +91,7 @@
                     </div>
 
                     <div class="p-4 bg-light border-top d-flex justify-content-end align-items-center gap-3 mt-4">
-                        <button type="button" class="btn btn-success fw-bold px-4 py-2.5 rounded-pill shadow-sm d-flex align-items-center gap-2" onclick="addProductRow()">
+                        <button type="button" class="btn btn-success fw-bold px-4 py-2.5 fs-6 shadow rounded-pill shadow-sm d-flex align-items-center gap-2" onclick="addProductRow()">
                             <i class="bi bi-plus-lg"></i> Agregar Producto
                         </button>
                         
@@ -203,7 +104,7 @@
             </div>
             
             <div class="col-lg-4">
-                <div class="card border-0 rounded-4 shadow-sm bg-white p-4 filter-card h-100">
+                <div id="invoiceCard" class="card border-0 rounded-4 shadow-sm bg-white p-4 filter-card">
                     <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                         <i class="bi bi-file-earmark-text me-2 fs-4" style="color: #B31F24;"></i>
                         <h5 class="m-0 fw-bold text-dark">Datos de la Factura</h5>
@@ -269,7 +170,24 @@
 </div>
 
 <script>
-    // Función dinámica ajustada con las clases de píldora para nuevas filas
+    // CONTROL DE ALTURAS UNIFORMES E INDEPENDIENTES
+    document.addEventListener('DOMContentLoaded', () => {
+        const productsCard = document.getElementById('productsCard');
+        const invoiceCard = document.getElementById('invoiceCard');
+        
+        if (productsCard && invoiceCard && window.innerWidth >= 992) {
+            // Evaluamos cuál tarjeta es más alta al renderizar la página inicialmente
+            const initialMaxHeight = Math.max(productsCard.offsetHeight, invoiceCard.offsetHeight);
+            
+            // La de productos usa min-height para poder expandirse libremente al añadir filas
+            productsCard.style.minHeight = `${initialMaxHeight}px`;
+            
+            // La de facturas se congela con height fija para que nunca crezca con los productos
+            invoiceCard.style.height = `${initialMaxHeight}px`;
+        }
+    });
+
+    // Función dinámica para nuevas filas
     function addProductRow() {
         const tbody = document.getElementById('itemsContainer');
         const firstSelect = document.querySelector('.prod-id');
@@ -315,7 +233,7 @@
         }
     }
 
-    // Envío AJAX del formulario al Servidor Backend
+    // Envío AJAX del formulario al backend
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
         e.preventDefault(); 
 

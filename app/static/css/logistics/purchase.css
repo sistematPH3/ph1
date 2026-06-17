@@ -71,21 +71,38 @@ body {
     transform: translateY(-1.5px);
 }
 
-/* Botón Secundario: Agregar Producto */
-.btn-purchase-success {
+/* =========================================================================
+   EFECTO DINÁMICO DE LEVANTAMIENTO Y BRILLO PARA EL BOTÓN VERDE
+   ========================================================================= */
+.btn-success {
     background-color: #198754 !important;
-    color: #ffffff !important;
     border: none !important;
-    border-radius: 50px !important;
-    font-weight: 600;
-    padding-left: 15px;
-    padding-right: 15px;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease-in-out !important;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3) !important;
 }
 
-.btn-purchase-success:hover {
-    background-color: #146c43 !important;
-    transform: translateY(-1px);
+/* Al pasar el mouse: se eleva 2px y genera el resplandor verde */
+.btn-success:hover {
+    transform: translateY(-2px) !important;
+    background-color: #157347 !important;
+    box-shadow: 0 6px 18px rgba(25, 135, 84, 0.45) !important;
+}
+
+/* Al hacer clic: regresa a su posición original */
+.btn-success:active {
+    transform: translateY(0) !important;
+}
+
+
+/* =========================================================================
+   REMOCIÓN ABSOLUTA DEL EFECTO HOVER EN LAS TARJETAS DEL FORMULARIO
+   ========================================================================= */
+/* Bloqueamos el movimiento y mantenemos la sombra estática original de Bootstrap */
+#productsCard.filter-card:hover,
+#invoiceCard.filter-card:hover {
+    transform: none !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+    cursor: default !important;
 }
 
 /* Botón de Acción: Eliminar Fila */
@@ -116,100 +133,91 @@ body {
 .purchase-table td {
     vertical-align: middle;
 }
-body {
-            background-color: #ebedf1 !important;
-        }
-        .form-label {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #495057;
-            margin-bottom: 0.4rem;
-        }
-        
-        /* DISEÑO DE LA TABLA CON ARMONÍA SIMÉTRICA Y LÍMITES CERRADOS */
-        .custom-insumos-table {
-            border-collapse: separate !important;
-            border-spacing: 0 !important;
-            width: 100%;
-            border-radius: 12px !important;
-            overflow: hidden !important;
-            border: 1px solid #dee2e6 !important; /* Límite perimetral completo que marca la redondez */
-        }
-        
-        /* Ajuste fino del espacio arriba-abajo de los encabezados */
-        .custom-insumos-table thead th {
-            background-color: #B31F24 !important;
-            color: #ffffff !important;
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 0.6rem 1rem !important; /* Espacio vertical calibrado y compacto */
-            border: none !important;
-            vertical-align: middle;
-        }
+/* =========================================================================
+   ESTILOS ESPECÍFICOS DE LA TABLA DE INSUMOS (ESTILO MARIUSKA)
+   ========================================================================= */
+.form-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+    margin-bottom: 0.4rem;
+}
 
-        /* Celdas del cuerpo de la tabla */
-        .custom-insumos-table td {
-            padding: 0.85rem 0.5rem !important;
-            border-bottom: 1px solid #dee2e6 !important;
-            background-color: #ffffff !important;
-        }
+.custom-insumos-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    border: 1px solid #dee2e6 !important;
+}
 
-        /* CORRECCIÓN: Quitamos la línea de abajo a TODAS las celdas de la última fila */
-        .custom-insumos-table tbody tr:last-child td {
-            border-bottom: none !important;
-        }
+.custom-insumos-table thead th {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem !important;
+    border: none !important;
+    vertical-align: middle;
+}
 
-        /* Redondeado de acople perfecto con el borde exterior de la tabla */
-        .custom-insumos-table tbody tr:last-child td:first-child {
-            border-bottom-left-radius: 11px !important;
-        }
-        .custom-insumos-table tbody tr:last-child td:last-child {
-            border-bottom-right-radius: 11px !important;
-        }
+.custom-insumos-table td {
+    padding: 0.85rem 0.5rem !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    background-color: #ffffff !important;
+}
 
-        /* ANULACIÓN TOTAL Y ABSOLUTA DEL HOVER DE BOOTSTRAP 5 */
-        .custom-insumos-table tbody tr,
-        .custom-insumos-table tbody tr td,
-        .custom-insumos-table tbody tr:hover,
-        .custom-insumos-table tbody tr:hover td {
-            background-color: #ffffff !important;
-            background: #ffffff !important;
-            color: inherit !important;
-            --bs-table-accent-bg: transparent !important;
-            --bs-table-hover-bg: transparent !important;
-            --bs-table-bg: #ffffff !important;
-        }
+.custom-insumos-table tbody tr:last-child td {
+    border-bottom: none !important;
+}
 
-        .table-field-wrapper {
-            width: 100%;
-            padding: 0 4px;
-        }
+.custom-insumos-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 11px !important;
+}
+.custom-insumos-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 11px !important;
+}
 
-        /* DISEÑO PÍLDORA (Ultra-Redondeado) */
-        .custom-insumos-table .mariuska-select-group, 
-        .custom-insumos-table .search-input-group {
-            border-radius: 50px !important;
-            border: 1px solid #ced4da !important;
-            background-color: #f8f9fa !important;
-            overflow: hidden;
-            transition: all 0.2s ease-in-out;
-        }
+.custom-insumos-table tbody tr,
+.custom-insumos-table tbody tr td,
+.custom-insumos-table tbody tr:hover,
+.custom-insumos-table tbody tr:hover td {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: inherit !important;
+    --bs-table-accent-bg: transparent !important;
+    --bs-table-hover-bg: transparent !important;
+    --bs-table-bg: #ffffff !important;
+}
 
-        /* Heredar curva de píldora en los elementos internos */
-        .custom-insumos-table .form-control,
-        .custom-insumos-table .form-select,
-        .custom-insumos-table .input-group-text {
-            border-radius: 0 !important;
-        }
+.table-field-wrapper {
+    width: 100%;
+    padding: 0 4px;
+}
 
-        /* Brillo de enfoque interactivo carmesí al hacer clic */
-        .custom-insumos-table .mariuska-select-group:focus-within, 
-        .custom-insumos-table .search-input-group:focus-within {
-            border-color: #B31F24 !important;
-            box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
-            background-color: #ffffff !important;
-        }
+.custom-insumos-table .mariuska-select-group, 
+.custom-insumos-table .search-input-group {
+    border-radius: 50px !important;
+    border: 1px solid #ced4da !important;
+    background-color: #f8f9fa !important;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+}
 
-        .custom-insumos-table .form-select {
-            padding-left: 1.2rem !important;
-        }
+.custom-insumos-table .form-control, 
+.custom-insumos-table .form-select, 
+.custom-insumos-table .input-group-text {
+    border-radius: 0 !important;
+}
+
+.custom-insumos-table .mariuska-select-group:focus-within, 
+.custom-insumos-table .search-input-group:focus-within {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    background-color: #ffffff !important;
+}
+
+.custom-insumos-table .form-select {
+    padding-left: 1.2rem !important;
+}
