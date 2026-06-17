@@ -1,5 +1,5 @@
-# app/logistics/routes/purchase_history_routes.py
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from app.extensions import db
 from app.logistics.services.purchase_history_service import PurchaseHistoryService
 from app.logistics.requests.purchase_history_request import PurchaseHistoryFilterRequest
 from app.models import Supplier  
@@ -11,16 +11,16 @@ filter_request_validator = PurchaseHistoryFilterRequest()
 # 1. VISTA PRINCIPAL DEL HISTORIAL (Carga total para el JavaScript)
 @purchase_history_bp.route('/purchases/history', methods=['GET'], strict_slashes=False)
 def index():
-    # Dejamos que cargue todo directo para que tu buscador interactivo funcione al instante
+   
     purchases = PurchaseHistoryService.get_formatted_history()
     suppliers = Supplier.query.all()
     return render_template('logistics/purchase_history.html', purchases=purchases, suppliers=suppliers)
 
 
-# 2. DETALLES DE COMPRA (Formato JSON asíncrono para el despliegue de filas)
+
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/details', methods=['GET'])
 def get_details_json(purchase_id):
-    # NOTA: Cambié el nombre de la función a 'get_details_json' para evitar el AssertionError
+    
     summary = PurchaseHistoryService.get_purchase_details_summary(purchase_id)
     if not summary:
         return jsonify({"error": "La factura de compra no existe."}), 404
@@ -49,7 +49,7 @@ def get_details_json(purchase_id):
     }), 200
 
 
-# 3. ANULACIÓN LOGICA DE COMPRA
+
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/annul', methods=['POST'])
 def annul(purchase_id):
     success = PurchaseHistoryService.process_annulment(purchase_id)
