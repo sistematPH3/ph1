@@ -16,7 +16,7 @@ purchase_bp = Blueprint('purchase_routes', __name__)
 def new_purchase_form():
     # 1. Recuperamos los datos ordenados desde la Base de Datos
     products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
-    suppliers = Supplier.query.filter_by(status='ACTIVO').order_by(Supplier.name.asc()).all()
+    suppliers = Supplier.query.filter_by(status='Active').order_by(Supplier.name.asc()).all()
     users = User.query.order_by(User.name.asc()).all()
     
     # 2. Se los pasamos a la plantilla HTML
