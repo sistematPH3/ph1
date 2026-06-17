@@ -1,0 +1,171 @@
+/* ==========================================================================
+   1. IMPORTACIÓN DE FUENTES (Rutas relativas corregidas)
+   ========================================================================== */
+@font-face {
+    font-family: 'Inter';
+    src: url('../fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: normal;
+}
+@font-face {
+    font-family: 'Inter-Bold';
+    src: url('../fonts/Inter-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'PassionOne';
+    src: url('../fonts/PassionOne-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+
+/* Motores para los archivos .woff y .woff2 de Bootstrap Icons que tienes */
+@font-face {
+    font-family: "bootstrap-icons";
+    src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
+         url("../../fonts/bootstrap-icons.woff") format("woff");
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Forzar las propiedades de la fuente solo al icono, no a los textos hijos */
+[class^="bi-"], [class*=" bi-"] {
+    display: inline-block;
+    font-family: "bootstrap-icons" !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    width: 1em; /* Evita herencias de ancho raras */
+    height: 1em;
+}
+
+/* Mapeo Unicode exacto para los pseudo-elementos */
+.bi-truck::before { content: "\f603" !important; }
+.bi-save::before { content: "\f522" !important; }
+
+
+/* ==========================================================================
+   2. VARIABLES Y ESTILOS BASE
+   ========================================================================== */
+:root {
+    --primary-red: #d32f2f;
+    --dark-red: #b71c1c;
+    --light-bg: #f8f9fa;
+    --white: #ffffff;
+    --text-dark: #212529;
+    --border-color: #dee2e6;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--light-bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px 0;
+}
+
+
+/* ==========================================================================
+   3. ESTRUCTURA VERTICAL DEL FORMULARIO
+   ========================================================================== */
+.form-container {
+    background-color: var(--white);
+    width: 100%;
+    max-width: 480px; /* Un poco más angosto para lucir mejor verticalmente */
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-top: 5px solid var(--primary-red);
+    overflow: hidden;
+}
+
+.form-header {
+    background-color: var(--white);
+    padding: 22px 25px 12px 25px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-header h2 {
+    font-family: 'PassionOne', sans-serif;
+    color: var(--primary-red);
+    margin: 0;
+    font-size: 1.9rem;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Separa el icono del texto */
+}
+
+.supplier-form {
+    padding: 25px;
+    display: flex;
+    flex-direction: column; /* Esto obliga a todo a alinearse hacia abajo */
+    gap: 16px; /* Espaciado uniforme entre cada bloque */
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+
+/* ==========================================================================
+   4. CAMPOS DE ENTRADA (INPUTS)
+   ========================================================================== */
+label {
+    margin-bottom: 6px;
+    font-size: 0.88rem;
+    font-weight: bold;
+    color: var(--text-dark);
+}
+
+input[type="text"],
+input[type="email"],
+select {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-red);
+    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
+}
+
+
+/* ==========================================================================
+   5. BOTÓN DE ENVÍO
+   ========================================================================== */
+.btn-submit {
+    background-color: var(--primary-red);
+    color: var(--white);
+    border: none;
+    padding: 13px 20px;
+    font-size: 1rem;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.2s;
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-submit:hover {
+    background-color: var(--dark-red);
+}

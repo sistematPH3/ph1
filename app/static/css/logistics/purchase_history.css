@@ -1,0 +1,163 @@
+/* static/css/logistics/purchase_history.css */
+
+/* Declaración de Fuentes Locales */
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: 400;
+}
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-Bold.ttf') format('truetype');
+    font-weight: 700;
+}
+@font-face {
+    font-family: 'Passion One';
+    src: url('../../fonts/PassionOne-Regular.ttf') format('truetype');
+    font-weight: 400;
+}
+@font-face {
+    font-family: 'Passion One';
+    src: url('../../fonts/PassionOne-Bold.ttf') format('truetype');
+    font-weight: 700;
+}
+@font-face {
+    font-family: 'Bootstrap-Icons';
+    src: url('../../fonts/bootstrap-icons.woff2') format('woff2'),
+         url('../../fonts/bootstrap-icons.woff') format('woff');
+}
+
+body {
+    background-color: #fcfcfc;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Contenedor Principal Limitador de Margen */
+.main-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.header-title {
+    font-family: 'Inter', sans-serif;
+    color: #111418;
+    font-size: 1.6rem;
+}
+
+/* Icono Header Redondeado tipo Auditoría */
+.icon-container-audit {
+    background-color: #b0121a;
+    color: #ffffff;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(176, 18, 26, 0.2);
+}
+
+.card-custom {
+    border: 1px solid #f0f0f0;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    background-color: #ffffff;
+}
+
+/* Inputs idénticos a los de Auditoría */
+.filter-input-group {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 20px;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.filter-input-group i {
+    color: #adb5bd;
+    margin-right: 8px;
+}
+
+.filter-input-group input, 
+.filter-input-group select {
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    color: #495057;
+    font-size: 0.88rem;
+}
+
+/* Tabla Estilo Auditoría */
+.table-custom-audit {
+    width: 100%;
+    margin-bottom: 0;
+    background-color: #ffffff;
+}
+
+.table-custom-audit thead th {
+    background-color: #b0121a !important;
+    color: #ffffff !important;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 18px;
+    border: none;
+}
+
+.table-custom-audit tbody td {
+    padding: 16px 18px;
+    vertical-align: middle;
+    font-size: 0.88rem;
+    color: #495057;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+.table-custom-audit tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badges de Estado Redondeados */
+.status-badge-completed {
+    background-color: #e6f6ec;
+    color: #15803d;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: 600;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-badge-annulled {
+    background-color: #fdf2f2;
+    color: #991b1b;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: 600;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Paginación */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    padding: 15px;
+    background: #ffffff;
+    border-top: 1px solid #f1f3f5;
+}
+
+/* Botones de acción */
+.btn-audit-action {
+    border-radius: 6px;
+    font-size: 0.82rem;
+    padding: 5px 12px;
+}
