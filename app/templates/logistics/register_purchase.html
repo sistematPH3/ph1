@@ -28,7 +28,7 @@
         </a>
     </div>
 
-    <form id="purchaseForm">
+    <form id="purchaseForm" novalidate>
         <div class="row g-4 align-items-start">
             
             <div class="col-lg-8">
@@ -57,7 +57,7 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group mariuska-select-group">
                                                 <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
-                                                    <option value="" disabled selected>-- Elige un producto --</option>
+                                                    <option value="" disabled selected>Seleccione un producto</option>
                                                     {% for p in products %}
                                                         <option value="{{ p.id }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
                                                     {% endfor %}
@@ -115,7 +115,7 @@
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-building"></i></span>
                             <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
-                                <option value="" disabled selected>-- Seleccione Proveedor --</option>
+                                <option value="" disabled selected>Seleccione Proveedor</option>
                                 {% for s in suppliers %}
                                     <option value="{{ s.id }}">{{ s.name }} ({{ s.tax_id }})</option>
                                 {% endfor %}
@@ -147,7 +147,7 @@
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-person-badge"></i></span>
                             <select id="user_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
-                                <option value="" disabled selected>-- Seleccione Usuario --</option>
+                                <option value="" disabled selected>Seleccione Usuario</option>
                                 {% for u in users %}
                                     <option value="{{ u.id }}">{{ u.name }}</option>
                                 {% endfor %}
@@ -176,18 +176,142 @@
         const invoiceCard = document.getElementById('invoiceCard');
         
         if (productsCard && invoiceCard && window.innerWidth >= 992) {
-            // Evaluamos cuál tarjeta es más alta al renderizar la página inicialmente
             const initialMaxHeight = Math.max(productsCard.offsetHeight, invoiceCard.offsetHeight);
-            
-            // La de productos usa min-height para poder expandirse libremente al añadir filas
             productsCard.style.minHeight = `${initialMaxHeight}px`;
-            
-            // La de facturas se congela con height fija para que nunca crezca con los productos
-            invoiceCard.style.height = `${initialMaxHeight}px`;
+            invoiceCard.style.minHeight = `${initialMaxHeight}px`;
         }
+
+        // Inicializar validaciones en tiempo real para los campos fijos de la factura
+        setupHeaderValidation();
     });
 
-    // Función dinámica para nuevas filas
+    // =========================================================================
+    // MOTOR DE VALIDACIÓN VISUAL TRADICIONAL (TEXTOS ROJOS)
+    // =========================================================================
+
+    // Muestra el mensaje de error debajo del campo correspondiente
+    function setFieldError(element, message) {
+        if (!element) return;
+        
+        // Buscamos el contenedor del grupo para posicionar el error abajo
+        const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
+        const inputGroup = element.closest('.mariuska-select-group') || element.closest('.search-input-group');
+        
+        // Eliminar error previo si existe para no duplicar
+        clearFieldError(element);
+
+        // Crear el elemento de texto rojo estilizado
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-danger small fw-bold mt-1 error-label animate-fade-in';
+        errorDiv.style.fontSize = '0.78rem';
+        errorDiv.style.whiteSpace = 'nowrap'; 
+        errorDiv.innerText = message;
+        
+        wrapper.appendChild(errorDiv);
+
+        // Aplicar borde rojo de advertencia al grupo contenedor
+        if (inputGroup) {
+            inputGroup.style.setProperty('border-color', '#dc3545', 'important');
+        }
+    }
+
+    // Limpia el mensaje de error y restaura los bordes originales
+    function clearFieldError(element) {
+        if (!element) return;
+        const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
+        const inputGroup = element.closest('.mariuska-select-group') || element.closest('.search-input-group');
+        
+        const existingError = wrapper.querySelector('.error-label');
+        if (existingError) {
+            existingError.remove();
+        }
+
+        if (inputGroup) {
+            inputGroup.style.borderColor = ''; // Restaura al CSS original
+        }
+    }
+
+    // Escuchadores en tiempo real para los campos de la Factura (Cabecera)
+    function setupHeaderValidation() {
+        const fields = [
+            { id: 'supplier_id', type: 'change', msg: 'Debes seleccionar un proveedor.' },
+            { id: 'user_id', type: 'change', msg: 'Debes seleccionar un usuario comprador.' },
+            { id: 'currency', type: 'change', msg: 'Debes seleccionar una moneda.' }
+        ];
+
+        fields.forEach(field => {
+            const el = document.getElementById(field.id);
+            if (el) {
+                el.addEventListener(field.type, () => {
+                    if (!el.value) setFieldError(el, field.msg);
+                    else clearFieldError(el);
+                });
+            }
+        });
+
+        // Caso especial Tasa de Cambio (Evitar vacío o menor/igual a cero)
+        const exchangeRateInput = document.getElementById('exchange_rate');
+        if (exchangeRateInput) {
+            exchangeRateInput.addEventListener('input', () => {
+                const val = parseFloat(exchangeRateInput.value);
+                if (!exchangeRateInput.value || isNaN(val)) {
+                    setFieldError(exchangeRateInput, 'La tasa de cambio es obligatoria.');
+                } else if (val <= 0) {
+                    setFieldError(exchangeRateInput, 'La tasa debe ser mayor a cero (0).');
+                } else {
+                    clearFieldError(exchangeRateInput);
+                }
+            });
+        }
+    }
+
+    // Escuchadores en tiempo real para las filas de la tabla (Productos/Detalle)
+    function attachRowValidationListeners(row) {
+        const prodId = row.querySelector('.prod-id');
+        const prodQty = row.querySelector('.prod-qty');
+        const prodPrice = row.querySelector('.prod-price');
+
+        if (prodId) {
+            prodId.addEventListener('change', () => {
+                if (!prodId.value) setFieldError(prodId, 'Selecciona producto.');
+                else clearFieldError(prodId);
+            });
+        }
+
+        if (prodQty) {
+            prodQty.addEventListener('input', () => {
+                const val = parseFloat(prodQty.value);
+                if (!prodQty.value || isNaN(val)) {
+                    setFieldError(prodQty, 'La cantidad es obligatoria.');
+                } else if (val <= 0) {
+                    setFieldError(prodQty, 'Debe ser mayor a 0.');
+                } else {
+                    clearFieldError(prodQty);
+                }
+            });
+        }
+
+        if (prodPrice) {
+            prodPrice.addEventListener('input', () => {
+                const val = parseFloat(prodPrice.value);
+                if (!prodPrice.value || isNaN(val)) {
+                    setFieldError(prodPrice, 'El precio es obligatorio.'); // Valida que el campo este vacio //
+                } else if (val <= 0) {
+                    setFieldError(prodPrice, 'Debe ser mayor a 0.');
+                } else {
+                    clearFieldError(prodPrice);
+                }
+            });
+        }
+    }
+
+    // Asegurar que la primera fila cargada por defecto también se valide en tiempo real
+    document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
+        attachRowValidationListeners(row);
+    });
+
+
+    // FUNCIÓN DINÁMICA PARA NUEVAS FILAS
     function addProductRow() {
         const tbody = document.getElementById('itemsContainer');
         const firstSelect = document.querySelector('.prod-id');
@@ -199,7 +323,7 @@
             <td>
                 <div class="table-field-wrapper">
                     <div class="input-group mariuska-select-group">
-                        <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
+                        <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id">
                             ${optionsHtml}
                         </select>
                     </div>
@@ -208,7 +332,7 @@
             <td>
                 <div class="table-field-wrapper">
                     <div class="input-group search-input-group">
-                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" required>
+                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10">
                     </div>
                 </div>
             </td>
@@ -216,7 +340,7 @@
                 <div class="table-field-wrapper">
                     <div class="input-group search-input-group">
                         <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
+                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" value="5.50">
                     </div>
                 </div>
             </td>
@@ -228,14 +352,79 @@
         `;
         tbody.appendChild(row);
 
-        if (typeof TomSelect !== 'undefined') {
-            new TomSelect(row.querySelector('.prod-id'), {});
+        // Vinculamos la validación en tiempo real inmediatamente a la nueva fila
+        attachRowValidationListeners(row);
+    }
+
+    // VALIDACIÓN INTEGRAL ANTES DEL ENVÍO AJAX
+    function validateFormBeforeSubmit() {
+        let isValid = true;
+
+        // 1. Validar Cabecera
+        const supplier = document.getElementById('supplier_id');
+        const user = document.getElementById('user_id');
+        const currency = document.getElementById('currency');
+        const exchangeRate = document.getElementById('exchange_rate');
+
+        if (!supplier.value) { setFieldError(supplier, 'Debes seleccionar un proveedor.'); isValid = false; }
+        if (!user.value) { setFieldError(user, 'Debes seleccionar un usuario comprador.'); isValid = false; }
+        if (!currency.value) { setFieldError(currency, 'Debes seleccionar una moneda.'); isValid = false; }
+        
+        const rateVal = parseFloat(exchangeRate.value);
+        if (!exchangeRate.value || isNaN(rateVal) || rateVal <= 0) { 
+            setFieldError(exchangeRate, 'La tasa de cambio debe ser un número mayor a cero.'); 
+            isValid = false; 
         }
+
+        // 2. Validar Detalle de Productos Evita que el usuario borre todo y lo mande
+        const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
+        if (rows.length === 0) {
+            alert("Error: Debes registrar al menos un producto en la compra.");
+            isValid = false;
+        }
+
+        rows.forEach(row => {
+            const prodId = row.querySelector('.prod-id');
+            const prodQty = row.querySelector('.prod-qty');
+            const prodPrice = row.querySelector('.prod-price');
+
+            if (!prodId.value) { setFieldError(prodId, 'Selecciona producto.'); isValid = false; }
+            
+            const qtyVal = parseFloat(prodQty.value);
+            if (!prodQty.value || isNaN(qtyVal)) { 
+                setFieldError(prodQty, 'La cantidad es obligatoria.'); 
+                isValid = false; 
+            } else if (qtyVal <= 0) { 
+                setFieldError(prodQty, 'Debe ser mayor a 0.'); 
+                isValid = false; 
+            }
+            
+            const priceVal = parseFloat(prodPrice.value);
+            if (!prodPrice.value || isNaN(priceVal)) { 
+                setFieldError(prodPrice, 'El precio es obligatorio.'); 
+                isValid = false; 
+            } else if (priceVal <= 0) { 
+                setFieldError(prodPrice, 'Debe ser mayor a 0.'); 
+                isValid = false; 
+            }
+        });
+
+        return isValid;
     }
 
     // Envío AJAX del formulario al backend
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
         e.preventDefault(); 
+
+        // Ejecutar nuestro validador visual personalizado primero
+        if (!validateFormBeforeSubmit()) {
+            // Hacemos scroll suave hacia el primer error visible para que el usuario lo note
+            const firstError = document.querySelector('.error-label');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return; 
+        }
 
         const payload = {
             supplier_id: parseInt(document.getElementById('supplier_id').value),
@@ -277,7 +466,13 @@
                 container.innerHTML = '';
                 addProductRow();
             } else {
-                alert("Error: " + (result.error || result.message));
+                // Si el backend responde con errores específicos, los mapeamos también con textos rojos
+                if (result.details) {
+                    alert("Se encontraron errores de consistencia en el Servidor.");
+                    console.log("Errores de servidor:", result.details);
+                } else {
+                    alert("Error: " + result.message);
+                }
             }
         } catch (error) {
             console.error("Error:", error);
