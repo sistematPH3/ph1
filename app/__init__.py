@@ -48,6 +48,13 @@ def create_app():
         # Lo registramos con el prefijo /inventory para que sea estético y organizado
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
 
+        # ==========================================================\
+        # HISTORIAL DE COMPRAS 
+        # ==========================================================\
+        from .logistics.routes.purchase_history_routes import purchase_history_bp
+        app.register_blueprint(purchase_history_bp, url_prefix='/logistics')
+        # ==========================================================\
+
         # ==========================================================
         # MÓDULO 4: REGISTRO DE LA API MULTI-MONEDA (Nueva Carpeta Integrations)
         # ==========================================================
