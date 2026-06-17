@@ -2,13 +2,13 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Registro de Compra | Sistema Gestion PH</title> <!--pestaña de la pagina-->
+    <title>Registro de Compra | Sistema Gestion PH</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
 
@@ -28,7 +28,7 @@
         </a>
     </div>
 
-    <form id="purchaseForm" novalidate>
+    <form id="purchaseForm" novalidate enctype="multipart/form-data">
         <div class="row g-4 align-items-start">
             
             <div class="col-lg-8">
@@ -156,11 +156,14 @@
                     </div>
 
                     <div class="mb-2">
-                        <label class="form-label">URL del Comprobante / Factura</label>
-                        <div class="input-group search-input-group bg-light">
-                            <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-link-45deg"></i></span>
-                            <input type="url" id="invoice_url" class="form-control border-0 py-2 bg-transparent" value="https://i.ibb.co/factura_ejemplo.png">
-                        </div>
+                        <label class="form-label fw-bold">Foto del Comprobante / Factura</label>
+                        <label class="border rounded-3 p-3 text-center bg-light shadow-sm d-block" 
+                               style="cursor: pointer; border: 2px dashed #adb5bd !important; transition: all 0.3s ease;" 
+                               id="dropzoneArea" for="invoice_photo">
+                            <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
+                            <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
+                            <input type="file" id="invoice_photo" name="invoice_photo" style="display: none;" accept="image/*" required>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -170,7 +173,6 @@
 </div>
 
 <script>
-    // CONTROL DE ALTURAS UNIFORMES E INDEPENDIENTES
     document.addEventListener('DOMContentLoaded', () => {
         const productsCard = document.getElementById('productsCard');
         const invoiceCard = document.getElementById('invoiceCard');
@@ -181,26 +183,37 @@
             invoiceCard.style.minHeight = `${initialMaxHeight}px`;
         }
 
-        // Inicializar validaciones en tiempo real para los campos fijos de la factura
         setupHeaderValidation();
     });
 
-    // =========================================================================
-    // MOTOR DE VALIDACIÓN VISUAL TRADICIONAL (TEXTOS ROJOS)
-    // =========================================================================
+    document.getElementById('invoice_photo').addEventListener('change', function(e) {
+        const fileNameDisplay = document.getElementById('photoFileName');
+        const icon = document.getElementById('cameraIcon');
+        const dropzone = document.getElementById('dropzoneArea');
+        
+        if (this.files && this.files.length > 0) {
+            fileNameDisplay.innerText = this.files[0].name;
+            fileNameDisplay.classList.replace('text-muted', 'text-success');
+            icon.classList.replace('bi-camera', 'bi-check-circle-fill');
+            icon.classList.replace('text-muted', 'text-success');
+            dropzone.style.borderColor = '#198754';
+        } else {
+            fileNameDisplay.innerText = 'Toca aquí para tomar foto o abrir galería';
+            fileNameDisplay.classList.replace('text-success', 'text-muted');
+            icon.classList.replace('bi-check-circle-fill', 'bi-camera');
+            icon.classList.replace('text-success', 'text-muted');
+            dropzone.style.borderColor = '#adb5bd';
+        }
+    });
 
-    // Muestra el mensaje de error debajo del campo correspondiente
     function setFieldError(element, message) {
         if (!element) return;
         
-        // Buscamos el contenedor del grupo para posicionar el error abajo
         const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
         const inputGroup = element.closest('.mariuska-select-group') || element.closest('.search-input-group');
         
-        // Eliminar error previo si existe para no duplicar
         clearFieldError(element);
 
-        // Crear el elemento de texto rojo estilizado
         const errorDiv = document.createElement('div');
         errorDiv.className = 'text-danger small fw-bold mt-1 error-label animate-fade-in';
         errorDiv.style.fontSize = '0.78rem';
@@ -209,13 +222,11 @@
         
         wrapper.appendChild(errorDiv);
 
-        // Aplicar borde rojo de advertencia al grupo contenedor
         if (inputGroup) {
             inputGroup.style.setProperty('border-color', '#dc3545', 'important');
         }
     }
 
-    // Limpia el mensaje de error y restaura los bordes originales
     function clearFieldError(element) {
         if (!element) return;
         const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
@@ -227,11 +238,10 @@
         }
 
         if (inputGroup) {
-            inputGroup.style.borderColor = ''; // Restaura al CSS original
+            inputGroup.style.borderColor = '';
         }
     }
 
-    // Escuchadores en tiempo real para los campos de la Factura (Cabecera)
     function setupHeaderValidation() {
         const fields = [
             { id: 'supplier_id', type: 'change', msg: 'Debes seleccionar un proveedor.' },
@@ -249,7 +259,6 @@
             }
         });
 
-        // Caso especial Tasa de Cambio (Evitar vacío o menor/igual a cero)
         const exchangeRateInput = document.getElementById('exchange_rate');
         if (exchangeRateInput) {
             exchangeRateInput.addEventListener('input', () => {
@@ -265,7 +274,6 @@
         }
     }
 
-    // Escuchadores en tiempo real para las filas de la tabla (Productos/Detalle)
     function attachRowValidationListeners(row) {
         const prodId = row.querySelector('.prod-id');
         const prodQty = row.querySelector('.prod-qty');
@@ -295,7 +303,7 @@
             prodPrice.addEventListener('input', () => {
                 const val = parseFloat(prodPrice.value);
                 if (!prodPrice.value || isNaN(val)) {
-                    setFieldError(prodPrice, 'El precio es obligatorio.'); // Valida que el campo este vacio //
+                    setFieldError(prodPrice, 'El precio es obligatorio.');
                 } else if (val <= 0) {
                     setFieldError(prodPrice, 'Debe ser mayor a 0.');
                 } else {
@@ -305,13 +313,10 @@
         }
     }
 
-    // Asegurar que la primera fila cargada por defecto también se valide en tiempo real
     document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
         attachRowValidationListeners(row);
     });
 
-
-    // FUNCIÓN DINÁMICA PARA NUEVAS FILAS
     function addProductRow() {
         const tbody = document.getElementById('itemsContainer');
         const firstSelect = document.querySelector('.prod-id');
@@ -352,19 +357,17 @@
         `;
         tbody.appendChild(row);
 
-        // Vinculamos la validación en tiempo real inmediatamente a la nueva fila
         attachRowValidationListeners(row);
     }
 
-    // VALIDACIÓN INTEGRAL ANTES DEL ENVÍO AJAX
     function validateFormBeforeSubmit() {
         let isValid = true;
 
-        // 1. Validar Cabecera
         const supplier = document.getElementById('supplier_id');
         const user = document.getElementById('user_id');
         const currency = document.getElementById('currency');
         const exchangeRate = document.getElementById('exchange_rate');
+        const invoicePhoto = document.getElementById('invoice_photo');
 
         if (!supplier.value) { setFieldError(supplier, 'Debes seleccionar un proveedor.'); isValid = false; }
         if (!user.value) { setFieldError(user, 'Debes seleccionar un usuario comprador.'); isValid = false; }
@@ -376,10 +379,26 @@
             isValid = false; 
         }
 
-        // 2. Validar Detalle de Productos Evita que el usuario borre todo y lo mande
+        if (!invoicePhoto.files || invoicePhoto.files.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Evidencia Requerida',
+                text: 'Debes adjuntar la foto de la factura.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
+            isValid = false;
+        }
+
         const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
         if (rows.length === 0) {
-            alert("Error: Debes registrar al menos un producto en la compra.");
+            Swal.fire({
+                icon: 'warning',
+                title: 'Carrito Vacío',
+                text: 'Debes registrar al menos un producto en la compra.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
             isValid = false;
         }
 
@@ -412,13 +431,10 @@
         return isValid;
     }
 
-    // Envío AJAX del formulario al backend
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
         e.preventDefault(); 
 
-        // Ejecutar nuestro validador visual personalizado primero
         if (!validateFormBeforeSubmit()) {
-            // Hacemos scroll suave hacia el primer error visible para que el usuario lo note
             const firstError = document.querySelector('.error-label');
             if (firstError) {
                 firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -426,14 +442,14 @@
             return; 
         }
 
-        const payload = {
-            supplier_id: parseInt(document.getElementById('supplier_id').value),
-            currency: document.getElementById('currency').value,
-            exchange_rate: parseFloat(document.getElementById('exchange_rate').value),
-            user_id: parseInt(document.getElementById('user_id').value),
-            invoice_url: document.getElementById('invoice_url').value,
-            items: []
-        };
+        const formData = new FormData();
+        formData.append('supplier_id', document.getElementById('supplier_id').value);
+        formData.append('currency', document.getElementById('currency').value);
+        formData.append('exchange_rate', document.getElementById('exchange_rate').value);
+        formData.append('user_id', document.getElementById('user_id').value);
+        
+        const photoFile = document.getElementById('invoice_photo').files[0];
+        formData.append('invoice_photo', photoFile);
 
         const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
         rows.forEach(row => {
@@ -442,41 +458,63 @@
             const priceVal = row.querySelector('.prod-price').value;
 
             if(prodIdVal) {
-                payload.items.push({
-                    product_id: parseInt(prodIdVal),
-                    quantity: parseFloat(qtyVal),
-                    foreign_price: parseFloat(priceVal)
-                });
+                formData.append('product_id[]', prodIdVal);
+                formData.append('quantity[]', qtyVal);
+                formData.append('foreign_price[]', priceVal);
             }
         });
 
         try {
             const response = await fetch('/logistics/purchases', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: formData
             });
 
             const result = await response.json();
 
             if (response.ok) {
-                alert("¡Éxito!: " + result.message);
-                document.getElementById('purchaseForm').reset();
-                const container = document.getElementById('itemsContainer');
-                container.innerHTML = '';
-                addProductRow();
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Compra registrada!',
+                    text: 'Compra realizada con éxito',
+                    confirmButtonColor: '#198754',
+                    confirmButtonText: 'Aceptar',
+                    customClass: {
+                        popup: 'rounded-4'
+                    }
+                }).then(() => {
+                    document.getElementById('purchaseForm').reset();
+                    document.getElementById('itemsContainer').innerHTML = '';
+                    addProductRow();
+                    document.getElementById('invoice_photo').dispatchEvent(new Event('change'));
+                });
             } else {
-                // Si el backend responde con errores específicos, los mapeamos también con textos rojos
                 if (result.details) {
-                    alert("Se encontraron errores de consistencia en el Servidor.");
-                    console.log("Errores de servidor:", result.details);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de consistencia',
+                        text: 'Se encontraron errores de consistencia en el Servidor.',
+                        confirmButtonColor: 'red',
+                        confirmButtonText: 'Cerrar'
+                    });
                 } else {
-                    alert("Error: " + result.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: result.message || 'Ocurrió un error al procesar la compra.',
+                        confirmButtonColor: 'red',
+                        confirmButtonText: 'Cerrar'
+                    });
                 }
             }
         } catch (error) {
-            console.error("Error:", error);
-            alert("No se pudo conectar con el servidor backend.");
+            Swal.fire({
+                icon: 'error',
+                title: 'Fallo de Conexión',
+                text: 'No se pudo conectar con el servidor backend.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
         }
     });
 </script>
