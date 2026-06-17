@@ -13,6 +13,7 @@
     src: url('../fonts/PassionOne-Bold.ttf') format('truetype');
     font-weight: bold;
 }
+
 @font-face {
     font-family: "bootstrap-icons";
     src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
@@ -32,7 +33,7 @@
     vertical-align: -.125em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    width: 1em;
+    width: 1em; 
     height: 1em;
 }
 
@@ -64,7 +65,7 @@ body {
 .form-container {
     background-color: var(--white);
     width: 100%;
-    max-width: 480px;
+    max-width: 480px; 
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-top: 5px solid var(--primary-red);
@@ -85,7 +86,7 @@ body {
     letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 10px; 
 }
 
 .flash-messages {
@@ -116,8 +117,8 @@ body {
 .supplier-form {
     padding: 25px;
     display: flex;
-    flex-direction: column;
-    gap: 16px;
+    flex-direction: column; 
+    gap: 16px; 
 }
 
 .form-group {
@@ -135,6 +136,7 @@ label {
 
 input[type="text"],
 input[type="email"],
+input[type="tel"],
 select {
     width: 100%;
     padding: 11px;
@@ -199,4 +201,20 @@ input:focus, select:focus {
 
 .btn-cancel:hover {
     background-color: var(--dark-red);
+}
+
+.validation-msg {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    min-height: 16px; 
+}
+
+.text-danger {
+    color: var(--dark-red);
+}
+
+.text-success {
+    color: var(--success-green);
 }
