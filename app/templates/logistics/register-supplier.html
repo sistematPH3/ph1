@@ -12,6 +12,18 @@
             <h2><i class="bi bi-truck"></i> Registrar Proveedor</h2>
         </div>
         
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
         <form action="{{ url_for('logistics.suppliers.handle_register') }}" method="POST" class="supplier-form">
             
             <div class="form-group">
@@ -47,9 +59,12 @@
                 </select>
             </div>
 
-            <button type="submit" class="btn-submit">
-                <span class="bi-save"></span> Guardar Proveedor
-            </button>
+            <div class="form-actions">
+                <a href="#" class="btn-cancel">Cancelar</a>
+                <button type="submit" class="btn-submit">
+                    <span class="bi-save"></span> Guardar Proveedor
+                </button>
+            </div>
         </form>
     </div>
 

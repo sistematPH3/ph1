@@ -14,9 +14,7 @@ def show_register_form():
 def handle_register():
     try:
         supplier_request = SupplierRequest(request.form)
-        
-        db_conn = db
-        repository = SupplierRepository(db_conn)
+        repository = SupplierRepository(db)
         service = SupplierService(repository)
         
         generated_id = service.register_new_supplier(supplier_request)
@@ -24,8 +22,8 @@ def handle_register():
         flash(f"¡Proveedor registrado con éxito! ID asignado: {generated_id}", "success")
         
     except ValueError as e:
-        flash(f"Error de validación: {str(e)}", "danger")
+        flash(str(e), "danger")
     except Exception as e:
-        flash(f"Ocurrió un error inesperado al guardar: {str(e)}", "danger")
+        flash(f"Ocurrió un error de base de datos al guardar: {str(e)}", "danger")
         
-    return redirect(url_for('suppliers.show_register_form'))
+    return redirect(url_for('logistics.suppliers.show_register_form'))

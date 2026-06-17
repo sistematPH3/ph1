@@ -1,6 +1,3 @@
-/* ==========================================================================
-   1. IMPORTACIÓN DE FUENTES (Rutas relativas corregidas)
-   ========================================================================== */
 @font-face {
     font-family: 'Inter';
     src: url('../fonts/Inter-Regular.ttf') format('truetype');
@@ -16,8 +13,6 @@
     src: url('../fonts/PassionOne-Bold.ttf') format('truetype');
     font-weight: bold;
 }
-
-/* Motores para los archivos .woff y .woff2 de Bootstrap Icons que tienes */
 @font-face {
     font-family: "bootstrap-icons";
     src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
@@ -26,7 +21,6 @@
     font-style: normal;
 }
 
-/* Forzar las propiedades de la fuente solo al icono, no a los textos hijos */
 [class^="bi-"], [class*=" bi-"] {
     display: inline-block;
     font-family: "bootstrap-icons" !important;
@@ -38,21 +32,18 @@
     vertical-align: -.125em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    width: 1em; /* Evita herencias de ancho raras */
+    width: 1em;
     height: 1em;
 }
 
-/* Mapeo Unicode exacto para los pseudo-elementos */
 .bi-truck::before { content: "\f603" !important; }
 .bi-save::before { content: "\f522" !important; }
 
-
-/* ==========================================================================
-   2. VARIABLES Y ESTILOS BASE
-   ========================================================================== */
 :root {
     --primary-red: #d32f2f;
     --dark-red: #b71c1c;
+    --success-green: #2e7d32;
+    --success-hover: #1b5e20;
     --light-bg: #f8f9fa;
     --white: #ffffff;
     --text-dark: #212529;
@@ -70,14 +61,10 @@ body {
     padding: 20px 0;
 }
 
-
-/* ==========================================================================
-   3. ESTRUCTURA VERTICAL DEL FORMULARIO
-   ========================================================================== */
 .form-container {
     background-color: var(--white);
     width: 100%;
-    max-width: 480px; /* Un poco más angosto para lucir mejor verticalmente */
+    max-width: 480px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-top: 5px solid var(--primary-red);
@@ -98,14 +85,39 @@ body {
     letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 10px; /* Separa el icono del texto */
+    gap: 10px;
+}
+
+.flash-messages {
+    padding: 0 25px;
+    margin-top: 15px;
+}
+
+.alert {
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.alert-success {
+    background-color: #e8f5e9;
+    color: var(--success-green);
+    border: 1px solid #a5d6a7;
+}
+
+.alert-danger {
+    background-color: #ffebee;
+    color: var(--dark-red);
+    border: 1px solid #ef9a9a;
 }
 
 .supplier-form {
     padding: 25px;
     display: flex;
-    flex-direction: column; /* Esto obliga a todo a alinearse hacia abajo */
-    gap: 16px; /* Espaciado uniforme entre cada bloque */
+    flex-direction: column;
+    gap: 16px;
 }
 
 .form-group {
@@ -114,10 +126,6 @@ body {
     width: 100%;
 }
 
-
-/* ==========================================================================
-   4. CAMPOS DE ENTRADA (INPUTS)
-   ========================================================================== */
 label {
     margin-bottom: 6px;
     font-size: 0.88rem;
@@ -144,11 +152,34 @@ input:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
 }
 
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
 
-/* ==========================================================================
-   5. BOTÓN DE ENVÍO
-   ========================================================================== */
 .btn-submit {
+    background-color: var(--success-green);
+    color: var(--white);
+    border: none;
+    padding: 13px 20px;
+    font-size: 1rem;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+}
+
+.btn-submit:hover {
+    background-color: var(--success-hover);
+}
+
+.btn-cancel {
     background-color: var(--primary-red);
     color: var(--white);
     border: none;
@@ -157,15 +188,15 @@ input:focus, select:focus {
     font-weight: bold;
     border-radius: 4px;
     cursor: pointer;
-    width: 100%;
-    transition: background-color 0.2s;
-    margin-top: 8px;
+    flex: 1;
+    text-align: center;
+    text-decoration: none;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    transition: background-color 0.2s;
 }
 
-.btn-submit:hover {
+.btn-cancel:hover {
     background-color: var(--dark-red);
 }
