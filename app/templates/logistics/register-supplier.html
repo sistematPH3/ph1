@@ -24,7 +24,7 @@
             {% endif %}
         {% endwith %}
         
-        <form action="{{ url_for('logistics.suppliers.handle_register') }}" method="POST" class="supplier-form">
+        <form action="{{ url_for('logistics.suppliers.handle_register') }}" method="POST" class="supplier-form" id="supplierForm">
             
             <div class="form-group">
                 <label for="name">Razón Social / Nombre</label>
@@ -43,12 +43,14 @@
 
             <div class="form-group">
                 <label for="phone">Teléfono</label>
-                <input type="text" id="phone" name="phone" maxlength="20" required placeholder="Ej. +58 412-0000000">
+                <input type="tel" id="phone" name="phone" maxlength="20" required placeholder="Ej. +58 412-0000000" oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')">
+                <small id="phone-error" class="validation-msg"></small>
             </div>
 
             <div class="form-group">
                 <label for="email">Correo Electrónico</label>
                 <input type="email" id="email" name="email" maxlength="100" required placeholder="ejemplo@correo.com">
+                <small id="email-error" class="validation-msg"></small>
             </div>
 
             <div class="form-group">
@@ -61,12 +63,57 @@
 
             <div class="form-actions">
                 <a href="#" class="btn-cancel">Cancelar</a>
-                <button type="submit" class="btn-submit">
+                <button type="submit" class="btn-submit" id="submitBtn">
                     <span class="bi-save"></span> Guardar Proveedor
                 </button>
             </div>
         </form>
     </div>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const phoneInput = document.getElementById('phone');
+            const phoneError = document.getElementById('phone-error');
+            const emailInput = document.getElementById('email');
+            const emailError = document.getElementById('email-error');
+            const submitBtn = document.getElementById('submitBtn');
+
+            const phoneRegex = /^\+?[0-9][0-9\-\s]{7,18}[0-9]$/;
+            const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+            function validateForm() {
+                let isPhoneValid = phoneRegex.test(phoneInput.value);
+                let isEmailValid = emailRegex.test(emailInput.value);
+                
+                submitBtn.disabled = (!isPhoneValid && phoneInput.value !== '') || (!isEmailValid && emailInput.value !== '');
+            }
+
+            phoneInput.addEventListener('input', function() {
+                if (this.value.length === 0) {
+                    phoneError.textContent = '';
+                } else if (!phoneRegex.test(this.value)) {
+                    phoneError.textContent = 'Formato inválido. Ej: +58 412-0000000';
+                    phoneError.className = 'validation-msg text-danger';
+                } else {
+                    phoneError.textContent = 'Formato válido';
+                    phoneError.className = 'validation-msg text-success';
+                }
+                validateForm();
+            });
+
+            emailInput.addEventListener('input', function() {
+                if (this.value.length === 0) {
+                    emailError.textContent = '';
+                } else if (!emailRegex.test(this.value)) {
+                    emailError.textContent = 'Debe incluir "@" y un dominio válido';
+                    emailError.className = 'validation-msg text-danger';
+                } else {
+                    emailError.textContent = 'Correo válido';
+                    emailError.className = 'validation-msg text-success';
+                }
+                validateForm();
+            });
+        });
+    </script>
 </body>
 </html>
