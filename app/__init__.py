@@ -36,6 +36,7 @@ def create_app():
         
         from .logistics.routes.location_routes import location_bp
         app.register_blueprint(location_bp, url_prefix='/logistics')
+        
         # ==========================================================\
         # REGISTRO DEL SUB-MÓDULO DE REGISTRO DE COMPRAS de Modulo 4
         # ==========================================================\
@@ -43,9 +44,16 @@ def create_app():
         app.register_blueprint(purchase_bp, url_prefix='/logistics')
         # ==========================================================\
 
-        # Importamos el Blueprint que acabamos de estructurar arriba
+        # ==========================================================\
+        # SUB-MÓDULO: LISTADO DE PROVEEDORES (NUEVO)
+        # ==========================================================\
+        from .logistics.routes.supplier_list_routes import supplier_list_bp
+        app.register_blueprint(supplier_list_bp, url_prefix='/logistics')
+        # ==========================================================\
+
+        
         from .inventory import inventory_bp
-        # Lo registramos con el prefijo /inventory para que sea estético y organizado
+        
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
 
         # ==========================================================\

@@ -1,12 +1,20 @@
 # app/logistics/repositories/purchase_history_repository.py
-from app.extensions import db  
-from app.models import Purchase, PurchaseDetail, Supplier  # <-- Asegura el "app." antes de models
+from app.models import Purchase, PurchaseDetail, Supplier
 
 class PurchaseHistoryRepository:
-    
-    @staticmethod
-    def get_filtered_history(start_date=None, end_date=None, supplier_id=None, status=None):
-        query = db.session.query(Purchase).join(Supplier, Purchase.supplier_id == Supplier.id)
+    def __init__(self, db_connection):
+        """
+        Recibe la instancia de la base de datos (db) para mantener 
+        la consistencia arquitectónica y la inyección de dependencias.
+        """
+        self.db = db_connection
+
+    def get_filtered_history(self, start_date=None, end_date=None, supplier_id=None, status=None):
+        """Saca el historial filtrado trayendo explícitamente el objeto compra y el nombre del proveedor"""
+        # Solicitamos el objeto Purchase completo Y el campo name de la tabla Supplier
+        query = self.db.session.query(Purchase, Supplier.name.label('supplier_name')).join(
+            Supplier, Purchase.supplier_id == Supplier.id
+        )
         
         if start_date:
             query = query.filter(Purchase.purchase_date >= start_date)
@@ -21,20 +29,22 @@ class PurchaseHistoryRepository:
             
         return query.order_by(Purchase.purchase_date.desc()).all()
 
-    @staticmethod
-    def get_purchase_by_id(purchase_id):
-        return Purchase.query.get(purchase_id)
+    def get_purchase_by_id(self, purchase_id):
+        """Busca una compra por su ID usando la sesión actual"""
+        return self.db.session.query(Purchase).get(purchase_id)
 
-    @staticmethod
-    def get_details_by_purchase_id(purchase_id):
-        return db.session.query(PurchaseDetail)\
+    def get_details_by_purchase_id(self, purchase_id):
+        """Obtiene los renglones/detalles de una compra específica incluyendo el SKU del producto"""
+        from app.models import Product
+        return self.db.session.query(PurchaseDetail, Product.sku.label('product_sku'))\
+            .join(Product, PurchaseDetail.product_id == Product.id)\
             .filter(PurchaseDetail.purchase_id == purchase_id).all()
             
-    @staticmethod
-    def logical_annulment(purchase_id):
-        purchase = Purchase.query.get(purchase_id)
+    def logical_annulment(self, purchase_id):
+        """Ejecuta la anulación lógica cambiando el estado a ANULADO"""
+        purchase = self.get_purchase_by_id(purchase_id)
         if purchase:
             purchase.status = 'ANNULLED'
-            db.session.commit()
+            self.db.session.commit()
             return True
         return False

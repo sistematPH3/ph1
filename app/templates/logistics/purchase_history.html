@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Compras - Pizza Master</title>
     
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_history.css') }}"> 
+    <link class="stylesheet" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link class="stylesheet" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_history.css') }}"> 
 </head>
 <body>
 
@@ -83,13 +83,13 @@
                 {% if purchases %}
                     {% for purchase in purchases %}
                     <tr class="purchase-row" 
-                        data-id="#{{ purchase.id }}" 
-                        data-supplier="{{ purchase.supplier.name if purchase.supplier else '' }}"
+                        data-id="{{ purchase.id }}" 
+                        data-supplier="{{ purchase.supplier_name }}"
                         data-date="{{ purchase.purchase_date.strftime('%Y-%m-%d') }}"
                         style="cursor: pointer;">
                         
                         <td class="fw-bold text-secondary">#{{ purchase.id }}</td>
-                        <td><span class="fw-semibold text-dark">{{ purchase.supplier.name if purchase.supplier else 'Proveedor N/A' }}</span></td>
+                        <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
                         <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
                         <td class="fw-bold text-danger">Bs. {{ "%.2f"|format(purchase.total_amount) }}</td>
                         <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
@@ -103,11 +103,11 @@
                         </td>
                         <td class="text-center">
                             <div class="d-flex justify-content-center gap-2">
+                                {## CORREGIDO: Se quitó onclick manual para evitar conflictos con Bootstrap ##}
                                 <button class="btn btn-sm btn-light btn-audit-action text-dark border toggle-details-btn" 
                                         type="button" 
                                         data-bs-toggle="collapse" 
-                                        data-bs-target="#details-row-{{ purchase.id }}" 
-                                        onclick="loadCollapseDetails('{{ purchase.id }}')">
+                                        data-bs-target="#details-row-{{ purchase.id }}">
                                     <i class="bi bi-chevron-down"></i> Insumos
                                 </button>
                                 
@@ -122,7 +122,8 @@
                         </td>
                     </tr>
 
-                    <tr id="details-row-{{ purchase.id }}" class="collapse detail-row-container" data-parent-id="#{{ purchase.id }}">
+                    {## CORREGIDO: Eliminadas restricciones manuales de CSS y se añade data-id ##}
+                    <tr id="details-row-{{ purchase.id }}" class="collapse detail-row-container" data-purchase-id="{{ purchase.id }}">
                         <td colspan="8" class="bg-light p-4" style="border-left: 4px solid #b0121a;">
                             <div class="container-fluid">
                                 <div class="row mb-3 pb-2 border-bottom">
@@ -144,8 +145,8 @@
                                     <table class="table table-sm table-bordered bg-white m-0 align-middle">
                                         <thead class="table-dark small text-uppercase">
                                             <tr>
-                                                <th>ID Detalle</th>
-                                                <th>ID Producto (Insumo)</th>
+                                                <th>Identificación</th>
+                                                <th>SKU</th>
                                                 <th class="text-center">Cantidad</th>
                                                 <th class="text-end">Precio (Divisa Originaria)</th>
                                                 <th class="text-end">Precio Equivalente (Bs.)</th>
@@ -183,11 +184,10 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-
-    // 1. LIMITAR FECHAS DINÁMICAMENTE (Hoy hasta hace 10 años)
+    // 1. LIMITAR FECHAS DINÁMICAMENTE
     const today = new Date();
     const formattedToday = today.toISOString().split('T')[0];
     
@@ -213,21 +213,24 @@
 
     function filterAndPaginate() {
         const searchText = searchInput.value.toLowerCase().trim();
-        const selectedSupplier = supplierFilter.value;
+        const selectedSupplier = supplierFilter.value.toLowerCase().trim(); 
         const selectedDate = dateFilterInput.value; 
 
-        // Ocultar cualquier fila de detalles abierta antes de filtrar para evitar desfases visuales
-        document.querySelectorAll('.detail-row-container').forEach(row => {
-            row.classList.remove('show');
+        // Ocultar limpiamente los colapsables con el método de Bootstrap para evitar bugs visuales
+        document.querySelectorAll('.detail-row-container.show').forEach(row => {
+            const bsCollapse = bootstrap.Collapse.getInstance(row);
+            if (bsCollapse) bsCollapse.hide();
         });
 
+        const cleanSearchText = searchText.replace('#', '');
+
         filteredRows = tableRows.filter(row => {
-            const id = row.getAttribute('data-id').toLowerCase();
-            const supplier = row.getAttribute('data-supplier');
+            const id = row.getAttribute('data-id').toLowerCase().trim();
+            const supplier = row.getAttribute('data-supplier').toLowerCase().trim(); 
             const date = row.getAttribute('data-date'); 
 
-            const matchesSearch = id.includes(searchText) || supplier.toLowerCase().includes(searchText);
-            const matchesSupplier = !selectedSupplier || supplier === selectedSupplier;
+            const matchesSearch = !cleanSearchText || id.includes(cleanSearchText) || supplier.includes(cleanSearchText);
+            const matchesSupplier = !selectedSupplier || supplier === selectedSupplier; 
             const matchesDate = !selectedDate || date === selectedDate;
 
             return matchesSearch && matchesSupplier && matchesDate;
@@ -235,6 +238,7 @@
 
         if (filteredRows.length === 0) {
             tableRows.forEach(row => row.style.display = 'none');
+            document.querySelectorAll('.detail-row-container').forEach(row => row.classList.remove('show'));
             noDataRow.classList.remove('d-none');
             paginationBox.classList.add('d-none');
             paginationItems.innerHTML = '';
@@ -249,33 +253,65 @@
     }
 
     function renderTable() {
-        // Ocultar todas las filas de datos principales y de detalles
+        // Ocultar filas de datos principales
         tableRows.forEach(row => row.style.display = 'none');
-        document.querySelectorAll('.detail-row-container').forEach(row => row.style.display = 'none');
 
         const startIndex = (currentPage - 1) * rowsPerPage;
         const endIndex = startIndex + rowsPerPage;
         const pageRows = filteredRows.slice(startIndex, endIndex);
 
-        // Mostrar únicamente las filas principales activas en la página actual
+        // Mostrar solo las filas de la página actual
         pageRows.forEach(row => {
             row.style.display = 'table-row';
-            // Permitir que su respectivo colapsable se renderice como fila si el usuario lo abre
-            const targetId = row.querySelector('.toggle-details-btn').getAttribute('data-bs-target');
-            const detailRow = document.querySelector(targetId);
-            if (detailRow) detailRow.style.display = 'table-row';
         });
 
         renderPagination();
     }
 
-   // 3. CARGA DINÁMICA DE INSUMOS EN EL DESPLEGABLE (ASÍNCRONO)
+    function renderPagination() {
+        paginationItems.innerHTML = '';
+        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+        if (totalPages <= 1) {
+            paginationBox.classList.add('d-none');
+            return;
+        }
+        paginationBox.classList.remove('d-none');
+
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentPage = i;
+                renderTable();
+            });
+            paginationItems.appendChild(li);
+        }
+    }
+
+    // {## CORREGIDO: Manejo de eventos nativos de Bootstrap sin forzar `style.display` que rompe las transiciones ##}
+    document.querySelectorAll('.detail-row-container').forEach(detailRow => {
+        detailRow.addEventListener('show.bs.collapse', function () {
+            const purchaseId = this.getAttribute('data-purchase-id');
+            loadCollapseDetails(purchaseId);
+        });
+    });
+
+    searchInput.addEventListener('input', filterAndPaginate);
+    supplierFilter.addEventListener('change', filterAndPaginate);
+    dateFilterInput.addEventListener('change', filterAndPaginate);
+
+    // Carga inicial
+    filterAndPaginate();
+
+    // 3. CARGA DINÁMICA DE INSUMOS (ACTUALIZADO CON SKU)
     function loadCollapseDetails(purchaseId) {
         const tbody = document.getElementById(`collapse-body-${purchaseId}`);
-        const targetRow = document.getElementById(`details-row-${purchaseId}`);
         
-        // Si ya está abierto, Bootstrap lo cerrará solo, no volvemos a hacer el fetch
-        if (targetRow.classList.contains('show')) return;
+        if (tbody.children.length > 1 || (tbody.children.length === 1 && !tbody.children[0].innerHTML.includes('Cargando'))) {
+            return;
+        }
 
         fetch(`/logistics/purchases/history/${purchaseId}/details`)
             .then(response => {
@@ -290,10 +326,11 @@
                 }
 
                 data.details.forEach(detail => {
+                    // CORREGIDO: Ahora muestra detail.product_sku directamente en la etiqueta
                     const row = `
                         <tr>
                             <td class="text-secondary fw-bold">#${detail.id}</td>
-                            <td><span class="badge bg-dark text-white">SKU / ID: ${detail.product_id}</span></td>
+                            <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
                             <td class="text-center fw-bold text-primary">${detail.quantity}</td>
                             <td class="text-end text-success fw-semibold">${data.currency} ${detail.foreign_price.toFixed(2)}</td>
                             <td class="text-end fw-bold text-dark">Bs. ${detail.price_bs.toFixed(2)}</td>
