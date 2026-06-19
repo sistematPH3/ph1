@@ -63,7 +63,7 @@ body {
 }
 
 .custom-table-header {
-    background-color: #b52929;
+    background-color: #b52929 !important; /* Forzar el fondo rojo en el contenedor */
     color: white;
     font-family: 'Inter-Bold', sans-serif;
     font-size: 0.85rem;
@@ -73,6 +73,8 @@ body {
 }
 
 .custom-table-header th {
+    background-color: #b52929 !important; /* ¡ESTA ES LA CLAVE! Aplica el rojo directamente a cada celda del membrete */
+    color: white !important;
     padding-top: 14px;
     padding-bottom: 14px;
     border: none;
