@@ -1,0 +1,223 @@
+/* =========================================================================
+   PALETA DE COLORES Y ARMONÍA CORPORATIVA (Módulo de Compras)
+   ========================================================================= */
+body {
+    background-color: #ebedf1 !important; /* Gris claro idéntico al tablero de insumos */
+}
+
+/* Encabezado Principal del Formulario */
+.purchase-card-header {
+    background-color: #B31F24 !important; /* Rojo Mariuska */
+    color: #ffffff !important;
+    border-bottom: none !important;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+/* Contenedor de la Tarjeta */
+.purchase-card {
+    border: none !important;
+    border-radius: 20px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
+}
+
+/* Títulos de Sección Secundarios */
+.section-subtitle {
+    color: #212529 !important;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+/* =========================================================================
+   CONTROLES DE FORMULARIO: SELECTS E INPUTS ESTILO PÍLDORA
+   ========================================================================= */
+.purchase-form-control, 
+.purchase-form-select {
+    border-radius: 50px !important; /* Forma de píldora interactiva */
+    border: 1px solid #dee2e6 !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+    font-weight: 500;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Enfoque con Brillo Rojo Corporativo */
+.purchase-form-control:focus, 
+.purchase-form-select:focus {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    background-color: #ffffff !important;
+    outline: none !important;
+}
+
+/* =========================================================================
+   BOTONES CON BRILLO DINÁMICO
+   ========================================================================= */
+/* Botón Principal: Procesar Compra */
+.btn-purchase-primary {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(179, 31, 36, 0.3) !important;
+    transition: all 0.25s ease-in-out;
+}
+
+.btn-purchase-primary:hover {
+    background-color: #8a1619 !important;
+    box-shadow: 0 6px 20px rgba(179, 31, 36, 0.55) !important;
+    transform: translateY(-1.5px);
+}
+
+/* ==================================================================
+   EFECTO DINÁMICO DE LEVANTAMIENTO Y BRILLO PARA EL BOTÓN VERDE
+   =================================================================== */
+.btn-success {
+    background-color: #198754 !important;
+    border: none !important;
+    transition: all 0.25s ease-in-out !important;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3) !important;
+}
+
+/* Al pasar el mouse: se eleva 2px y genera el resplandor verde */
+.btn-success:hover {
+    transform: translateY(-2px) !important;
+    background-color: #157347 !important;
+    box-shadow: 0 6px 18px rgba(25, 135, 84, 0.45) !important;
+}
+
+/* Al hacer clic: regresa a su posición original */
+.btn-success:active {
+    transform: translateY(0) !important;
+}
+
+
+/* =========================================================================
+   REMOCIÓN ABSOLUTA DEL EFECTO HOVER EN LAS TARJETAS DEL FORMULARIO
+   ========================================================================= */
+/* Bloqueamos el movimiento y mantenemos la sombra estática original de Bootstrap */
+#productsCard.filter-card:hover,
+#invoiceCard.filter-card:hover {
+    transform: none !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+    cursor: default !important;
+}
+
+/* Botón de Acción: Eliminar Fila */
+.btn-purchase-danger {
+    border-radius: 50px !important;
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 0.85rem;
+}
+
+/* =========================================================================
+   TABLA DE ITEMS DE COMPRA
+   ========================================================================= */
+.purchase-table thead {
+    background-color: #212529 !important; /* Mantiene un contraste oscuro elegante para los items */
+    color: #ffffff !important;
+}
+
+.purchase-table th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border: none !important;
+}
+
+.purchase-table td {
+    vertical-align: middle;
+}
+/* =========================================================================
+   ESTILOS ESPECÍFICOS DE LA TABLA DE INSUMOS (ESTILO MARIUSKA)
+   ========================================================================= */
+.form-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+    margin-bottom: 0.4rem;
+}
+
+.custom-insumos-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    border: 1px solid #dee2e6 !important;
+}
+
+.custom-insumos-table thead th {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem !important;
+    border: none !important;
+    vertical-align: middle;
+}
+
+.custom-insumos-table td {
+    padding: 0.85rem 0.5rem !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    background-color: #ffffff !important;
+}
+
+.custom-insumos-table tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+.custom-insumos-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 11px !important;
+}
+.custom-insumos-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 11px !important;
+}
+
+.custom-insumos-table tbody tr,
+.custom-insumos-table tbody tr td,
+.custom-insumos-table tbody tr:hover,
+.custom-insumos-table tbody tr:hover td {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: inherit !important;
+    --bs-table-accent-bg: transparent !important;
+    --bs-table-hover-bg: transparent !important;
+    --bs-table-bg: #ffffff !important;
+}
+
+.table-field-wrapper {
+    width: 100%;
+    padding: 0 4px;
+}
+
+.custom-insumos-table .mariuska-select-group, 
+.custom-insumos-table .search-input-group {
+    border-radius: 50px !important;
+    border: 1px solid #ced4da !important;
+    background-color: #f8f9fa !important;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+}
+
+.custom-insumos-table .form-control, 
+.custom-insumos-table .form-select, 
+.custom-insumos-table .input-group-text {
+    border-radius: 0 !important;
+}
+
+.custom-insumos-table .mariuska-select-group:focus-within, 
+.custom-insumos-table .search-input-group:focus-within {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    background-color: #ffffff !important;
+}
+
+.custom-insumos-table .form-select {
+    padding-left: 1.2rem !important;
+}

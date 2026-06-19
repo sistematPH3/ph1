@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Proveedores - Pizza Hut</title>
+    
+    <link class="js-css-placeholder" rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link class="js-css-placeholder" rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+    <link class="js-css-placeholder" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier_list.css') }}?v=1.4">
+</head>
+<body>
+
+    <div class="container my-5">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center">
+                <div class="header-icon-container p-3 rounded-3 me-3 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-shop text-white fs-4"></i>
+                </div>
+                <div>
+                    <h1 class="module-title mb-0">Gestión de Proveedores</h1>
+                    <small class="text-muted">Control, estatus y compras consolidadas a nivel nacional</small>
+                </div>
+            </div>
+            <a href="{{ url_for('supplier_list.register_supplier_view') }}" class="btn btn-add-supplier rounded-pill px-4 text-white shadow-sm d-inline-flex align-items-center text-decoration-none">
+                <i class="bi bi-plus-lg me-1"></i> Nuevo Proveedor
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4 align-items-center">
+            <div class="col-md-8 position-relative">
+                <span class="search-icon-wrapper">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" id="autoSearch" class="form-control search-input shadow-sm" placeholder="Buscar por nombre o RIF...">
+            </div>
+            <div class="col-md-4">
+                <select id="statusFilter" class="form-select filter-select rounded-pill shadow-sm">
+                    <option value="">Todos los estatus</option>
+                    <option value="ACTIVE">Activos</option>
+                    <option value="INACTIVE">Inactivos</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0" id="suppliersTable">
+                    <thead class="custom-table-header">
+                        <tr>
+                            <th class="ps-4" style="width: 20%;">RIF / Tax ID</th>
+                            <th style="width: 35%;">Nombre del Proveedor</th>
+                            <th class="text-center" style="width: 25%;">Estatus Operativo</th>
+                            <th class="text-center" style="width: 20%;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in suppliers %}
+                        {% set is_active = s.status.upper() == 'ACTIVE' or s.status.upper() == 'OPERATIVA' %}
+                        
+                        <tr class="supplier-row {{ 'row-inactive' if not is_active }}" 
+                            data-status="{{ 'ACTIVE' if is_active else 'INACTIVE' }}"
+                            data-name="{{ s.name }}"
+                            data-taxid="{{ s.tax_id }}"
+                            data-contact="{{ s.contact_name }}"
+                            data-phone="{{ s.phone }}"
+                            data-email="{{ s.email }}"
+                            data-date="{% if s.last_purchase_date %}{{ s.last_purchase_date.strftime('%d/%m/%Y - %I:%M %p') }}{% else %}Ninguna compra registrada{% endif %}">
+                            
+                            <td class="ps-4 supplier-tax-id clickable-trigger" style="cursor: pointer;">{{ s.tax_id }}</td>
+                            <td class="clickable-trigger" style="cursor: pointer;">
+                                <span class="supplier-name text-dark h6">{{ s.name }}</span> 
+                                <i class="bi bi-window-fullscreen ms-1 text-muted small" title="Ver detalles"></i>
+                            </td>
+                            <td class="text-center">
+                                {% if is_active %}
+                                    <span class="status-badge-active">Operativa</span>
+                                {% else %}
+                                    <span class="status-badge-inactive">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-action-edit p-1 me-2" title="Editar Proveedor" data-id="{{ s.id }}">
+                                    <i class="bi bi-pencil-square custom-edit-icon"></i>
+                                </button>
+                                
+                                <div class="form-check form-switch d-inline-block align-middle m-0">
+                                    <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                                           data-id="{{ s.id }}" data-name="{{ s.name }}"
+                                           {% if is_active %}checked{% endif %}>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div id="noResults" class="text-center p-5 d-none">
+                    <div class="mb-3">
+                        <i class="bi bi-search text-muted" style="font-size: 3.5rem;"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark m-0">No se encontraron resultados</h5>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDetails" tabindex="-1" aria-labelledby="modalDetailsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header bg-light border-0 py-3 px-4">
+                    <h5 class="modal-title fw-bold text-dark" id="modalDetailsLabel">
+                        <i class="bi bi-info-circle-fill me-2 text-danger"></i>Información del Proveedor
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-4 text-dark">
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold text-uppercase d-block mb-1">Nombre del Proveedor</label>
+                            <p id="detName" class="fs-5 fw-semibold mb-0 text-dark"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold text-uppercase d-block mb-1">RIF / Tax ID</label>
+                            <p id="detTaxId" class="fs-5 fw-semibold mb-0 text-secondary"></p>
+                        </div>
+                        <hr class="my-2 text-muted opacity-25">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-person-badge me-1"></i> Contacto Interno</h6>
+                            <div class="mb-2">
+                                <label class="text-muted small d-block">Nombre</label>
+                                <span id="detContact" class="fw-semibold"></span>
+                            </div>
+                            <div>
+                                <label class="text-muted small d-block">Teléfono</label>
+                                <span id="detPhone" class="text-secondary"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-envelope me-1"></i> Comunicación y Logística</h6>
+                            <div class="mb-2">
+                                <label class="text-muted small d-block">Correo Electrónico</label>
+                                <span id="detEmail" class="text-secondary"></span>
+                            </div>
+                            <div>
+                                <label class="text-muted small d-block">Última Compra Recibida</label>
+                                <span id="detDate" class="fw-semibold text-dark"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light py-2 px-4 justify-content-end">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDeactivate" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content border-0 shadow-lg p-4 text-center rounded-4">
+                <div class="modal-body p-0">
+                    <div class="mb-4 text-danger d-flex justify-content-center">
+                        <i class="bi bi-octagon-fill position-relative" style="font-size: 5.5rem; line-height: 1;">
+                            <span class="position-absolute top-50 start-50 translate-middle text-white fw-bold fs-2" style="margin-top: -4px; font-family: sans-serif;">!</span>
+                        </i>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-3">¿Desactivar Proveedor?</h3>
+                    <p class="text-muted small px-3 mb-4">Estás a punto de desactivar al proveedor <strong id="deactivateSupplierName"></strong>.</p>
+                    <div class="d-grid gap-3 px-3">
+                        <button type="button" class="btn btn-confirm-deactivate rounded-pill py-2 text-white fw-bold" id="btnConfirmDeactivate">Confirmar</button>
+                        <a href="#" class="text-muted small text-decoration-none label-cancel-return" data-bs-dismiss="modal">← Cancelar y volver</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalActivate" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content border-0 shadow-lg p-4 text-center rounded-4">
+                <div class="modal-body p-0">
+                    <div class="mb-4 text-success">
+                        <i class="bi bi-check-circle-fill" style="font-size: 5.5rem; line-height: 1;"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-3">¿Activar Proveedor?</h3>
+                    <p class="text-muted small px-3 mb-4">Vas a reactivar al proveedor <strong id="activateSupplierName"></strong>.</p>
+                    <div class="d-grid gap-3 px-3">
+                        <button type="button" class="btn btn-confirm-activate rounded-pill py-2 text-white fw-bold" id="btnConfirmActivate">Confirmar</button>
+                        <a href="#" class="text-muted small text-decoration-none label-cancel-return" data-bs-dismiss="modal">← Cancelar y volver</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const searchInput = document.getElementById('autoSearch');
+            const statusFilter = document.getElementById('statusFilter');
+            const noResults = document.getElementById('noResults');
+            const tableElement = document.getElementById('suppliersTable');
+            const tableHeader = tableElement.querySelector('thead');
+
+            const modalDeactivate = new bootstrap.Modal(document.getElementById('modalDeactivate'));
+            const modalActivate = new bootstrap.Modal(document.getElementById('modalActivate'));
+            const modalDetails = new bootstrap.Modal(document.getElementById('modalDetails'));
+
+            let activeToggleTarget = null;
+
+            // FUNCIÓN ACTUALIZADA: Asegura limpieza total de textos mediante .trim()
+            function applyFilters() {
+                const searchValue = searchInput.value.toLowerCase().trim();
+                const selectedStatus = statusFilter.value;
+                const rows = document.querySelectorAll('#suppliersTable tbody .supplier-row');
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    // El método .trim() remueve saltos de línea invisibles introducidos por Jinja2
+                    const sName = (row.getAttribute('data-name') || '').toLowerCase().trim();
+                    const sTaxId = (row.getAttribute('data-taxid') || '').toLowerCase().trim();
+                    const rowStatus = row.getAttribute('data-status');
+
+                    const matchesSearch = sName.includes(searchValue) || sTaxId.includes(searchValue);
+                    const matchesStatus = (selectedStatus === "") || (rowStatus === selectedStatus);
+
+                    if (matchesSearch && matchesStatus) {
+                        row.style.display = "";
+                        visibleCount++;
+                    } else {
+                        row.style.display = "none";
+                    }
+                });
+
+                if (visibleCount === 0) {
+                    tableHeader.style.display = "none";
+                    noResults.classList.remove('d-none');
+                } else {
+                    tableHeader.style.display = "";
+                    noResults.classList.add('d-none');
+                }
+            }
+
+            // Escuchas de eventos para activar el buscador en tiempo real
+            searchInput.addEventListener('keyup', applyFilters);
+            searchInput.addEventListener('input', applyFilters); // Soporte extra para autocompletados
+            statusFilter.addEventListener('change', applyFilters);
+
+            // Despliegue del formulario al pinchar RIF o Nombre
+            const triggers = document.querySelectorAll('.clickable-trigger');
+            triggers.forEach(cell => {
+                cell.addEventListener('click', function() {
+                    const row = this.closest('.supplier-row');
+
+                    document.getElementById('detName').innerText = row.getAttribute('data-name');
+                    document.getElementById('detTaxId').innerText = row.getAttribute('data-taxid');
+                    document.getElementById('detContact').innerText = row.getAttribute('data-contact');
+                    document.getElementById('detPhone').innerText = row.getAttribute('data-phone');
+                    document.getElementById('detEmail').innerText = row.getAttribute('data-email');
+                    document.getElementById('detDate').innerText = row.getAttribute('data-date');
+
+                    modalDetails.show();
+                });
+            });
+
+            // Manejo de clics de edición
+            const editButtons = document.querySelectorAll('.btn-action-edit');
+            editButtons.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    const supplierId = this.getAttribute('data-id');
+                    window.location.href = `/logistics/suppliers/edit/${supplierId}`;
+                });
+            });
+
+            // Manejo de toggles (Activar/Desactivar)
+            const toggles = document.querySelectorAll('.status-toggle');
+            toggles.forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    e.preventDefault(); 
+                    activeToggleTarget = this;
+                    const supplierName = this.getAttribute('data-name');
+
+                    if (!this.checked) {
+                        document.getElementById('deactivateSupplierName').innerText = supplierName;
+                        modalDeactivate.show();
+                    } else {
+                        document.getElementById('activateSupplierName').innerText = supplierName;
+                        modalActivate.show();
+                    }
+                });
+            });
+
+            document.getElementById('btnConfirmDeactivate').addEventListener('click', function() {
+                if (activeToggleTarget) executeToggleAjax(activeToggleTarget);
+                modalDeactivate.hide();
+            });
+
+            document.getElementById('btnConfirmActivate').addEventListener('click', function() {
+                if (activeToggleTarget) executeToggleAjax(activeToggleTarget);
+                modalActivate.hide();
+            });
+
+            function executeToggleAjax(toggleElement) {
+                const supplierId = toggleElement.getAttribute('data-id');
+                fetch(`/logistics/suppliers/list/${supplierId}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload(); 
+                    } else {
+                        alert("Error al procesar la solicitud.");
+                    }
+                })
+                .catch(err => console.error("Error:", err));
+            }
+
+            // Ejecución inicial por si hay filtros por defecto
+            applyFilters();
+        });
+    </script>
+</body>
+</html>

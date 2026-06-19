@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro de Compra | Sistema Gestion PH</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 header-container">
+        <div class="d-flex align-items-center">
+            <div class="bg-mariuska-red text-white p-3 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 60px; height: 60px;">
+                <i class="bi bi-cart-fill fs-2"></i>
+            </div>
+            <div>
+                <h2 class="m-0 fw-bold system-title" style="color: #212529;">Registro de Compras</h2>
+                <small class="text-muted fw-medium subtitle-text">Registrar Nueva Compra e incorporación de stock al inventario nacional</small>
+            </div>
+        </div>
+        <a href="{{ url_for('inventory.list_products') }}" class="btn btn-filter-dark fw-bold px-4 py-2 d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left"></i> Volver al Stock
+        </a>
+    </div>
+
+    <form id="purchaseForm" novalidate enctype="multipart/form-data">
+        <div class="row g-4 align-items-start">
+            
+            <div class="col-lg-8">
+                <div id="productsCard" class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden filter-card d-flex flex-column">
+                    
+                    <div class="p-4 bg-white border-bottom">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-box-seam me-2 fs-4" style="color: #B31F24;"></i>
+                            <h5 class="m-0 fw-bold text-dark">Productos de la Compra</h5>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive flex-grow-1 px-4 mt-3">
+                        <table class="table align-middle m-0 custom-insumos-table" id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 45%;">Producto / Insumo</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Cantidad</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 25%;">Precio Extranjero</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 10%;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsContainer">
+                                <tr class="main-product-row">
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group mariuska-select-group">
+                                                <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
+                                                    <option value="" disabled selected>Seleccione un producto</option>
+                                                    {% for p in products %}
+                                                        <option value="{{ p.id }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group search-input-group">
+                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10" required>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group search-input-group">
+                                                <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-currency-exchange"></i></span>
+                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" value="5.50" required>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove()" title="Eliminar">
+                                            <i class="bi bi-trash text-white fs-6"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-4 bg-light border-top d-flex justify-content-end align-items-center gap-3 mt-4">
+                        <button type="button" class="btn btn-success fw-bold px-4 py-2.5 fs-6 shadow rounded-pill shadow-sm d-flex align-items-center gap-2" onclick="addProductRow()">
+                            <i class="bi bi-plus-lg"></i> Agregar Producto
+                        </button>
+                        
+                        <button type="submit" class="btn btn-mariuska-red fw-bold px-5 py-2.5 fs-6 shadow">
+                            <i class="bi bi-check2-circle me-1"></i> Procesar y Guardar Compra
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div id="invoiceCard" class="card border-0 rounded-4 shadow-sm bg-white p-4 filter-card">
+                    <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                        <i class="bi bi-file-earmark-text me-2 fs-4" style="color: #B31F24;"></i>
+                        <h5 class="m-0 fw-bold text-dark">Datos de la Factura</h5>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Proveedor</label>
+                        <div class="input-group mariuska-select-group bg-light">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-building"></i></span>
+                            <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
+                                <option value="" disabled selected>Seleccione Proveedor</option>
+                                {% for s in suppliers %}
+                                    <option value="{{ s.id }}">{{ s.name }} ({{ s.tax_id }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Moneda</label>
+                        <div class="input-group mariuska-select-group bg-light">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-cash-coin"></i></span>
+                            <select id="currency" class="form-select border-0 py-2 bg-transparent cursor-pointer">
+                                <option value="USD">Dólares (USD)</option>
+                                <option value="EUR">Euros (EUR)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tasa de Cambio</label>
+                        <div class="input-group search-input-group bg-light">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-graph-up-arrow"></i></span>
+                            <input type="number" step="0.01" id="exchange_rate" class="form-control border-0 py-2 bg-transparent" value="36.55" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Usuario / Comprador</label>
+                        <div class="input-group mariuska-select-group bg-light">
+                            <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-person-badge"></i></span>
+                            <select id="user_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
+                                <option value="" disabled selected>Seleccione Usuario</option>
+                                {% for u in users %}
+                                    <option value="{{ u.id }}">{{ u.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Foto del Comprobante / Factura</label>
+                        <label class="border rounded-3 p-3 text-center bg-light shadow-sm d-block" 
+                               style="cursor: pointer; border: 2px dashed #adb5bd !important; transition: all 0.3s ease;" 
+                               id="dropzoneArea" for="invoice_photo">
+                            <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
+                            <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
+                            <input type="file" id="invoice_photo" name="invoice_photo" style="display: none;" accept="image/*" required>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const productsCard = document.getElementById('productsCard');
+        const invoiceCard = document.getElementById('invoiceCard');
+        
+        if (productsCard && invoiceCard && window.innerWidth >= 992) {
+            const initialMaxHeight = Math.max(productsCard.offsetHeight, invoiceCard.offsetHeight);
+            productsCard.style.minHeight = `${initialMaxHeight}px`;
+            invoiceCard.style.minHeight = `${initialMaxHeight}px`;
+        }
+
+        setupHeaderValidation();
+    });
+
+    document.getElementById('invoice_photo').addEventListener('change', function(e) {
+        const fileNameDisplay = document.getElementById('photoFileName');
+        const icon = document.getElementById('cameraIcon');
+        const dropzone = document.getElementById('dropzoneArea');
+        
+        if (this.files && this.files.length > 0) {
+            fileNameDisplay.innerText = this.files[0].name;
+            fileNameDisplay.classList.replace('text-muted', 'text-success');
+            icon.classList.replace('bi-camera', 'bi-check-circle-fill');
+            icon.classList.replace('text-muted', 'text-success');
+            dropzone.style.borderColor = '#198754';
+        } else {
+            fileNameDisplay.innerText = 'Toca aquí para tomar foto o abrir galería';
+            fileNameDisplay.classList.replace('text-success', 'text-muted');
+            icon.classList.replace('bi-check-circle-fill', 'bi-camera');
+            icon.classList.replace('text-success', 'text-muted');
+            dropzone.style.borderColor = '#adb5bd';
+        }
+    });
+
+    function setFieldError(element, message) {
+        if (!element) return;
+        
+        const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
+        const inputGroup = element.closest('.mariuska-select-group') || element.closest('.search-input-group');
+        
+        clearFieldError(element);
+
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-danger small fw-bold mt-1 error-label animate-fade-in';
+        errorDiv.style.fontSize = '0.78rem';
+        errorDiv.style.whiteSpace = 'nowrap'; 
+        errorDiv.innerText = message;
+        
+        wrapper.appendChild(errorDiv);
+
+        if (inputGroup) {
+            inputGroup.style.setProperty('border-color', '#dc3545', 'important');
+        }
+    }
+
+    function clearFieldError(element) {
+        if (!element) return;
+        const wrapper = element.closest('.mb-3') || element.closest('.mb-2') || element.closest('.table-field-wrapper');
+        const inputGroup = element.closest('.mariuska-select-group') || element.closest('.search-input-group');
+        
+        const existingError = wrapper.querySelector('.error-label');
+        if (existingError) {
+            existingError.remove();
+        }
+
+        if (inputGroup) {
+            inputGroup.style.borderColor = '';
+        }
+    }
+
+    function setupHeaderValidation() {
+        const fields = [
+            { id: 'supplier_id', type: 'change', msg: 'Debes seleccionar un proveedor.' },
+            { id: 'user_id', type: 'change', msg: 'Debes seleccionar un usuario comprador.' },
+            { id: 'currency', type: 'change', msg: 'Debes seleccionar una moneda.' }
+        ];
+
+        fields.forEach(field => {
+            const el = document.getElementById(field.id);
+            if (el) {
+                el.addEventListener(field.type, () => {
+                    if (!el.value) setFieldError(el, field.msg);
+                    else clearFieldError(el);
+                });
+            }
+        });
+
+        const exchangeRateInput = document.getElementById('exchange_rate');
+        if (exchangeRateInput) {
+            exchangeRateInput.addEventListener('input', () => {
+                const val = parseFloat(exchangeRateInput.value);
+                if (!exchangeRateInput.value || isNaN(val)) {
+                    setFieldError(exchangeRateInput, 'La tasa de cambio es obligatoria.');
+                } else if (val <= 0) {
+                    setFieldError(exchangeRateInput, 'La tasa debe ser mayor a cero (0).');
+                } else {
+                    clearFieldError(exchangeRateInput);
+                }
+            });
+        }
+    }
+
+    function attachRowValidationListeners(row) {
+        const prodId = row.querySelector('.prod-id');
+        const prodQty = row.querySelector('.prod-qty');
+        const prodPrice = row.querySelector('.prod-price');
+
+        if (prodId) {
+            prodId.addEventListener('change', () => {
+                if (!prodId.value) setFieldError(prodId, 'Selecciona producto.');
+                else clearFieldError(prodId);
+            });
+        }
+
+        if (prodQty) {
+            prodQty.addEventListener('input', () => {
+                const val = parseFloat(prodQty.value);
+                if (!prodQty.value || isNaN(val)) {
+                    setFieldError(prodQty, 'La cantidad es obligatoria.');
+                } else if (val <= 0) {
+                    setFieldError(prodQty, 'Debe ser mayor a 0.');
+                } else {
+                    clearFieldError(prodQty);
+                }
+            });
+        }
+
+        if (prodPrice) {
+            prodPrice.addEventListener('input', () => {
+                const val = parseFloat(prodPrice.value);
+                if (!prodPrice.value || isNaN(val)) {
+                    setFieldError(prodPrice, 'El precio es obligatorio.');
+                } else if (val <= 0) {
+                    setFieldError(prodPrice, 'Debe ser mayor a 0.');
+                } else {
+                    clearFieldError(prodPrice);
+                }
+            });
+        }
+    }
+
+    document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
+        attachRowValidationListeners(row);
+    });
+
+    function addProductRow() {
+        const tbody = document.getElementById('itemsContainer');
+        const firstSelect = document.querySelector('.prod-id');
+        const optionsHtml = firstSelect ? firstSelect.innerHTML : '<option value="">-- Elige un producto --</option>';
+
+        const row = document.createElement('tr');
+        row.className = 'main-product-row';
+        row.innerHTML = `
+            <td>
+                <div class="table-field-wrapper">
+                    <div class="input-group mariuska-select-group">
+                        <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id">
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="table-field-wrapper">
+                    <div class="input-group search-input-group">
+                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10">
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="table-field-wrapper">
+                    <div class="input-group search-input-group">
+                        <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
+                        <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" value="5.50">
+                    </div>
+                </div>
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove()" title="Eliminar">
+                    <i class="bi bi-trash text-white fs-6"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+
+        attachRowValidationListeners(row);
+    }
+
+    function validateFormBeforeSubmit() {
+        let isValid = true;
+
+        const supplier = document.getElementById('supplier_id');
+        const user = document.getElementById('user_id');
+        const currency = document.getElementById('currency');
+        const exchangeRate = document.getElementById('exchange_rate');
+        const invoicePhoto = document.getElementById('invoice_photo');
+
+        if (!supplier.value) { setFieldError(supplier, 'Debes seleccionar un proveedor.'); isValid = false; }
+        if (!user.value) { setFieldError(user, 'Debes seleccionar un usuario comprador.'); isValid = false; }
+        if (!currency.value) { setFieldError(currency, 'Debes seleccionar una moneda.'); isValid = false; }
+        
+        const rateVal = parseFloat(exchangeRate.value);
+        if (!exchangeRate.value || isNaN(rateVal) || rateVal <= 0) { 
+            setFieldError(exchangeRate, 'La tasa de cambio debe ser un número mayor a cero.'); 
+            isValid = false; 
+        }
+
+        if (!invoicePhoto.files || invoicePhoto.files.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Evidencia Requerida',
+                text: 'Debes adjuntar la foto de la factura.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
+            isValid = false;
+        }
+
+        const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
+        if (rows.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Carrito Vacío',
+                text: 'Debes registrar al menos un producto en la compra.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
+            isValid = false;
+        }
+
+        rows.forEach(row => {
+            const prodId = row.querySelector('.prod-id');
+            const prodQty = row.querySelector('.prod-qty');
+            const prodPrice = row.querySelector('.prod-price');
+
+            if (!prodId.value) { setFieldError(prodId, 'Selecciona producto.'); isValid = false; }
+            
+            const qtyVal = parseFloat(prodQty.value);
+            if (!prodQty.value || isNaN(qtyVal)) { 
+                setFieldError(prodQty, 'La cantidad es obligatoria.'); 
+                isValid = false; 
+            } else if (qtyVal <= 0) { 
+                setFieldError(prodQty, 'Debe ser mayor a 0.'); 
+                isValid = false; 
+            }
+            
+            const priceVal = parseFloat(prodPrice.value);
+            if (!prodPrice.value || isNaN(priceVal)) { 
+                setFieldError(prodPrice, 'El precio es obligatorio.'); 
+                isValid = false; 
+            } else if (priceVal <= 0) { 
+                setFieldError(prodPrice, 'Debe ser mayor a 0.'); 
+                isValid = false; 
+            }
+        });
+
+        return isValid;
+    }
+
+    document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); 
+
+        if (!validateFormBeforeSubmit()) {
+            const firstError = document.querySelector('.error-label');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return; 
+        }
+
+        const formData = new FormData();
+        formData.append('supplier_id', document.getElementById('supplier_id').value);
+        formData.append('currency', document.getElementById('currency').value);
+        formData.append('exchange_rate', document.getElementById('exchange_rate').value);
+        formData.append('user_id', document.getElementById('user_id').value);
+        
+        const photoFile = document.getElementById('invoice_photo').files[0];
+        formData.append('invoice_photo', photoFile);
+
+        const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
+        rows.forEach(row => {
+            const prodIdVal = row.querySelector('.prod-id').value;
+            const qtyVal = row.querySelector('.prod-qty').value;
+            const priceVal = row.querySelector('.prod-price').value;
+
+            if(prodIdVal) {
+                formData.append('product_id[]', prodIdVal);
+                formData.append('quantity[]', qtyVal);
+                formData.append('foreign_price[]', priceVal);
+            }
+        });
+
+        try {
+            const response = await fetch('/logistics/purchases', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Compra registrada!',
+                    text: 'Compra realizada con éxito',
+                    confirmButtonColor: '#198754',
+                    confirmButtonText: 'Aceptar',
+                    customClass: {
+                        popup: 'rounded-4'
+                    }
+                }).then(() => {
+                    document.getElementById('purchaseForm').reset();
+                    document.getElementById('itemsContainer').innerHTML = '';
+                    addProductRow();
+                    document.getElementById('invoice_photo').dispatchEvent(new Event('change'));
+                });
+            } else {
+                if (result.details) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de consistencia',
+                        text: 'Se encontraron errores de consistencia en el Servidor.',
+                        confirmButtonColor: 'red',
+                        confirmButtonText: 'Cerrar'
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: result.message || 'Ocurrió un error al procesar la compra.',
+                        confirmButtonColor: 'red',
+                        confirmButtonText: 'Cerrar'
+                    });
+                }
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Fallo de Conexión',
+                text: 'No se pudo conectar con el servidor backend.',
+                confirmButtonColor: 'red',
+                confirmButtonText: 'Cerrar'
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Compras - Pizza Master</title>
+    
+    <link class="stylesheet" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link class="stylesheet" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_history.css') }}"> 
+</head>
+<body>
+
+<div class="main-container py-4 px-4">
+    
+    <div class="d-flex align-items-center mb-4">
+        <div class="icon-container-audit me-3">
+            <i class="bi bi-receipt fs-4"></i>
+        </div>
+        <div>
+            <h2 class="header-title m-0 fw-bold">Historial de Compras</h2>
+            <p class="text-muted m-0 small">Control y trazabilidad de facturas de proveedores a nivel general</p>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card card-custom p-3 mb-4">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <div class="filter-input-group">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="search-input" placeholder="Buscar por número o proveedor...">
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="filter-input-group">
+                    <i class="bi bi-filter"></i>
+                    <select id="supplier-filter">
+                        <option value="">Todos los proveedores</option>
+                        {% for supplier in suppliers %}
+                            <option value="{{ supplier.name }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="filter-input-group">
+                    <i class="bi bi-calendar3"></i>
+                    <input type="date" id="date-filter">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div class="card card-custom overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-custom-audit table-hover align-middle" id="purchases-table">
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Proveedor</th>
+                    <th>Fecha de Compra</th>
+                    <th>Monto Total</th>
+                    <th>Moneda</th>
+                    <th>Tasa Aplicada</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                {% if purchases %}
+                    {% for purchase in purchases %}
+                    <tr class="purchase-row" 
+                        data-id="{{ purchase.id }}" 
+                        data-supplier="{{ purchase.supplier_name }}"
+                        data-date="{{ purchase.purchase_date.strftime('%Y-%m-%d') }}"
+                        style="cursor: pointer;">
+                        
+                        <td class="fw-bold text-secondary">#{{ purchase.id }}</td>
+                        <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
+                        <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
+                        <td class="fw-bold text-danger">Bs. {{ "%.2f"|format(purchase.total_amount) }}</td>
+                        <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
+                        <td>Bs. {{ "%.4f"|format(purchase.exchange_rate) }}</td>
+                        <td>
+                            {% if purchase.status == 'COMPLETED' %}
+                            <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
+                            {% else %}
+                            <span class="status-badge-annulled"><i class="bi bi-x-circle-fill"></i> ANNULLED</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2">
+                                {## CORREGIDO: Se quitó onclick manual para evitar conflictos con Bootstrap ##}
+                                <button class="btn btn-sm btn-light btn-audit-action text-dark border toggle-details-btn" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#details-row-{{ purchase.id }}">
+                                    <i class="bi bi-chevron-down"></i> Insumos
+                                </button>
+                                
+                                {% if purchase.status == 'COMPLETED' %}
+                                <form action="{{ url_for('purchase_history.annul', purchase_id=purchase.id) }}" method="POST" onsubmit="return confirm('¿Está seguro de que desea anular lógicamente esta factura?');" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger btn-audit-action">
+                                        <i class="bi bi-trash3"></i> Anular
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    {## CORREGIDO: Eliminadas restricciones manuales de CSS y se añade data-id ##}
+                    <tr id="details-row-{{ purchase.id }}" class="collapse detail-row-container" data-purchase-id="{{ purchase.id }}">
+                        <td colspan="8" class="bg-light p-4" style="border-left: 4px solid #b0121a;">
+                            <div class="container-fluid">
+                                <div class="row mb-3 pb-2 border-bottom">
+                                    <div class="col-md-6">
+                                        <h6 class="fw-bold text-dark m-0"><i class="bi bi-box-seam me-2"></i>Especificación Técnica y Desglose de Insumos</h6>
+                                    </div>
+                                    <div class="col-md-6 text-md-end">
+                                        {% if purchase.invoice_url %}
+                                        <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-image me-1"></i> Ver Factura Original (Evidencia)
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted small"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered bg-white m-0 align-middle">
+                                        <thead class="table-dark small text-uppercase">
+                                            <tr>
+                                                <th>Identificación</th>
+                                                <th>SKU</th>
+                                                <th class="text-center">Cantidad</th>
+                                                <th class="text-end">Precio (Divisa Originaria)</th>
+                                                <th class="text-end">Precio Equivalente (Bs.)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="collapse-body-{{ purchase.id }}">
+                                            <tr>
+                                                <td colspan="5" class="text-center py-2 text-muted">
+                                                    <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Cargando renglones...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+                
+                <tr id="no-data-row" class="{% if purchases %}d-none{% endif %}">
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <i class="bi bi-search fs-1 d-block mb-3 text-secondary" style="font-size: 3rem !important;"></i>
+                        <h5 class="fw-bold text-dark m-0">No se encontraron resultados</h5>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-container" id="pagination-box">
+        <nav>
+            <ul class="pagination pagination-sm m-0" id="pagination-items"></ul>
+        </nav>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // 1. LIMITAR FECHAS DINÁMICAMENTE
+    const today = new Date();
+    const formattedToday = today.toISOString().split('T')[0];
+    
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(today.getFullYear() - 10);
+    const formattedTenYearsAgo = tenYearsAgo.toISOString().split('T')[0];
+
+    const dateFilterInput = document.getElementById('date-filter');
+    dateFilterInput.max = formattedToday;
+    dateFilterInput.min = formattedTenYearsAgo;
+
+    // 2. LÓGICA DE FILTRADO EN TIEMPO REAL Y PAGINACIÓN
+    const searchInput = document.getElementById('search-input');
+    const supplierFilter = document.getElementById('supplier-filter');
+    const tableRows = Array.from(document.querySelectorAll('.purchase-row'));
+    const noDataRow = document.getElementById('no-data-row');
+    const paginationBox = document.getElementById('pagination-box');
+    const paginationItems = document.getElementById('pagination-items');
+    
+    let filteredRows = [...tableRows];
+    let currentPage = 1;
+    const rowsPerPage = 10;
+
+    function filterAndPaginate() {
+        const searchText = searchInput.value.toLowerCase().trim();
+        const selectedSupplier = supplierFilter.value.toLowerCase().trim(); 
+        const selectedDate = dateFilterInput.value; 
+
+        // Ocultar limpiamente los colapsables con el método de Bootstrap para evitar bugs visuales
+        document.querySelectorAll('.detail-row-container.show').forEach(row => {
+            const bsCollapse = bootstrap.Collapse.getInstance(row);
+            if (bsCollapse) bsCollapse.hide();
+        });
+
+        const cleanSearchText = searchText.replace('#', '');
+
+        filteredRows = tableRows.filter(row => {
+            const id = row.getAttribute('data-id').toLowerCase().trim();
+            const supplier = row.getAttribute('data-supplier').toLowerCase().trim(); 
+            const date = row.getAttribute('data-date'); 
+
+            const matchesSearch = !cleanSearchText || id.includes(cleanSearchText) || supplier.includes(cleanSearchText);
+            const matchesSupplier = !selectedSupplier || supplier === selectedSupplier; 
+            const matchesDate = !selectedDate || date === selectedDate;
+
+            return matchesSearch && matchesSupplier && matchesDate;
+        });
+
+        if (filteredRows.length === 0) {
+            tableRows.forEach(row => row.style.display = 'none');
+            document.querySelectorAll('.detail-row-container').forEach(row => row.classList.remove('show'));
+            noDataRow.classList.remove('d-none');
+            paginationBox.classList.add('d-none');
+            paginationItems.innerHTML = '';
+            return;
+        } else {
+            noDataRow.classList.add('d-none');
+            paginationBox.classList.remove('d-none');
+        }
+
+        currentPage = 1;
+        renderTable();
+    }
+
+    function renderTable() {
+        // Ocultar filas de datos principales
+        tableRows.forEach(row => row.style.display = 'none');
+
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
+        const pageRows = filteredRows.slice(startIndex, endIndex);
+
+        // Mostrar solo las filas de la página actual
+        pageRows.forEach(row => {
+            row.style.display = 'table-row';
+        });
+
+        renderPagination();
+    }
+
+    function renderPagination() {
+        paginationItems.innerHTML = '';
+        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+        if (totalPages <= 1) {
+            paginationBox.classList.add('d-none');
+            return;
+        }
+        paginationBox.classList.remove('d-none');
+
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentPage = i;
+                renderTable();
+            });
+            paginationItems.appendChild(li);
+        }
+    }
+
+    // {## CORREGIDO: Manejo de eventos nativos de Bootstrap sin forzar `style.display` que rompe las transiciones ##}
+    document.querySelectorAll('.detail-row-container').forEach(detailRow => {
+        detailRow.addEventListener('show.bs.collapse', function () {
+            const purchaseId = this.getAttribute('data-purchase-id');
+            loadCollapseDetails(purchaseId);
+        });
+    });
+
+    searchInput.addEventListener('input', filterAndPaginate);
+    supplierFilter.addEventListener('change', filterAndPaginate);
+    dateFilterInput.addEventListener('change', filterAndPaginate);
+
+    // Carga inicial
+    filterAndPaginate();
+
+    // 3. CARGA DINÁMICA DE INSUMOS (ACTUALIZADO CON SKU)
+    function loadCollapseDetails(purchaseId) {
+        const tbody = document.getElementById(`collapse-body-${purchaseId}`);
+        
+        if (tbody.children.length > 1 || (tbody.children.length === 1 && !tbody.children[0].innerHTML.includes('Cargando'))) {
+            return;
+        }
+
+        fetch(`/logistics/purchases/history/${purchaseId}/details`)
+            .then(response => {
+                if (!response.ok) throw new Error('No se pudo procesar el desglose.');
+                return response.json();
+            })
+            .then(data => {
+                tbody.innerHTML = '';
+                if(data.details.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
+                    return;
+                }
+
+                data.details.forEach(detail => {
+                    // CORREGIDO: Ahora muestra detail.product_sku directamente en la etiqueta
+                    const row = `
+                        <tr>
+                            <td class="text-secondary fw-bold">#${detail.id}</td>
+                            <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
+                            <td class="text-center fw-bold text-primary">${detail.quantity}</td>
+                            <td class="text-end text-success fw-semibold">${data.currency} ${detail.foreign_price.toFixed(2)}</td>
+                            <td class="text-end fw-bold text-dark">Bs. ${detail.price_bs.toFixed(2)}</td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+            })
+            .catch(error => {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+            });
+    }
+</script>
+</body>
+</html>

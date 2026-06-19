@@ -36,17 +36,41 @@ def create_app():
         
         from .logistics.routes.location_routes import location_bp
         app.register_blueprint(location_bp, url_prefix='/logistics')
+        
+        # ==========================================================\
+        # REGISTRO DEL SUB-MÓDULO DE REGISTRO DE COMPRAS de Modulo 4
+        # ==========================================================\
+        from .logistics.routes.purchase_routes import purchase_bp
+        app.register_blueprint(purchase_bp, url_prefix='/logistics')
+        # ==========================================================\
 
-        # Importamos el Blueprint que acabamos de estructurar arriba
+        # ==========================================================\
+        # SUB-MÓDULO: LISTADO DE PROVEEDORES (NUEVO)
+        # ==========================================================\
+        from .logistics.routes.supplier_list_routes import supplier_list_bp
+        app.register_blueprint(supplier_list_bp, url_prefix='/logistics')
+        # ==========================================================\
+
+        
         from .inventory import inventory_bp
-        # Lo registramos con el prefijo /inventory para que sea estético y organizado
+        
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
+
+        # ==========================================================\
+        # HISTORIAL DE COMPRAS 
+        # ==========================================================\
+        from .logistics.routes.purchase_history_routes import purchase_history_bp
+        app.register_blueprint(purchase_history_bp, url_prefix='/logistics')
+        # ==========================================================\
 
         # ==========================================================
         # MÓDULO 4: REGISTRO DE LA API MULTI-MONEDA (Nueva Carpeta Integrations)
         # ==========================================================
         from .integrations.api_bcv.routes_api import api_bcv_bp
         app.register_blueprint(api_bcv_bp, url_prefix='/bcv')
+
+        from .integrations.imgbb.imgbb_routes import imgbb_bp
+        app.register_blueprint(imgbb_bp)
         # ==========================================================
 
         from . import models 
