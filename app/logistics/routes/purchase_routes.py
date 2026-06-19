@@ -1,16 +1,10 @@
 from flask import Blueprint, request, jsonify, render_template
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
-# IMPORTAMOS TU INSTANCIA DE BASE DE DATOS (Ajusta la ruta si la importan de otro lado)
 from app import db 
-# IMPORTAMOS LOS MODELOS NECESARIOS
 from app.models.inventory_model import Product
 from app.models.security_model import User  
-from app.models.logistics_model import Supplier
-# === AÑADE ESTA LÍNEA PARA LOS MODELOS DEL SUB-MÓDULO 5 ===
-# (Asegúrate de que los nombres coincidan exactamente con las clases en tu logistics_model)
-from app.models.logistics_model import Purchase, PurchaseDetail, ExchangeRateHistory
-from app.models.security_model import User
+from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, ExchangeRateHistory
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
 
 purchase_bp = Blueprint('purchase_routes', __name__)
@@ -27,35 +21,28 @@ def new_purchase_form():
         suppliers=suppliers, 
         users=users
     )
+
 @purchase_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
-# Si usas flask_login, puedes descomentar la siguiente línea:
-# @login_required
 def view_purchase_details(purchase_id):
-    # 1. Buscar la cabecera de la compra. Si no existe, envía un error 404 estructurado.
     purchase = Purchase.query.get_or_404(purchase_id)
-    # 2. Buscar el proveedor y el usuario usando los IDs de la compra
-    # Esto repara el problema de que salgan en 'N/A' y 'Sistema'
     supplier = Supplier.query.get(purchase.supplier_id)
     user = User.query.get(purchase.user_id)
     
-    # 2. Consultar los renglones (detalles) cruzando con el nombre del Producto
     details = db.session.query(PurchaseDetail, Product.name)\
         .join(Product, PurchaseDetail.product_id == Product.id)\
         .filter(PurchaseDetail.purchase_id == purchase_id).all()
     
-    # 3. Traer las últimas 5 tasas históricas de la moneda de esta factura para el panel de Lemin
     rate_history = ExchangeRateHistory.query\
         .filter_by(currency=purchase.currency)\
         .order_by(ExchangeRateHistory.timestamp.desc())\
         .limit(5).all()
     
-    # 4. Renderizar la plantilla pasándole todas las variables necesarias
     return render_template(
         'logistics/purchase_details.html', 
         purchase=purchase, 
         details=details,
         rate_history=rate_history,
-        supplier=supplier,  # <-- Enviado de forma independiente
+        supplier=supplier,
         user=user
     )
 
