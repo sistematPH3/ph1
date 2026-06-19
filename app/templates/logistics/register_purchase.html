@@ -135,10 +135,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Tasa de Cambio</label>
+                        <label class="form-label">Tasa de Cambio (BCV)</label>
                         <div class="input-group search-input-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-graph-up-arrow"></i></span>
-                            <input type="number" step="0.01" id="exchange_rate" class="form-control border-0 py-2 bg-transparent" value="36.55" required>
+                            <input type="number" step="0.01" id="exchange_rate" class="form-control border-0 py-2 bg-transparent text-dark fw-bold" required>
+                            <button class="btn btn-outline-secondary border-0" type="button" id="refreshRateBtn" title="Actualizar Tasa">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -162,7 +165,7 @@
                                id="dropzoneArea" for="invoice_photo">
                             <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
                             <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
-                            <input type="file" id="invoice_photo" name="invoice_photo" style="display: none;" accept="image/*" required>
+                            <input type="file" id="invoice_photo" name="invoice_photo" class="visually-hidden" accept="image/png, image/jpeg, image/jpg" required>
                         </label>
                     </div>
                 </div>
@@ -184,6 +187,70 @@
         }
 
         setupHeaderValidation();
+
+        const currencySelect = document.getElementById('currency');
+        const rateInput = document.getElementById('exchange_rate');
+        const refreshRateBtn = document.getElementById('refreshRateBtn');
+
+        async function fetchExchangeRate() {
+            const selectedCurrency = currencySelect.value;
+            
+            rateInput.value = '';
+            rateInput.setAttribute('placeholder', 'Consultando...');
+            rateInput.setAttribute('readonly', true);
+            rateInput.classList.replace('text-dark', 'text-muted');
+            
+            const icon = refreshRateBtn.querySelector('i');
+            icon.classList.add('bi-hourglass-split');
+            icon.classList.remove('bi-arrow-clockwise');
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            try {
+                const response = await fetch(`/bcv/api/get-rate?currency=${selectedCurrency}`, { 
+                    signal: controller.signal 
+                });
+                
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const rate = data.rate || data.tasa || data[selectedCurrency] || data.valor;
+
+                    if (rate) {
+                        rateInput.value = parseFloat(rate).toFixed(4);
+                        rateInput.setAttribute('readonly', true);
+                        rateInput.removeAttribute('placeholder');
+                        rateInput.classList.replace('text-dark', 'text-muted');
+                    } else {
+                        throw new Error("Formato de respuesta desconocido");
+                    }
+                } else {
+                    throw new Error("Error en la API BCV");
+                }
+            } catch (error) {
+                rateInput.value = '';
+                rateInput.removeAttribute('readonly');
+                rateInput.setAttribute('placeholder', 'Ingrese tasa manual');
+                rateInput.classList.replace('text-muted', 'text-dark');
+                
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Conexión BCV Fallida',
+                    text: 'No se pudo obtener la tasa automáticamente. Por favor, ingrese la tasa de cambio manualmente.',
+                    confirmButtonColor: '#dc3545',
+                    confirmButtonText: 'Entendido'
+                });
+            } finally {
+                icon.classList.remove('bi-hourglass-split');
+                icon.classList.add('bi-arrow-clockwise');
+            }
+        }
+
+        fetchExchangeRate();
+        currencySelect.addEventListener('change', fetchExchangeRate);
+        refreshRateBtn.addEventListener('click', fetchExchangeRate);
     });
 
     document.getElementById('invoice_photo').addEventListener('change', function(e) {
@@ -258,20 +325,6 @@
                 });
             }
         });
-
-        const exchangeRateInput = document.getElementById('exchange_rate');
-        if (exchangeRateInput) {
-            exchangeRateInput.addEventListener('input', () => {
-                const val = parseFloat(exchangeRateInput.value);
-                if (!exchangeRateInput.value || isNaN(val)) {
-                    setFieldError(exchangeRateInput, 'La tasa de cambio es obligatoria.');
-                } else if (val <= 0) {
-                    setFieldError(exchangeRateInput, 'La tasa debe ser mayor a cero (0).');
-                } else {
-                    clearFieldError(exchangeRateInput);
-                }
-            });
-        }
     }
 
     function attachRowValidationListeners(row) {
