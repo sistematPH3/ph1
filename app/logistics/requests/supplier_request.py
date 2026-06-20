@@ -7,7 +7,6 @@ class SupplierRequest:
         self.contact_name = form_data.get('contact_name', '').strip()
         self.phone = form_data.get('phone', '').strip()
         self.email = form_data.get('email', '').strip()
-        self.status = form_data.get('status', 'Active').strip()
 
     def validate(self):
         if not self.name or len(self.name) > 150:
@@ -26,6 +25,3 @@ class SupplierRequest:
         email_regex = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
         if not self.email or not email_regex.fullmatch(self.email) or len(self.email) > 100:
             raise ValueError("El correo electrónico es obligatorio y debe tener un formato válido con su '@'.")
-
-        if self.status not in ['Active', 'Inactive']:
-            raise ValueError("El estado seleccionado no es válido.")
