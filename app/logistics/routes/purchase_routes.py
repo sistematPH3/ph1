@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template
 from sqlalchemy import func
+from datetime import datetime
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
 from app import db 
@@ -89,6 +90,19 @@ def create_purchase():
     result = PurchaseService.register_purchase(data)
 
     if result["success"]:
+        try:
+            historial_tasa = ExchangeRateHistory(
+                currency=data['currency'],
+                rate=data['exchange_rate'],
+                source='COMPRA REGISTRADA',
+                timestamp=datetime.now(),
+                user_id=data['user_id']
+            )
+            db.session.add(historial_tasa)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            
         return jsonify(result), 201
     else:
         return jsonify(result), 500
