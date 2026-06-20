@@ -112,11 +112,12 @@
                                 </button>
                                 
                                 {% if purchase.status == 'COMPLETED' %}
-                                <form action="{{ url_for('purchase_history.annul', purchase_id=purchase.id) }}" method="POST" onsubmit="return confirm('¿Está seguro de que desea anular lógicamente esta factura?');" style="display:inline;">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger btn-audit-action">
-                                        <i class="bi bi-trash3"></i> Anular
-                                    </button>
-                                </form>
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
+                                        data-id="{{ purchase.id }}" 
+                                        data-url="{{ url_for('purchase_history.annul', purchase_id=purchase.id) }}">
+                                    <i class="bi bi-trash3"></i> Anular
+                                </button>
                                 {% endif %}
                             </div>
                         </td>
@@ -183,9 +184,30 @@
         </nav>
     </div>
 </div>
+<div class="modal fade" id="modalAnnul" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+        <div class="modal-content border-0 shadow-lg p-4 text-center" style="border-radius: 24px !important;">
+            <div class="modal-body p-0">
+                <div class="mb-4 text-danger d-flex justify-content-center">
+                    <i class="bi bi-octagon-fill position-relative" style="font-size: 5.5rem; line-height: 1; color: #b0121a;">
+                        <span class="position-absolute top-50 start-50 translate-middle text-white fw-bold fs-2" style="margin-top: -4px; font-family: sans-serif;">!</span>
+                    </i>
+                </div>
+                <h3 class="fw-bold text-dark mb-3" style="font-family: 'Inter', sans-serif;">¿Anular Factura?</h3>
+                <p class="text-muted small px-3 mb-4">Estás a punto de anular lógicamente la factura <strong id="annulPurchaseId"></strong>.</p>
+                
+                <form id="formAnnulConfirm" method="POST" action="">
+                    <div class="d-grid gap-3 px-3">
+                        <button type="submit" class="btn rounded-pill py-2 text-white fw-bold" style="background-color: #b0121a; border: none; font-size: 1rem;">Confirmar</button>
+                        <a href="#" class="text-muted small text-decoration-none" data-bs-dismiss="modal" style="color: #6c757d !important;">← Cancelar y volver</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
     // 1. LIMITAR FECHAS DINÁMICAMENTE
     const today = new Date();
@@ -343,6 +365,25 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
             });
     }
+    // 4. CONTROL DEL MODAL DE ANULACIÓN PERSONALIZADO (CORREGIDO Y BLINDADO)
+    const modalAnnulElement = document.getElementById('modalAnnul');
+    const modalAnnul = new bootstrap.Modal(modalAnnulElement);
+    const annulPurchaseIdSpan = document.getElementById('annulPurchaseId');
+    const formAnnulConfirm = document.getElementById('formAnnulConfirm');
+
+    document.getElementById('table-body').addEventListener('click', function(e) {
+        const triggerButton = e.target.closest('.btn-annul-trigger');
+        
+        if (triggerButton) {
+            const purchaseId = triggerButton.getAttribute('data-id');
+            const annulUrl = triggerButton.getAttribute('data-url');
+            
+            annulPurchaseIdSpan.innerText = `#${purchaseId}`;
+            formAnnulConfirm.setAttribute('action', annulUrl);
+            
+            modalAnnul.show();
+        }
+    });
 </script>
 </body>
 </html>

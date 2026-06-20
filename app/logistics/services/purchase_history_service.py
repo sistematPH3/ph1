@@ -1,5 +1,5 @@
 # app/logistics/services/purchase_history_service.py
-
+import pytz  # <-- 1. IMPORTANTE: Agrega este import al inicio del archivo
 class PurchaseHistoryService:
     def __init__(self, repository):
         """Inyección del repositorio de historial de compras"""
@@ -17,14 +17,25 @@ class PurchaseHistoryService:
         
         formatted_history = []
         
-       
+       # 2. Definimos las zonas horarias que interactúan
+        utc_tz = pytz.utc
+        caracas_tz = pytz.timezone('America/Caracas')
         for purchase, supplier_name in raw_purchases:
+
+            # 3. LÓGICA DE CONVERSIÓN:
+            # Asumimos que la base de datos nos da una fecha "naive" (sin zona horaria asignada) en UTC.
+            # Primero le indicamos a Python que esa fecha es UTC, y luego la convertimos a la de Caracas.
+            if purchase.purchase_date:
+                purchase_date_utc = utc_tz.localize(purchase.purchase_date)
+                purchase_date_local = purchase_date_utc.astimezone(caracas_tz)
+            else:
+                purchase_date_local = None
             
             formatted_history.append({
                 'id': purchase.id,
                 'supplier_id': purchase.supplier_id,
                 'supplier_name': supplier_name if supplier_name else "Proveedor N/A",
-                'purchase_date': purchase.purchase_date,  # <-- Dejamos la fecha tal cual como venía originalmente
+                'purchase_date': purchase_date_local,  # <-- Dejamos la fecha tal cual como venía originalmente
                 'total_amount': purchase.total_amount,
                 'currency': purchase.currency,
                 'exchange_rate': purchase.exchange_rate,
