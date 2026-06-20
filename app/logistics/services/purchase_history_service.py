@@ -17,7 +17,7 @@ class PurchaseHistoryService:
         
         formatted_history = []
         
-       # 2. Definimos las zonas horarias que interactúan
+       # 2. Definimos las zonas horarias que interactúan: Logica para las zonas horarios del historial
         utc_tz = pytz.utc
         caracas_tz = pytz.timezone('America/Caracas')
         for purchase, supplier_name in raw_purchases:
