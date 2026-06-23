@@ -1,6 +1,7 @@
 from app.extensions import db
 from datetime import datetime
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.dialects.postgresql import JSONB
 
 class Location(db.Model):
     __tablename__ = 'locations'
@@ -15,10 +16,6 @@ class Location(db.Model):
     
     @hybrid_property
     def address(self):
-        """
-        Cuando Mariuska llame a 'location.address', esto interceptará 
-        la petición y le devolverá el formato exacto que ella espera.
-        """
         if self.detailed_address:
             return f"{self.state} - {self.detailed_address}"
         return self.state
@@ -33,13 +30,12 @@ class Supplier(db.Model):
     email = db.Column(db.String(100)) 
     status = db.Column(db.String(20), default='ACTIVO')
 
-
 class ExchangeRateHistory(db.Model):
     __tablename__ = 'exchange_rate_history'
     id = db.Column(db.Integer, primary_key=True)
-    currency = db.Column(db.String(5), nullable=False) # Ej. 'USD' o 'EUR'
+    currency = db.Column(db.String(5), nullable=False)
     rate = db.Column(db.Numeric(15, 4), nullable=False)
-    source = db.Column(db.String(20), nullable=False) # 'BCV' o 'MANUAL'
+    source = db.Column(db.String(20), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
@@ -53,8 +49,6 @@ class Purchase(db.Model):
     exchange_rate = db.Column(db.Numeric(15, 4)) 
     invoice_url = db.Column(db.Text, nullable=False) 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    
-    
     status = db.Column(db.String(20), default='COMPLETED', nullable=False)
     
     details = db.relationship('PurchaseDetail', backref='purchase', lazy=True)
@@ -65,11 +59,8 @@ class PurchaseDetail(db.Model):
     purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
-    
-    
     foreign_price = db.Column(db.Numeric(15, 2)) 
     price_bs = db.Column(db.Numeric(15, 2))
-    
 
 class Movement(db.Model):
     __tablename__ = 'movements'
@@ -91,3 +82,13 @@ class MovementDetail(db.Model):
     movement_id = db.Column(db.Integer, db.ForeignKey('movements.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
+
+class PurchaseAuditLog(db.Model):
+    __tablename__ = 'purchase_audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+    purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'), nullable=False)
+    action_type = db.Column(db.String(20), nullable=False)
+    previous_data = db.Column(JSONB, nullable=False)
+    new_data = db.Column(JSONB, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
