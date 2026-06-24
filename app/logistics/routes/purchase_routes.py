@@ -1,4 +1,7 @@
-from flask import Blueprint, request, jsonify, render_template
+import threading
+import io
+from flask import Blueprint, request, jsonify, render_template, current_app
+from flask_login import current_user
 from sqlalchemy import func
 from datetime import datetime
 from app.logistics.requests.purchase_request import PurchaseRequest
@@ -10,6 +13,32 @@ from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, Excha
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
 
 purchase_bp = Blueprint('purchase_routes', __name__)
+
+def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
+    """
+    Función que se ejecuta en segundo plano para subir la imagen a ImgBB
+    y actualizar la URL real en la base de datos de forma silenciosa.
+    """
+    # Levantamos el contexto de la aplicación en el hilo secundario
+    with app_instance.app_context():
+        try:
+            # Reconstruimos el archivo en memoria usando los bytes guardados
+            foto_factura_memoria = io.BytesIO(file_bytes)
+            foto_factura_memoria.filename = filename
+            
+            # Subir a ImgBB de forma asíncrona respecto al usuario
+            url_generada = upload_invoice_image(foto_factura_memoria)
+            
+            # Buscamos la compra creada previamente y actualizamos su URL
+            purchase = Purchase.query.get(purchase_id)
+            if purchase:
+                purchase.invoice_url = url_generada
+                db.session.commit()
+                print(f"[BACKGROUND] URL de factura actualizada con éxito para la compra ID: {purchase_id}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[BACKGROUND ERROR] Falló la subida de imagen para la compra ID {purchase_id}: {str(e)}")
+
 
 @purchase_bp.route('/purchases/new', methods=['GET'])
 def new_purchase_form():
@@ -55,7 +84,12 @@ def create_purchase():
         if not foto_factura or foto_factura.filename == '':
             return jsonify({"error": "Debe adjuntar la foto de la factura."}), 400
 
-        url_generada = upload_invoice_image(foto_factura)
+        # =====================================================================
+        # PASO 1: Extraer los bytes e información del archivo de inmediato.
+        # Esto evita que los datos se pierdan al responder al cliente.
+        # =====================================================================
+        file_bytes = foto_factura.read()
+        filename = foto_factura.filename
 
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('quantity[]')
@@ -69,12 +103,13 @@ def create_purchase():
                 'foreign_price': float(foreign_prices[i]) if foreign_prices[i] else 0.0
             })
         
+        # Guardamos provisionalmente un texto indicador mientras se sube la imagen
         data = {
             'supplier_id': request.form.get('supplier_id', type=int),
             'currency': request.form.get('currency'),
             'exchange_rate': request.form.get('exchange_rate', type=float),
-            'user_id': request.form.get('user_id', type=int) or 1,
-            'invoice_url': url_generada,
+            'user_id': current_user.id if current_user.is_authenticated else (request.form.get('user_id', type=int) or 1),
+            'invoice_url': 'Subiendo comprobante...', 
             'items': items
         }
     except Exception as e:
@@ -87,6 +122,7 @@ def create_purchase():
     if not is_valid:
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
 
+    # Guardamos la compra de manera atómica y segura en base de datos
     result = PurchaseService.register_purchase(data)
 
     if result["success"]:
@@ -103,6 +139,20 @@ def create_purchase():
         except Exception as e:
             db.session.rollback()
             
+        # =====================================================================
+        # PASO 2: Disparar el Hilo secundario para subir la imagen a ImgBB
+        # =====================================================================
+        # Obtenemos la instancia real de la app detrás del proxy current_app
+        app_instance = current_app._get_current_object()
+        purchase_id = result["purchase_id"]
+        
+        thread = threading.Thread(
+            target=bg_upload_invoice,
+            args=(app_instance, purchase_id, file_bytes, filename)
+        )
+        thread.start()
+
+        # Respondemos INSTANTÁNEAMENTE al frontend
         return jsonify(result), 201
     else:
         return jsonify(result), 500
