@@ -91,9 +91,9 @@
                         <td class="fw-bold text-secondary">#{{ purchase.id }}</td>
                         <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
                         <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
-                        <td class="fw-bold text-danger">Bs. {{ "%.2f"|format(purchase.total_amount) }}</td>
+                        <td class="fw-bold text-danger">Bs. {{ "{:,.2f}".format(purchase.total_amount) }}</td>
                         <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
-                        <td>Bs. {{ "%.4f"|format(purchase.exchange_rate) }}</td>
+                        <td>Bs. {{ "{:,.4f}".format(purchase.exchange_rate) }}</td>
                         <td>
                             {% if purchase.status == 'COMPLETED' %}
                             <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
@@ -111,6 +111,12 @@
                                 </button>
                                 
                                 {% if purchase.status == 'COMPLETED' %}
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
+                                        data-id="{{ purchase.id }}">
+                                    <i class="bi bi-pencil-square"></i> Editar
+                                </button>
+                                
                                 <button type="button" 
                                         class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
                                         data-id="{{ purchase.id }}" 
@@ -150,8 +156,8 @@
                                                 <th>Identificación</th>
                                                 <th>SKU</th>
                                                 <th class="text-center">Cantidad</th>
-                                                <th class="text-end">Precio (Divisa Originaria)</th>
-                                                <th class="text-end">Precio Equivalente (Bs.)</th>
+                                                <th class="text-end">Precio por cantidad (Divisa Originaria)</th>
+                                                <th class="text-end">Total en Bs.</th>
                                             </tr>
                                         </thead>
                                         <tbody id="collapse-body-{{ purchase.id }}">
@@ -178,13 +184,14 @@
             </tbody>
         </table>
     </div>
-<!--Logica para el modal-->
+
     <div class="pagination-container" id="pagination-box">
         <nav>
             <ul class="pagination pagination-sm m-0" id="pagination-items"></ul>
         </nav>
     </div>
 </div>
+
 <div class="modal fade" id="modalAnnul" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
         <div class="modal-content border-0 shadow-lg p-4 text-center" style="border-radius: 24px !important;">
@@ -203,6 +210,43 @@
                         <a href="#" class="text-muted small text-decoration-none" data-bs-dismiss="modal" style="color: #6c757d !important;">← Cancelar y volver</a>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEdit" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header bg-light border-bottom-0 py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-primary me-2"></i>Edición de Compra #<span id="editPurchaseId"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="editErrorAlert" class="alert alert-danger d-none small mb-4 rounded-3 border-0" style="background-color: #f8d7da; color: #842029;"></div>
+                
+                <p class="text-muted small mb-4">Modifique las cantidades recibidas o los precios. El sistema calculará la diferencia automáticamente y ajustará el almacén general.</p>
+                <div class="table-responsive border rounded-3">
+                    <table class="table align-middle table-borderless m-0" id="edit-table">
+                        <thead class="table-light text-center small text-uppercase fw-bold border-bottom">
+                            <tr>
+                                <th class="text-start ps-3">Insumo (SKU)</th>
+                                <th style="width: 140px;">Cantidad</th>
+                                <th style="width: 160px;">Precio (Divisa)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="edit-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-light rounded-pill px-4 border shadow-sm fw-medium" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm text-white" id="btnSaveEdit" style="background-color: #b0121a; border: none;">
+                        <i class="bi bi-floppy me-1"></i> Guardar Cambios
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -341,13 +385,17 @@
                 }
 
                 data.details.forEach(detail => {
+                    const subtotalBs = detail.quantity * detail.foreign_price * data.exchange_rate;
+                    const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    
                     const row = `
                         <tr>
                             <td class="text-secondary fw-bold">#${detail.id}</td>
                             <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
                             <td class="text-center fw-bold text-primary">${detail.quantity}</td>
-                            <td class="text-end text-success fw-semibold">${data.currency} ${detail.foreign_price.toFixed(2)}</td>
-                            <td class="text-end fw-bold text-dark">Bs. ${detail.price_bs.toFixed(2)}</td>
+                            <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
+                            <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
                         </tr>
                     `;
                     tbody.insertAdjacentHTML('beforeend', row);
@@ -357,7 +405,7 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
             });
     }
-    // 4. CONTROL DEL MODAL DE ANULACIÓN PERSONALIZADO (CORREGIDO Y BLINDADO)
+
     const modalAnnulElement = document.getElementById('modalAnnul');
     const modalAnnul = new bootstrap.Modal(modalAnnulElement);
     const annulPurchaseIdSpan = document.getElementById('annulPurchaseId');
@@ -365,16 +413,112 @@
 
     document.getElementById('table-body').addEventListener('click', function(e) {
         const triggerButton = e.target.closest('.btn-annul-trigger');
-        
         if (triggerButton) {
             const purchaseId = triggerButton.getAttribute('data-id');
             const annulUrl = triggerButton.getAttribute('data-url');
-            
             annulPurchaseIdSpan.innerText = `#${purchaseId}`;
             formAnnulConfirm.setAttribute('action', annulUrl);
-            
             modalAnnul.show();
         }
+    });
+
+    const modalEditElement = document.getElementById('modalEdit');
+    const modalEdit = new bootstrap.Modal(modalEditElement);
+    const editPurchaseIdSpan = document.getElementById('editPurchaseId');
+    const editTableBody = document.getElementById('edit-table-body');
+    const btnSaveEdit = document.getElementById('btnSaveEdit');
+    const editErrorAlert = document.getElementById('editErrorAlert');
+    let currentEditPurchaseId = null;
+
+    document.getElementById('table-body').addEventListener('click', function(e) {
+        const triggerButton = e.target.closest('.btn-edit-trigger');
+        if (triggerButton) {
+            const purchaseId = triggerButton.getAttribute('data-id');
+            currentEditPurchaseId = purchaseId;
+            editPurchaseIdSpan.innerText = purchaseId;
+            
+            editErrorAlert.classList.add('d-none');
+            editTableBody.innerHTML = `<tr><td colspan="3" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
+            modalEdit.show();
+
+            fetch(`/logistics/purchases/history/${purchaseId}/details`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Error en la red');
+                    return res.json();
+                })
+                .then(data => {
+                    editTableBody.innerHTML = '';
+                    if(data.details.length === 0) {
+                        editTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
+                        return;
+                    }
+                    data.details.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="ps-3"><span class="badge bg-secondary mb-1">${item.product_sku}</span><br><small class="text-muted">Registro #${item.id}</small></td>
+                            <td class="text-center px-2">
+                                <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
+                            </td>
+                            <td class="text-center px-2">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary text-muted small">${data.currency}</span>
+                                    <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${item.id}" value="${item.foreign_price}" min="0" step="0.01">
+                                </div>
+                            </td>
+                        `;
+                        editTableBody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    editTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+                });
+        }
+    });
+
+    btnSaveEdit.addEventListener('click', function() {
+        editErrorAlert.classList.add('d-none');
+        const items = [];
+        const rows = editTableBody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const qtyInput = row.querySelector('.edit-qty');
+            const priceInput = row.querySelector('.edit-price');
+            if(qtyInput && priceInput) {
+                items.push({
+                    id: qtyInput.getAttribute('data-id'),
+                    quantity: parseFloat(qtyInput.value),
+                    foreign_price: parseFloat(priceInput.value)
+                });
+            }
+        });
+
+        if (items.length === 0) return;
+
+        btnSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
+        btnSaveEdit.disabled = true;
+
+        fetch(`/logistics/purchases/history/${currentEditPurchaseId}/edit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                window.location.reload();
+            } else {
+                editErrorAlert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + (data.error || 'Error procesando la solicitud en el servidor.');
+                editErrorAlert.classList.remove('d-none');
+                btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
+                btnSaveEdit.disabled = false;
+            }
+        })
+        .catch(err => {
+            editErrorAlert.innerHTML = '<i class="bi bi-wifi-off me-2"></i>Fallo crítico de conexión al servidor.';
+            editErrorAlert.classList.remove('d-none');
+            btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
+            btnSaveEdit.disabled = false;
+        });
     });
 </script>
 </body>

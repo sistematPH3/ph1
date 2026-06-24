@@ -1,12 +1,13 @@
 from flask import Blueprint, request, jsonify, render_template
 from sqlalchemy import func
 from datetime import datetime
+import pytz
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
 from app import db 
 from app.models.inventory_model import Product
 from app.models.security_model import User  
-from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, ExchangeRateHistory
+from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, ExchangeRateHistory, PurchaseAuditLog
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
 
 purchase_bp = Blueprint('purchase_routes', __name__)
@@ -38,6 +39,20 @@ def view_purchase_details(purchase_id):
         .filter_by(currency=purchase.currency)\
         .order_by(ExchangeRateHistory.timestamp.desc())\
         .limit(5).all()
+        
+    audit_log = None
+    audit_user = None
+    audit_timestamp_local = None
+    
+    if purchase.status == 'ANNULLED':
+        audit_log = PurchaseAuditLog.query.filter_by(purchase_id=purchase_id, action_type='ANNULLED').order_by(PurchaseAuditLog.timestamp.desc()).first()
+        if audit_log:
+            audit_user = User.query.get(audit_log.user_id)
+            if audit_log.timestamp:
+                utc_tz = pytz.utc
+                caracas_tz = pytz.timezone('America/Caracas')
+                audit_utc = utc_tz.localize(audit_log.timestamp)
+                audit_timestamp_local = audit_utc.astimezone(caracas_tz)
     
     return render_template(
         'logistics/purchase_details.html', 
@@ -45,7 +60,10 @@ def view_purchase_details(purchase_id):
         details=details,
         rate_history=rate_history,
         supplier=supplier,
-        user=user
+        user=user,
+        audit_log=audit_log,
+        audit_user=audit_user,
+        audit_timestamp_local=audit_timestamp_local
     )
 
 @purchase_bp.route('/purchases', methods=['POST'])
