@@ -149,11 +149,19 @@
                         <label class="form-label">Usuario / Comprador</label>
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-person-badge"></i></span>
-                            <select id="user_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
-                                <option value="" disabled selected>Seleccione Usuario</option>
-                                {% for u in users %}
-                                    <option value="{{ u.id }}">{{ u.name }}</option>
-                                {% endfor %}
+                            <!-- Se añade pointer-events y opacidad para que actúe como un campo de lectura informativa pero envíe su valor con normalidad -->
+                            <select id="user_id" class="form-select border-0 py-2 bg-transparent" style="pointer-events: none; opacity: 0.85; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none !important;" 
+                            tabindex="-1" required>
+                                {% if current_user.is_authenticated %}
+                                    <!-- Si hay sesión activa, se auto-selecciona el usuario actual -->
+                                    <option value="{{ current_user.id }}" selected>{{ current_user.name }}</option>
+                                {% else %}
+                                    <!-- Fallback de seguridad en caso de que no detecte sesión -->
+                                    <option value="" disabled selected>Seleccione Usuario</option>
+                                    {% for u in users %}
+                                        <option value="{{ u.id }}">{{ u.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
                             </select>
                         </div>
                     </div>
@@ -176,6 +184,9 @@
 </div>
 
 <script>
+    // Variable global para almacenar las opciones de productos de Jinja2 en memoria
+    let productOptionsHtml = '';
+
     document.addEventListener('DOMContentLoaded', () => {
         const productsCard = document.getElementById('productsCard');
         const invoiceCard = document.getElementById('invoiceCard');
@@ -184,6 +195,12 @@
             const initialMaxHeight = Math.max(productsCard.offsetHeight, invoiceCard.offsetHeight);
             productsCard.style.minHeight = `${initialMaxHeight}px`;
             invoiceCard.style.minHeight = `${initialMaxHeight}px`;
+        }
+
+        // RESPALDO: Guardamos las opciones de productos apenas carga la página
+        const initialSelect = document.querySelector('.prod-id');
+        if (initialSelect) {
+            productOptionsHtml = initialSelect.innerHTML;
         }
 
         setupHeaderValidation();
@@ -372,8 +389,8 @@
 
     function addProductRow() {
         const tbody = document.getElementById('itemsContainer');
-        const firstSelect = document.querySelector('.prod-id');
-        const optionsHtml = firstSelect ? firstSelect.innerHTML : '<option value="">-- Elige un producto --</option>';
+        // MODIFICACIÓN: Si la variable global tiene las opciones, úsalas. Si no, usa el fallback genérico.
+        const optionsHtml = productOptionsHtml || '<option value="">-- Elige un producto --</option>';
 
         const row = document.createElement('tr');
         row.className = 'main-product-row';
@@ -536,10 +553,26 @@
                         popup: 'rounded-4'
                     }
                 }).then(() => {
+                    // 1. Reseteamos los campos estándar del formulario nativo
                     document.getElementById('purchaseForm').reset();
+                    
+                    // 2. Limpiamos cualquier etiqueta o borde de error visual residual de validaciones previas
+                    document.querySelectorAll('.error-label').forEach(el => el.remove());
+                    document.querySelectorAll('.mariuska-select-group, .search-input-group').forEach(el => {
+                        el.style.borderColor = '';
+                    });
+
+                    // 3. Vaciamos las filas dinámicas de la tabla de forma segura
                     document.getElementById('itemsContainer').innerHTML = '';
+                    
+                    // 4. Agregamos una fila inicial limpia (ahora leerá desde la variable en memoria)
                     addProductRow();
+                    
+                    // 5. Forzamos el evento para limpiar la interfaz visual del dropzone de la factura
                     document.getElementById('invoice_photo').dispatchEvent(new Event('change'));
+                    
+                    // 6. Volvemos a disparar la consulta de la tasa de cambio para que la mantenga actualizada
+                    document.getElementById('currency').dispatchEvent(new Event('change'));
                 });
             } else {
                 if (result.details) {
