@@ -3,18 +3,14 @@ from flask import render_template, request, redirect, url_for, flash, jsonify
 from app.inventory.services.products_service import ProductService
 from app.inventory.requests.products_request import validate_product_form
 from app.inventory.repositories.products_repository import ProductRepository
+# CAMBIO: Importamos ProductType desde tus modelos reales
+from app.models.inventory_model import ProductType 
 from app.inventory import inventory_bp
 
 @inventory_bp.route('/products/create', methods=['GET', 'POST'])
 def create_product():
-    categories = [
-        type('Category', (), {'id': 1, 'name': 'Secos'}),
-        type('Category', (), {'id': 2, 'name': 'Lacteos'}),
-        type('Category', (), {'id': 3, 'name': 'Embutidos'}),
-        type('Category', (), {'id': 4, 'name': 'Vegetales Frescos'}),
-        type('Category', (), {'id': 5, 'name': 'Salsas y Liquido'}),
-        type('Category', (), {'id': 6, 'name': 'Utensilios y Empaques'})
-    ]
+    # CAMBIO AQUÍ: Traemos los tipos de productos directo de la Base de Datos
+    product_types = ProductType.query.all()
     
     if request.method == 'POST':
         is_valid, errors, validated_data = validate_product_form(request.form)
@@ -25,25 +21,18 @@ def create_product():
             return redirect(url_for('inventory.list_products'))
             
         return render_template('inventory/product_form.html', 
-                               data=request.form, 
-                               errors=errors, 
-                               categories=categories)
+                               data=request.form, \
+                               errors=errors, \
+                               product_types=product_types) # Pasamos product_types
 
-    return render_template('inventory/product_form.html', data={}, errors={}, categories=categories)
+    return render_template('inventory/product_form.html', data={}, errors={}, product_types=product_types)
 
 
 @inventory_bp.route('/products/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     product = ProductService.get_product_by_id(product_id)
-    
-    categories = [
-        type('Category', (), {'id': 1, 'name': 'Secos'}),
-        type('Category', (), {'id': 2, 'name': 'Lacteos'}),
-        type('Category', (), {'id': 3, 'name': 'Embutidos'}),
-        type('Category', (), {'id': 4, 'name': 'Vegetales Frescos'}),
-        type('Category', (), {'id': 5, 'name': 'Salsas y Liquido'}),
-        type('Category', (), {'id': 6, 'name': 'Utensilios y Empaques'})
-    ]
+    # CAMBIO AQUÍ: Traemos los tipos de productos reales
+    product_types = ProductType.query.all()
 
     if not product:
         flash('El insumo que intenta editar no existe.', 'danger')
@@ -58,21 +47,22 @@ def edit_product(product_id):
             return redirect(url_for('inventory.list_products'))
 
         return render_template('inventory/product_form.html', 
-                               product=product, 
-                               data=request.form, 
-                               errors=errors, 
-                               categories=categories)
+                               product=product, \
+                               data=request.form, \
+                               errors=errors, \
+                               product_types=product_types)
 
+    # CAMBIO AQUÍ: Mapeamos product_type_id al diccionario de edición
     data = {
         'name': product.name,
-        'category_id': product.category_id,
+        'product_type_id': product.product_type_id,
         'unit_of_measure': product.unit_of_measure,
         'quantity': product.quantity,
         'sku': product.sku,
         'technical_description': product.technical_description
     }
 
-    return render_template('inventory/product_form.html', product=product, data=data, errors={}, categories=categories)
+    return render_template('inventory/product_form.html', product=product, data=data, errors={}, product_types=product_types)
 
 
 @inventory_bp.route('/products/check_sku', methods=['POST'])
