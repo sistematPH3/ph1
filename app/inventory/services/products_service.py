@@ -24,10 +24,11 @@ class ProductService:
         if existing_product:
             raise ValueError(f"El SKU '{cleaned_sku}' ya está registrado.")
 
+        # CAMBIO AQUÍ: Se instancia con product_type_id
         new_product = Product(
             name=data.get('name', '').strip(),
             sku=cleaned_sku,
-            category_id=data.get('category_id'),
+            product_type_id=data.get('product_type_id'),
             quantity=data.get('quantity', 0),
             unit_of_measure=data.get('unit_of_measure', '').strip(),
             technical_description=data.get('technical_description', '').strip(),
@@ -55,7 +56,8 @@ class ProductService:
                 raise ValueError(f"El SKU '{cleaned_sku}' ya está registrado por otro insumo.")
 
         product.name = name
-        product.category_id = data.get('category_id')
+        # CAMBIO AQUÍ: Se actualiza product_type_id
+        product.product_type_id = data.get('product_type_id')
         product.unit_of_measure = unit_of_measure
         product.quantity = data.get('quantity', 0)
         product.sku = cleaned_sku

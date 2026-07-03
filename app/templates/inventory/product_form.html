@@ -23,14 +23,14 @@
             </div>
 
             <div class="form-group">
-                <label for="category_id">Categoría</label>
-                <select id="category_id" name="category_id" data-selected="{{ data.get('category_id', '') }}" required>
-                    <option value="">Seleccione una Categoría</option>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}">{{ category.name }}</option>
+                <label for="product_type_id">Tipo de Producto</label>
+                <select id="product_type_id" name="product_type_id" data-selected="{{ data.get('product_type_id', '') }}" required>
+                    <option value="">Seleccione un Tipo de Producto</option>
+                    {% for p_type in product_types %}
+                        <option value="{{ p_type.id }}">{{ p_type.name }}</option>
                     {% endfor %}
                 </select>
-                {% if errors and errors.get('category_id') %}<span class="error-text">{{ errors.category_id }}</span>{% endif %}
+                {% if errors and errors.get('product_type_id') %}<span class="error-text">{{ errors.product_type_id }}</span>{% endif %}
             </div>
 
             <div class="form-group">
@@ -78,13 +78,15 @@
     </div>
 
     <script>
-        const categoryInput = document.getElementById('category_id');
+        // CAMBIO AQUÍ: Apuntar al nuevo ID del DOM
+        const productTypeInput = document.getElementById('product_type_id');
         const unitSelect = document.getElementById('unit_of_measure_select');
         const unitCustom = document.getElementById('unit_of_measure_custom');
 
         document.addEventListener('DOMContentLoaded', () => {
-            const catVal = categoryInput.getAttribute('data-selected');
-            if (catVal) categoryInput.value = catVal;
+            // CAMBIO AQUÍ: Recuperar la selección previa del Tipo de Producto
+            const typeVal = productTypeInput.getAttribute('data-selected');
+            if (typeVal) productTypeInput.value = typeVal;
 
             const unitVal = unitSelect.getAttribute('data-selected');
             if (unitVal) {
