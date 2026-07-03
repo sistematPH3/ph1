@@ -1,8 +1,8 @@
-"""Actualizacion_de_Tablas: Añadida quantity
+"""tabla product_types añadida para el modulo 3
 
-Revision ID: 9104980da99b
+Revision ID: d001a5a776f7
 Revises: 
-Create Date: 2026-05-27 19:31:01.482738
+Create Date: 2026-07-03 17:00:39.518522
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '9104980da99b'
+revision = 'd001a5a776f7'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,7 +21,8 @@ def upgrade():
     op.create_table('categories',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=50), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
     )
     op.create_table('locations',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -53,18 +54,15 @@ def upgrade():
     sa.Column('name', sa.String(length=50), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('products',
+    op.create_table('product_types',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('sku', sa.String(length=50), nullable=False),
-    sa.Column('category_id', sa.Integer(), nullable=True),
-    sa.Column('quantity', sa.Integer(), nullable=False),
-    sa.Column('unit_of_measure', sa.String(length=20), nullable=True),
-    sa.Column('technical_description', sa.Text(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('name', sa.String(length=60), nullable=False),
+    sa.Column('category_id', sa.Integer(), nullable=False),
+    sa.Column('requires_manual_date', sa.Boolean(), nullable=False),
+    sa.Column('shelf_life_days', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('sku')
+    sa.UniqueConstraint('name')
     )
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -86,15 +84,6 @@ def upgrade():
     sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('changed_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('inventory',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('location_id', sa.Integer(), nullable=True),
-    sa.Column('product_id', sa.Integer(), nullable=True),
-    sa.Column('current_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('login_audit',
@@ -148,6 +137,19 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('token')
     )
+    op.create_table('products',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('sku', sa.String(length=50), nullable=False),
+    sa.Column('product_type_id', sa.Integer(), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('unit_of_measure', sa.String(length=20), nullable=True),
+    sa.Column('technical_description', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['product_type_id'], ['product_types.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('sku')
+    )
     op.create_table('purchases',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('supplier_id', sa.Integer(), nullable=True),
@@ -168,20 +170,13 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('user_id', 'location_id')
     )
-    op.create_table('waste',
+    op.create_table('inventory',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('product_id', sa.Integer(), nullable=True),
     sa.Column('location_id', sa.Integer(), nullable=True),
-    sa.Column('waste_type_id', sa.Integer(), nullable=True),
-    sa.Column('quantity', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('evidence_url', sa.Text(), nullable=True),
-    sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('date', sa.DateTime(), nullable=True),
-    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('current_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['waste_type_id'], ['waste_types.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('movement_details',
@@ -205,24 +200,41 @@ def upgrade():
     sa.ForeignKeyConstraint(['purchase_id'], ['purchases.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('waste',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('location_id', sa.Integer(), nullable=True),
+    sa.Column('waste_type_id', sa.Integer(), nullable=True),
+    sa.Column('quantity', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('evidence_url', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('date', sa.DateTime(), nullable=True),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['waste_type_id'], ['waste_types.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_table('waste')
     op.drop_table('purchase_details')
     op.drop_table('movement_details')
-    op.drop_table('waste')
+    op.drop_table('inventory')
     op.drop_table('user_locations')
     op.drop_table('purchases')
+    op.drop_table('products')
     op.drop_table('password_recoveries')
     op.drop_table('notifications')
     op.drop_table('movements')
     op.drop_table('login_audit')
-    op.drop_table('inventory')
     op.drop_table('audit_logs')
     op.drop_table('users')
-    op.drop_table('products')
+    op.drop_table('product_types')
     op.drop_table('waste_types')
     op.drop_table('suppliers')
     op.drop_table('roles')
