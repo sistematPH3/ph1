@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from app.extensions import db
 from app.models import Supplier  
+
 from app.logistics.repositories.purchase_history_repository import PurchaseHistoryRepository
 from app.logistics.services.purchase_history_service import PurchaseHistoryService
 from app.logistics.requests.purchase_history_request import PurchaseHistoryFilterRequest
@@ -67,7 +68,8 @@ def get_details(purchase_id):
                 "product_sku": product_sku if product_sku else "(Sin SKU)",
                 "quantity": float(d.quantity),
                 "foreign_price": float(d.foreign_price) if d.foreign_price is not None else 0.0,
-                "price_bs": float(d.price_bs) if d.price_bs is not None else 0.0
+                "price_bs": float(d.price_bs) if d.price_bs is not None else 0.0,
+                "expiration_date": d.expiration_date.strftime('%Y-%m-%d') if getattr(d, 'expiration_date', None) else ""
             })
 
         return jsonify({

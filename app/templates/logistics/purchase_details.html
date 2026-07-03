@@ -99,8 +99,9 @@
                             <thead style="background-color: #B31F24; color: #ffffff;">
                                 <tr>
                                     <th class="py-3 ps-4 border-0 text-white" style="background-color: #B31F24;">Insumo</th>
-                                    <th class="py-3 text-center border-0 text-white" style="background-color: #B31F24;">Cantidad Comprada.</th> 
-                                    <th class="py-3 text-center border-0 text-white" style="background-color: #B31F24;">Precio por insumo ({{ purchase.currency }})</th> 
+                                    <th class="py-3 text-center border-0 text-white" style="background-color: #B31F24;">Cant.</th> 
+                                    <th class="py-3 text-center border-0 text-white" style="background-color: #B31F24;">Vencimiento</th> 
+                                    <th class="py-3 text-center border-0 text-white" style="background-color: #B31F24;">Precio por cantidad ({{ purchase.currency }})</th> 
                                     <th class="py-3 text-center pe-4 border-0 text-white" style="background-color: #B31F24;">Total en Bs.</th> 
                                 </tr>
                             </thead>
@@ -113,12 +114,19 @@
                                     <tr>
                                         <td class="ps-4 py-3"><strong class="text-dark">{{ product_name }}</strong></td>
                                         <td class="text-center py-3">{{ item.quantity }}</td>
+                                        <td class="text-center py-3">
+                                            {% if item.expiration_date %}
+                                                <span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>{{ item.expiration_date.strftime('%d/%m/%Y') }}</span>
+                                            {% else %}
+                                                <span class="text-muted small">N/A</span>
+                                            {% endif %}
+                                        </td>
                                         <td class="text-center text-primary fw-bold py-3">{{ "{:,.2f}".format(item.foreign_price) }}</td>
                                         <td class="text-center fw-bold pe-4 py-3">Bs. {{ "{:,.2f}".format(subtotal_row_bs) }}</td>
                                     </tr>
                                 {% endfor %}
                                 <tr class="table-light">
-                                    <td colspan="3" class="text-end fw-bold p-3">Monto Total Facturado:</td>
+                                    <td colspan="4" class="text-end fw-bold p-3">Monto Total Facturado:</td>
                                     <td class="text-center text-danger fw-bold fs-5 p-3 pe-4">Bs. {{ "{:,.2f}".format(total_bs.value) }}</td>
                                 </tr>
                             </tbody>

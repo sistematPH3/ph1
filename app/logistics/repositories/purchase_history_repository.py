@@ -52,7 +52,8 @@ class PurchaseHistoryRepository:
                         "product_id": d.product_id,
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price) if d.foreign_price else 0.0,
-                        "price_bs": float(d.price_bs) if d.price_bs else 0.0
+                        "price_bs": float(d.price_bs) if d.price_bs else 0.0,
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
                     } for d in details
                 ]
             }
@@ -80,7 +81,6 @@ class PurchaseHistoryRepository:
                 user_id=user_id
             )
             self.db.session.add(audit_log)
-
             self.db.session.commit()
             return True
         except Exception as e:
@@ -108,7 +108,8 @@ class PurchaseHistoryRepository:
                         "product_id": d.product_id,
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price) if d.foreign_price else 0.0,
-                        "price_bs": float(d.price_bs) if d.price_bs else 0.0
+                        "price_bs": float(d.price_bs) if d.price_bs else 0.0,
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
                     } for d in details
                 ]
             }
@@ -141,6 +142,10 @@ class PurchaseHistoryRepository:
                     detail.foreign_price = new_price
                     detail.price_bs = new_price * purchase.exchange_rate
                     
+                    if 'expiration_date' in matching_new and matching_new['expiration_date']:
+                        from datetime import datetime
+                        detail.expiration_date = datetime.strptime(matching_new['expiration_date'], '%Y-%m-%d').date()
+
                     new_total_amount += (new_qty * new_price)
                 else:
                     new_total_amount += (detail.quantity * detail.foreign_price)
@@ -160,7 +165,8 @@ class PurchaseHistoryRepository:
                         "product_id": d.product_id,
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price),
-                        "price_bs": float(d.price_bs)
+                        "price_bs": float(d.price_bs),
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
                     } for d in details
                 ]
             }
@@ -173,7 +179,6 @@ class PurchaseHistoryRepository:
                 user_id=user_id
             )
             self.db.session.add(audit_log)
-
             self.db.session.commit()
             return True
         except Exception as e:

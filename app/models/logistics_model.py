@@ -61,7 +61,8 @@ class PurchaseDetail(db.Model):
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
     foreign_price = db.Column(db.Numeric(15, 2)) 
     price_bs = db.Column(db.Numeric(15, 2))
-
+    expiration_date = db.Column(db.Date, nullable=True)
+    
 class Movement(db.Model):
     __tablename__ = 'movements'
     id = db.Column(db.Integer, primary_key=True)
