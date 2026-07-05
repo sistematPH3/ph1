@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from app.inventory.repositories.products_repository import ProductRepository
 
 def validate_product_form(data, current_product_id=None):
@@ -22,7 +23,6 @@ def validate_product_form(data, current_product_id=None):
         if existing_product and existing_product.id != current_product_id:
             errors['sku'] = f"El SKU '{cleaned_sku}' ya está registrado."
 
-    # CAMBIO AQUÍ: Validar product_type_id en vez de category_id
     product_type_id = data.get('product_type_id')
     if not product_type_id or not str(product_type_id).isdigit():
         errors['product_type_id'] = 'Debe seleccionar un tipo de producto válido.'
@@ -48,9 +48,28 @@ def validate_product_form(data, current_product_id=None):
 
     technical_description = data.get('technical_description', '').strip()
 
+    # NUEVA VALIDACIÓN: Procesar los cuadritos de fecha de manera unificada
+    day = data.get('date_day')
+    month = data.get('date_month')
+    year = data.get('date_year')
+
+    expiration_date = None
+
+    if day and month and year:
+        try:
+            # Intentar estructurar la fecha ingresada manualmente
+            expiration_date = date(int(year), int(month), int(day))
+            if expiration_date < date.today():
+                errors['expiration_date'] = 'La fecha ingresada no puede ser menor a la fecha actual.'
+        except ValueError:
+            errors['expiration_date'] = 'La fecha ingresada en los casilleros no es válida.'
+    else:
+        # Si venían vacíos o bloqueados por ser un tipo de producto automático, se registra la fecha actual por defecto
+        expiration_date = date.today()
+
     is_valid = len(errors) == 0
 
-    # CAMBIO AQUÍ: Mapear product_type_id en el diccionario validado
+    # Diccionario mapeado listo para enviar al Service y Repository
     validated_data = {
         'name': name,
         'sku': cleaned_sku,
@@ -58,6 +77,7 @@ def validate_product_form(data, current_product_id=None):
         'unit_of_measure': unit_of_measure if is_valid else '',
         'quantity': int(quantity) if quantity and quantity.isdigit() else 0,
         'technical_description': technical_description,
+        'expiration_date': expiration_date,  # Se inyecta la fecha limpia calculada
         'is_active': True
     }
 
