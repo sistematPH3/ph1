@@ -9,8 +9,17 @@
 <body>
     <div class="form-container">
         <h2>{% if product %}Editar Producto{% else %}Nuevo Producto{% endif %}</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for class_alert, message in messages %}
+            <div class="alert-error" style="background-color: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #fecaca; font-weight: 600; font-size: 0.9rem;">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 
-        {% if errors and errors.get('general') %}
+{% if errors and errors.get('general') %}
             <div class="alert alert-error">{{ errors.general }}</div>
         {% endif %}
 
@@ -23,15 +32,41 @@
             </div>
 
             <div class="form-group">
-                <label for="product_type_id">Tipo de Producto</label>
-                <select id="product_type_id" name="product_type_id" data-selected="{{ data.get('product_type_id', '') }}" required>
-                    <option value="">Seleccione un Tipo de Producto</option>
-                    {% for p_type in product_types %}
-                        <option value="{{ p_type.id }}">{{ p_type.name }}</option>
-                    {% endfor %}
-                </select>
-                {% if errors and errors.get('product_type_id') %}<span class="error-text">{{ errors.product_type_id }}</span>{% endif %}
-            </div>
+    <div class="form-group">
+    <label for="product_type_id">Tipo de Producto</label>
+    <select id="product_type_id" name="product_type_id" required>
+        <option value="">Seleccione un tipo...</option>
+        {% for pt in product_types %}
+            <option value="{{ pt.id }}" 
+                    data-manual="{{ 'true' if pt.requires_manual_date else 'false' }}"
+                    data-days="{{ pt.shelf_life_days or 0 }}"
+                    {% if data.get('product_type_id')|int == pt.id|int or (product and product.product_type_id == pt.id) %}selected{% endif %}>
+                {{ pt.name }}
+            </option>
+        {% endfor %}
+    </select>
+    {% if errors and errors.get('product_type_id') %}<span class="error-text">{{ errors.product_type_id }}</span>{% endif %}
+</div>
+
+            <div id="expiration-date-group" class="form-group" style="display: none;">
+    <label>Fecha de Vencimiento Primaria</label>
+    <div style="display: flex; gap: 10px;">
+        <input type="number" name="date_day" placeholder="DD" min="1" max="31" value="{{ data.get('date_day', '') }}" style="width: 30%; text-align: center;">
+        <input type="number" name="date_month" placeholder="MM" min="1" max="12" value="{{ data.get('date_month', '') }}" style="width: 30%; text-align: center;">
+        <input type="number" name="date_year" placeholder="AAAA" min="2026" value="{{ data.get('date_year', '') }}" style="width: 40%; text-align: center;">
+    </div>
+    {% if errors and errors.get('expiration_date') %}<span class="error-text">{{ errors.expiration_date }}</span>{% endif %}
+</div>
+
+<div id="manual-date-notice" style="display: none; background-color: #f0f7ff; color: #1d4ed8; padding: 1.2rem; border-radius: 12px; border: 1px solid #bfdbfe; font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.4;">
+    <strong style="color: #1e40af; display: block; margin-bottom: 4px;">ℹ️ Control de Lote Manual</strong>
+    Se digitará manualmente en cada compra de productos.
+</div>
+
+<div id="auto-date-notice" style="display: none; background-color: #f0fdf4; color: #15803d; padding: 1.2rem; border-radius: 12px; border: 1px solid #bbf7d0; font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.4;">
+    <strong style="color: #166534; display: block; margin-bottom: 4px;">⏳ Cálculo de Días Hábiles</strong>
+    Este tipo de producto cuenta con <span id="notice-days-count" style="font-weight: bold; color: #16a34a;">0</span> días hábiles.
+</div>
 
             <div class="form-group">
                 <label for="unit_of_measure_select">Unidad de Medida</label>
@@ -78,15 +113,163 @@
     </div>
 
     <script>
-        // CAMBIO AQUÍ: Apuntar al nuevo ID del DOM
+        // 🚀 CONTROL ARMONIOSO: Fecha manual vs Días hábiles automáticos
+        document.addEventListener('DOMContentLoaded', function() {
+            const productTypeSelect = document.getElementById('product_type_id');
+            const dateGroup = document.getElementById('expiration-date-group');
+            const manualNotice = document.getElementById('manual-date-notice');
+            const autoNotice = document.getElementById('auto-date-notice');
+            const daysCountSpan = document.getElementById('notice-days-count');
+
+            function toggleDateFields(isInitialLoad = false) {
+                const selectedOption = productTypeSelect.options[productTypeSelect.selectedIndex];
+                
+                // Si no hay selección válida, ocultamos todo
+                if (!selectedOption || !selectedOption.value) {
+                    if (dateGroup) dateGroup.style.display = 'none';
+                    if (manualNotice) manualNotice.style.display = 'none';
+                    if (autoNotice) autoNotice.style.display = 'none';
+                    return;
+                }
+
+                const isManual = selectedOption.getAttribute('data-manual') === 'true';
+                const shelfDays = parseInt(selectedOption.getAttribute('data-days') || '0', 10);
+
+                const inputDay = dateGroup.querySelector('input[name="date_day"]');
+                const inputMonth = dateGroup.querySelector('input[name="date_month"]');
+                const inputYear = dateGroup.querySelector('input[name="date_year"]');
+
+                if (isManual) {
+                    // --- CASO 1: REGLA MANUAL (Módulo 4 / Lemin) ---
+                    if (dateGroup) {
+                        dateGroup.style.display = 'none';
+                        if (inputDay) inputDay.value = '';
+                        if (inputMonth) inputMonth.value = '';
+                        if (inputYear) inputYear.value = '';
+                    }
+                    if (manualNotice) manualNotice.style.display = 'block';
+                    if (autoNotice) autoNotice.style.display = 'none';
+                } else {
+                    // --- CASO 2: REGLA AUTOMÁTICA (Tu función original de Días Hábiles) ---
+                    if (dateGroup) dateGroup.style.display = 'block';
+                    if (manualNotice) manualNotice.style.display = 'none';
+
+                    // Si el usuario cambia manualmente la opción, o si están vacíos al cargar (modo creación)
+                    if (!isInitialLoad || (!inputDay.value && !inputMonth.value && !inputYear.value)) {
+                        const today = new Date();
+                        if (inputDay) inputDay.value = today.getDate();
+                        if (inputMonth) inputMonth.value = today.getMonth() + 1;
+                        if (inputYear) inputYear.value = today.getFullYear();
+                    }
+
+                    // Mostramos el banner de días si tiene una parametrización mayor a cero
+                    if (shelfDays > 0) {
+                        if (daysCountSpan) daysCountSpan.textContent = shelfDays;
+                        if (autoNotice) autoNotice.style.display = 'block';
+                    } else {
+                        if (autoNotice) autoNotice.style.display = 'none';
+                    }
+                }
+            }
+
+            // Escuchar los cambios del selector en tiempo real
+            productTypeSelect.addEventListener('change', function() {
+                toggleDateFields(false);
+            });
+
+            // Ejecutar al inicio respetando si es edición o recarga de Flask
+            toggleDateFields(true);
+        });
         const productTypeInput = document.getElementById('product_type_id');
         const unitSelect = document.getElementById('unit_of_measure_select');
         const unitCustom = document.getElementById('unit_of_measure_custom');
+        
+        // Referencias a los nuevos cuadritos
+        const dayInput = document.getElementById('date_day');
+        const monthInput = document.getElementById('date_month');
+        const yearInput = document.getElementById('date_year');
+        const shelfLifeHelp = document.getElementById('shelf-life-help');
+
+        function obtenerFechaHoy() {
+            const hoy = new Date();
+            return {
+                d: hoy.getDate(),
+                m: hoy.getMonth() + 1,
+                a: hoy.getFullYear()
+            };
+        }
+
+        // Calcula los días hábiles en caliente si el usuario ingresa una fecha manualmente
+        function calcularDiasHabilesManual() {
+            const d = parseInt(dayInput.value);
+            const m = parseInt(monthInput.value);
+            const a = parseInt(yearInput.value);
+
+            if (!d || !m || !a) {
+                shelfLifeHelp.textContent = "✍️ Ingrese la fecha de vencimiento del proveedor para calcular su vida útil.";
+                shelfLifeHelp.style.color = "#b02a37";
+                return;
+            }
+
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+
+            const fechaVencimiento = new Date(a, m - 1, d);
+            fechaVencimiento.setHours(0, 0, 0, 0);
+
+            const diferenciaTiempo = fechaVencimiento - hoy;
+            const diferenciaDias = Math.ceil(diferenciaTiempo / (1000 * 60 * 60 * 24));
+
+            if (diferenciaDias < 0) {
+                shelfLifeHelp.textContent = "❌ Error: La fecha ingresada ya expiró en el pasado.";
+                shelfLifeHelp.style.color = "#b02a37";
+            } else {
+                shelfLifeHelp.textContent = `📋 Alerta: Este lote contará con ${diferenciaDias} días hábiles para ser utilizado en cocina.`;
+                shelfLifeHelp.style.color = "#0b5ed7";
+            }
+        }
+
+        function evaluarTipoProducto() {
+            const selectedOption = productTypeInput.options[productTypeInput.selectedIndex];
+            const hoy = obtenerFechaHoy();
+            
+            if (!productTypeInput.value) {
+                dayInput.disabled = false; monthInput.disabled = false; yearInput.disabled = false;
+                shelfLifeHelp.textContent = "";
+                return;
+            }
+
+            const requiresManual = selectedOption.getAttribute('data-requires-manual') === 'true';
+            const shelfLifeDays = selectedOption.getAttribute('data-shelf-life');
+
+            if (!requiresManual) {
+                // CASO AUTOMÁTICO: Bloquea cuadritos fijando la fecha de HOY
+                dayInput.value = hoy.d;
+                monthInput.value = hoy.m;
+                yearInput.value = hoy.a;
+
+                dayInput.disabled = true;
+                monthInput.disabled = true;
+                yearInput.disabled = true;
+
+                shelfLifeHelp.textContent = `✅ Estándar de fábrica: Registrado hoy. Cuenta con ${shelfLifeDays || 0} días hábiles de vida útil.`;
+                shelfLifeHelp.style.color = "#157347";
+            } else {
+                // CASO MANUAL: Habilita los cuadritos para que digiten la fecha del lote
+                dayInput.disabled = false;
+                monthInput.disabled = false;
+                yearInput.disabled = false;
+
+                calcularDiasHabilesManual();
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // CAMBIO AQUÍ: Recuperar la selección previa del Tipo de Producto
             const typeVal = productTypeInput.getAttribute('data-selected');
-            if (typeVal) productTypeInput.value = typeVal;
+            if (typeVal) {
+                productTypeInput.value = typeVal;
+                evaluarTipoProducto();
+            }
 
             const unitVal = unitSelect.getAttribute('data-selected');
             if (unitVal) {
@@ -102,6 +285,13 @@
             }
         });
 
+        productTypeInput.addEventListener('change', evaluarTipoProducto);
+        
+        // Escuchadores para calcular en tiempo real al escribir en los cuadritos
+        dayInput.addEventListener('input', calcularDiasHabilesManual);
+        monthInput.addEventListener('input', calcularDiasHabilesManual);
+        yearInput.addEventListener('input', calcularDiasHabilesManual);
+
         unitSelect.addEventListener('change', (e) => {
             if (e.target.value === 'OTHER') {
                 unitCustom.style.display = 'block';
@@ -111,6 +301,13 @@
                 unitCustom.removeAttribute('required');
                 unitCustom.value = '';
             }
+        });
+
+        // TRUCO EXCELENTE: Antes de enviar, habilitamos los campos un milisegundo para que viajen al backend sin perderse
+        document.querySelector('form').addEventListener('submit', () => {
+            dayInput.disabled = false;
+            monthInput.disabled = false;
+            yearInput.disabled = false;
         });
 
         const skuInput = document.getElementById('sku');
