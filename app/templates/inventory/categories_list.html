@@ -1,0 +1,151 @@
+{% extends 'auth_base.html' %}
+
+{% block title %}Categorías | Sistema de Gestión PH{% endblock %}
+{% block extra_css %}
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 header-container">
+        <div class="d-flex align-items-center">
+            <div class="bg-mariuska-red text-white p-3 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 60px; height: 60px;">
+                <i class="bi bi-tags fs-2"></i>
+            </div>
+            <div>
+                <h2 class="m-0 fw-bold system-title" style="color: #212529;">Configuración de Categorías</h2>
+                <small class="text-muted fw-medium subtitle-text">Reglas de automatización de fechas de control y vencimientos</small>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+        <a href="{{ url_for('inventory.list_products') }}" class="btn btn-mariuska-red fw-bold px-4 py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-boxes"></i> Volver al Listado
+    </a>
+        <a href="{{ url_for('inventory.create_category') }}" class="btn btn-mariuska-red fw-bold px-4 py-2 d-flex align-items-center gap-2">
+            <i class="bi bi-plus-lg"></i> Nueva Categoría
+        </a>
+    </div>
+</div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row g-3 align-items-center mb-4">
+        <div class="col-md-12">
+            <div class="input-group search-input-group">
+                <span class="input-group-text bg-light border-0 text-muted ps-4"><i class="bi bi-search"></i></span>
+                <input type="text" id="categorySearchInput" class="form-control" placeholder="Buscar categoría por nombre...">
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden table-card">
+        <div class="table-responsive">
+            <table class="table align-middle m-0 custom-insumos-table">
+                <thead class="table-mariuska-header text-white">
+    <tr>
+        <th class="text-center text-uppercase tracking-wider">Categoría</th>
+        <th class="text-center text-uppercase tracking-wider">Días de Vida Útil</th>
+        <th class="text-center text-uppercase tracking-wider">Tipo de Control de Fecha</th>
+        <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
+    </tr>
+</thead>
+<tbody id="categoryTableBody">
+    {% if product_types %}
+        {% for type in product_types %}
+            <tr class="category-row">
+                <td class="text-center fw-bold text-dark fs-6">
+                    {{ type.name }}
+                </td>
+                <td class="text-center">
+                    {% if type.shelf_life_days %}
+                        <span class="badge bg-light text-dark border border-secondary-subtle px-3 py-1 fw-bold fs-7">
+                            {{ type.shelf_life_days }} días
+                        </span>
+                    {% else %}
+                        <span class="text-muted fs-7">No aplica</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if type.requires_manual_date %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 fs-7">
+                            <i class="bi bi-pencil-square me-1"></i> Manual (Lote / Compras)
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 fs-7">
+                            <i class="bi bi-cpu me-1"></i> Automático (Días Hábiles)
+                        </span>
+                    {% endif %}
+                </td>
+                <td class="text-center pe-4" style="width: 140px;">
+                    <div class="d-flex justify-content-center align-items-center gap-3">
+                        <a href="{{ url_for('inventory.edit_category', type_id=type.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar">
+                            <i class="bi bi-pencil-square fs-5"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+    {% else %}
+        <tr>
+            <td colspan="4" class="text-center text-muted py-5">
+                <i class="bi bi-tag display-4 opacity-50 d-block mb-2"></i>
+                No hay categorías registradas.
+            </td>
+        </tr>
+    {% endif %}
+</tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Auto-cierre de alertas flash
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        setTimeout(function() {
+            if (window.bootstrap && bootstrap.Alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            } else {
+                alert.style.transition = "opacity 0.5s ease";
+                alert.style.opacity = "0";
+                setTimeout(() => alert.remove(), 500);
+            }
+        }, 2000);
+    });
+
+    // Buscador en tiempo real nativo
+    const searchInput = document.getElementById('categorySearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('.category-row');
+            
+            rows.forEach(row => {
+                const categoryName = row.cells[0].textContent.toLowerCase();
+                if (categoryName.includes(query)) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
