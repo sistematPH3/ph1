@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from app.extensions import db
 from app.models import Supplier  
+from app.models.inventory_model import Product
 
 from app.logistics.repositories.purchase_history_repository import PurchaseHistoryRepository
 from app.logistics.services.purchase_history_service import PurchaseHistoryService
@@ -28,6 +29,7 @@ def index():
         validated_data = filter_request_validator.load(params)
         
         suppliers = Supplier.query.filter_by(status='Active').order_by(Supplier.name.asc()).all()
+        products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
         
         purchases = service.get_formatted_history(
             start_date=validated_data['start_date'],
@@ -39,7 +41,8 @@ def index():
         return render_template(
             'logistics/purchase_history.html', 
             purchases=purchases,
-            suppliers=suppliers
+            suppliers=suppliers,
+            products=products
         )
         
     except ValueError as val_err:
@@ -47,7 +50,7 @@ def index():
         return redirect(url_for('purchase_history.index'))
     except Exception as e:
         flash(f"Error interno en el sistema: {str(e)}", "error")
-        return render_template('logistics/purchase_history.html', purchases=[], suppliers=[])
+        return render_template('logistics/purchase_history.html', purchases=[], suppliers=[], products=[])
 
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/details', methods=['GET'])
 def get_details(purchase_id):

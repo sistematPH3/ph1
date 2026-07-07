@@ -1,6 +1,6 @@
 from app.models import Purchase, PurchaseDetail, Supplier, Inventory, PurchaseAuditLog, Product, ProductType
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class PurchaseHistoryRepository:
     def __init__(self, db_connection):
@@ -121,7 +121,7 @@ class PurchaseHistoryRepository:
             new_total_amount = Decimal('0.00')
 
             for detail in details:
-                matching_new = next((item for item in new_items if int(item['id']) == detail.id), None)
+                matching_new = next((item for item in new_items if str(item['id']) == str(detail.id)), None)
                 
                 if matching_new:
                     new_qty = Decimal(str(matching_new['quantity']))
@@ -155,7 +155,50 @@ class PurchaseHistoryRepository:
                 else:
                     new_total_amount += (detail.quantity * detail.foreign_price)
 
+            for item in new_items:
+                if str(item['id']).startswith('new_'):
+                    if not item.get('product_id'):
+                        continue
+                        
+                    new_qty = Decimal(str(item['quantity']))
+                    new_price = Decimal(str(item['foreign_price']))
+                    product_id = int(item['product_id'])
+                    
+                    exp_date_obj = None
+                    if item.get('expiration_date'):
+                        exp_date_obj = datetime.strptime(item['expiration_date'], '%Y-%m-%d').date()
+                    else:
+                        product = self.db.session.query(Product).filter_by(id=product_id).first()
+                        if product and getattr(product, 'product_type_id', None):
+                            p_type = self.db.session.query(ProductType).filter_by(id=product.product_type_id).first()
+                            if p_type and getattr(p_type, 'shelf_life_days', None):
+                                exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
+
+                    new_detail = PurchaseDetail(
+                        purchase_id=purchase.id,
+                        product_id=product_id,
+                        quantity=new_qty,
+                        foreign_price=new_price,
+                        price_bs=new_price * purchase.exchange_rate,
+                        expiration_date=exp_date_obj
+                    )
+                    self.db.session.add(new_detail)
+                    
+                    product = self.db.session.query(Product).filter_by(id=product_id).first()
+                    if product:
+                        product.quantity += new_qty
+                        
+                    inventory_item = self.db.session.query(Inventory).filter_by(product_id=product_id).first()
+                    if inventory_item:
+                        inventory_item.current_quantity += new_qty
+
+                    new_total_amount += (new_qty * new_price)
+
+            self.db.session.flush()
+
             purchase.total_amount = new_total_amount
+            
+            final_details = self.db.session.query(PurchaseDetail).filter_by(purchase_id=purchase_id).all()
 
             new_data = {
                 "id": purchase.id,
@@ -172,7 +215,7 @@ class PurchaseHistoryRepository:
                         "foreign_price": float(d.foreign_price),
                         "price_bs": float(d.price_bs),
                         "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
-                    } for d in details
+                    } for d in final_details
                 ]
             }
 
