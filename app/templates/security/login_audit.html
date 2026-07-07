@@ -34,10 +34,10 @@
                         <i class="bi bi-funnel filter-icon-position"></i>
                         <select id="locationFilter" class="form-select ps-5">
                             <option value="">Todas las sedes</option>
-                            <option value="Global / No Location">Global / Sin Sede</option>
+                            <option value="Global / Sin Sede">Global / Sin Sede</option>
                             {% set unique_locations = [] %}
-                            {% for log in historial %}
-                                {% if log.location and log.location.name not in unique_locations %}
+                            {% for log in historial if log.location %}
+                                {% if log.location.name not in unique_locations %}
                                     <option value="{{ log.location.name }}">{{ log.location.name }}</option>
                                     {% set _ = unique_locations.append(log.location.name) %}
                                 {% endif %}
@@ -47,8 +47,8 @@
                 </div>
 
                 <div class="col-6 col-md-3">
-                    <input type="datetime-local" id="datetimeFilter" class="form-control" title="Filtrar por fecha y hora máxima legítima">
-                </div>
+    <input type="datetime-local" id="datetimeFilter" class="form-control" step="3600" title="Filtrar por fecha y hora">
+</div>
             </div>
         </div>
 
@@ -57,10 +57,10 @@
                 <table class="table table-hover align-middle m-0" id="auditDataTable">
                     <thead>
                         <tr>
-                            <th scope="col" class="text-center id-column-width">IDENTIFICACIÓN</th>
+                            <th scope="col" class="text-center">ID</th>
                             <th scope="col">USUARIO</th>
-                            <th scope="col">ROLE</th>
-                            <th scope="col">UBICACIÓN / SUCURSAL</th>
+                            <th scope="col">ROL</th>
+                            <th scope="col">UBICACIÓN</th>
                             <th scope="col">ACCIÓN</th>
                             <th scope="col">FECHA Y HORA</th>
                         </tr>
@@ -71,17 +71,28 @@
                             <td class="text-center text-muted fw-bold">{{ log.id }}</td>
                             
                             <td>
-                                <div class="fw-bold text-dark user-name-text">{{ log.user.name }}</div>
-                                <div class="text-muted email-subtext">{{ log.user.email }}</div>
+                                <div class="fw-bold text-dark">{{ log.user.name if log.user else 'Usuario Desconocido' }}</div>
+                                <div class="text-muted email-subtext">{{ log.user.email if log.user else '---' }}</div>
                             </td>
                             
                             <td>
+                                {# Definición del diccionario de traducción #}
+                                {% set traducciones = {
+                                    'Administrator': 'Administrador',
+                                    'Manager': 'Gerente',
+                                    'Assistant Manager': 'Asistente de Gerente',
+                                    'Guest': 'Invitado',
+                                    'Management': 'Director',
+                                    'Operations': 'Operaciones',
+                                    'Finance': 'Finanzas'
+                                } %}
                                 <span class="badge role-badge">
-                                    {{ log.role.name if log.role else 'Invitado (0)' }}
+                                    {# Traduce usando el diccionario, si no existe la clave, muestra el valor original #}
+                                    {{ traducciones.get(log.role.name, log.role.name) if log.role else 'Sin rol' }}
                                 </span>
                             </td>
                             
-                            <td class="location-cell-data">
+                            <td>
                                 {% if log.location %}
                                     <i class="bi bi-geo-alt-fill text-danger me-1"></i>
                                     <span class="fw-semibold text-secondary">{{ log.location.name }}</span>
@@ -91,36 +102,27 @@
                             </td>
                             
                             <td>
-                                {% if 'FALLIDO' in log.action.upper() or 'ERROR' in log.action.upper() or 'FAILED' in log.action.upper() %}
-                                    <span class="badge status-badge bg-danger-subtle text-danger border border-danger-subtle">
-                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ log.action }}
-                                    </span>
-                                {% elif 'CIERRE' in log.action.upper() or 'LOGOUT' in log.action.upper() %}
-                                    <span class="badge status-badge bg-warning-subtle text-warning-dark border border-warning-subtle">
-                                        <i class="bi bi-door-closed-fill me-1"></i> {{ log.action }}
-                                    </span>
-                                {% else %}
-                                    <span class="badge status-badge bg-success-subtle text-success border border-success-subtle">
-                                        <i class="bi bi-check-circle-fill me-1"></i> {{ log.action }}
-                                    </span>
-                                {% endif %}
+                                <span class="badge status-badge {{ 'bg-danger-subtle text-danger' if 'FALLIDO' in (log.action or '')|upper else 'bg-success-subtle text-success' }}">
+                                    {{ log.action or 'Sin acción' }}
+                                </span>
                             </td>
 
-                            <td class="datetime-column-cell" data-timestamp="{{ log.timestamp.strftime('%Y-%m-%dT%H:%M') }}">
-                                <span class="fw-semibold text-dark">{{ log.timestamp.strftime('%d/%m/%Y') }}</span>
-                                <span class="text-muted time-subtext ms-2">
-                                    <i class="bi bi-clock me-1"></i>{{ log.timestamp.strftime('%I:%M %p') }}
-                                </span>
+                            <td class="datetime-column-cell" data-timestamp="{{ log.timestamp.strftime('%Y-%m-%dT%H:%M') if log.timestamp else '' }}">
+                                {% if log.timestamp %}
+                                    <span class="fw-semibold text-dark">{{ log.timestamp.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted time-subtext ms-2">
+                                        <i class="bi bi-clock me-1"></i>{{ log.timestamp.strftime('%I:%M %p') }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-warning fw-bold small"><i class="bi bi-exclamation-triangle"></i> Pendiente</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                         
                         <tr id="noResultsRow" style="display: none;">
                             <td colspan="6" class="text-center py-5 bg-white border-0">
-                                <div class="mb-3">
-                                    <i class="bi bi-search text-dark" style="font-size: 2.8rem; -webkit-text-stroke: 1px;"></i>
-                                </div>
-                                <h5 class="fw-bold text-dark m-0" style="letter-spacing: -0.2px;">No se encontraron resultados</h5>
+                                <h5>No se encontraron resultados</h5>
                             </td>
                         </tr>
                     </tbody>
@@ -131,79 +133,77 @@
 
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const datetimeFilterInput = document.getElementById("datetimeFilter");
-        const searchInput = document.getElementById("auditSearchInput");
-        const locationFilterSelect = document.getElementById("locationFilter");
-        const dataRows = document.querySelectorAll(".audit-data-row");
-        const noResultsRow = document.getElementById("noResultsRow");
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const datetimeFilterInput = document.getElementById("datetimeFilter");
+    const searchInput = document.getElementById("auditSearchInput");
+    const locationFilterSelect = document.getElementById("locationFilter");
+    const dataRows = document.querySelectorAll(".audit-data-row");
+    const noResultsRow = document.getElementById("noResultsRow");
 
-        // Inicializar la fila de vacío si el backend no manda nada desde el principio
-        if (dataRows.length === 0) {
-            noResultsRow.style.display = "";
-        }
+    // Inicializar la fila de vacío
+    if (dataRows.length === 0) {
+        noResultsRow.style.display = "";
+    }
 
-        // 1. RESTRICCIÓN DE CALENDARIO: Bloquear estrictamente el futuro
-        const currentDateTime = new Date();
-        const currentYear = currentDateTime.getFullYear();
-        const currentMonth = String(currentDateTime.getMonth() + 1).padStart(2, '0');
-        const currentDay = String(currentDateTime.getDate()).padStart(2, '0');
-        const currentHours = String(currentDateTime.getHours()).padStart(2, '0');
-        const currentMinutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+    // 1. RESTRICCIÓN DE CALENDARIO: Bloquear futuro
+    const currentDateTime = new Date();
+    const offset = currentDateTime.getTimezoneOffset() * 60000;
+    const maxDateTimeString = (new Date(currentDateTime - offset)).toISOString().slice(0, 16);
+    datetimeFilterInput.max = maxDateTimeString;
+
+    // 2. FUNCIÓN DE FILTRADO EN TIEMPO REAL
+    function processTableFilters() {
+        const searchKeyword = searchInput.value.toLowerCase();
+        const selectedLocation = locationFilterSelect.value;
+        const selectedDateTime = datetimeFilterInput.value; 
         
-        // Formato ISO estricto requerido por datetime-local (YYYY-MM-DDTHH:MM)
-        const maxDateTimeString = `${currentYear}-${currentMonth}-${currentDay}T${currentHours}:${currentMinutes}`;
-        datetimeFilterInput.max = maxDateTimeString;
+        // Recortamos a 13 caracteres para comparar solo AÑO-MES-DIA-HORA (YYYY-MM-DDTHH)
+        const selectedHourBlock = selectedDateTime.substring(0, 13);
+        let visibleCount = 0;
 
-        // 2. FUNCIÓN DE FILTRADO EN TIEMPO REAL
-        function processTableFilters() {
-            const searchKeyword = searchInput.value.toLowerCase();
-            const selectedLocation = locationFilterSelect.value;
-            const selectedDateTime = datetimeFilterInput.value; 
-            let visibleCount = 0;
+        dataRows.forEach(row => {
+            const rowFullText = row.textContent.toLowerCase();
+            
+            // Validación de Sede
+            const locationCell = row.querySelector(".location-cell-data");
+            const locationText = locationCell ? locationCell.textContent.trim() : "";
+            const matchesLocation = !selectedLocation || locationText.includes(selectedLocation);
+            
+            // Validación del buscador inteligente
+            const matchesSearch = rowFullText.includes(searchKeyword);
+            
+            // Validación de fecha (Bloque de hora redondeada)
+            const datetimeCell = row.querySelector(".datetime-column-cell");
+            const rowTimestampFull = datetimeCell ? datetimeCell.getAttribute("data-timestamp") : "";
+            
+            // Recortamos a 13 caracteres (YYYY-MM-DDTHH)
+            const rowHourBlock = rowTimestampFull.substring(0, 13); 
 
-            dataRows.forEach(row => {
-                const rowFullText = row.textContent.toLowerCase();
-                
-                // Validación de Sede
-                const locationCell = row.querySelector(".location-cell-data");
-                const locationText = locationCell ? locationCell.textContent.trim() : "";
-                const matchesLocation = !selectedLocation || locationText.includes(selectedLocation);
-                
-                // Validación del buscador inteligente
-                const matchesSearch = rowFullText.includes(searchKeyword);
-                
-                // Validación del limitador de fecha (Pasado -> Fecha Máxima seleccionada)
-                const datetimeCell = row.querySelector(".datetime-column-cell");
-                const rowTimestamp = datetimeCell ? datetimeCell.getAttribute("data-timestamp") : "";
-                let matchesDate = true;
-                if (selectedDateTime && rowTimestamp) {
-                    matchesDate = (rowTimestamp <= selectedDateTime);
-                }
-
-                // Renderizado condicional simultáneo
-                if (matchesLocation && matchesSearch && matchesDate) {
-                    row.style.display = "";
-                    visibleCount++;
-                } else {
-                    row.style.display = "none";
-                }
-            });
-
-            // Mostrar el contenedor de la lupita "No se encontraron resultados" si el contador llega a 0
-            if (visibleCount === 0) {
-                noResultsRow.style.display = "";
-            } else {
-                noResultsRow.style.display = "none";
+            let matchesDate = true;
+            if (selectedDateTime && rowTimestampFull) {
+                // Comparamos el bloque de hora: si coinciden (mismo día y misma hora), muestra la fila
+                matchesDate = (rowHourBlock === selectedHourBlock);
             }
-        }
 
-        // Listeners activos
-        searchInput.addEventListener("input", processTableFilters);
-        locationFilterSelect.addEventListener("change", processTableFilters);
-        datetimeFilterInput.addEventListener("input", processTableFilters);
-    });
-    </script>
+            // Renderizado condicional
+            if (matchesLocation && matchesSearch && matchesDate) {
+                row.style.display = "";
+                visibleCount++;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        // Mostrar fila de "No resultados"
+        noResultsRow.style.display = (visibleCount === 0) ? "" : "none";
+    }
+
+    // Listeners activos
+    searchInput.addEventListener("input", processTableFilters);
+    locationFilterSelect.addEventListener("change", processTableFilters);
+    datetimeFilterInput.addEventListener("input", processTableFilters);
+});
+</script>
 </body>
 </html>

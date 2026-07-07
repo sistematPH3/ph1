@@ -1,6 +1,6 @@
 from app.extensions import db
 from flask_login import UserMixin
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import validates
 
 # ⚠️ SE ELIMINÓ EL IMPORT GLOBAL DE AUDIT_VALIDATORS PARA EVITAR LA IMPORTACIÓN CIRCULAR
@@ -155,7 +155,7 @@ class LoginAudit(db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id', ondelete='RESTRICT'), nullable=False)
     
     action = db.Column(db.String(50), nullable=False) # 'INICIO_SESION', 'CERRAR_SESION', 'CAMBIO_CONTRASENA'
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone(timedelta(hours=-4))).replace(tzinfo=None))
     
     user = db.relationship('User', backref=db.backref('login_logs', lazy=True))
     location = db.relationship('Location', backref=db.backref('login_logs', lazy=True))
