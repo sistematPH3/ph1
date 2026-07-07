@@ -7,7 +7,7 @@ class LoginService:
         usuario = LoginRepository.obtener_usuario_por_email(email)
         
        
-        if usuario and usuario.is_active and check_password_hash(usuario.password_hash, password):
+        if usuario and check_password_hash(usuario.password_hash, password):
             return usuario
             
         return None

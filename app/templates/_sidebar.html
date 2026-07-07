@@ -1,0 +1,83 @@
+<!-- _sidebar.html -->
+<nav class="sidebar">
+    <ul class="nav flex-column">
+        
+        <!-- Módulo: USUARIOS Y PERMISOS -->
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Usuarios y Permisos</h6>
+            <a class="nav-link" href="{{ url_for('security.admin_pending_requests') }}">Gestión de Permisos</a>
+            <a class="nav-link" href="#">Gestión de Usuarios</a>
+            <a class="nav-link" href="{{ url_for('logistics.logistics_users.users_page') }}">Asignación de sedes</a>
+        </li>
+        {% endif %}
+
+        <!-- Módulo: SEDES -->
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Sedes</h6>
+            <a class="nav-link" href="{{ url_for('locations.register_location') }}">Registro de Sedes</a>
+            <a class="nav-link" href="{{ url_for('list_sedes_bp.list_sedes') }}">Gestión de Sedes</a>
+        </li>
+        {% endif %}
+
+        <!-- Módulo: INSUMOS E INVENTARIO -->
+        <!-- Cambiado is_director por is_management -->
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Insumos e Inventario</h6>
+            <a class="nav-link" href="{{ url_for('inventory.list_categories') }}">Gestión de Categorías</a>
+            <a class="nav-link" href="{{ url_for('inventory.create_product') }}">Registro de Insumos</a>
+            <a class="nav-link" href="{{ url_for('inventory.list_products') }}">Gestión de Insumos</a>
+        </li>
+        {% endif %}
+
+        <!-- Módulo: COMPRAS Y PROVEEDORES -->
+        <!-- Cambiado is_director por is_management -->
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Compras y Proveedores</h6>
+            <a class="nav-link" href="{{ url_for('purchase_routes.new_purchase_form') }}">Registro de Compra</a>
+            <a class="nav-link" href="{{ url_for('purchase_history.index') }}">Gestión de Compras</a>
+            <a class="nav-link" href="{{ url_for('supplier_list.register_supplier_view') }}">Registro de Proveedores</a>
+            <a class="nav-link" href="{{ url_for('supplier_list.index') }}">Gestión de Proveedores</a>
+        </li>
+        {% endif %}
+
+        <!-- Módulo: TRASLADOS Y MERMAS -->
+        <!-- Cambiado is_director por is_management -->
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Traslados</h6>
+            <a class="nav-link" href="#">Gestión de Traslados</a>
+        </li>
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Mermas</h6>
+            <a class="nav-link" href="#">Gestión de Mermas</a>
+        </li>
+        {% endif %}
+
+        <!-- Módulo: REPORTES Y AUDITORÍA -->
+        {% if current_user.is_admin or current_user.is_finance %}
+        <li class="nav-item">
+            <h6 class="sidebar-heading">Reportes y Auditoría</h6>
+            <a class="nav-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
+        </li>
+        {% endif %}
+
+        <!-- Sección de Sesión -->
+        <li class="nav-item mt-4">
+            <hr>
+            <a class="nav-link text-danger" href="{{ url_for('security.logout') }}">Cerrar Sesión</a>
+        </li>
+
+    </ul>
+</nav>
+<div style="background: #eee; padding: 10px; font-size: 10px;">
+    <strong>Debug:</strong><br>
+    Nombre: {{ current_user.name }}<br>
+    Rol ID: {{ current_user.role_id }}<br>
+    Rol Nombre: {{ current_user.role.name if current_user.role else 'Sin rol' }}<br>
+    Es Management: {{ current_user.is_management }}<br>
+    Es Admin: {{ current_user.is_admin }}
+</div>

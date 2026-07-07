@@ -3,97 +3,89 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}">
 
-<div class="container mt-5 admin-container">
-    <div class="card main-card">
-        <!-- Cabecera con Logo -->
-        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="brand-section d-flex align-items-center">
-                    <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Pizza Hut" class="me-3" style="height: 50px;">
-                    <div>
-                        <h2 class="title-ph mb-0">Gestión de Permisos</h2>
-                        <p class="subtitle-ph mb-0">Revisión de nuevos colaboradores</p>
+<div class="wrapper" style="display: flex;">
+
+    <div style="min-width: 250px;">
+        {% include '_sidebar.html' %}
+    </div>
+
+    <div class="content container mt-5 admin-container" style="flex-grow: 1;">
+        <div class="card main-card">
+            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="brand-section d-flex align-items-center">
+                        <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Pizza Hut" class="me-3" style="height: 50px;">
+                        <div>
+                            <h2 class="title-ph mb-0">Gestión de Permisos</h2>
+                            <p class="subtitle-ph mb-0">Revisión de nuevos colaboradores</p>
+                        </div>
+                    </div>
+                    <span class="badge rounded-pill ph-badge-red">Módulo Administrativo</span>
+                </div>
+
+                <div class="row mt-4 mb-2">
+                    <div class="col-md-8">
+                        <div class="search-box">
+                            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/search_icon.png') }}" class="search-icon-img" alt="Buscar">
+                            <input type="text" id="userInput" onkeyup="filterTable()" class="form-control border-0" placeholder="Buscar por nombre o correo...">
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button class="btn btn-outline-secondary rounded-pill" onclick="toggleSort()">
+                            <i class="fas fa-sort-amount-down"></i> <span id="sortText">Más recientes</span>
+                        </button>
                     </div>
                 </div>
-                <span class="badge rounded-pill ph-badge-red">Módulo Administrativo</span>
             </div>
 
-            <div class="row mt-4 mb-2">
-                <div class="col-md-8">
-                    <div class="search-box">
-                        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/search_icon.png') }}" class="search-icon-img" alt="Buscar">
-                        <input type="text" id="userInput" onkeyup="filterTable()" class="form-control border-0" placeholder="Buscar por nombre o correo...">
-                    </div>
-                </div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-outline-secondary rounded-pill" onclick="toggleSort()">
-                        <i class="fas fa-sort-amount-down"></i> <span id="sortText">Más recientes</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-custom mb-0" id="userTable">
-                    <thead>
-                        <tr>
-                            <th>Usuario</th>
-                            <th>Correo y Registro</th>
-                            <th class="text-center">Estado</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for usuario in usuarios_espera %}
-                        <tr>
-                            <!-- 1. Columna Nombre -->
-                            <td class="user-name">
-                                <div class="avatar-circle">{{ usuario.name[0] | upper }}</div>
-                                <span>{{ usuario.name }}</span>
-                            </td>
-
-                            <!-- 2. Columna Correo y Registro -->
-                            <td>
-                                <div class="user-email text-dark fw-bold">{{ usuario.email }}</div>
-                                <div class="text-muted small">ID de Registro: {{ usuario.id }}</div>
-                            </td>
-
-                            <!-- 3. Columna Estado -->
-                            <td class="text-center">
-                                <span class="badge status-pending">Pendiente</span>
-                            </td>
-
-                            <!-- 4. Columna Acciones -->
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <!-- Formulario Rechazar con Alerta -->
-                                    <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="d-inline">
-                                        <button type="submit" class="btn btn-action btn-reject" title="Rechazar"
-                                                onclick="return confirm('¿Estás segura de que deseas rechazar a {{ usuario.name }}? Esta acción no se puede deshacer.')">
-                                            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/reject_user.png') }}" width="18">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-custom mb-0" id="userTable">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Correo y Registro</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usuario in usuarios_espera %}
+                            <tr>
+                                <td class="user-name">
+                                    <div class="avatar-circle">{{ usuario.name[0] | upper }}</div>
+                                    <span>{{ usuario.name }}</span>
+                                </td>
+                                <td>
+                                    <div class="user-email text-dark fw-bold">{{ usuario.email }}</div>
+                                    <div class="text-muted small">ID de Registro: {{ usuario.id }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge status-pending">Pendiente</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-action btn-reject" title="Rechazar"
+                                                    onclick="return confirm('¿Estás segura de que deseas rechazar a {{ usuario.name }}?')">
+                                                <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/reject_user.png') }}" width="18">
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-action btn-approve" data-bs-toggle="modal" data-bs-target="#modalApprove{{ usuario.id }}" title="Asignar Rol">
+                                            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/check_user.png') }}" width="18">
                                         </button>
-                                    </form>
-
-                                    <!-- Botón Aprobar -->
-                                    <button type="button" class="btn btn-action btn-approve" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#modalApprove{{ usuario.id }}" 
-                                            title="Asignar Rol">
-                                        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/check_user.png') }}" width="18">
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modales de aprobación -->
 {% for usuario in usuarios_espera %}
 <div class="modal fade" id="modalApprove{{ usuario.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -102,18 +94,53 @@
                 <h5 class="modal-title">Asignar Rol a {{ usuario.name }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST">
+            
+            <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" 
+                  data-id="{{ usuario.id }}" 
+                  onsubmit="return validarFormularioAprobacion(this);">
                 <div class="modal-body">
-                     <label class="form-label text-muted small fw-bold">SELECCIONE EL CARGO:</label>
-                     <select name="role_id" class="form-select" required>
-                        <option value="" selected disabled>Seleccione un rol...</option>
-                        <option value="1">Administrador</option>
-                        <option value="2">Gerente</option>
-                        <option value="3">Sub gerente</option>
-                        <option value="4">Operaciones</option>
-                        <option value="5">Dirección</option>
-                        <option value="6">Finanzas</option>
-                    </select>
+                    
+                    <div class="mb-3">
+                        <label for="role_id_{{ usuario.id }}" class="form-label text-muted small fw-bold">1. SELECCIONE EL CARGO:</label>
+                        <select name="role_id" id="role_id_{{ usuario.id }}" data-user-id="{{ usuario.id }}" class="form-select" onchange="toggleSedesContainer(this);" required>
+                            <option value="" selected disabled>Seleccione un rol...</option>
+                            <option value="1">Administrador</option>
+                            <option value="2">Gerente</option>
+                            <option value="3">Sub gerente</option>
+                            <option value="4">Operaciones</option>
+                            <option value="5">Dirección</option>
+                            <option value="6">Finanzas</option>
+                        </select>
+                    </div>
+
+                    <div id="location_container_{{ usuario.id }}" class="mb-3">
+                        <label class="form-label fw-bold" style="color: var(--text-main); font-size: 0.9rem;">Asignar Sedes:</label>
+                        
+                        <div class="locations-pills-container" id="pills_container_{{ usuario.id }}">
+                            {% for sede in sedes %}
+                                <input type="checkbox" 
+                                       name="location_ids" 
+                                       value="{{ sede.id }}" 
+                                       id="sede_{{ usuario.id }}_{{ sede.id }}" 
+                                       class="btn-check-pill-hidden" 
+                                       autocomplete="off">
+                                
+                                <label class="location-pill" for="sede_{{ usuario.id }}_{{ sede.id }}">
+                                    {{ sede.name }}
+                                    <span class="remove-x">&times;</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="text-danger d-none mt-1 small" id="error_msg_sedes_{{ usuario.id }}" style="font-size: 0.85rem; font-weight: 500;">
+                            Debes seleccionar al menos una sede para este colaborador.
+                        </div>
+                    </div>
+
+                    <div id="error_msg_general_{{ usuario.id }}" class="alert alert-danger d-none mt-2" role="alert" style="font-size: 0.85rem;">
+                        <strong>Atención:</strong> Debes rellenar los campos obligatorios correctamente.
+                    </div>
+
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -152,6 +179,58 @@ function toggleSort() {
     let order = currentUrl.searchParams.get("sort") === "asc" ? "desc" : "asc";
     currentUrl.searchParams.set("sort", order);
     window.location.href = currentUrl.href;
+}
+
+function toggleSedesContainer(rolSelect) {
+    const usuarioId = rolSelect.getAttribute('data-user-id');
+    const locationContainer = document.getElementById('location_container_' + usuarioId);
+    
+    if (rolSelect.value === "1") { // ID 1 es 'Administrador'
+        locationContainer.style.display = 'none';
+        
+        // Desmarcamos correctamente los Checkboxes/Pills por si acaso seleccionó alguno antes
+        const checkboxes = locationContainer.querySelectorAll('input[name="location_ids"]');
+        checkboxes.forEach(cb => cb.checked = false);
+    } else {
+        locationContainer.style.display = 'block';
+    }
+}
+
+function validarFormularioAprobacion(formulario) {
+    const usuarioId = formulario.getAttribute('data-id'); 
+    const rolSelect = formulario.querySelector('#role_id_' + usuarioId);
+    const errorMsgSedes = formulario.querySelector('#error_msg_sedes_' + usuarioId);
+    const errorMsgGeneral = formulario.querySelector('#error_msg_general_' + usuarioId);
+    
+    // Captura los Checkboxes activos dentro del contenedor de píldoras
+    const checkboxesMarcados = formulario.querySelectorAll('input[name="location_ids"]:checked');
+    
+    let esValido = true;
+
+    rolSelect.classList.remove('is-invalid');
+    if (errorMsgSedes) errorMsgSedes.classList.add('d-none');
+    if (errorMsgGeneral) errorMsgGeneral.classList.add('d-none');
+
+    // Validar el cargo/rol
+    if (rolSelect.value === "") {
+        rolSelect.classList.add('is-invalid');
+        esValido = false;
+    }
+
+    // Validar sedes si NO es Administrador
+    if (rolSelect.value !== "1") {
+        if (checkboxesMarcados.length === 0) {
+            if (errorMsgSedes) errorMsgSedes.classList.remove('d-none');
+            esValido = false;
+        }
+    }
+
+    if (!esValido) {
+        if (errorMsgGeneral) errorMsgGeneral.classList.remove('d-none');
+        return false; 
+    }
+
+    return true; 
 }
 </script>
 {% endblock %}

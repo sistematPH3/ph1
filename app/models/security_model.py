@@ -33,6 +33,86 @@ class User(db.Model, UserMixin):
     # Buzón interno / Bandeja de alarmas
     notifications = db.relationship('Notification', backref='recipient', lazy=True)
 
+
+    # =========================================================================
+    # --- LÓGICA DE SEGURIDAD Y ROLES DE LA BASE DE DATOS ---
+    # =========================================================================
+
+    @property
+    def is_admin(self):
+        return self.role is not None and self.role.name == 'Administrator'
+
+    @property
+    def is_manager(self):
+        return self.role is not None and self.role.name == 'Manager'
+
+    @property
+    def is_assistant_manager(self):
+        return self.role is not None and self.role.name == 'Assistant Manager'
+
+    @property
+    def is_operations(self):
+        return self.role is not None and self.role.name == 'Operations'
+
+    @property
+    def is_management(self):
+        return self.role is not None and self.role.name == 'Management'
+    
+    @property
+    def is_finance(self):
+        return self.role is not None and self.role.name == 'Finance'
+    
+    @property
+    def is_guest(self):
+        # Reconocimiento robusto de usuarios invitados por ID o por nombre string
+        return self.role_id == 0 or (self.role is not None and self.role.name == 'Guest')
+    
+    @property
+    def is_fully_active(self):
+        """
+        Validación de habilitación de usuario:
+        1. Estado de actividad general (is_active).
+        2. Asignación obligatoria de un rol.
+        3. Vinculación a sedes activas (Excluye administradores e invitados).
+        """
+        if not self.is_active:
+            return False
+        
+        # Validación de rol
+        if self.role is None:
+            return False
+        
+        # Validación de sedes (Omitida para administradores e invitados)
+        if not self.is_admin and not self.is_guest:
+            active_assigned = any(loc.is_active for loc in self.locations)
+            if not active_assigned:
+                return False
+        
+        return True
+
+    # --- SINCRONIZACIÓN DE ESTADO AUTOMÁTICA ---
+    def sync_activation_status(self):
+        """
+        Actualización de la bandera is_active según las sedes vinculadas.
+        Mantiene siempre activos a administradores e invitados.
+        """
+        # Excepción absoluta de desactivación
+        if self.is_admin or self.is_guest:
+            self.is_active = True
+            db.session.commit()
+            return
+        
+        # Filtrado de sedes que se encuentren activas en el sistema
+        active_assigned_locations = [loc for loc in self.locations if loc.is_active]
+        
+        # Inhabilitación si no cuenta con sedes o si todas están inactivas
+        if len(self.locations) == 0 or len(active_assigned_locations) == 0:
+            self.is_active = False
+        else:
+            self.is_active = True
+            
+        db.session.commit()
+
     def __repr__(self):
         return f'<User {self.email}>'
 

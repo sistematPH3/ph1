@@ -73,6 +73,9 @@ def create_app():
         app.register_blueprint(imgbb_bp)
         # ==========================================================
 
+        from app.dashboard.dashboard_routes import dashboard_bp
+        app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model

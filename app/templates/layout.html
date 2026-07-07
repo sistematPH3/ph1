@@ -3,81 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PML - Gestión Operativa</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-    <style>
-        /* Fondo de la barra superior */
-        .navbar { background-color: rgb(187, 3, 3); }
-        /* Título de la aplicación */
-        .navbar-brand { color: white !important; }
-        /* 1. SEPARACIÓN: Estilo exclusivo para los botones de arriba a la derecha (Navbar) */
-        .navbar-nav .nav-link { color: white !important; }
-        .navbar-nav .nav-link:hover {
-            background-color: rgba(255, 255, 255, 0.2); /* Un sutil fondo claro al pasar el mouse arriba */
-            color: white !important; }
-        /* 2. SEPARACIÓN: Estilo exclusivo para los botones de la izquierda (Sidebar) */
-        .sidebar { 
-            background: #f8f9fa; 
-            min-height: 100vh; 
-            border-right: 1px solid #dee2e6; 
-            padding-top: 20px;
-        }
-        .sidebar .nav-link { 
-            color: #333333 !important; /* Color oscuro para contraste con fondo blanco */
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin: 2px 10px;
-            display: block;
-        }
-
-        /* 3. SOLUCIÓN AL HOVER: Cambiar el color del texto a blanco cuando el fondo sea oscuro */
-        .sidebar .nav-link:hover { 
-            background-color: #dee2e6 !important; /* Fondo oscuro */
-            color: #303131 !important;             /* ¡Letras blancas para que no se camuflen! */
-        }
-    </style>
+    <title>Pizza Hut - Gestión Administrativa</title>
+    <!-- Enlace a tu archivo CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg sticky-top mb-0">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">Pizza Master Logistics</a>
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="#">Auditoría</a></li>
-                <li class="nav-item"><a class="nav-link" href="#">Cerrar Sesión</a></li>
-            </ul>
-        </div>
-    </nav>
+    <div class="wrapper">
+        <!-- Inclusión del Sidebar -->
+        {% include '_sidebar.html' %}
 
-    <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-3 col-lg-2 d-none d-md-block sidebar">
-                <ul class="nav flex-column">
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">📦 Inventario</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">🗑️ Mermas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">🏢 Gestión de Sedes</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">👥 Asignación de Personal</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">🔔 Alertas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="#">📊 Analíticas</a></li>
-                </ul>
-            </nav>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 pt-4">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                  {% if messages %}
-                    {% for category, message in messages %}
-                      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>
-                    {% endfor %}
-                  {% endif %}
-                {% endwith %}
-
-                {% block content %}{% endblock %}
-            </main>
-        </div>
+        <!-- Contenido principal -->
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
     </div>
-   
-   <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 </body>
 </html>
