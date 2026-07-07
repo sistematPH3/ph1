@@ -45,9 +45,10 @@
                         <table class="table align-middle m-0 custom-insumos-table" id="itemsTable">
                             <thead>
                                 <tr>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 45%;">Producto / Insumo</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Cantidad</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 25%;">Precio Extranjero</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 35%;">Producto / Insumo</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 15%;">Cantidad</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Vencimiento</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Precio Extranjero</th>
                                     <th class="text-center text-uppercase tracking-wider" style="width: 10%;">Acción</th>
                                 </tr>
                             </thead>
@@ -69,6 +70,13 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
                                                 <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10" required>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group search-input-group">
+                                                <input type="date" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-exp">
                                             </div>
                                         </div>
                                     </td>
@@ -149,14 +157,11 @@
                         <label class="form-label">Usuario / Comprador</label>
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-person-badge"></i></span>
-                            <!-- Se añade pointer-events y opacidad para que actúe como un campo de lectura informativa pero envíe su valor con normalidad -->
                             <select id="user_id" class="form-select border-0 py-2 bg-transparent" style="pointer-events: none; opacity: 0.85; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none !important;" 
                             tabindex="-1" required>
                                 {% if current_user.is_authenticated %}
-                                    <!-- Si hay sesión activa, se auto-selecciona el usuario actual -->
                                     <option value="{{ current_user.id }}" selected>{{ current_user.name }}</option>
                                 {% else %}
-                                    <!-- Fallback de seguridad en caso de que no detecte sesión -->
                                     <option value="" disabled selected>Seleccione Usuario</option>
                                     {% for u in users %}
                                         <option value="{{ u.id }}">{{ u.name }}</option>
@@ -184,7 +189,6 @@
 </div>
 
 <script>
-    // Variable global para almacenar las opciones de productos de Jinja2 en memoria
     let productOptionsHtml = '';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -197,7 +201,6 @@
             invoiceCard.style.minHeight = `${initialMaxHeight}px`;
         }
 
-        // RESPALDO: Guardamos las opciones de productos apenas carga la página
         const initialSelect = document.querySelector('.prod-id');
         if (initialSelect) {
             productOptionsHtml = initialSelect.innerHTML;
@@ -389,7 +392,6 @@
 
     function addProductRow() {
         const tbody = document.getElementById('itemsContainer');
-        // MODIFICACIÓN: Si la variable global tiene las opciones, úsalas. Si no, usa el fallback genérico.
         const optionsHtml = productOptionsHtml || '<option value="">-- Elige un producto --</option>';
 
         const row = document.createElement('tr');
@@ -408,6 +410,13 @@
                 <div class="table-field-wrapper">
                     <div class="input-group search-input-group">
                         <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10">
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="table-field-wrapper">
+                    <div class="input-group search-input-group">
+                        <input type="date" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-exp">
                     </div>
                 </div>
             </td>
@@ -525,11 +534,13 @@
         rows.forEach(row => {
             const prodIdVal = row.querySelector('.prod-id').value;
             const qtyVal = row.querySelector('.prod-qty').value;
+            const expVal = row.querySelector('.prod-exp').value;
             const priceVal = row.querySelector('.prod-price').value;
 
             if(prodIdVal) {
                 formData.append('product_id[]', prodIdVal);
                 formData.append('quantity[]', qtyVal);
+                formData.append('expiration_date[]', expVal);
                 formData.append('foreign_price[]', priceVal);
             }
         });
@@ -553,25 +564,19 @@
                         popup: 'rounded-4'
                     }
                 }).then(() => {
-                    // 1. Reseteamos los campos estándar del formulario nativo
                     document.getElementById('purchaseForm').reset();
                     
-                    // 2. Limpiamos cualquier etiqueta o borde de error visual residual de validaciones previas
                     document.querySelectorAll('.error-label').forEach(el => el.remove());
                     document.querySelectorAll('.mariuska-select-group, .search-input-group').forEach(el => {
                         el.style.borderColor = '';
                     });
 
-                    // 3. Vaciamos las filas dinámicas de la tabla de forma segura
                     document.getElementById('itemsContainer').innerHTML = '';
                     
-                    // 4. Agregamos una fila inicial limpia (ahora leerá desde la variable en memoria)
                     addProductRow();
                     
-                    // 5. Forzamos el evento para limpiar la interfaz visual del dropzone de la factura
                     document.getElementById('invoice_photo').dispatchEvent(new Event('change'));
                     
-                    // 6. Volvemos a disparar la consulta de la tasa de cambio para que la mantenga actualizada
                     document.getElementById('currency').dispatchEvent(new Event('change'));
                 });
             } else {

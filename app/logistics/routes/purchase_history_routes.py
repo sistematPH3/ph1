@@ -62,14 +62,15 @@ def get_details(purchase_id):
         details = data['details']
         
         details_list = []
-        for d, product_sku in details:
+        for d, product_sku, requires_manual_date in details:
             details_list.append({
                 "id": d.id,
                 "product_sku": product_sku if product_sku else "(Sin SKU)",
                 "quantity": float(d.quantity),
                 "foreign_price": float(d.foreign_price) if d.foreign_price is not None else 0.0,
                 "price_bs": float(d.price_bs) if d.price_bs is not None else 0.0,
-                "expiration_date": d.expiration_date.strftime('%Y-%m-%d') if getattr(d, 'expiration_date', None) else ""
+                "expiration_date": d.expiration_date.strftime('%Y-%m-%d') if getattr(d, 'expiration_date', None) else "",
+                "requires_manual_date": bool(requires_manual_date)
             })
 
         return jsonify({

@@ -1,5 +1,6 @@
-from app.models import Purchase, PurchaseDetail, Supplier, Inventory, PurchaseAuditLog, Product
+from app.models import Purchase, PurchaseDetail, Supplier, Inventory, PurchaseAuditLog, Product, ProductType
 from decimal import Decimal
+from datetime import datetime
 
 class PurchaseHistoryRepository:
     def __init__(self, db_connection):
@@ -27,10 +28,13 @@ class PurchaseHistoryRepository:
         return self.db.session.query(Purchase).get(purchase_id)
 
     def get_details_by_purchase_id(self, purchase_id):
-        from app.models import Product
-        return self.db.session.query(PurchaseDetail, Product.sku.label('product_sku'))\
-            .join(Product, PurchaseDetail.product_id == Product.id)\
-            .filter(PurchaseDetail.purchase_id == purchase_id).all()
+        return self.db.session.query(
+            PurchaseDetail, 
+            Product.sku.label('product_sku'),
+            ProductType.requires_manual_date.label('requires_manual_date')
+        ).join(Product, PurchaseDetail.product_id == Product.id)\
+         .outerjoin(ProductType, Product.product_type_id == ProductType.id)\
+         .filter(PurchaseDetail.purchase_id == purchase_id).all()
             
     def logical_annulment(self, purchase_id, user_id):
         try:
@@ -143,8 +147,9 @@ class PurchaseHistoryRepository:
                     detail.price_bs = new_price * purchase.exchange_rate
                     
                     if 'expiration_date' in matching_new and matching_new['expiration_date']:
-                        from datetime import datetime
                         detail.expiration_date = datetime.strptime(matching_new['expiration_date'], '%Y-%m-%d').date()
+                    else:
+                        detail.expiration_date = None
 
                     new_total_amount += (new_qty * new_price)
                 else:

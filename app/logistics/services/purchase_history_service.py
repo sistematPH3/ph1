@@ -1,4 +1,4 @@
-import pytz
+from datetime import timedelta
 
 class PurchaseHistoryService:
     def __init__(self, repository):
@@ -14,12 +14,9 @@ class PurchaseHistoryService:
         
         formatted_history = []
         
-        utc_tz = pytz.utc
-        caracas_tz = pytz.timezone('America/Caracas')
         for purchase, supplier_name in raw_purchases:
             if purchase.purchase_date:
-                purchase_date_utc = utc_tz.localize(purchase.purchase_date)
-                purchase_date_local = purchase_date_utc.astimezone(caracas_tz)
+                purchase_date_local = purchase.purchase_date - timedelta(hours=4)
             else:
                 purchase_date_local = None
             

@@ -156,13 +156,14 @@
                                                 <th>Identificación</th>
                                                 <th>SKU</th>
                                                 <th class="text-center">Cantidad</th>
+                                                <th class="text-center">Vencimiento</th>
                                                 <th class="text-end">Precio por cantidad (Divisa Originaria)</th>
                                                 <th class="text-end">Total en Bs.</th>
                                             </tr>
                                         </thead>
                                         <tbody id="collapse-body-{{ purchase.id }}">
                                             <tr>
-                                                <td colspan="5" class="text-center py-2 text-muted">
+                                                <td colspan="6" class="text-center py-2 text-muted">
                                                     <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Cargando renglones...
                                                 </td>
                                             </tr>
@@ -227,14 +228,15 @@
             <div class="modal-body p-4">
                 <div id="editErrorAlert" class="alert alert-danger d-none small mb-4 rounded-3 border-0" style="background-color: #f8d7da; color: #842029;"></div>
                 
-                <p class="text-muted small mb-4">Modifique las cantidades recibidas o los precios. El sistema calculará la diferencia automáticamente y ajustará el almacén general.</p>
+                <p class="text-muted small mb-4">Modifique las cantidades recibidas, el precio o la fecha de vencimiento.</p>
                 <div class="table-responsive border rounded-3">
                     <table class="table align-middle table-borderless m-0" id="edit-table">
                         <thead class="table-light text-center small text-uppercase fw-bold border-bottom">
                             <tr>
                                 <th class="text-start ps-3">Insumo (SKU)</th>
-                                <th style="width: 140px;">Cantidad</th>
-                                <th style="width: 160px;">Precio (Divisa)</th>
+                                <th style="width: 120px;">Cantidad</th>
+                                <th style="width: 150px;">Vencimiento</th>
+                                <th style="width: 150px;">Precio (Divisa)</th>
                             </tr>
                         </thead>
                         <tbody id="edit-table-body">
@@ -380,7 +382,7 @@
             .then(data => {
                 tbody.innerHTML = '';
                 if(data.details.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
                     return;
                 }
 
@@ -388,12 +390,14 @@
                     const subtotalBs = detail.quantity * detail.foreign_price * data.exchange_rate;
                     const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${detail.expiration_date.split('-').reverse().join('/')}</span>` : `<span class="text-muted small">N/A</span>`;
                     
                     const row = `
                         <tr>
                             <td class="text-secondary fw-bold">#${detail.id}</td>
                             <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
                             <td class="text-center fw-bold text-primary">${detail.quantity}</td>
+                            <td class="text-center">${expDateBadge}</td>
                             <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
                             <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
                         </tr>
@@ -402,7 +406,7 @@
                 });
             })
             .catch(error => {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
             });
     }
 
@@ -438,7 +442,7 @@
             editPurchaseIdSpan.innerText = purchaseId;
             
             editErrorAlert.classList.add('d-none');
-            editTableBody.innerHTML = `<tr><td colspan="3" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
+            editTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
             modalEdit.show();
 
             fetch(`/logistics/purchases/history/${purchaseId}/details`)
@@ -449,7 +453,7 @@
                 .then(data => {
                     editTableBody.innerHTML = '';
                     if(data.details.length === 0) {
-                        editTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
+                        editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
                         return;
                     }
                     data.details.forEach(item => {
@@ -460,8 +464,11 @@
                                 <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
                             </td>
                             <td class="text-center px-2">
+                                <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${item.expiration_date || ''}">
+                            </td>
+                            <td class="text-center px-2">
                                 <div class="input-group">
-                                    <span class="input-group-text bg-light border-secondary text-muted small">${data.currency}</span>
+                                    <span class="input-group-text bg-light border-secondary text-muted small px-1">${data.currency}</span>
                                     <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${item.id}" value="${item.foreign_price}" min="0" step="0.01">
                                 </div>
                             </td>
@@ -470,7 +477,7 @@
                     });
                 })
                 .catch(err => {
-                    editTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+                    editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
                 });
         }
     });
@@ -483,11 +490,14 @@
         rows.forEach(row => {
             const qtyInput = row.querySelector('.edit-qty');
             const priceInput = row.querySelector('.edit-price');
+            const expInput = row.querySelector('.edit-exp');
+            
             if(qtyInput && priceInput) {
                 items.push({
                     id: qtyInput.getAttribute('data-id'),
                     quantity: parseFloat(qtyInput.value),
-                    foreign_price: parseFloat(priceInput.value)
+                    foreign_price: parseFloat(priceInput.value),
+                    expiration_date: expInput ? expInput.value : ""
                 });
             }
         });
