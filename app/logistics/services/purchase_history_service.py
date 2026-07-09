@@ -48,5 +48,5 @@ class PurchaseHistoryService:
     def process_annulment(self, purchase_id, user_id):
         return self.repository.logical_annulment(purchase_id, user_id)
 
-    def process_edit(self, purchase_id, user_id, new_items):
-        return self.repository.logical_edit(purchase_id, user_id, new_items)
+    def process_edit(self, purchase_id, user_id, new_items, reason):
+        return self.repository.logical_edit(purchase_id, user_id, new_items, reason)

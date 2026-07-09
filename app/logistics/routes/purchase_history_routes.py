@@ -116,7 +116,11 @@ def edit_purchase(purchase_id):
         if not data or 'items' not in data:
             return jsonify({"success": False, "error": "Datos incompletos para la edición."}), 400
             
-        success = service.process_edit(purchase_id, user_id, data['items'])
+        reason = data.get('reason')
+        if not reason or len(reason.strip()) < 5:
+            return jsonify({"success": False, "error": "Debe proporcionar un motivo válido para justificar la edición."}), 400
+            
+        success = service.process_edit(purchase_id, user_id, data['items'], reason.strip())
         
         if success:
             flash(f"La compra Nro. {purchase_id} ha sido modificada con éxito.", "success")

@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, render_template, current_app
 from flask_login import current_user
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import pytz
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
 from app import db 
@@ -32,7 +33,19 @@ def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
 
 @purchase_bp.route('/purchases/new', methods=['GET'])
 def new_purchase_form():
-    products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
+    products_query = db.session.query(Product, ProductType).outerjoin(
+        ProductType, Product.product_type_id == ProductType.id
+    ).filter(Product.is_active == True).order_by(Product.name.asc()).all()
+    
+    products = []
+    for prod, ptype in products_query:
+        products.append({
+            'id': prod.id,
+            'name': prod.name,
+            'unit_of_measure': prod.unit_of_measure,
+            'shelf_life_days': ptype.shelf_life_days if ptype else 0
+        })
+        
     suppliers = Supplier.query.filter(func.upper(Supplier.status).in_(['ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA'])).order_by(Supplier.name.asc()).all()
     users = User.query.order_by(User.name.asc()).all()
     
@@ -67,7 +80,22 @@ def view_purchase_details(purchase_id):
         if audit_log:
             audit_user = User.query.get(audit_log.user_id)
             if audit_log.timestamp:
-                audit_timestamp_local = audit_log.timestamp - timedelta(hours=4)
+                utc_tz = pytz.utc
+                caracas_tz = pytz.timezone('America/Caracas')
+                audit_utc = utc_tz.localize(audit_log.timestamp)
+                audit_timestamp_local = audit_utc.astimezone(caracas_tz)
+                
+    edit_logs_raw = PurchaseAuditLog.query.filter_by(purchase_id=purchase_id, action_type='EDIT').order_by(PurchaseAuditLog.timestamp.asc()).all()
+    edit_logs = []
+    for log in edit_logs_raw:
+        editor = User.query.get(log.user_id)
+        local_time = log.timestamp - timedelta(hours=4) if log.timestamp else None
+        reason = log.new_data.get('edit_reason', 'Edición sin motivo especificado') if log.new_data else 'Edición sin motivo especificado'
+        edit_logs.append({
+            'editor_name': editor.name if editor else 'Usuario Desconocido',
+            'timestamp': local_time,
+            'reason': reason
+        })
     
     return render_template(
         'logistics/purchase_details.html', 
@@ -78,7 +106,8 @@ def view_purchase_details(purchase_id):
         user=user,
         audit_log=audit_log,
         audit_user=audit_user,
-        audit_timestamp_local=audit_timestamp_local
+        audit_timestamp_local=audit_timestamp_local,
+        edit_logs=edit_logs
     )
 
 @purchase_bp.route('/purchases', methods=['POST'])

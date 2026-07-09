@@ -91,7 +91,7 @@ class PurchaseHistoryRepository:
             self.db.session.rollback()
             raise e
 
-    def logical_edit(self, purchase_id, user_id, new_items):
+    def logical_edit(self, purchase_id, user_id, new_items, reason):
         try:
             purchase = self.get_purchase_by_id(purchase_id)
             if not purchase or purchase.status == 'ANNULLED':
@@ -207,6 +207,7 @@ class PurchaseHistoryRepository:
                 "currency": purchase.currency,
                 "exchange_rate": float(purchase.exchange_rate),
                 "status": purchase.status,
+                "edit_reason": reason,
                 "details": [
                     {
                         "id": d.id,

@@ -113,7 +113,7 @@
                                     {% set total_bs.value = total_bs.value + subtotal_row_bs %}
                                     <tr>
                                         <td class="ps-4 py-3"><strong class="text-dark">{{ product_name }}</strong></td>
-                                        <td class="text-center py-3">{{ item.quantity }}</td>
+                                        <td class="text-center py-3">{{ "{:,.2f}".format(item.quantity) }}</td>
                                         <td class="text-center py-3">
                                             {% if item.expiration_date %}
                                                 <span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>{{ item.expiration_date.strftime('%d/%m/%Y') }}</span>
@@ -134,6 +134,29 @@
                     </div>
                 </div>
             </div>
+
+            {% if edit_logs %}
+            <div class="card purchase-card shadow-sm mb-4" style="border-radius: 12px; overflow: hidden; border: none; border-left: 6px solid #B31F24;">
+                <div class="p-3 border-bottom d-flex align-items-center" style="background-color: #f8f9fa;">
+                    <i class="bi bi-clock-history text-danger me-2 fs-5"></i> 
+                    <h5 class="m-0 fw-bold text-dark">Historial de Modificaciones</h5>
+                </div>
+                <div class="card-body p-4 bg-white">
+                    {% for log in edit_logs %}
+                    <div class="mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fw-bold text-dark"><i class="bi bi-person-fill text-danger me-1"></i> {{ log.editor_name }}</span>
+                            <span class="text-muted small"><i class="bi bi-calendar3 me-1"></i> {{ log.timestamp.strftime('%d/%m/%Y %I:%M %p') if log.timestamp else 'N/A' }}</span>
+                        </div>
+                        <p class="m-0 p-3 rounded-3" style="background-color: #fff5f5; border: 1px solid #f8d7da; color: #212529;">
+                            <strong class="text-danger">Motivo:</strong> {{ log.reason }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
         </div> 
         
         <div class="col-lg-4">
