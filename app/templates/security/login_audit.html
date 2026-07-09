@@ -24,12 +24,12 @@
 
         <div class="card toolbar-card border-0 shadow-sm p-3 mb-3">
             <div class="row g-2">
-                <div class="col-12 col-md-5 position-relative">
+                <div class="col-12 col-lg-4 position-relative">
                     <i class="bi bi-search search-icon-position"></i>
                     <input type="text" id="auditSearchInput" class="form-control ps-5" placeholder="Buscar por nombre, correo o acción...">
                 </div>
 
-                <div class="col-6 col-md-4">
+                <div class="col-12 col-md-4 col-lg-3">
                     <div class="position-relative">
                         <i class="bi bi-funnel filter-icon-position"></i>
                         <select id="locationFilter" class="form-select ps-5">
@@ -46,9 +46,39 @@
                     </div>
                 </div>
 
-                <div class="col-6 col-md-3">
-    <input type="datetime-local" id="datetimeFilter" class="form-control" step="3600" title="Filtrar por fecha y hora">
-</div>
+                <div class="col-6 col-md-4 col-lg-3">
+                    <input type="date" id="dateFilter" class="form-control" title="Filtrar por fecha">
+                </div>
+
+                <div class="col-6 col-md-4 col-lg-2">
+                    <select id="hourFilter" class="form-select" title="Filtrar por hora exacta">
+                        <option value="">Cualquier hora</option>
+                        <option value="00">12:00 AM</option>
+                        <option value="01">01:00 AM</option>
+                        <option value="02">02:00 AM</option>
+                        <option value="03">03:00 AM</option>
+                        <option value="04">04:00 AM</option>
+                        <option value="05">05:00 AM</option>
+                        <option value="06">06:00 AM</option>
+                        <option value="07">07:00 AM</option>
+                        <option value="08">08:00 AM</option>
+                        <option value="09">09:00 AM</option>
+                        <option value="10">10:00 AM</option>
+                        <option value="11">11:00 AM</option>
+                        <option value="12">12:00 PM</option>
+                        <option value="13">01:00 PM</option>
+                        <option value="14">02:00 PM</option>
+                        <option value="15">03:00 PM</option>
+                        <option value="16">04:00 PM</option>
+                        <option value="17">05:00 PM</option>
+                        <option value="18">06:00 PM</option>
+                        <option value="19">07:00 PM</option>
+                        <option value="20">08:00 PM</option>
+                        <option value="21">09:00 PM</option>
+                        <option value="22">10:00 PM</option>
+                        <option value="23">11:00 PM</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -76,7 +106,6 @@
                             </td>
                             
                             <td>
-                                {# Definición del diccionario de traducción #}
                                 {% set traducciones = {
                                     'Administrator': 'Administrador',
                                     'Manager': 'Gerente',
@@ -87,12 +116,11 @@
                                     'Finance': 'Finanzas'
                                 } %}
                                 <span class="badge role-badge">
-                                    {# Traduce usando el diccionario, si no existe la clave, muestra el valor original #}
                                     {{ traducciones.get(log.role.name, log.role.name) if log.role else 'Sin rol' }}
                                 </span>
                             </td>
                             
-                            <td>
+                            <td class="location-cell-data">
                                 {% if log.location %}
                                     <i class="bi bi-geo-alt-fill text-danger me-1"></i>
                                     <span class="fw-semibold text-secondary">{{ log.location.name }}</span>
@@ -135,59 +163,64 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const datetimeFilterInput = document.getElementById("datetimeFilter");
     const searchInput = document.getElementById("auditSearchInput");
     const locationFilterSelect = document.getElementById("locationFilter");
+    const dateFilterInput = document.getElementById("dateFilter");
+    const hourFilterSelect = document.getElementById("hourFilter");
     const dataRows = document.querySelectorAll(".audit-data-row");
     const noResultsRow = document.getElementById("noResultsRow");
 
-    // Inicializar la fila de vacío
     if (dataRows.length === 0) {
         noResultsRow.style.display = "";
     }
 
-    // 1. RESTRICCIÓN DE CALENDARIO: Bloquear futuro
     const currentDateTime = new Date();
     const offset = currentDateTime.getTimezoneOffset() * 60000;
-    const maxDateTimeString = (new Date(currentDateTime - offset)).toISOString().slice(0, 16);
-    datetimeFilterInput.max = maxDateTimeString;
+    const maxDateString = (new Date(currentDateTime - offset)).toISOString().split('T')[0];
+    dateFilterInput.max = maxDateString;
 
-    // 2. FUNCIÓN DE FILTRADO EN TIEMPO REAL
     function processTableFilters() {
         const searchKeyword = searchInput.value.toLowerCase();
         const selectedLocation = locationFilterSelect.value;
-        const selectedDateTime = datetimeFilterInput.value; 
+        const selectedDate = dateFilterInput.value;
+        const selectedHour = hourFilterSelect.value;
         
-        // Recortamos a 13 caracteres para comparar solo AÑO-MES-DIA-HORA (YYYY-MM-DDTHH)
-        const selectedHourBlock = selectedDateTime.substring(0, 13);
         let visibleCount = 0;
 
         dataRows.forEach(row => {
             const rowFullText = row.textContent.toLowerCase();
             
-            // Validación de Sede
             const locationCell = row.querySelector(".location-cell-data");
             const locationText = locationCell ? locationCell.textContent.trim() : "";
             const matchesLocation = !selectedLocation || locationText.includes(selectedLocation);
             
-            // Validación del buscador inteligente
             const matchesSearch = rowFullText.includes(searchKeyword);
             
-            // Validación de fecha (Bloque de hora redondeada)
             const datetimeCell = row.querySelector(".datetime-column-cell");
             const rowTimestampFull = datetimeCell ? datetimeCell.getAttribute("data-timestamp") : "";
             
-            // Recortamos a 13 caracteres (YYYY-MM-DDTHH)
-            const rowHourBlock = rowTimestampFull.substring(0, 13); 
-
             let matchesDate = true;
-            if (selectedDateTime && rowTimestampFull) {
-                // Comparamos el bloque de hora: si coinciden (mismo día y misma hora), muestra la fila
-                matchesDate = (rowHourBlock === selectedHourBlock);
+            let matchesHour = true;
+
+            if (rowTimestampFull) {
+                const parts = rowTimestampFull.split('T');
+                const rDate = parts[0];
+                const rHour = parts[1] ? parts[1].substring(0, 2) : "";
+
+                if (selectedDate) {
+                    matchesDate = (selectedDate === rDate);
+                }
+                if (selectedHour) {
+                    matchesHour = (selectedHour === rHour);
+                }
+            } else {
+                if (selectedDate || selectedHour) {
+                    matchesDate = false;
+                    matchesHour = false;
+                }
             }
 
-            // Renderizado condicional
-            if (matchesLocation && matchesSearch && matchesDate) {
+            if (matchesLocation && matchesSearch && matchesDate && matchesHour) {
                 row.style.display = "";
                 visibleCount++;
             } else {
@@ -195,14 +228,13 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // Mostrar fila de "No resultados"
         noResultsRow.style.display = (visibleCount === 0) ? "" : "none";
     }
 
-    // Listeners activos
     searchInput.addEventListener("input", processTableFilters);
     locationFilterSelect.addEventListener("change", processTableFilters);
-    datetimeFilterInput.addEventListener("input", processTableFilters);
+    dateFilterInput.addEventListener("input", processTableFilters);
+    hourFilterSelect.addEventListener("change", processTableFilters);
 });
 </script>
 </body>
