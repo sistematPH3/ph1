@@ -1,15 +1,111 @@
-/* Estilos base para el layout */
-body { margin: 0; font-family: 'Arial', sans-serif; background-color: #f4f4f9; }
-.wrapper { display: flex; min-height: 100vh; }
+/* =========================================================
+   ESTILOS BASE
+   ========================================================= */
+body { 
+    margin: 0; 
+    font-family: 'Segoe UI', Arial, sans-serif; 
+    background-color: #f4f4f9; 
+    overflow-x: hidden;
+}
 
-/* Estilos del Sidebar */
-.sidebar { width: 250px; background-color: #2c3e50; color: white; padding: 20px; }
-.sidebar-heading { color: #bdc3c7; text-transform: uppercase; font-size: 0.8rem; margin-top: 20px; border-bottom: 1px solid #34495e; padding-bottom: 5px; }
+.wrapper { 
+    display: flex; 
+    min-height: 100vh; 
+}
 
-/* Estilos de los links del Sidebar */
-.nav { list-style: none; padding: 0; }
-.nav-link { display: block; color: #ecf0f1; padding: 10px; text-decoration: none; transition: 0.3s; }
-.nav-link:hover { background-color: #e31937; color: white; padding-left: 15px; } /* Rojo Pizza Hut al pasar el mouse */
+/* =========================================================
+   SIDEBAR (BARRA LATERAL)
+   ========================================================= */
+.sidebar { 
+    width: 250px; 
+    background-color: #2c3e50; 
+    color: white; 
+    padding: 10px 0; 
+    flex-shrink: 0; 
+    position: relative; 
+}
 
-/* Contenido Principal */
-.content { flex-grow: 1; padding: 30px; }
+.sidebar-toggler {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background-color: #34495e;
+    color: white !important;
+    padding: 12px 15px;
+    margin: 10px 10px 0 10px; 
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    font-weight: bold;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    border: none;
+    width: calc(100% - 20px);
+}
+
+.sidebar-toggler:hover {
+    background-color: #e31937; 
+    color: white;
+}
+
+.sidebar-toggler i { margin-right: 10px; }
+
+/* Enlaces normales */
+.nav-link { 
+    display: block; 
+    color: #ecf0f1; 
+    padding: 10px 15px; 
+    text-decoration: none; 
+    transition: 0.3s; 
+}
+
+/* Sub-enlaces del menú */
+.sub-link { 
+    background-color: #233140; 
+    padding: 12px 20px !important; 
+    font-size: 0.85rem; 
+    color: #bdc3c7 !important; 
+    border-bottom: 1px solid #2c3e50;
+    transition: all 0.2s ease;
+}
+
+.sub-link:hover { 
+    background-color: #e31937 !important; 
+    color: white !important; 
+}
+
+/* =========================================================
+   EFECTO HOVER PARA ESCRITORIO
+   ========================================================= */
+@media (min-width: 992px) {
+    .sidebar .nav-item { position: relative; }
+
+    /* Usamos nuestra clase personalizada .menu-desplegable */
+    .sidebar .menu-desplegable {
+        display: none !important;
+        position: absolute;
+        left: 100%; 
+        top: 0;
+        width: 220px;
+        background-color: #233140;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.3);
+        z-index: 1050;
+        border-left: 3px solid #e31937;
+    }
+
+    .sidebar .nav-item:hover .menu-desplegable {
+        display: block !important;
+    }
+
+    .sidebar-toggler .bi-chevron-down { display: none; }
+}
+
+/* =========================================================
+   CONTENIDO PRINCIPAL Y UTILIDADES
+   ========================================================= */
+.content { 
+    flex-grow: 1; 
+    padding: 30px; 
+    background-color: #f4f4f9;
+}

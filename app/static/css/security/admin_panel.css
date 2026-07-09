@@ -1,342 +1,124 @@
-/* STREAMING_CHUNK:Configuración base y variables... /
-/ 0. ESTRUCTURA DEL LAYOUT (NUEVO) */
-.wrapper {
-display: flex;
-min-height: 100vh;
-width: 100%;
+/* ==========================================================================
+   ADMIN PANEL - ESTILOS LIMPIOS SIN CARACTERES CORRUPTOS
+   ========================================================================== */
+
+/* Tipografía y suavizado de fuentes */
+body, .custom-card-list, table {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
 }
 
-.content {
-flex-grow: 1;
-width: 100%;
-padding: 20px;
+/* Tarjeta contenedora blanca con bordes curvos */
+.custom-card-list {
+    border-radius: 12px !important;
+    border: 1px solid #eef2f6 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02) !important;
 }
 
-/* 1. CONFIGURACIÓN BASE */
-@font-face {
-font-family: 'Inter';
-src: url('../../fonts/Inter-Regular.ttf') format('truetype');
-font-weight: normal;
-font-style: normal;
-}
-
-:root {
---ph-red: #E31837;
---ph-black: #000000;
---ph-white: #ffffff;
---bg-light: #f8f9fa;
---text-main: #202124;
---text-muted: #5f6368;
---border-color: #e0e0e0;
-}
-
-body, .admin-container {
-font-family: 'Inter', sans-serif !important;
-color: var(--text-main);
-background-color: var(--bg-light);
-}
-
-.main-card {
-border: none;
-border-radius: 15px;
-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-overflow: hidden;
-background-color: var(--ph-white);
-}
-
-/* STREAMING_CHUNK:Estilos de la marca e interfaz... /
-/ 3. BRANDING (PIZZA HUT STYLE) */
-.title-ph {
-font-weight: 800;
-color: var(--ph-red);
-letter-spacing: -0.5px;
-}
-
-.subtitle-ph {
-color: var(--text-muted);
-font-size: 0.9rem;
-}
-
-.ph-badge-red {
-background-color: var(--ph-red);
-color: var(--ph-white);
-font-weight: 600;
-padding: 6px 15px;
-}
-
-.search-box {
-position: relative;
-display: flex;
-align-items: center;
-background: #f1f3f4;
-border-radius: 12px;
-border: 1px solid transparent;
-transition: all 0.3s;
-}
-
-.search-box:focus-within {
-background: white;
-border-color: var(--ph-red);
-box-shadow: 0 0 0 3px rgba(227, 24, 55, 0.1);
-}
-
-.search-icon-img {
-position: absolute;
-left: 15px;
-width: 18px;
-height: 18px;
-opacity: 0.6;
-z-index: 5;
-}
-
-.search-box input {
-padding-left: 45px !important;
-background: transparent;
-}
-
-.search-box input:focus,
-.search-box input:active {
-outline: none !important;
-border: none !important;
-box-shadow: none !important;
-}
-
-/* STREAMING_CHUNK:Estilos de tabla y usuarios... */
-.table-custom {
-table-layout: auto !important;
-width: 100%;
-margin-bottom: 0;
-}
-
-.table-custom thead th {
-background-color: #fafafa;
-color: var(--text-muted);
-font-weight: 600;
-text-transform: uppercase;
-font-size: 0.75rem;
-letter-spacing: 0.8px;
-padding: 18px;
-border-bottom: 2px solid var(--border-color);
-}
-
-.table-custom tbody td {
-vertical-align: middle !important;
-padding: 15px 20px;
-background-color: transparent !important;
-}
-
-.table-hover tbody tr:hover td {
-background-color: rgba(0, 0, 0, 0.04) !important;
-}
-
-.user-name {
-font-weight: 600;
-display: flex;
-align-items: center;
-white-space: nowrap;
-}
-
-.avatar-circle {
-width: 35px;
-height: 35px;
-background: linear-gradient(135deg, var(--ph-red), #b2132b);
-color: white;
-border-radius: 50%;
-display: flex;
-align-items: center;
-justify-content: center;
-margin-right: 12px;
-font-size: 0.8rem;
-flex-shrink: 0;
-}
-
-.user-email {
-font-size: 0.95rem;
-margin-bottom: 2px;
-}
-
-.status-pending {
-background-color: #fef3c7 !important;
-color: #92400e !important;
-
-font-weight: 700 !important;
-
-padding: 0.4rem 0.8rem;
-border-radius: 50px;
-font-size: 0.85rem;
-display: inline-block;
-}
-
-/* STREAMING_CHUNK:Estilos de botones y acciones... */
-.btn-action {
-width: 38px;
-height: 38px;
-border-radius: 10px;
-display: flex;
-align-items: center;
-justify-content: center;
-transition: all 0.2s ease-in-out;
-border: 1px solid #eee;
-background: var(--ph-white);
-padding: 0;
-}
-
-.btn-action img {
-display: block;
-pointer-events: none;
-}
-
-.btn-action:focus, .btn-action:active {
-outline: none !important;
-box-shadow: none !important;
-}
-
-.btn-reject:hover {
-background-color: #fff1f2;
-border-color: var(--ph-red);
-transform: scale(1.05);
-}
-
-.btn-approve:hover {
-background-color: #f0fdf4;
-border-color: #16a34a;
-transform: scale(1.05);
-}
-
-.btn-ph-red {
-background-color: var(--ph-red);
-color: white;
-font-weight: 600;
-border-radius: 25px;
-padding: 10px 25px;
-border: none;
-}
-
-.btn-ph-red:hover {
-background-color: #b2132b;
-color: white;
-box-shadow: 0 4px 12px rgba(227, 24, 55, 0.3);
-}
-
-.form-select:focus {
-border-color: var(--ph-red);
-box-shadow: 0 0 0 0.25rem rgba(227, 24, 55, 0.1);
-}
-
-/* STREAMING_CHUNK:Estilos del selector múltiple de sedes... */
-select[multiple].form-select {
-padding: 8px;
-scrollbar-width: thin;
-scrollbar-color: #cbd5e1 transparent;
-border-radius: 10px;
-min-height: 120px;
-}
-
-select[multiple].form-select option {
-padding: 10px 15px;
-margin-bottom: 4px;
-border-radius: 6px;
-transition: background-color 0.2s, color 0.2s;
-cursor: pointer;
-}
-
-/* Color rojo de Pizza Hut cuando se selecciona una o varias opciones */
-select[multiple].form-select option:checked {
-background-color: var(--ph-red) !important;
-color: var(--ph-white) !important;
-font-weight: 600;
-}
-
-select[multiple].form-select option:hover {
-background-color: #f8f9fa;
-}
-/* =========================================================================
-   SELECTOR DE SEDES MODERNO (PILLS INTERACTIVOS)
-   ========================================================================= */
-
-/* Contenedor principal que agrupa las sedes */
-.locations-pills-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
-    border: 1px solid var(--border-color, #e0e0e0);
-    border-radius: 10px;
-    background-color: #ffffff;
-    min-height: 50px;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-/* Ocultar el checkbox nativo del navegador de manera limpia */
-.btn-check-pill-hidden {
-    position: absolute;
-    clip: rect(0, 0, 0, 0);
-    pointer-events: none;
-}
-
-/* Estilo Base del Pill (Estado: Desmarcado / Inactivo) */
-.location-pill {
-    display: inline-flex;
-    align-items: center;
-    background-color: #f1f3f4;
-    color: var(--text-main, #202124);
-    padding: 6px 14px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 20px;
-    border: 1px solid #dae0e5;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    user-select: none;
-}
-
-/* Efecto hover al pasar sobre un Pill desmarcado */
-.location-pill:hover {
-    background-color: #e8eaed;
-    border-color: #cdd1d4;
-    transform: translateY(-1px);
-}
-
-/* El símbolo "X" para desmarcar (Oculto y colapsado por defecto) */
-.location-pill .remove-x {
-    display: inline-block;
-    font-size: 1.1rem;
+/* Icono del escudo del módulo */
+.module-icon-title {
+    color: #e31937 !important;
+    font-size: 1.5rem !important;
     line-height: 1;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: bold;
-    visibility: hidden;
-    width: 0;
-    overflow: hidden;
-    margin-left: 0;
-    transition: width 0.2s ease, margin 0.2s ease, visibility 0.2s ease;
 }
 
-.location-pill .remove-x:hover {
-    color: #ffffff;
-}
-
-/* =========================================================================
-   ESTADOS ACTIVOS (Cuando el checkbox oculto está :checked)
-   ========================================================================= */
-
-/* Pill teñido de rojo Pizza Hut al seleccionarse */
-.btn-check-pill-hidden:checked + .location-pill {
-    background-color: var(--ph-red, #E31837) !important;
+/* AVATAR: Círculo rojo perfecto con inicial blanca */
+.avatar-circle-red {
+    width: 36px !important;
+    height: 36px !important;
+    background-color: #e31937 !important;
     color: #ffffff !important;
-    border-color: var(--ph-red, #E31837) !important;
-    box-shadow: 0 3px 8px rgba(227, 24, 55, 0.25);
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
 }
 
-/* Mostrar la "X" con una transición suave de expansión */
-.btn-check-pill-hidden:checked + .location-pill .remove-x {
-    visibility: visible;
-    width: 12px;
-    margin-left: 8px;
+/* Textos oscuros y contrastados para las celdas */
+.user-name-text {
+    font-size: 0.92rem !important;
+    font-weight: 600 !important;
+    color: #1e293b !important; /* Azul pizarra muy oscuro, no gris */
 }
 
-/* Borde rojo de error en el contenedor si el JS activa 'is-invalid' */
-.locations-pills-container.is-invalid {
-    border-color: var(--ph-red, #E31837) !important;
-    box-shadow: 0 0 0 0.25rem rgba(227, 24, 55, 0.15) !important;
-    background-color: #fff8f8;
+.user-email-text {
+    font-size: 0.88rem !important;
+    color: #475569 !important; /* Gris intermedio legible */
+}
+
+.user-id-text {
+    font-size: 0.78rem !important;
+    color: #94a3b8 !important; /* Gris claro secundario para el ID */
+    margin-top: 1px;
+}
+
+/* BADGE PENDIENTE: Píldora suave con fondo pastel y texto mostaza legible */
+.status-badge-pending {
+    display: inline-flex !important;
+    align-items: center !important;
+    background-color: #fff8e6 !important;
+    color: #b45309 !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    padding: 4px 12px !important;
+    border-radius: 50px !important;
+    border: 1px solid #fef3c7 !important;
+    text-transform: capitalize !important;
+}
+
+/* Forzar color de los encabezados rompiendo el gris por defecto de Bootstrap */
+.table thead.content-table-header th {
+    color: #475569 !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 14px 20px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background-color: #ffffff !important;
+}
+
+/* Celdas del cuerpo de la tabla */
+.table tbody td {
+    padding: 14px 20px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    vertical-align: middle !important;
+    background-color: #ffffff !important;
+}
+
+.table tbody tr:hover td {
+    background-color: #f8fafc !important;
+}
+
+/* Botones de acción circulares */
+.btn-action-round {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    font-size: 0.9rem !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-action-round:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+}
+
+.btn-action-round.text-danger:hover {
+    background-color: #fff5f5 !important;
+    border-color: #fed7d7 !important;
+}
+
+.btn-action-round.text-success:hover {
+    background-color: #f0fff4 !important;
+    border-color: #c6f6d5 !important;
 }

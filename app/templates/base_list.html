@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-2 p-4">
+    <div class="custom-card-list shadow-sm p-4 bg-white">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 class="fw-bold mb-1 text-dark">{% block title_list %}{% endblock %}</h3>
+                <p class="text-muted small mb-0">{% block subtitle_list %}{% endblock %}</p>
+            </div>
+            <div>
+                {% block actions_top %}{% endblock %}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4 gap-3">
+            <div class="flex-grow-1 position-relative search-box-container">
+                <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                
+                <input type="text" 
+                       id="{% block search_input_id %}genericSearchInput{% endblock %}" 
+                       {% block search_input_attrs %}{% endblock %} 
+                       class="form-control rounded-pill bg-light border-0 ps-5 py-2" 
+                       placeholder="{% block search_placeholder %}Buscar...{% endblock %}">
+            </div>
+            <div>
+                {% block actions_filter %}{% endblock %}
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="{% block table_id %}genericTable{% endblock %}" class="table align-middle table-hover mb-0">
+                <thead class="text-uppercase text-muted content-table-header">
+                    <tr>
+                        {% block table_head %}{% endblock %}
+                    </tr>
+                </thead>
+                <tbody class="border-0">
+                    {% block table_body %}{% endblock %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

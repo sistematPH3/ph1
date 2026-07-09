@@ -1,53 +1,44 @@
-{% extends "auth_base.html" %}
+{% extends "layout.html" %}
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}">
 
-<div class="wrapper">
-    <!-- Sidebar -->
-    {% include '_sidebar.html' %}
+<header class="dashboard-header">
+    <h1>Panel de Dirección</h1>
+    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
+</header>
 
-    <!-- Contenido Principal -->
-    <div class="content-area">
-        <header class="dashboard-header">
-            <h1>Panel de Dirección</h1>
-            <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
-        </header>
-
-        <div class="dashboard-grid">
-            <!-- Tarjetas de acceso rápido -->
-            <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-                <div class="card-dash">
-                    <i class="fas fa-boxes"></i>
-                    <h3>Inventario</h3>
-                    <p>Gestionar insumos y stock</p>
-                </div>
-            </a>
-
-            <a href="{{ url_for('purchase_history.index') }}" class="card-link">
-                <div class="card-dash">
-                    <i class="fas fa-shopping-cart"></i>
-                    <h3>Compras</h3>
-                    <p>Historial y proveedores</p>
-                </div>
-            </a>
-
-            <a href="#" class="card-link">
-                <div class="card-dash">
-                    <i class="fas fa-truck"></i>
-                    <h3>Traslados</h3>
-                    <p>Logística de sucursales</p>
-                </div>
-            </a>
-
-            <a href="{{ url_for('audit.ver_auditoria_accesos') }}" class="card-link">
-                <div class="card-dash highlight">
-                    <i class="fas fa-chart-line"></i>
-                    <h3>Reportes</h3>
-                    <p>Auditoría y métricas</p>
-                </div>
-            </a>
+<div class="dashboard-grid">
+    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-boxes"></i>
+            <h3>Inventario</h3>
+            <p>Gestionar insumos y stock</p>
         </div>
-    </div>
+    </a>
+
+    <a href="{{ url_for('purchase_history.index') }}" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-shopping-cart"></i>
+            <h3>Compras</h3>
+            <p>Historial y proveedores</p>
+        </div>
+    </a>
+
+    <a href="#" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-truck"></i>
+            <h3>Traslados</h3>
+            <p>Logística de sucursales</p>
+        </div>
+    </a>
+
+    <a href="{{ url_for('audit.ver_auditoria_accesos') }}" class="card-link">
+        <div class="card-dash highlight">
+            <i class="fas fa-chart-line"></i>
+            <h3>Reportes</h3>
+            <p>Auditoría y métricas</p>
+        </div>
+    </a>
 </div>
 {% endblock %}

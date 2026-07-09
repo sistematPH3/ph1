@@ -1,0 +1,35 @@
+/* Estilo para las cabeceras de las tablas */
+.table th {
+    color: #8c8c8c !important;
+    font-weight: 600;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f0f0f0 !important;
+}
+
+/* Espaciado de las filas de datos */
+.table td {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+/* Avatar circular con la inicial del Colaborador (Rojo Pizza Hut) */
+.avatar-circle {
+    width: 36px;
+    height: 36px;
+    background-color: #e31937;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+/* Bordes del input buscador al ganar foco */
+.form-control:focus {
+    box-shadow: none;
+    background-color: #f1f3f5 !important;
+}
