@@ -5,16 +5,24 @@
 {% block search_placeholder %}Buscar por nombre o correo...{% endblock %}
 {% block table_id %}userTable{% endblock %}
 
-{% block title_list %}Gestión de Permisos{% endblock %}
+{% block title_list %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}">
+    
+    <div class="d-flex align-items-center">
+        <i class="bi bi-shield-lock-fill me-2" style="color: #e31937; font-size: 1.8rem; line-height: 1;"></i>
+        <span style="color: #e31937; font-weight: 800; letter-spacing: -0.5px; font-size: 1.5rem;">Gestión de Permisos</span>
+    </div>
+{% endblock %}
+
 {% block subtitle_list %}Revisión de nuevos colaboradores en espera{% endblock %}
 
 {% block actions_top %}
-    <span class="badge rounded-pill px-3 py-2 fw-semibold admin-module-badge" style="background-color: #e31937; color: white; font-size: 0.75rem;">Módulo Administrativo</span>
+    <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #e31937; color: white; font-size: 0.75rem;">Módulo Administrativo</span>
 {% endblock %}
 
 {% block actions_filter %}
-    <button onclick="toggleSort()" class="btn rounded-pill px-4 btn-sm fw-medium filter-btn">
-        <i class="bi bi-sort-down me-1"></i> Ordenar
+    <button onclick="toggleSort()" class="btn btn-outline-secondary rounded-pill px-4 btn-sm fw-medium d-flex align-items-center" style="background-color: #ffffff;">
+        <i class="bi bi-sort-down me-2"></i> Ordenar
     </button>
 {% endblock %}
 
@@ -43,76 +51,95 @@
         </td>
         <td>
             <div class="d-flex gap-2 justify-content-end" style="padding-right: 10px;">
-                <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="m-0">
-                    <button type="submit" class="btn-action-round text-danger" title="Rechazar solicitud">
-                        <i class="bi bi-x-lg"></i>
+                <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="m-0" id="rejectForm_{{ usuario.id }}">
+                    <button type="button" class="btn-action-square" title="Rechazar solicitud" onclick="confirmReject('{{ usuario.id }}')">
+                        <i class="bi bi-x text-danger fs-5"></i>
                     </button>
                 </form>
                 
-                <button type="button" class="btn-action-round text-success" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}" title="Aprobar y asignar rol">
-                    <i class="bi bi-check-lg"></i>
+                <button type="button" class="btn-action-square" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}" title="Aprobar y asignar rol">
+                    <i class="bi bi-check text-success fs-5"></i>
                 </button>
+            </div>
+
+            <div class="modal fade text-start" id="approveModal{{ usuario.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-dark">Asignar Credenciales</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        
+                        <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" onsubmit="validarFormularioAprobacion(event, this)">
+                            <div class="modal-body">
+                                <p class="text-muted small">Elige las propiedades de acceso para <strong>{{ usuario.name }}</strong>.</p>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold small text-muted">Cargo o Rol</label>
+                                    <select class="form-select" name="role_id" onchange="toggleSedesContainer(this)" style="border-radius: 8px;">
+                                        <option value="" selected disabled>Selecciona un rol...</option>
+                                        <option value="1">Administrador</option>
+                                        <option value="2">Finanzas</option>
+                                        <option value="3">Operaciones</option>
+                                        <option value="4">Gerente de Sede</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3 location-container-box">
+                                    <label class="form-label fw-semibold small text-muted d-block">Sedes Habilitadas</label>
+                                    
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for sede in sedes %}
+                                        <div class="form-check-inline m-0">
+                                            <input type="checkbox" class="btn-check" name="location_ids" id="sede_{{ usuario.id }}_{{ sede.id }}" value="{{ sede.id }}" autocomplete="off">
+                                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 text-muted" style="font-size: 0.8rem;" for="sede_{{ usuario.id }}_{{ sede.id }}">{{ sede.name }}</label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal" style="font-size: 0.85rem;">Cancelar</button>
+                                <button type="submit" class="btn rounded-pill px-4 text-white" style="background-color: #e31937; font-size: 0.85rem;">Confirmar Acceso</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </td>
     </tr>
-
-    <div class="modal fade" id="approveModal{{ usuario.id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-dark">Asignar Credenciales</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                
-                <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" data-id="{{ usuario.id }}" onsubmit="return validarFormularioAprobacion(this)">
-                    <div class="modal-body">
-                        <p class="text-muted small">Elige las propiedades de acceso para <strong>{{ usuario.name }}</strong>.</p>
-                        
-                        <div id="error_msg_general_{{ usuario.id }}" class="alert alert-danger d-none p-2 small" role="alert">
-                            Por favor, completa los campos requeridos antes de guardar.
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="role_id_{{ usuario.id }}" class="form-label fw-semibold small text-muted">Cargo o Rol</label>
-                            <select class="form-select" name="role_id" id="role_id_{{ usuario.id }}" data-user-id="{{ usuario.id }}" onchange="toggleSedesContainer(this)" style="border-radius: 8px;">
-                                <option value="" selected disabled>Selecciona un rol...</option>
-                                <option value="1">Administrador</option>
-                                <option value="2">Finanzas</option>
-                                <option value="3">Operaciones</option>
-                                <option value="4">Gerente de Sede</option>
-                            </select>
-                            <div class="invalid-feedback">Debes elegir un rol corporativo.</div>
-                        </div>
-
-                        <div class="mb-3" id="location_container_{{ usuario.id }}">
-                            <label class="form-label fw-semibold small text-muted d-block">Sedes Habilitadas</label>
-                            
-                            <div id="error_msg_sedes_{{ usuario.id }}" class="text-danger d-none small mb-2">
-                                Debes asignar al menos una sede operativa para este rol.
-                            </div>
-
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for sede in sedes %}
-                                <div class="form-check-inline m-0">
-                                    <input type="checkbox" class="btn-check" name="location_ids" id="sede_{{ usuario.id }}_{{ sede.id }}" value="{{ sede.id }}" autocomplete="off">
-                                    <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 text-muted" style="font-size: 0.8rem;" for="sede_{{ usuario.id }}_{{ sede.id }}">{{ sede.name }}</label>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal" style="font-size: 0.85rem;">Cancelar</button>
-                        <button type="submit" class="btn rounded-pill px-4 text-white" style="background-color: #e31937; font-size: 0.85rem;">Confirmar Acceso</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
     {% endfor %}
-{% endblock %}
+    
+    {% if not usuarios_espera %}
+    <tr>
+        <td colspan="4" class="text-center py-5 text-muted border-0">
+            No hay solicitudes de acceso pendientes.
+        </td>
+    </tr>
+    {% endif %}
 
-{% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ url_for('static', filename='js/security/admin_table.js') }}"></script>
+    <script>
+        function confirmReject(userId) {
+            Swal.fire({
+                title: '¿Denegar acceso?',
+                text: "El usuario será eliminado de la lista de forma permanente.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e31937',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, rechazar',
+                cancelButtonText: 'Cancelar',
+                customClass: {
+                    popup: 'rounded-4'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('rejectForm_' + userId).submit();
+                }
+            });
+        }
+    </script>
 {% endblock %}

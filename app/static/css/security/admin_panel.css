@@ -1,29 +1,8 @@
-/* ==========================================================================
-   ADMIN PANEL - ESTILOS LIMPIOS SIN CARACTERES CORRUPTOS
-   ========================================================================== */
-
-/* Tipografía y suavizado de fuentes */
 body, .custom-card-list, table {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     -webkit-font-smoothing: antialiased;
 }
 
-/* Tarjeta contenedora blanca con bordes curvos */
-.custom-card-list {
-    border-radius: 12px !important;
-    border: 1px solid #eef2f6 !important;
-    background-color: #ffffff !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02) !important;
-}
-
-/* Icono del escudo del módulo */
-.module-icon-title {
-    color: #e31937 !important;
-    font-size: 1.5rem !important;
-    line-height: 1;
-}
-
-/* AVATAR: Círculo rojo perfecto con inicial blanca */
 .avatar-circle-red {
     width: 36px !important;
     height: 36px !important;
@@ -37,39 +16,53 @@ body, .custom-card-list, table {
     font-size: 0.9rem !important;
 }
 
-/* Textos oscuros y contrastados para las celdas */
 .user-name-text {
     font-size: 0.92rem !important;
     font-weight: 600 !important;
-    color: #1e293b !important; /* Azul pizarra muy oscuro, no gris */
+    color: #1e293b !important;
 }
 
 .user-email-text {
     font-size: 0.88rem !important;
-    color: #475569 !important; /* Gris intermedio legible */
+    color: #475569 !important;
 }
 
 .user-id-text {
     font-size: 0.78rem !important;
-    color: #94a3b8 !important; /* Gris claro secundario para el ID */
+    color: #94a3b8 !important;
     margin-top: 1px;
 }
 
-/* BADGE PENDIENTE: Píldora suave con fondo pastel y texto mostaza legible */
 .status-badge-pending {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: #fff8e6 !important;
-    color: #b45309 !important;
+    background-color: #fff3cd !important;
+    color: #856404 !important;
     font-size: 0.78rem !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     padding: 4px 12px !important;
-    border-radius: 50px !important;
-    border: 1px solid #fef3c7 !important;
-    text-transform: capitalize !important;
+    border-radius: 20px !important;
 }
 
-/* Forzar color de los encabezados rompiendo el gris por defecto de Bootstrap */
+.btn-action-square {
+    width: 32px !important;
+    height: 32px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 6px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 0 !important;
+}
+
+.btn-action-square:hover {
+    background-color: #f8f9fa !important;
+    border-color: #adb5bd !important;
+}
+
 .table thead.content-table-header th {
     color: #475569 !important;
     font-weight: 600 !important;
@@ -81,7 +74,6 @@ body, .custom-card-list, table {
     background-color: #ffffff !important;
 }
 
-/* Celdas del cuerpo de la tabla */
 .table tbody td {
     padding: 14px 20px !important;
     border-bottom: 1px solid #f1f5f9 !important;
@@ -91,34 +83,4 @@ body, .custom-card-list, table {
 
 .table tbody tr:hover td {
     background-color: #f8fafc !important;
-}
-
-/* Botones de acción circulares */
-.btn-action-round {
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 50% !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background-color: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    font-size: 0.9rem !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-}
-
-.btn-action-round:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
-}
-
-.btn-action-round.text-danger:hover {
-    background-color: #fff5f5 !important;
-    border-color: #fed7d7 !important;
-}
-
-.btn-action-round.text-success:hover {
-    background-color: #f0fff4 !important;
-    border-color: #c6f6d5 !important;
 }

@@ -1,7 +1,3 @@
-/**
- * Lógica para el panel administrativo (Listados y Aprobaciones)
- */
-
 function filterTable() {
     let input = document.getElementById("userInput");
     let table = document.getElementById("userTable");
@@ -33,13 +29,12 @@ function toggleSort() {
 }
 
 function toggleSedesContainer(rolSelect) {
-    const usuarioId = rolSelect.getAttribute('data-user-id');
-    const locationContainer = document.getElementById('location_container_' + usuarioId);
+    const formulario = rolSelect.closest('form');
+    const locationContainer = formulario.querySelector('.location-container-box');
     
-    if (rolSelect.value === "1") { // ID 1 es 'Administrador'
+    if (rolSelect.value === "1") { 
         locationContainer.style.display = 'none';
         
-        // Desmarcamos correctamente los Checkboxes/Pills por si acaso seleccionó alguno antes
         const checkboxes = locationContainer.querySelectorAll('input[name="location_ids"]');
         checkboxes.forEach(cb => cb.checked = false);
     } else {
@@ -47,39 +42,45 @@ function toggleSedesContainer(rolSelect) {
     }
 }
 
-function validarFormularioAprobacion(formulario) {
-    const usuarioId = formulario.getAttribute('data-id'); 
-    const rolSelect = formulario.querySelector('#role_id_' + usuarioId);
-    const errorMsgSedes = formulario.querySelector('#error_msg_sedes_' + usuarioId);
-    const errorMsgGeneral = formulario.querySelector('#error_msg_general_' + usuarioId);
+function validarFormularioAprobacion(event, formulario) {
+    event.preventDefault();
     
-    // Captura los Checkboxes activos dentro del contenedor de píldoras
-    const checkboxesMarcados = formulario.querySelectorAll('input[name="location_ids"]:checked');
+    const rolSelect = formulario.querySelector('select[name="role_id"]');
+    const checkboxes = formulario.querySelectorAll('input[name="location_ids"]');
     
-    let esValido = true;
-
-    if (rolSelect) rolSelect.classList.remove('is-invalid');
-    if (errorMsgSedes) errorMsgSedes.classList.add('d-none');
-    if (errorMsgGeneral) errorMsgGeneral.classList.add('d-none');
-
-    // Validar el cargo/rol
-    if (rolSelect && rolSelect.value === "") {
-        rolSelect.classList.add('is-invalid');
-        esValido = false;
-    }
-
-    // Validar sedes si NO es Administrador
-    if (rolSelect && rolSelect.value !== "1") {
-        if (checkboxesMarcados.length === 0) {
-            if (errorMsgSedes) errorMsgSedes.classList.remove('d-none');
-            esValido = false;
+    let tieneSede = false;
+    for (let i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            tieneSede = true;
+            break;
         }
     }
 
-    if (!esValido) {
-        if (errorMsgGeneral) errorMsgGeneral.classList.remove('d-none');
-        return false; 
+    if (!rolSelect || rolSelect.value === "") {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Rol no seleccionado',
+            text: 'Debes asignar un cargo o rol al usuario antes de confirmar.',
+            confirmButtonColor: '#e31937',
+            customClass: {
+                popup: 'rounded-4'
+            }
+        });
+        return;
     }
 
-    return true; 
+    if (rolSelect.value !== "1" && !tieneSede) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sede Obligatoria',
+            text: 'Recuerda que debes asignar al menos una sede operativa para este rol.',
+            confirmButtonColor: '#e31937',
+            customClass: {
+                popup: 'rounded-4'
+            }
+        });
+        return;
+    }
+
+    formulario.submit();
 }
