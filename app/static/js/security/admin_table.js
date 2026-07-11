@@ -42,6 +42,26 @@ function toggleSedesContainer(rolSelect) {
     }
 }
 
+ function confirmReject(userId) {
+            Swal.fire({
+                title: '¿Denegar acceso?',
+                text: "El usuario será eliminado de la lista de forma permanente.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e31937',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, rechazar',
+                cancelButtonText: 'Cancelar',
+                customClass: {
+                    popup: 'rounded-4'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('rejectForm_' + userId).submit();
+                }
+            });
+        }
+
 function validarFormularioAprobacion(event, formulario) {
     event.preventDefault();
     
