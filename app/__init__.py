@@ -76,6 +76,12 @@ def create_app():
         from app.dashboard.dashboard_routes import dashboard_bp
         app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
 
+       # ==========================================================
+        # MÓDULO: PERSONAL (STAFF)
+        # ==========================================================
+        from app.security.routes.staff_routes import staff_bp
+        app.register_blueprint(staff_bp, url_prefix='/staff')
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model

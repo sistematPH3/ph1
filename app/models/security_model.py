@@ -90,28 +90,28 @@ class User(db.Model, UserMixin):
         
         return True
 
-    # --- SINCRONIZACIÓN DE ESTADO AUTOMÁTICA ---
+# --- SINCRONIZACIÓN DE ESTADO SEGURA ---
     def sync_activation_status(self):
         """
-        Actualización de la bandera is_active según las sedes vinculadas.
-        Mantiene siempre activos a administradores e invitados.
+        Ajusta is_active solo si el usuario viola la regla de sedes.
+        Si el administrador desactivó manualmente a un usuario con sedes, 
+        esta lógica NO lo reactivará automáticamente.
         """
-        # Excepción absoluta de desactivación
+        # Excepción absoluta para roles especiales
         if self.is_admin or self.is_guest:
-            self.is_active = True
-            db.session.commit()
+            if not self.is_active:
+                self.is_active = True
+                db.session.commit()
             return
         
-        # Filtrado de sedes que se encuentren activas en el sistema
+        # Obtenemos sedes activas
         active_assigned_locations = [loc for loc in self.locations if loc.is_active]
         
-        # Inhabilitación si no cuenta con sedes o si todas están inactivas
+        # REGLA: Si NO tiene sedes o NO tiene ninguna activa, DEBE estar desactivado.
         if len(self.locations) == 0 or len(active_assigned_locations) == 0:
-            self.is_active = False
-        else:
-            self.is_active = True
-            
-        db.session.commit()
+            if self.is_active: # Solo cambiamos si realmente estaba activo
+                self.is_active = False
+                db.session.commit()
 
     def __repr__(self):
         return f'<User {self.email}>'
