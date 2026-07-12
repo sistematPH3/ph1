@@ -24,12 +24,8 @@
         <select id="locationFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted w-auto" style="font-size: 0.88rem;">
             <option value="">Todas las sedes</option>
             <option value="Global / Sin Sede">Global / Sin Sede</option>
-            {% set unique_locations = [] %}
-            {% for log in historial if log.location %}
-                {% if log.location.name not in unique_locations %}
-                    <option value="{{ log.location.name }}">{{ log.location.name }}</option>
-                    {% set _ = unique_locations.append(log.location.name) %}
-                {% endif %}
+            {% for sede in sedes %}
+                <option value="{{ sede.name }}">{{ sede.name }}</option>
             {% endfor %}
         </select>
 
