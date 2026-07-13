@@ -1,0 +1,242 @@
+:root {
+    --bg-color: #f8f9fa;
+    --card-bg: #ffffff;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --primary-red: #ce1126; /* Tono Pizza Hut */
+    --primary-red-hover: #b00e1e;
+    --border-color: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    /* Hereda la tipografía base definida en tu layout */
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    padding: 30px;
+}
+
+/* Banner de Bienvenida */
+.welcome-banner {
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    padding: 15px 25px;
+    margin-bottom: 30px;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 5px solid var(--primary-red);
+}
+
+.welcome-banner p {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.welcome-banner strong {
+    color: var(--primary-red);
+}
+
+.close-banner {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+}
+
+/* Títulos principales */
+.header-title h1 {
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.header-title p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+}
+
+/* Grid de Botones/Kpis de métricas superiores */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    background-color: var(--card-bg);
+    border: none;
+    border-radius: 14px;
+    padding: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+
+.metric-info h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.metric-info .number {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.metric-icon {
+    background-color: rgba(206, 17, 38, 0.05);
+    color: var(--primary-red);
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+/* Distribución del contenido principal */
+.dashboard-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 25px;
+}
+
+/* Contenedor Común de Paneles */
+.panel {
+    background-color: var(--card-bg);
+    border-radius: 14px;
+    padding: 25px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.panel-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.panel-link {
+    color: var(--primary-red);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.panel-link:hover {
+    text-decoration: underline;
+    color: var(--primary-red-hover);
+}
+
+/* Sección de Gráficas con Carrusel */
+.slider-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.slider-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.slider-btn:hover {
+    background-color: var(--primary-red);
+    color: white;
+    border-color: var(--primary-red);
+}
+
+.chart-wrapper {
+    flex-grow: 1;
+    position: relative;
+    min-height: 280px;
+    cursor: pointer;
+}
+
+/* Sección de Últimos Accesos */
+.log-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.log-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.log-time {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    min-width: 50px;
+}
+
+.log-details h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.log-details p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .dashboard-content {
+        grid-template-columns: 1fr;
+    }
+}

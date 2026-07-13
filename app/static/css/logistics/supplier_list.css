@@ -1,55 +1,13 @@
-/* app/static/css/logistics/supplier_list.css */
-
-body {
-    font-family: 'Inter-Regular', sans-serif;
-    background-color: #f4f6f9;
-}
-
-.module-title {
-    font-family: 'PassionOne-Bold', sans-serif;
-    font-size: 2.1rem;
-    color: #1a1a1a;
-    letter-spacing: 0.5px;
-}
-
-.header-icon-container {
-    background-color: #b52929 !important;
-    width: 52px;
-    height: 52px;
-    box-shadow: 0 4px 10px rgba(181, 41, 41, 0.2);
-}
-
 .btn-add-supplier {
-    background-color: #b52929 !important;
+    background-color: #e31937 !important;
     font-family: 'Inter-Bold', sans-serif;
     font-size: 0.9rem;
     transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .btn-add-supplier:hover {
-    background-color: #942121 !important;
+    background-color: #b51226 !important;
     transform: translateY(-1px);
-}
-
-.search-input {
-    border-radius: 30px;
-    padding-left: 42px;
-    font-size: 0.95rem;
-    border: 1px solid #ced4da;
-}
-
-.search-input:focus {
-    border-color: #b52929;
-    box-shadow: 0 0 0 0.2rem rgba(181, 41, 41, 0.15);
-}
-
-.search-icon-wrapper {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #8c96a3;
-    font-size: 0.95rem;
 }
 
 .filter-select {
@@ -58,26 +16,8 @@ body {
 }
 
 .filter-select:focus {
-    border-color: #b52929;
-    box-shadow: 0 0 0 0.2rem rgba(181, 41, 41, 0.15);
-}
-
-.custom-table-header {
-    background-color: #b52929 !important; /* Forzar el fondo rojo en el contenedor */
-    color: white;
-    font-family: 'Inter-Bold', sans-serif;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border: none;
-}
-
-.custom-table-header th {
-    background-color: #b52929 !important; /* ¡ESTA ES LA CLAVE! Aplica el rojo directamente a cada celda del membrete */
-    color: white !important;
-    padding-top: 14px;
-    padding-bottom: 14px;
-    border: none;
+    border-color: #e31937;
+    box-shadow: 0 0 0 0.2rem rgba(227, 25, 55, 0.15);
 }
 
 .supplier-row {
@@ -120,7 +60,7 @@ body {
 
 .status-badge-inactive {
     background-color: #fce8e6;
-    color: #b52929;
+    color: #e31937;
     font-family: 'Inter-Bold', sans-serif;
     font-size: 0.8rem;
     padding: 5px 14px;
@@ -129,7 +69,6 @@ body {
     display: inline-block;
 }
 
-/* --- Botón de Editar e Icono --- */
 .btn-action-edit {
     transition: transform 0.2s ease;
     border: none;
@@ -153,43 +92,10 @@ body {
 }
 
 .status-toggle:checked {
-    background-color: #b52929;
-    border-color: #b52929;
+    background-color: #e31937;
+    border-color: #e31937;
 }
 
-.details-pane {
-    background-color: #fcfcfd;
-    border-left: 5px solid #b52929;
-    padding: 18px 24px;
-    font-size: 0.92rem;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
-}
-
-.card-detail-section {
-    border-right: 1px solid #e9ecef;
-}
-
-.detail-section-title {
-    color: #6c757d;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    font-family: 'Inter-Bold', sans-serif;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-}
-
-.last-purchase-highlight {
-    font-family: 'Inter-Bold', sans-serif;
-    color: #b52929;
-}
-
-.no-purchase-text {
-    font-family: 'Inter-Regular', sans-serif;
-    color: #8c96a3;
-    font-style: italic;
-}
-
-/* --- Estilos Nuevos para los Modales Rediseñados --- */
 .modal-content {
     border-radius: 24px !important;
 }
@@ -228,11 +134,5 @@ body {
     color: #212529 !important;
 }
 
-@media (max-width: 768px) {
-    .card-detail-section {
-        border-right: none;
-        border-bottom: 1px solid #e9ecef;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-    }
-}
+
+

@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Vinculación del archivo CSS local usando la estructura estática de Flask -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}">
+
+<div class="welcome-banner" id="welcomeBanner">
+    <p>Bienvenido al sistema PH, <strong id="adminName">{{ current_user.name }}</strong></p>
+    <button class="close-banner" onclick="document.getElementById('welcomeBanner').style.display='none'">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<div class="header-title">
+    <h1>Panel de Control Global</h1>
+    <p>Gestión, control y estado de sucursales a nivel nacional</p>
+</div>
+
+<!-- Grid de Botones/KPIs superiores vacíos -->
+<div class="metrics-grid">
+    <button class="metric-card" onclick="location.href='/sedes'">
+        <div class="metric-info">
+            <h3>Sedes Activas</h3>
+            <div class="number" id="countSedes">--</div>
+        </div>
+        <div class="metric-icon">
+            <i class="fas fa-map-marker-alt"></i>
+        </div>
+    </button>
+
+    <button class="metric-card" onclick="location.href='/insumos'">
+        <div class="metric-info">
+            <h3>Insumos Registrados</h3>
+            <div class="number" id="countInsumos">--</div>
+        </div>
+        <div class="metric-icon">
+            <i class="fas fa-boxes"></i>
+        </div>
+    </button>
+
+    <button class="metric-card" onclick="location.href='/colaboradores'">
+        <div class="metric-info">
+            <h3>Colaboradores</h3>
+            <div class="number" id="countColaboradores">--</div>
+        </div>
+        <div class="metric-icon">
+            <i class="fas fa-users"></i>
+        </div>
+    </button>
+</div>
+
+<div class="dashboard-content">
+    
+    <!-- Sección de Gráficas (Vacía de momento) -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2 id="chartTitle">Reportes Estadísticos</h2>
+            <div class="slider-controls">
+                <button class="slider-btn" onclick="changeChart(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button class="slider-btn" onclick="changeChart(1)"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+        <div class="chart-wrapper" onclick="location.href='/reportes-detallados'" title="Click para ver reporte extendido">
+            <canvas id="globalChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Sección de Últimos Accesos (Lista vacía) -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Últimos Accesos</h2>
+            <a href="/auditoria" class="panel-link">Ver Historial</a>
+        </div>
+        <ul class="log-list" id="logList">
+            <!-- Los elementos <li> se generarán dinámicamente -->
+        </ul>
+    </div>
+
+</div>
+
+<!-- Si ya incluyes Chart.js en tu layout.html base, puedes remover este script externo -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('globalChart').getContext('2d');
+    let activeChart = null;
+
+    function changeChart(direction) {
+        console.log("Cambiar gráfica en dirección: " + direction);
+    }
+</script>
+{% endblock %}
