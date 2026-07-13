@@ -55,3 +55,37 @@ class StaffService:
             role_id=data.get('role_id'),
             locations=nuevas_sedes
         )
+
+    @staticmethod
+    def activar_personal_por_sede(location_id):
+        """
+        Busca y activa masivamente a todos los miembros del personal 
+        que estén INACTIVOS y pertenezcan a la sede especificada.
+        """
+        try:
+            # Reutilizamos el método del repositorio para traer el personal
+            staff = StaffRepository.get_all_approved_staff()
+            usuarios_activados = 0
+
+            for usuario in staff:
+                # Si el usuario ya está activo, lo ignoramos para ahorrar procesamiento
+                if usuario.is_active:
+                    continue
+                
+                # Comprobamos si el usuario tiene vinculada la sede que estamos activando
+                pertenece_a_sede = any(loc.id == location_id for loc in usuario.locations)
+                
+                if pertenece_a_sede:
+                    usuario.is_active = True
+                    usuarios_activados += 1
+
+            # Solo hacemos commit si realmente hubo cambios que guardar
+            if usuarios_activados > 0:
+                db.session.commit()
+                return True, f"Se activaron correctamente {usuarios_activados} usuarios asociados a la sede."
+            
+            return True, "No se encontraron usuarios inactivos en esta sede."
+
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Error al procesar la activación masiva: {str(e)}"

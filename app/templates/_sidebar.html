@@ -7,7 +7,8 @@
             </a>
             <div class="menu-desplegable">
                 <a class="nav-link sub-link" href="{{ url_for('security.admin_pending_requests') }}">Gestión de Permisos</a>
-                <a class="nav-link sub-link" href="#">Gestión de Usuarios</a>
+                <!-- ENLACE CORREGIDO AQUÍ: Conecta con el listado de personal protegido -->
+                <a class="nav-link sub-link" href="{{ url_for('staff.list_staff') }}">Gestión de Usuarios</a>
             </div>
         </li>
         {% endif %}
@@ -55,7 +56,6 @@
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-truck"></i> Traslados y Mermas <i class="bi bi-chevron-down ms-auto"></i>
-
             </a>
             <div class="menu-desplegable">
                 <a class="nav-link sub-link" href="#">Gestión de Traslados</a>
