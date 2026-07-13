@@ -4,11 +4,8 @@ from .. import security_bp
 from ..services.login_service import LoginService
 from ..requests.auth_validators import mensaje_error_generico
 from ..requests.login_validators import validar_formulario_login
-
-# === IMPORTACIONES PARA LA AUDITORÍA ===
 from app.extensions import db
 from app.models import LoginAudit 
-# =======================================
 
 @security_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -19,15 +16,12 @@ def login():
             flash(mensaje_error_generico(), 'danger')
             return render_template('security/login.html')
 
-        # El servicio ahora retorna usuario y un estado descriptivo
         usuario, estado = LoginService.autenticar(datos['email'], datos['password'])
 
         if estado == "ok":
-            # Proceder al login
             login_user(usuario)
             flash(f'Bienvenido al sistema PH, {usuario.name}', 'success')
             
-            # REGISTRO DE AUDITORÍA
             sede_id = usuario.locations[0].id if (hasattr(usuario, 'locations') and usuario.locations) else None
             nuevo_ingreso = LoginAudit(
                 user_id=usuario.id,
@@ -38,17 +32,17 @@ def login():
             db.session.add(nuevo_ingreso)
             db.session.commit()
 
-            # REDIRECCIÓN SEGÚN ROL
             if usuario.is_admin:
                 return redirect(url_for('security.admin_pending_requests'))
             elif usuario.is_management:
                 return redirect(url_for('dashboard.director_dashboard'))
+            elif getattr(usuario, 'is_manager', False) or usuario.role_id == 2:
+                return redirect(url_for('dashboard.manager_dashboard'))
             elif usuario.is_guest:
                 return redirect(url_for('security.waiting_room'))
-            
-            return redirect(url_for('main.index'))
+            else:
+                return redirect(url_for('security.login'))
 
-        # Manejo de estados de error personalizados
         elif estado == "cuenta_desactivada":
             flash("Actualmente su cuenta está fuera de servicio, comuníquese con el administrador.", "warning")
         
@@ -56,7 +50,6 @@ def login():
             flash("No puedes entrar al sistema porque no tienes sedes activas, comunícate con el administrador.", "warning")
             
         else:
-            # Caso "datos_incorrectos"
             flash(mensaje_error_generico(), 'danger')
 
     return render_template('security/login.html')
@@ -64,7 +57,6 @@ def login():
 @security_bp.route('/logout')
 @login_required
 def logout():
-    # REGISTRO DE AUDITORÍA
     sede_id = current_user.locations[0].id if (hasattr(current_user, 'locations') and current_user.locations) else None
         
     cierre_sesion = LoginAudit(
