@@ -10,16 +10,6 @@ from app.logistics.requests.supplier_list_request import SupplierListFilterReque
 supplier_list_bp = Blueprint('supplier_list', __name__)
 filter_request_validator = SupplierListFilterRequest()
 
-def supplier_access_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Validamos que el usuario cumpla con al menos uno de los tres roles permitidos
-        if not (current_user.is_admin or current_user.is_management or current_user.is_manager):
-            flash("Acceso denegado: Se requieren privilegios de Administrador, Director o Gerente.", "danger")
-            return redirect(url_for('security.login')) # Redirige al login igual que los otros decoradores
-        return f(*args, **kwargs)
-    return decorated_function
-
 def get_supplier_list_service():
     """Instancia de forma limpia el servicio inyectándole el repositorio"""
     repository = SupplierListRepository(db)

@@ -13,13 +13,13 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    /* Hereda la tipografía base definida en tu layout */
 }
 
 body {
     background-color: var(--bg-color);
     color: var(--text-main);
-    padding: 30px;
+    /* Corrección: padding: arriba derecha abajo izquierda */
+    padding: 30px 30px 30px 0;
 }
 
 /* Banner de Bienvenida */

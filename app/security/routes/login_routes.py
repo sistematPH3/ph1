@@ -33,7 +33,7 @@ def login():
             db.session.commit()
 
             if usuario.is_admin:
-                return redirect(url_for('security.admin_pending_requests'))
+                return redirect(url_for('dashboard.admin_dashboard'))
             elif usuario.is_management:
                 return redirect(url_for('dashboard.director_dashboard'))
             elif getattr(usuario, 'is_manager', False) or usuario.role_id == 2:
