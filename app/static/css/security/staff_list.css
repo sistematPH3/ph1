@@ -1,0 +1,383 @@
+/* Paleta de Colores Dashboard Premium - Pizza Hut */
+:root {
+    --ph-red: #b01212;        /* Tu rojo exacto */
+    --ph-red-hover: #8c0e0e;  /* Rojo más oscuro para los efectos hover */
+    --ph-red-light: #fdf2f2;  /* Tonalidad clara para alertas o fondos suaves */
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-border-soft: #E2E8F0;
+}
+
+/* Base general */
+.container-fluid {
+    background-color: var(--ph-bg-main);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Contenedor Blanco Central (Aísla el módulo sobre el fondo gris) */
+.main-white-panel {
+    background-color: #FFFFFF;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Tipografías y Textos Suaves */
+.module-title {
+    color: var(--ph-red);
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: -0.5px;
+    
+    /* Efecto flotante con doble capa */
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.15), 
+                 2px 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+.text-subtitle {
+    color: var(--ph-text-muted);
+    font-size: 0.9rem;
+}
+
+.bg-ph-red-pill {
+    background-color: var(--ph-red);
+    color: #FFFFFF;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* Contenedores de Entrada (Buscador y Filtro) */
+.search-box-container, .filter-box-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 16px;
+    color: var(--ph-text-muted);
+    font-size: 1.05rem;
+    pointer-events: none;
+}
+
+.search-input, .filter-select {
+    padding-left: 44px !important;
+    height: 48px;
+    background-color: #F8FAFC; 
+    border: 1px solid var(--ph-border-soft);
+    border-radius: 99px !important;
+    color: var(--ph-text-soft);
+    font-size: 0.92rem;
+    transition: all 0.2s ease;
+}
+
+.search-input:focus, .filter-select:focus {
+    background-color: #FFFFFF;
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 3px rgba(176, 18, 18, 0.1);
+}
+
+/* Tarjeta de la Tabla */
+.card-ph-clean {
+    background-color: #FFFFFF;
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* Asegura las esquinas redondeadas en el contenedor responsive */
+.table-responsive {
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+}
+
+/* Cabecera Roja Corporativa con tu nuevo color */
+.table thead th {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.82rem;
+    letter-spacing: 0.8px;
+    padding: 18px 24px;
+    border: none;
+}
+
+/* Ajustes de Filas */
+.table tbody tr {
+    border-bottom: 1px solid var(--ph-border-soft);
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #FAFAFA !important;
+}
+
+.table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.table td {
+    padding: 16px 24px;
+}
+
+/* Componente: Avatar circular con Letra */
+.avatar-letter {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--ph-red);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: 0 2px 6px rgba(176, 18, 18, 0.15);
+}
+
+/* Textos internos de la tabla */
+.user-name-text {
+    font-weight: 600;
+    color: var(--ph-text-main);
+    display: block;
+    font-size: 0.95rem;
+}
+
+.user-role-subtext, .user-id-subtext {
+    color: var(--ph-text-muted);
+    font-size: 0.8rem;
+    margin-top: 1px;
+}
+
+.user-email-text {
+    color: var(--ph-text-soft);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Estados (Activo, Inactivo) y Botones */
+.badge-ph-active {
+    background-color: #D1FAE5;
+    color: #065F46;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 50px;
+}
+
+.badge-ph-inactive {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 50px;
+}
+
+.badge-ph-location {
+    background-color: #F1F5F9;
+    color: #374151;
+    border: 1px solid #E2E8F0;
+    font-weight: 500;
+    font-size: 0.78rem;
+}
+
+.btn-ph-edit {
+    background-color: transparent;
+    border: 1px solid var(--ph-border-soft);
+    color: var(--ph-text-soft);
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 6px 12px;
+    transition: all 0.2s ease;
+}
+
+.btn-ph-edit:hover {
+    background-color: #111111;
+    border-color: #111111;
+    color: #FFFFFF;
+}
+
+.form-check-input:checked {
+    background-color: var(--ph-red);
+    border-color: var(--ph-red);
+}
+
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.2);
+}
+
+/* Estilos de Modales limpios */
+.form-label-custom {
+    font-weight: 600;
+    color: var(--ph-text-soft);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+
+.form-control-custom {
+    border-radius: 10px;
+    border: 1px solid var(--ph-border-soft);
+    padding: 10px 14px;
+    font-size: 0.9rem;
+}
+
+.form-control-custom:focus {
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 3px rgba(176, 18, 18, 0.1);
+}
+
+.btn-ph-save {
+    background-color: var(--ph-red);
+    border-color: var(--ph-red);
+    color: white;
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 10px 20px;
+}
+
+.btn-ph-save:hover {
+    background-color: var(--ph-red-hover);
+    color: white;
+}
+/* Nuevo: Contenedor en cuadro rojo para el icono del título */
+.icon-box-red {
+    background-color: var(--ph-red); /* Usa tu rojo #b01212 */
+    color: #FFFFFF;                  /* Icono blanco */
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;             /* Esquinas suavizadas idénticas a la imagen */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;               /* Tamaño del icono interno */
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2); /* Sutil reflejo inferior */
+    flex-shrink: 0;                  /* Evita que se deforme en pantallas chicas */
+}
+/* Píldoras de sedes en estado base (Apariencia exacta a tu imagen) */
+.ph-interactive-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 18px;
+    border: 1px solid #a0aec0; /* Borde grisáceo estilizado */
+    border-radius: 50px;       /* Forma de óvalo píldora */
+    color: #4a5568;            /* Letras más suaves */
+    font-size: 0.88rem;
+    font-weight: 500;
+    background-color: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    user-select: none;
+}
+
+/* Ocultar la X por defecto cuando la sede NO está seleccionada */
+.ph-interactive-pill .pill-x-icon {
+    display: none;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.15s ease;
+}
+
+.ph-interactive-pill .pill-x-icon:hover {
+    color: #FFFFFF;
+}
+
+/* ESTADO SELECCIONADO: Píldora se transforma a tu Rojo Pizza Hut */
+.ph-interactive-pill.selected {
+    background-color: var(--ph-red) !important; /* Usa tu #b01212 */
+    border-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    box-shadow: 0 3px 8px rgba(176, 18, 18, 0.25);
+}
+
+/* Mostrar la X automáticamente si la píldora tiene la clase 'selected' */
+.ph-interactive-pill.selected .pill-x-icon {
+    display: inline-block;
+}
+
+/* Efecto hover al pasar el ratón por una sede desmarcada */
+.ph-interactive-pill:not(.selected):hover {
+    background-color: #f7fafc;
+    border-color: var(--ph-red);
+    color: var(--ph-red);
+}
+/* Ancho máximo del cuadro de alerta */
+.modal-alert-custom {
+    max-width: 440px;
+}
+
+/* Radio de curvatura suavizado de la tarjeta */
+.alert-modal-radius {
+    border-radius: 24px !important;
+}
+
+/* El círculo de advertencia naranja delgado */
+.alert-warning-circle {
+    width: 86px;
+    height: 86px;
+    border: 3px solid #fbd38d; /* Color ámbar/naranja sutil */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f6ad55;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 3.4rem;
+    font-weight: 300;
+    line-height: 1;
+}
+
+/* Título de la alerta */
+.alert-modal-title {
+    color: #4a5568;
+    font-weight: 700;
+    font-size: 1.7rem;
+    letter-spacing: -0.3px;
+}
+
+/* Texto del cuerpo del mensaje */
+.alert-modal-text {
+    font-size: 0.98rem;
+    color: #718096 !important;
+    line-height: 1.5;
+}
+
+/* Botón OK personalizado con tu rojo #b01212 */
+.btn-ph-alert-ok {
+    background-color: var(--ph-red); /* Tu variable o #b01212 */
+    color: #FFFFFF !important;
+    border: none;
+    font-size: 0.9rem;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    border-radius: 6px;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-ph-alert-ok:hover {
+    background-color: #8c0e0e; /* Un tono un poco más oscuro al pasar el cursor */
+}
+
+.btn-ph-alert-ok:active {
+    transform: scale(0.96);
+}
+/* El círculo de interrogación azul sutil */
+.alert-question-circle {
+    width: 86px;
+    height: 86px;
+    border: 3px solid #90cdf4; /* Azul claro */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4299e1;            /* Azul medio */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 3.4rem;
+    font-weight: 300;
+    line-height: 1;
+}

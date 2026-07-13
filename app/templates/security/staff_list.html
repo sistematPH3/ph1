@@ -1,91 +1,189 @@
 {% extends "base_list.html" %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>Directorio del Personal</h3>
-    </div>
-    
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <table class="table table-hover align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Correo</th>
-                        <th>Rol</th>
-                        <th>Sedes Asignadas</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td>{{ user.name }}</td>
-                        <td>{{ user.email }}</td>
-                        <td>{{ user.role.name if user.role else 'Sin rol' }}</td>
-                        <td>
-                            {# Filtro para mostrar solo sedes activas #}
-                            {% for loc in user.locations %}
-                                {% if loc.is_active %}
-                                    <span class="badge bg-secondary">{{ loc.name }}</span>
-                                {% endif %}
-                            {% endfor %}
-                        </td>
-                        <td>
-                            <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                {{ 'Activo' if user.is_active else 'Inactivo' }}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="form-check form-switch me-3">
-                                    <input class="form-check-input status-toggle" type="checkbox" role="switch" 
-                                           id="switch-{{ user.id }}" data-id="{{ user.id }}" 
-                                           {% if user.is_active %}checked{% endif %}>
-                                </div>
-                                <button class="btn btn-sm btn-primary edit-btn" 
-                                        data-id="{{ user.id }}" 
-                                        data-name="{{ user.name }}" 
-                                        data-email="{{ user.email }}" 
-                                        data-role="{{ user.role_id or '' }}">
-                                    <i class="bi bi-pencil-square"></i> Editar
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{# Enlace al CSS propio del módulo #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/staff_list.css') }}">
+
+{# Diccionario de traducción para los roles del sistema #}
+{% set traduccion_roles = {
+    'administrator': 'Administrador',
+    'admin': 'Administrador',
+    'management': 'Directivo',
+    'manager': 'Gerente',
+    'guest': 'Invitado',
+    'staff': 'Personal'
+} %}
+
+<div class="container-fluid py-5 px-4">
+    <!-- GRAN CONTENEDOR BLANCO CENTRAL -->
+    <div class="main-white-panel p-4 p-md-5">
+        
+       <!-- Encabezado del Módulo con el Icono en Cuadro Rojo -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-3 mb-1">
+            <!-- Cuadro rojo con el icono blanco adentro -->
+            <div class="icon-box-red">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <h3 class="module-title m-0">Directorio del Personal</h3>
         </div>
+        <p class="text-subtitle m-0">Gestión de accesos, roles corporativos y sedes comerciales del equipo.</p>
     </div>
+    <span class="badge bg-ph-red-pill px-3 py-2 rounded-pill">Módulo Administrativo</span>
+</div>
+        <!-- Barra de Herramientas: Buscador y Filtro -->
+        <div class="row g-3 mb-4 align-items-center">
+            <div class="col-12 col-md-8">
+                <div class="search-box-container">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" id="tableSearch" class="form-control search-input" placeholder="Buscar por nombre o correo electrónico...">
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="filter-box-container">
+                    <i class="bi bi-filter search-icon"></i>
+                    <select id="statusFilter" class="form-select filter-select">
+                        <option value="all">Todos los estados</option>
+                        <option value="active">Solo Activos</option>
+                        <option value="inactive">Solo Inactivos</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenedor Limpio de la Tabla (Card-PH-Clean) -->
+        <div class="card card-ph-clean">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle m-0" id="staffTable">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Correo y Registro</th>
+                                <th>Sedes Asignadas</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr data-status="{{ 'active' if user.is_active else 'inactive' }}">
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <!-- Avatar circular con la inicial del nombre -->
+                                        <div class="avatar-letter">
+                                            {{ user.name[0] | upper if user.name else '?' }}
+                                        </div>
+                                        <div>
+                                            <span class="user-name-text">{{ user.name }}</span>
+                                            <div class="user-role-subtext">
+                                                {{ traduccion_roles.get(user.role.name.lower(), user.role.name) if user.role else 'Sin rol' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="user-email-text">{{ user.email }}</div>
+                                    <div class="user-id-subtext">ID de Registro: #{{ user.id }}</div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {# Validación para Administradores #}
+                                        {% if user.role and user.role.name.lower() in ['admin', 'administrator'] %}
+                                            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Global / Sin sede</span>
+                                        {% else %}
+                                            {% set ns = namespace(tiene_sedes=false) %}
+                                            {% for loc in user.locations %}
+                                                {% if loc.is_active %}
+                                                    <span class="badge badge-ph-location">{{ loc.name }}</span>
+                                                    {% set ns.tiene_sedes = true %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            
+                                            {% if not ns.tiene_sedes %}
+                                                <span class="text-muted small font-italic">Sin sedes activas</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge {% if user.is_active %}badge-ph-active{% else %}badge-ph-inactive{% endif %}">
+                                        {{ 'Activo' if user.is_active else 'Inactivo' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="form-check form-switch me-3">
+                                            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                                                   id="switch-{{ user.id }}" data-id="{{ user.id }}" 
+                                                   {% if user.is_active %}checked{% endif %}>
+                                        </div>
+                                        <button class="btn btn-sm btn-ph-edit edit-btn" 
+        data-id="{{ user.id }}" 
+        data-name="{{ user.name }}" 
+        data-email="{{ user.email }}" 
+        data-role="{{ user.role_id or '' }}"
+        data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
+    <i class="bi bi-pencil-square"></i> Editar
+</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </div> <!-- FIN DEL CONTENEDOR BLANCO -->
 </div>
 
 <!-- Modal de Edición -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header"><h5>Editar Personal</h5></div>
-            <div class="modal-body">
+            <div class="modal-header px-4">
+                <h5 class="m-0 py-1">Editar Personal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
                 <form id="editForm">
                     <input type="hidden" id="editUserId">
                     <div class="mb-3">
-                        <label>Correo</label>
-                        <input type="email" class="form-control" id="editEmail" required>
+                        <label class="form-label-custom">Correo Electrónico</label>
+                        <input type="email" class="form-control form-control-custom" id="editEmail" required>
                     </div>
                     <div class="mb-3">
-                        <label>Rol</label>
-                        <select class="form-select" id="editRole">
+                        <label class="form-label-custom">Rol Asignado</label>
+                        <select class="form-select form-control-custom" id="editRole">
                             {% for role in roles %}
-                                <option value="{{ role.id }}">{{ role.name }}</option>
+                                <option value="{{ role.id }}">
+                                    {{ traduccion_roles.get(role.name.lower(), role.name) }}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="mb-3" id="locationsContainer">
-                        <label>Sedes</label>
-                        <select class="form-select" id="editLocations" multiple>
-                            {# Solo listar sedes activas para asignar #}
+                    
+                    <!-- NUEVA SECCIÓN: SEDES ESTILO MATRIZ DE PÍLDORAS -->
+                    <div class="mb-0" id="locationsContainer">
+                        <label class="form-label-custom d-block mb-2">Sedes Habilitadas</label>
+                        
+                        <!-- Contenedor donde se muestran TODAS las sedes simultáneamente -->
+                        <div class="d-flex flex-wrap gap-2 p-1" id="allLocationsPills">
+                            {% for loc in locations %}
+                                {% if loc.is_active %}
+                                    <div class="ph-interactive-pill" data-id="{{ loc.id }}">
+                                        <span class="pill-text">{{ loc.name }}</span>
+                                        <i class="bi bi-x-lg pill-x-icon ms-1"></i>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <!-- Mantenemos tu select múltiple original oculto en 'd-none' para la sincronización del backend -->
+                        <select id="editLocations" multiple class="d-none">
                             {% for loc in locations %}
                                 {% if loc.is_active %}
                                     <option value="{{ loc.id }}">{{ loc.name }}</option>
@@ -95,83 +193,62 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-primary" id="saveBtn">Guardar</button>
+            <div class="modal-footer px-4 bg-light">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-ph-save px-4" id="saveBtn">Guardar Cambios</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('editRole').addEventListener('change', checkRoleVisibility);
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            openEditModal(this.dataset.id, this.dataset.name, this.dataset.email, this.dataset.role);
-        });
-    });
+<!-- Modal de Alerta Personalizado (Estilo Captura) -->
+<div class="modal fade" id="alertModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-alert-custom">
+        <div class="modal-content border-0 shadow-lg p-4 text-center alert-modal-radius">
+            <div class="modal-body p-2">
+                <!-- Icono circular de exclamación delgado idéntico a la imagen -->
+                <div class="alert-warning-circle mx-auto mb-4">
+                    <span>!</span>
+                </div>
+                
+                <!-- Títulos dinámicos controlados por JS -->
+                <h4 class="alert-modal-title mb-3" id="alertModalTitle">Sede Obligatoria</h4>
+                <p class="alert-modal-text px-2 mb-4" id="alertModalMessage">
+                    Recuerda que debes asignar al menos una sede operativa para este rol.
+                </p>
+                
+                <!-- Botón de confirmación con tu rojo de marca -->
+                <button type="button" class="btn btn-ph-alert-ok px-4 py-2 fw-bold text-uppercase" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-    document.querySelectorAll('.status-toggle').forEach(sw => {
-        sw.addEventListener('change', function() {
-            toggleStatus(this.dataset.id, this.checked);
-        });
-    });
+<!-- Modal de Confirmación Personalizado (Activar/Desactivar / Guardar Cambios) -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-alert-custom">
+        <div class="modal-content border-0 shadow-lg p-4 text-center alert-modal-radius">
+            <div class="modal-body p-2">
+                <!-- Icono circular de interrogación azul estilizado -->
+                <div class="alert-question-circle mx-auto mb-4">
+                    <span>?</span>
+                </div>
+                
+                <h4 class="alert-modal-title mb-3" id="confirmModalTitle">¿Confirmar Acción?</h4>
+                <p class="alert-modal-text px-2 mb-4" id="confirmModalMessage">
+                    ¿Está seguro de realizar esta acción?
+                </p>
+                
+                <!-- Botones de Acción de Confirmación -->
+                <div class="d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-ph-alert-ok px-4 py-2 fw-bold text-uppercase" id="confirmBtnYes">Sí</button>
+                    <button type="button" class="btn btn-light border px-4 py-2 fw-bold text-uppercase text-dark alert-modal-radius" data-bs-dismiss="modal">No</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    document.getElementById('saveBtn').addEventListener('click', saveChanges);
-});
-
-function openEditModal(id, name, email, roleId) {
-    document.getElementById('editUserId').value = id;
-    document.getElementById('editEmail').value = email;
-    document.getElementById('editRole').value = roleId;
-    checkRoleVisibility();
-    new bootstrap.Modal(document.getElementById('editModal')).show();
-}
-
-function checkRoleVisibility() {
-    const roleSelect = document.getElementById('editRole');
-    const locationsContainer = document.getElementById('locationsContainer');
-    const selectedText = roleSelect.options[roleSelect.selectedIndex].text.toLowerCase();
-    locationsContainer.style.display = selectedText.includes('admin') ? 'none' : 'block';
-}
-
-function saveChanges() {
-    const userId = document.getElementById('editUserId').value;
-    const roleSelect = document.getElementById('editRole');
-    const selectedText = roleSelect.options[roleSelect.selectedIndex].text.toLowerCase();
-    
-    const data = {
-        email: document.getElementById('editEmail').value,
-        role_id: roleSelect.value,
-        locations: (selectedText.includes('admin')) ? [] : Array.from(document.getElementById('editLocations').selectedOptions).map(o => o.value)
-    };
-
-    fetch(`/staff/editar/${userId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) location.reload();
-        else alert(d.message);
-    });
-}
-
-function toggleStatus(userId, isChecked) {
-    fetch(`/staff/toggle-status/${userId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ activo: isChecked })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (!d.success) {
-            alert(d.message); // Notifica el error si no hay sedes activas
-        }
-        location.reload(); // Recarga para resetear el estado si falló la activación
-    });
-}
-</script>
+{# Carga del archivo JavaScript externo #}
+<script src="{{ url_for('static', filename='js/security/staff_list.js') }}"></script>
 {% endblock %}
