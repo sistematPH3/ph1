@@ -1,3 +1,15 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* En lugar de alterar el body, ajustamos el contenedor del título para anular el desfase */
+.supplier-title-container {
+    margin-top: -15px !important;
+    padding-top: 0 !important;
+}
+
 .btn-add-supplier {
     background-color: #e31937 !important;
     font-family: 'Inter-Bold', sans-serif;
@@ -133,6 +145,3 @@
 .label-cancel-return:hover {
     color: #212529 !important;
 }
-
-
-

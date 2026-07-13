@@ -4,17 +4,10 @@
 <!-- Vinculación del archivo CSS local usando la estructura estática de Flask -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}">
 
-<div class="welcome-banner" id="welcomeBanner">
-    <p>Bienvenido al sistema PH, <strong id="adminName">{{ current_user.name }}</strong></p>
-    <button class="close-banner" onclick="document.getElementById('welcomeBanner').style.display='none'">
-        <i class="fas fa-times"></i>
-    </button>
-</div>
-
-<div class="header-title">
+<header class="dashboard-header">
     <h1>Panel de Control Global</h1>
-    <p>Gestión, control y estado de sucursales a nivel nacional</p>
-</div>
+    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
+</header>
 
 <!-- Grid de Botones/KPIs superiores vacíos -->
 <div class="metrics-grid">
@@ -65,7 +58,6 @@
         </div>
     </div>
 
-    <!-- Sección de Últimos Accesos (Lista vacía) -->
     <div class="panel">
         <div class="panel-header">
             <h2>Últimos Accesos</h2>
