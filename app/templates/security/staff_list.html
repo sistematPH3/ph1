@@ -7,138 +7,201 @@
 {# Diccionario de traducción para los roles del sistema #}
 {% set traduccion_roles = {
     'administrator': 'Administrador',
-    'admin': 'Administrador',
-    'management': 'Directivo',
     'manager': 'Gerente',
-    'guest': 'Invitado',
-    'staff': 'Personal'
+    'assistant manager': 'Subgerente',
+    'operations': 'Operaciones',
+    'management': 'Director',
+    'finance': 'Finanzas',
+    'guest': 'Invitado'
 } %}
-
 <div class="container-fluid py-5 px-4">
-    <!-- GRAN CONTENEDOR BLANCO CENTRAL -->
-    <div class="main-white-panel p-4 p-md-5">
-        
-       <!-- Encabezado del Módulo con el Icono en Cuadro Rojo -->
-<div class="d-flex justify-content-between align-items-start mb-4">
-    <div>
-        <div class="d-flex align-items-center gap-3 mb-1">
-            <!-- Cuadro rojo con el icono blanco adentro -->
-            <div class="icon-box-red">
-                <i class="bi bi-people-fill"></i>
-            </div>
-            <h3 class="module-title m-0">Directorio del Personal</h3>
-        </div>
-        <p class="text-subtitle m-0">Gestión de accesos, roles corporativos y sedes comerciales del equipo.</p>
-    </div>
-    <span class="badge bg-ph-red-pill px-3 py-2 rounded-pill">Módulo Administrativo</span>
-</div>
-        <!-- Barra de Herramientas: Buscador y Filtro -->
-        <div class="row g-3 mb-4 align-items-center">
-            <div class="col-12 col-md-8">
-                <div class="search-box-container">
-                    <i class="bi bi-search search-icon"></i>
-                    <input type="text" id="tableSearch" class="form-control search-input" placeholder="Buscar por nombre o correo electrónico...">
+<!-- GRAN CONTENEDOR BLANCO CENTRAL -->
+<div class="main-white-panel p-4 p-md-5">
+    
+    <!-- Encabezado del Módulo con el Icono en Cuadro Rojo -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-3 mb-1">
+                <!-- Cuadro rojo con el icono blanco adentro -->
+                <div class="icon-box-red">
+                    <i class="bi bi-people-fill"></i>
                 </div>
+                <h3 class="module-title m-0">Directorio del Personal</h3>
             </div>
-            <div class="col-12 col-md-4">
-                <div class="filter-box-container">
-                    <i class="bi bi-filter search-icon"></i>
-                    <select id="statusFilter" class="form-select filter-select">
-                        <option value="all">Todos los estados</option>
-                        <option value="active">Solo Activos</option>
-                        <option value="inactive">Solo Inactivos</option>
+            <p class="text-subtitle m-0">Gestión de accesos, roles corporativos y sedes comerciales del equipo.</p>
+        </div>
+        <span class="badge bg-ph-red-pill px-3 py-2 rounded-pill">Módulo Administrativo</span>
+    </div>
+
+<!-- CONTENEDOR PRINCIPAL DE BÚSQUEDA Y FILTROS -->
+<div class="filters-section-container mb-4">
+    
+    <!-- Fila 1: Barra de Búsqueda Completa Arriba -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="search-box-container w-100" style="position: relative;">
+                <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
+                <input type="text" id="tableSearch" class="form-control search-input" 
+                       placeholder="Buscar por nombre o correo electrónico..." 
+                       style="padding-left: 40px; border-radius: 50px; height: 48px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila 2: Los 3 Filtros Perfectamente Distribuidos Abajo (12 / 3 = 4) -->
+    <div class="row g-3">
+        
+        <!-- 1. Filtro de Estados -->
+        <div class="col-12 col-md-4">
+            <div class="filter-box-container w-100" style="position: relative;">
+                <i class="bi bi-funnel search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
+                <select id="statusFilter" class="form-select filter-select" style="padding-left: 40px; border-radius: 50px; height: 45px;">
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 2. Filtro de Roles -->
+        <div class="col-12 col-md-4">
+            <div class="filter-box-container w-100" style="position: relative;">
+                <i class="bi bi-shield-lock search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
+                <select id="roleFilter" class="form-select filter-select" style="padding-left: 40px; border-radius: 50px; height: 45px;">
+                    <option value="all">Todos los roles</option>
+                    {% for role in roles %}
+                        <option value="{{ role.id }}">{{ traduccion_roles.get(role.name.lower(), role.name) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- 3. Filtro de Sedes + Botón Masivo -->
+        <div class="col-12 col-md-4">
+            <div class="d-flex gap-2 align-items-center w-100">
+                <div class="filter-box-container flex-grow-1" style="position: relative;">
+                    <i class="bi bi-geo-alt search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
+                    <select id="locationFilter" class="form-select filter-select" style="padding-left: 40px; border-radius: 50px; height: 45px;">
+                        <option value="all">Todas las sedes</option>
+                        {% for loc in locations %}
+                            {% if loc.is_active %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                            {% endif %}
+                        {% endfor %}
                     </select>
                 </div>
+                
+                <!-- El botón masivo se acopla al lado derecho de forma fluida si se activa una sede -->
+                <button type="button" id="bulkActivateBtn" class="btn btn-outline-success d-none text-nowrap" 
+                        style="border-radius: 50px; height: 45px; width: 45px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" 
+                        title="Activar todo el personal de esta sede">
+                    <i class="bi bi-person-check-fill" style="font-size: 1.1rem;"></i>
+                </button>
             </div>
         </div>
 
-        <!-- Contenedor Limpio de la Tabla (Card-PH-Clean) -->
-        <div class="card card-ph-clean">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle m-0" id="staffTable">
-                        <thead>
-                            <tr>
-                                <th>Usuario</th>
-                                <th>Correo y Registro</th>
-                                <th>Sedes Asignadas</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in users %}
-                            <tr data-status="{{ 'active' if user.is_active else 'inactive' }}">
-                                <td>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <!-- Avatar circular con la inicial del nombre -->
-                                        <div class="avatar-letter">
-                                            {{ user.name[0] | upper if user.name else '?' }}
-                                        </div>
-                                        <div>
-                                            <span class="user-name-text">{{ user.name }}</span>
-                                            <div class="user-role-subtext">
-                                                {{ traduccion_roles.get(user.role.name.lower(), user.role.name) if user.role else 'Sin rol' }}
-                                            </div>
+    </div>
+</div>
+    <!-- Contenedor Limpio de la Tabla (Card-PH-Clean) -->
+    <div class="card card-ph-clean">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle m-0" id="staffTable">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Correo y Registro</th>
+                            <th>Sedes Asignadas</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <!-- Datasets cruzados de rol y sedes activas para procesamiento en JS -->
+                        <tr data-status="{{ 'active' if user.is_active else 'inactive' }}"
+                            data-role="{{ user.role_id or '' }}"
+                            data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
+                            <td>
+                                <div class="d-flex align-items-center gap-3">
+                                    <!-- Avatar circular con la inicial del nombre -->
+                                    <div class="avatar-letter">
+                                        {{ user.name[0] | upper if user.name else '?' }}
+                                    </div>
+                                    <div>
+                                        <span class="user-name-text">{{ user.name }}</span>
+                                        <div class="user-role-subtext">
+                                            {{ traduccion_roles.get(user.role.name.lower(), user.role.name) if user.role else 'Sin rol' }}
                                         </div>
                                     </div>
-                                </td>
-                                <td>
-                                    <div class="user-email-text">{{ user.email }}</div>
-                                    <div class="user-id-subtext">ID de Registro: #{{ user.id }}</div>
-                                </td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        {# Validación para Administradores #}
-                                        {% if user.role and user.role.name.lower() in ['admin', 'administrator'] %}
-                                            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Global / Sin sede</span>
-                                        {% else %}
-                                            {% set ns = namespace(tiene_sedes=false) %}
-                                            {% for loc in user.locations %}
-                                                {% if loc.is_active %}
-                                                    <span class="badge badge-ph-location">{{ loc.name }}</span>
-                                                    {% set ns.tiene_sedes = true %}
-                                                {% endif %}
-                                            {% endfor %}
-                                            
-                                            {% if not ns.tiene_sedes %}
-                                                <span class="text-muted small font-italic">Sin sedes activas</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="user-email-text">{{ user.email }}</div>
+                                <div class="user-id-subtext">ID de Registro: #{{ user.id }}</div>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {# Validación para Administradores #}
+                                    {% if user.role and user.role.name.lower() in ['admin', 'administrator'] %}
+                                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Global / Sin sede</span>
+                                    {% else %}
+                                        {% set ns = namespace(tiene_sedes=false) %}
+                                        {% for loc in user.locations %}
+                                            {% if loc.is_active %}
+                                                <span class="badge badge-ph-location">{{ loc.name }}</span>
+                                                {% set ns.tiene_sedes = true %}
                                             {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if not ns.tiene_sedes %}
+                                            <span class="text-muted small font-italic">Sin sedes activas</span>
                                         {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge {% if user.is_active %}badge-ph-active{% else %}badge-ph-inactive{% endif %}">
+                                    {{ 'Activo' if user.is_active else 'Inactivo' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="form-check form-switch me-3">
+                                        <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                                               id="switch-{{ user.id }}" data-id="{{ user.id }}" 
+                                               {% if user.is_active %}checked{% endif %}>
                                     </div>
-                                </td>
-                                <td>
-                                    <span class="badge {% if user.is_active %}badge-ph-active{% else %}badge-ph-inactive{% endif %}">
-                                        {{ 'Activo' if user.is_active else 'Inactivo' }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="form-check form-switch me-3">
-                                            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
-                                                   id="switch-{{ user.id }}" data-id="{{ user.id }}" 
-                                                   {% if user.is_active %}checked{% endif %}>
-                                        </div>
-                                        <button class="btn btn-sm btn-ph-edit edit-btn" 
-        data-id="{{ user.id }}" 
-        data-name="{{ user.name }}" 
-        data-email="{{ user.email }}" 
-        data-role="{{ user.role_id or '' }}"
-        data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
-    <i class="bi bi-pencil-square"></i> Editar
-</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                    <button class="btn btn-ph-edit edit-btn" 
+                                            data-id="{{ user.id }}" 
+                                            data-name="{{ user.name }}" 
+                                            data-email="{{ user.email }}" 
+                                            data-role="{{ user.role_id or '' }}"
+                                            data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
+                                        <i class="bi bi-pencil-square"></i> Editar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- FILA AJUSTADA: Mensaje de "No resultados" con Lupa Informativa -->
+                        <tr id="noResultsRow" style="display: none !important;">
+                            <td colspan="5" class="text-center py-5">
+                                <div class="py-4">
+                                    <i class="bi bi-search text-muted mb-3 d-inline-block" style="font-size: 3.5rem; opacity: 0.6;"></i>
+                                    <h5 class="fw-bold text-secondary mb-1">No se encontraron resultados</h5>
+                                    <p class="text-muted small mb-0">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-        
-    </div> <!-- FIN DEL CONTENEDOR BLANCO -->
-</div>
+    </div>
+    
+</div> <!-- FIN DEL CONTENEDOR BLANCO -->
 
 <!-- Modal de Edición -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">

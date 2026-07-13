@@ -1,35 +1,108 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // ---- LÓGICA DE BÚSQUEDA Y FILTRADO EN TIEMPO REAL ----
+    // ---- LÓGICA DE ACTIVACIÓN MASIVA POR SEDE ----
+const locationFilterEl = document.getElementById('locationFilter');
+const bulkActivateBtn = document.getElementById('bulkActivateBtn');
+
+if (locationFilterEl && bulkActivateBtn) {
+    // Mostrar/ocultar el botón según la sede seleccionada
+    locationFilterEl.addEventListener('change', function() {
+        if (this.value !== 'all') {
+            bulkActivateBtn.classList.remove('d-none');
+        } else {
+            bulkActivateBtn.classList.add('d-none');
+        }
+    });
+
+    // Acción al presionar el botón masivo
+    bulkActivateBtn.addEventListener('click', function() {
+        const locationId = locationFilterEl.value;
+        const locationName = locationFilterEl.options[locationFilterEl.selectedIndex].text;
+
+        showConfirmModal(
+            "Activación Masiva",
+            `¿Está seguro de que desea ACTIVAR a todos los usuarios pertenecientes a la sede "${locationName}"?`,
+            function() {
+                // Si dice SÍ, disparamos el fetch al backend
+                fetch(`/staff/bulk-activate/${locationId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        location.reload(); // Recargamos para ver los cambios
+                    } else {
+                        showAlertModal("Error", d.message || "No se pudo realizar la activación masiva.");
+                    }
+                })
+                .catch(err => {
+                    showAlertModal("Error Crítico", "Problema de conexión con el servidor.");
+                });
+            },
+            function() {
+                console.log("Acción masiva cancelada.");
+            }
+        );
+    });
+}
+    // ---- LÓGICA DE BÚSQUEDA Y FILTRADO MULTI-CRITERIO EN TIEMPO REAL ----
     const searchInput = document.getElementById('tableSearch');
     const statusFilter = document.getElementById('statusFilter');
+    const roleFilter = document.getElementById('roleFilter');
+    const locationFilter = document.getElementById('locationFilter');
 
-    if (searchInput && statusFilter) {
+    if (searchInput && statusFilter && roleFilter && locationFilter) {
         searchInput.addEventListener('input', executeTableFilter);
         statusFilter.addEventListener('change', executeTableFilter);
+        roleFilter.addEventListener('change', executeTableFilter);
+        locationFilter.addEventListener('change', executeTableFilter);
     }
 
     function executeTableFilter() {
         const query = searchInput.value.toLowerCase().trim();
-        const selectedStatus = statusFilter.value; // 'all', 'active', 'inactive'
-        const rows = document.querySelectorAll('#staffTable tbody tr');
+        const selectedStatus = statusFilter.value;     // 'all', 'active', 'inactive'
+        const selectedRole = roleFilter.value;         // 'all' o ID de rol
+        const selectedLocation = locationFilter.value; // 'all' o ID de sede
+        
+        // AJUSTE: Excluimos la fila de "No resultados" para evitar errores de lectura de nodos
+        const rows = document.querySelectorAll('#staffTable tbody tr:not(#noResultsRow)');
+        let visibleRowsCount = 0;
 
         rows.forEach(row => {
-            // Extraer el texto de las columnas de interés
+            // Extraer textos y atributos de datos de la fila
             const nameText = row.querySelector('.user-name-text').textContent.toLowerCase();
             const emailText = row.querySelector('.user-email-text').textContent.toLowerCase();
-            const rowStatus = row.getAttribute('data-status'); // 'active' o 'inactive'
+            const rowStatus = row.getAttribute('data-status'); 
+            const rowRole = row.getAttribute('data-role');
+            
+            // Convertimos la cadena de sedes "1,2,3," en un array limpio de JS
+            const rowLocationsStr = row.getAttribute('data-locations') || '';
+            const rowLocationsArr = rowLocationsStr.split(',').filter(Boolean);
 
-            // Comprobar condiciones
+            // Evaluar cumplimiento de los 4 criterios en cascada
             const matchesSearch = nameText.includes(query) || emailText.includes(query);
             const matchesStatus = (selectedStatus === 'all') || (rowStatus === selectedStatus);
+            const matchesRole = (selectedRole === 'all') || (rowRole === selectedRole);
+            const matchesLocation = (selectedLocation === 'all') || rowLocationsArr.includes(selectedLocation);
 
-            // Mostrar u ocultar la fila según corresponda
-            if (matchesSearch && matchesStatus) {
+            // Mostrar u ocultar la fila (Todas las condiciones deben ser verdaderas)
+            if (matchesSearch && matchesStatus && matchesRole && matchesLocation) {
                 row.style.setProperty('display', '', 'important');
+                visibleRowsCount++; // Incrementamos si la fila pasa los filtros
             } else {
                 row.style.setProperty('display', 'none', 'important');
             }
         });
+
+        // CONTROL DE VISIBILIDAD DE LA LUPA
+        const noResultsRow = document.getElementById('noResultsRow');
+        if (noResultsRow) {
+            if (visibleRowsCount === 0) {
+                noResultsRow.style.setProperty('display', '', 'important');
+            } else {
+                noResultsRow.style.setProperty('display', 'none', 'important');
+            }
+        }
     }
 
     // ---- INTERACTIVIDAD DE LAS PÍLDORAS DE SEDES ----
@@ -72,23 +145,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.status-toggle').forEach(sw => {
         sw.addEventListener('change', function() {
             const userId = this.dataset.id;
-            const isChecked = this.checked; // Destino deseado (true si intenta activar, false si intenta desactivar)
+            const isChecked = this.checked;
 
-            // Definimos el mensaje personalizado según el estado del switch
             const message = isChecked 
                 ? "¿Está seguro de activar a este usuario?" 
                 : "¿Está seguro de desactivar a este usuario?";
 
-            // Abrimos el modal de confirmación pasándole las acciones correspondientes
             showConfirmModal(
                 "Confirmar Estado", 
                 message, 
                 function() {
-                    // Acción si hace clic en SÍ: Ejecutar la petición al servidor
                     executeToggleStatus(userId, isChecked);
                 }, 
                 function() {
-                    // Acción si hace clic en NO o cierra el modal: Revertir el switch en pantalla
                     const switchEl = document.querySelector(`.status-toggle[data-id="${userId}"]`);
                     if (switchEl) switchEl.checked = !isChecked;
                 }
@@ -110,7 +179,6 @@ function showAlertModal(title, message, callbackOnClose) {
     document.getElementById('alertModalTitle').textContent = title;
     document.getElementById('alertModalMessage').textContent = message;
     
-    // Uso de getOrCreateInstance para evitar fugas de memoria y bloqueos de capas oscuras
     const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
     
     if (callbackOnClose) {
@@ -132,25 +200,21 @@ function showConfirmModal(title, message, onYes, onNo) {
     document.getElementById('confirmModalMessage').textContent = message;
     
     const btnYes = document.getElementById('confirmBtnYes');
-    
-    // Clonamos el botón "Sí" para limpiar listeners viejos acumulados de otras acciones anteriores
     const newBtnYes = btnYes.cloneNode(true);
     btnYes.parentNode.replaceChild(newBtnYes, btnYes);
     
     const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
     let confirmed = false;
     
-    // Evento al presionar Sí
     newBtnYes.addEventListener('click', function() {
         confirmed = true;
         modalInstance.hide();
         if (onYes) onYes();
     });
     
-    // Evento al cerrar el modal por cualquier vía (Botón No, clic afuera o tecla ESC)
     modalEl.addEventListener('hidden.bs.modal', function handler() {
         if (!confirmed && onNo) {
-            onNo(); // Revierte el switch o cancela la acción si no confirmó con un SÍ
+            onNo(); 
         }
         modalEl.removeEventListener('hidden.bs.modal', handler);
     }, { once: true });
@@ -222,21 +286,17 @@ function saveChanges() {
         locations: selectedLocations
     };
 
-    // REGLA DE NEGOCIO VISUAL: Si no es admin y quitó todas las sedes, mandamos el flag de desactivación automática
     if (isSeparatedFromLocations && selectedLocations.length === 0) {
         data.activo = false;
     }
 
-    // Pedimos confirmación elegante al usuario usando el mismo modal estilizado
     showConfirmModal(
         "Confirmar Guardado",
         "¿Está seguro de guardar los datos editados?",
         function() {
-            // Si hace clic en "Sí", cerramos primero el modal de edición para limpiar la pantalla de backdrops
             const editModalEl = document.getElementById('editModal');
             bootstrap.Modal.getOrCreateInstance(editModalEl).hide();
 
-            // Se procesa el envío seguro al servidor
             fetch(`/staff/editar/${userId}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -248,7 +308,6 @@ function saveChanges() {
                     location.reload();
                 } else {
                     showAlertModal("Error de Guardado", d.message || "No se pudieron aplicar los cambios.", function() {
-                        // Si falla, volvemos a mostrar el modal de edición para que corrija
                         bootstrap.Modal.getOrCreateInstance(editModalEl).show();
                     });
                 }
@@ -260,7 +319,6 @@ function saveChanges() {
     );
 }
 
-// Envío real al Backend una vez que el usuario confirma con "Sí" el switch de estado
 function executeToggleStatus(userId, isChecked) {
     fetch(`/staff/toggle-status/${userId}`, {
         method: 'POST',
@@ -272,7 +330,6 @@ function executeToggleStatus(userId, isChecked) {
         if (d.success) {
             location.reload();
         } else {
-            // Si el backend lo rechaza (ej. intentar activar un usuario sin sedes asignadas)
             showAlertModal(
                 "Sede Obligatoria", 
                 d.message || "Recuerda que debes asignar al menos una sede operativa para este rol.",
