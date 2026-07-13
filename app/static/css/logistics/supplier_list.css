@@ -1,92 +1,177 @@
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+/* Paleta de Colores Dashboard Premium - Pizza Hut */
+:root {
+    --ph-red: #b01212;        /* Tu rojo exacto */
+    --ph-red-hover: #8c0e0e;  /* Rojo más oscuro para los efectos hover */
+    --ph-red-light: #fdf2f2;  /* Tonalidad clara para alertas o fondos suaves */
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-border-soft: #E2E8F0;
 }
 
-/* En lugar de alterar el body, ajustamos el contenedor del título para anular el desfase */
-.supplier-title-container {
-    margin-top: -15px !important;
-    padding-top: 0 !important;
+/* Base general */
+.container-fluid {
+    background-color: var(--ph-bg-main);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Contenedor Blanco Central (Aísla el módulo sobre el fondo gris) */
+.main-white-panel {
+    background-color: #FFFFFF;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Tipografías y Textos Suaves */
+.module-title {
+    color: var(--ph-red);
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: -0.5px;
+    
+    /* Efecto flotante con doble capa */
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.15), 
+                 2px 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+.text-subtitle {
+    color: var(--ph-text-muted);
+    font-size: 0.9rem;
+}
+
+/* Botón Añadir Proveedor - Estilo Corporativo Redondeado */
 .btn-add-supplier {
-    background-color: #e31937 !important;
-    font-family: 'Inter-Bold', sans-serif;
+    background-color: var(--ph-red) !important;
+    border-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
     font-size: 0.9rem;
     transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .btn-add-supplier:hover {
-    background-color: #b51226 !important;
+    background-color: var(--ph-red-hover) !important;
     transform: translateY(-1px);
 }
 
-.filter-select {
-    font-size: 0.95rem;
-    cursor: pointer;
+/* Contenedores de Entrada (Buscador y Filtro) */
+.search-box-container, .filter-box-container {
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
-.filter-select:focus {
-    border-color: #e31937;
-    box-shadow: 0 0 0 0.2rem rgba(227, 25, 55, 0.15);
+.search-icon {
+    position: absolute;
+    left: 16px;
+    color: var(--ph-text-muted);
+    font-size: 1.05rem;
+    pointer-events: none;
 }
 
-.supplier-row {
-    cursor: pointer;
+.search-input, .filter-select {
+    padding-left: 44px !important;
+    height: 48px;
+    background-color: #F8FAFC; 
+    border: 1px solid var(--ph-border-soft);
+    border-radius: 99px !important;
+    color: var(--ph-text-soft);
+    font-size: 0.92rem;
+    transition: all 0.2s ease;
+}
+
+.search-input:focus, .filter-select:focus {
+    background-color: #FFFFFF;
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 3px rgba(176, 18, 18, 0.1);
+}
+
+/* Tarjeta de la Tabla */
+.card-ph-clean {
+    background-color: #FFFFFF;
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* Asegura las esquinas redondeadas en el contenedor responsive */
+.table-responsive {
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+}
+
+/* Cabecera Roja Corporativa con tu nuevo color */
+.table thead th {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.82rem;
+    letter-spacing: 0.8px;
+    padding: 18px 24px;
+    border: none;
+}
+
+/* Ajustes de Filas */
+.table tbody tr {
+    border-bottom: 1px solid var(--ph-border-soft);
     transition: background-color 0.2s ease;
-    background-color: #ffffff;
 }
 
-.supplier-row:hover {
-    background-color: #fdf2f2;
+.table tbody tr:hover {
+    background-color: #FAFAFA !important;
 }
 
-.supplier-row.row-inactive {
-    background-color: #ffe8cc !important;
+.table tbody tr:last-child {
+    border-bottom: none;
 }
 
-.supplier-row.row-inactive:hover {
-    background-color: #ffd8a8 !important;
+.table td {
+    padding: 16px 24px;
 }
 
+/* Estilos de las Filas de Proveedores */
 .supplier-tax-id {
-    font-family: 'Inter-Bold', sans-serif;
-    color: #495057;
+    font-weight: 700;
+    color: var(--ph-text-main);
 }
 
 .supplier-name {
-    font-family: 'Inter-Bold', sans-serif;
+    font-weight: 600;
 }
 
-.status-badge-active {
-    background-color: #e2f6ed;
-    color: #14794a;
-    font-family: 'Inter-Bold', sans-serif;
+/* Estado Operativo (Píldoras) */
+.badge-ph-active {
+    background-color: #D1FAE5;
+    color: #065F46;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 50px;
     font-size: 0.8rem;
-    padding: 5px 14px;
-    border-radius: 20px;
-    border: 1px solid #a3e6cb;
     display: inline-block;
 }
 
-.status-badge-inactive {
-    background-color: #fce8e6;
-    color: #e31937;
-    font-family: 'Inter-Bold', sans-serif;
+.badge-ph-inactive {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 50px;
     font-size: 0.8rem;
-    padding: 5px 14px;
-    border-radius: 20px;
-    border: 1px solid #f5c2be;
     display: inline-block;
 }
 
+/* Acciones en la Tabla */
 .btn-action-edit {
     transition: transform 0.2s ease;
     border: none;
     background: transparent;
-    display: inline-block;
-    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-action-edit:hover {
@@ -95,7 +180,7 @@
 
 .custom-edit-icon {
     font-size: 1.25rem;
-    color: #0d6efd; 
+    color: var(--ph-text-soft);
 }
 
 .status-toggle {
@@ -104,10 +189,26 @@
 }
 
 .status-toggle:checked {
-    background-color: #e31937;
-    border-color: #e31937;
+    background-color: var(--ph-red) !important;
+    border-color: var(--ph-red) !important;
 }
 
+/* Nuevo: Contenedor en cuadro rojo para el icono del título */
+.icon-box-red {
+    background-color: var(--ph-red); /* Usa tu rojo #b01212 */
+    color: #FFFFFF;                  /* Icono blanco */
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;             /* Esquinas suavizadas idénticas */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;               /* Tamaño del icono interno */
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2); /* Sutil reflejo inferior */
+    flex-shrink: 0;                  /* Evita que se deforme en pantallas chicas */
+}
+
+/* Estilos de Modales limpios */
 .modal-content {
     border-radius: 24px !important;
 }
@@ -130,11 +231,6 @@
 
 .btn-confirm-activate:hover {
     background-color: #157347 !important;
-}
-
-.modal-body h3 {
-    font-family: 'Inter-Bold', sans-serif;
-    letter-spacing: -0.5px;
 }
 
 .label-cancel-return {
