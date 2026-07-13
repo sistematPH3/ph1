@@ -1,367 +1,175 @@
-{% extends 'auth_base.html' %}
+{% extends 'base_list.html' %} #listado de productos#
 
 {% block title %}Insumos | Sistema de Gestion PH{% endblock %}
-{% block extra_css %}
-<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
-    
+{% block extra_css %}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/base_list.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 {% endblock %}
 
-{% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+{# 1. Configuración de la barra de búsqueda nativa de la plantilla base #}
+{% block search_input_id %}searchInput{% endblock %}
+{% block search_placeholder %}Buscar por nombre o SKU...{% endblock %}
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 header-container">
-        <div class="d-flex align-items-center">
-            <div class="bg-mariuska-red text-white p-3 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 60px; height: 60px;">
-                <i class="bi bi-boxes fs-2"></i>
-            </div>
-            <div>
-                <h2 class="m-0 fw-bold system-title" style="color: #212529;">Gestión de Insumos</h2>
-                <small class="text-muted fw-medium subtitle-text">Control, stock y descripciones técnicas de insumos a nivel nacional</small>
-            </div>
+{# 2. Título e Icono principal #}
+{% block title_list %}
+    <div class="d-flex align-items-center">
+        <div class="bg-mariuska-red text-white p-2 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 45px; height: 45px; border-radius: 10px;">
+            <i class="bi bi-boxes fs-4"></i>
         </div>
-        <div class="d-flex gap-2">
-    <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red fw-bold px-4 py-2 d-flex align-items-center gap-2">
-        <i class="bi bi-tags"></i> Ver Categorías
-    </a>
-    <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red fw-bold px-4 py-2 d-flex align-items-center gap-2">
-        <i class="bi bi-plus-lg"></i> Nuevo Insumo
-    </a>
-</div>
-</div>
+        <span style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px; font-size: 1.75rem;">Gestión de Insumos</span>
+    </div>
+{% endblock %}
 
+{# 3. Subtítulo #}
+{% block subtitle_list %}Control, stock y descripciones técnicas de insumos a nivel nacional{% endblock %}
+
+{# 4. Botones de acción superiores (Forma de píldora con padding armónico) #}
+{% block actions_top %}
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
+            <i class="bi bi-tags"></i> Ver Categorías
+        </a>
+        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
+            <i class="bi bi-plus-lg"></i> Nuevo Insumo
+        </a>
+    </div>
+{% endblock %}
+
+{# 5. Filtro de estatus adaptado a píldora ultra-redondeada #}
+{% block actions_filter %}
+    <div class="input-group mariuska-select-group bg-white px-3 py-1" style="min-width: 200px;">
+        <span class="input-group-text bg-transparent border-0 text-muted ps-1 pe-1">
+            <i class="bi bi-funnel"></i>
+        </span>
+        <select id="statusSelect" class="form-select border-0 py-1 ps-1 pe-3 bg-transparent cursor-pointer text-muted" style="font-size: 0.88rem; outline: none; box-shadow: none;">
+            <option value="all">Todos los estatus</option>
+            <option value="active">Operativa</option>
+            <option value="inactive">Inactiva</option>
+        </select>
+    </div>
+{% endblock %}
+
+{# 6. Encabezados de la Tabla #}
+{% block table_head %}
+    <th class="text-center text-uppercase tracking-wider">SKU</th>
+    <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
+    <th class="text-center text-uppercase tracking-wider">Categoría</th>
+    <th class="text-center text-uppercase tracking-wider">Cantidad Actual</th>
+    <th class="text-center text-uppercase tracking-wider">U. Medida</th>
+    <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
+    <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
+{% endblock %}
+
+{# 7. Cuerpo de la tabla y filas de datos #}
+{% block table_body %}
+    
+    {# Zona de Mensajes Flash integrada elegantemente como fila al inicio de la tabla #}
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <tr class="border-0 alert-row">
+                    <td colspan="7" class="border-0 p-2">
+                        <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-2 py-2" role="alert">
+                            <small class="fw-semibold">{{ message }}</small>
+                            <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    </td>
+                </tr>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
-    <div class="row g-3 align-items-center mb-4">
-    <div class="col-md-8">
-        <div class="input-group search-input-group">
-            <span class="input-group-text bg-light border-0 text-muted ps-4"><i class="bi bi-search"></i></span>
-            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre o SKU...">
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="input-group mariuska-select-group bg-light">
-            <span class="input-group-text bg-transparent border-0 text-muted ps-4pe-1">
-                <i class="bi bi-funnel"></i>
-            </span>
-            <select id="statusSelect" class="form-select border-0 py-2 ps-2 pe-4 bg-transparent cursor-pointer">
-                <option value="all">Todos los estatus</option>
-                <option value="active">Operativa</option>
-                <option value="inactive">Inactiva</option>
-            </select>
-        </div>
-    </div>
-</div>
-
-    <div class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden table-card">
-        <div class="table-responsive">
-            <table class="table align-middle m-0 custom-insumos-table">
-    <thead class="table-mariuska-header text-white">
-        <tr>
-            <th class="text-center text-uppercase tracking-wider">SKU</th>
-            <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
-            <th class="text-center text-uppercase tracking-wider">Categoría</th>
-            <th class="text-center text-uppercase tracking-wider">Cantidad Actual</th>
-            <th class="text-center text-uppercase tracking-wider">U. Medida</th>
-            <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
-            <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
-        </tr>
-    </thead>
-    <tbody class="custom-table-body">
-        <tr id="noResultsRow" style="display: none;">
-            <td colspan="7" class="text-center text-muted py-5">
-                <div class="py-4">
-                    <div class="mb-3">
-                        <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
-                    </div>
-                    <span class="fs-5 fw-bold text-secondary d-block mb-1">Insumo o SKU no registrado</span>
-                    <span class="fs-6 text-muted d-block font-weight-normal">Verifica el nombre o asegúrate de registrar este nuevo insumo.</span>
+    <tr id="noResultsRow" style="display: none;">
+        <td colspan="7" class="text-center text-muted py-5 bg-white border-0">
+            <div class="py-4">
+                <div class="mb-3">
+                    <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
                 </div>
-            </td>
-        </tr>
-        {% if products %}
-            {% for product in products %}
-                <tr class="main-product-row {% if not product.is_active %}row-inhabilitada{% endif %}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
-                    <td class="text-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold fs-7">{{ product.sku }}</span>
-                    </td>
-                    <td class="text-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        <div class="d-flex align-items-center justify-content-center gap-2">
-                            <span class="fw-bold text-dark fs-6">{{ product.name }}</span>
-                            {% if product.technical_description %}
-                                <i class="bi bi-chevron-compact-down text-muted info-indicator-icon"></i>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td class="text-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        <span class="text-secondary fs-6">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
-                    </td>
-                    <td class="text-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        <span class="fw-semibold fs-6 text-dark">{{ product.quantity }}</span>
-                    </td>
-                    <td class="text-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        <span class="badge bg-light text-secondary border px-2 py-1 fs-7">{{ product.unit_of_measure }}</span>
-                    </td>
-                    <td class="text-center cursor-pointer status-badge-cell" data-bs-toggle="collapse" data-bs-target="#tech-desc-{{ product.id }}">
-                        {% if product.is_active %}
-                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>
-                        {% else %}
-                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>
+                <span class="fs-5 fw-bold text-secondary d-block mb-1">Insumo o SKU no registrado</span>
+                <span class="fs-6 text-muted d-block font-weight-normal">Verifica el nombre o asegúrate de registrar este nuevo insumo.</span>
+            </div>
+        </td>
+    </tr>
+
+    {% if products %}
+        {% for product in products %}
+            <tr class="main-product-row {% if not product.is_active %}row-inhabilitada{% endif %} border-bottom" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
+                <td class="text-center product-clickable-cell">
+                    <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold fs-7">{{ product.sku }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <span class="fw-bold text-dark fs-6">{{ product.name }}</span>
+                        {% if product.technical_description %}
+                            <i class="bi bi-chevron-compact-down text-muted info-indicator-icon"></i>
                         {% endif %}
-                    </td>
-                    <td class="text-center pe-4" style="width: 140px; white-space: nowrap;">
-                        <div class="d-flex justify-content-center align-items-center gap-3 flex-nowrap">
-                            <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar Insumo">
-                                <i class="bi bi-pencil-square fs-5"></i>
-                            </a>
-                            <div class="form-check form-switch m-0 p-0 d-inline-flex align-items-center">
-                                <input class="form-check-input mariuska-custom-switch toggle-status-switch cursor-pointer m-0" 
-                                    type="checkbox" 
-                                    role="switch" 
-                                    data-url="{{ url_for('inventory.toggle_product_status', product_id=product.id) }}"
-                                    {% if product.is_active %}checked{% endif %}>
-                            </div>
+                    </div>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <span class="text-secondary fs-6">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <span class="fw-semibold fs-6 text-dark">{{ product.quantity }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <span class="badge bg-light text-secondary border px-2 py-1 fs-7">{{ product.unit_of_measure }}</span>
+                </td>
+                <td class="text-center status-badge-cell product-clickable-cell">
+                    {% if product.is_active %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>
+                    {% else %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>
+                    {% endif %}
+                </td>
+                <td class="text-center pe-4" style="width: 140px; white-space: nowrap;">
+                    <div class="d-flex justify-content-center align-items-center gap-3 flex-nowrap">
+                        <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar Insumo">
+                            <i class="bi bi-pencil-square fs-5"></i>
+                        </a>
+                        <div class="form-check form-switch m-0 p-0 d-inline-flex align-items-center">
+                            <input class="form-check-input mariuska-custom-switch toggle-status-switch cursor-pointer m-0" 
+                                type="checkbox" 
+                                role="switch" 
+                                data-url="{{ url_for('inventory.toggle_product_status', product_id=product.id) }}"
+                                {% if product.is_active %}checked{% endif %}>
                         </div>
-                    </td>
-                </tr>
+                    </div>
+                </td>
+            </tr>
 
-                <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details bg-light-subtle">
-                    <td colspan="7" class="p-0">
-                        <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
-                            <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
-                                <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica y Preservación:
-                            </div>
-                            <p class="m-0 text-muted fs-6 lh-base">
-                                {{ product.technical_description if product.technical_description else 'No se ha registrado ninguna especificación técnica de almacenamiento para este insumo.' }}
-                            </p>
+            <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details bg-light-subtle">
+                <td colspan="7" class="p-0">
+                    <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
+                        <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
+                            <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica y Preservación:
                         </div>
-                    </td>
-                </tr>
-            {% endfor %}
-        {% endif %}
-    </tbody>
-</table>
-        </div>
-    </div>
-</div>
-<div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-5 gap-2" style="display: none !important;">
-    <nav aria-label="Paginación de insumos">
-        <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
-    </nav>
-    
-    <div class="text-muted fs-7 fw-medium text-center" id="paginationInfo"></div>
-</div>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(function(alert) {
-        setTimeout(function() {
-            // Si usas Bootstrap, esto activa la animación de cierre oficial
-            if (window.bootstrap && bootstrap.Alert) {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            } else {
-                // Alternativa nativa con transición suave si Bootstrap no responde
-                alert.style.transition = "opacity 0.5s ease";
-                alert.style.opacity = "0";
-                setTimeout(() => alert.remove(), 500);
-            }
-        }, 2000); // 2000 milisegundos = 2 segundos
-    });
-document.querySelectorAll('.collapse').forEach(collapseEl => {
-    
-    collapseEl.addEventListener('show.bs.collapse', function () {
-        this.style.setProperty('display', 'table-row', 'important');
-    });
+                        <p class="m-0 text-muted fs-6 lh-base">
+                            {{ product.technical_description if product.technical_description else 'No se ha registrado ninguna especificación técnica de almacenamiento para este insumo.' }}
+                        </p>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+    {% endif %}
 
-    collapseEl.addEventListener('shown.bs.collapse', function () {
-        if (typeof filtrarYPaginarInsumos === 'function') {
-            filtrarYPaginarInsumos();
-        }
-    });
+    {# Inyección limpia de la paginación dentro del cuerpo de la tabla #}
+    <tr class="border-0 generic-pagination-row">
+        <td colspan="7" class="border-0 bg-transparent p-0">
+            <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-3 gap-2" style="display: none !important;">
+                <nav aria-label="Paginación de insumos">
+                    <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+                </nav>
+                <div class="text-muted fs-7 fw-medium text-center" id="paginationInfo"></div>
+            </div>
+        </td>
+    </tr>
+{% endblock %}
 
-    collapseEl.addEventListener('hidden.bs.collapse', function () {
-        if (typeof filtrarYPaginarInsumos === 'function') {
-            filtrarYPaginarInsumos();
-        }
-    });
-});
-    const searchInput = document.getElementById('searchInput');
-    const statusSelect = document.getElementById('statusSelect');
-    const noResultsRow = document.getElementById('noResultsRow');
-    const paginationInfo = document.getElementById('paginationInfo');
-    const paginationControls = document.getElementById('paginationControls');
-    
-    let currentPage = 1;
-    const rowsPerPage = 10;
-
-    function filtrarYPaginarInsumos() {
-        const searchText = searchInput.value.toLowerCase().trim();
-        const selectedStatus = statusSelect.value;
-        const rows = document.querySelectorAll('.main-product-row');
-        
-        let matchingRows = [];
-
-        rows.forEach(row => {
-            const rowText = row.textContent.toLowerCase();
-            const productStatus = row.getAttribute('data-status') || '';
-
-            const coincideTexto = rowText.includes(searchText);
-            const coincideEstatus = (selectedStatus === 'all') || (productStatus === selectedStatus);
-
-            if (coincideTexto && coincideEstatus) {
-                matchingRows.push(row);
-            } else {
-                row.style.display = "none";
-                ocultarDetallesTecnicos(row);
-            }
-        });
-
-        const totalMatching = matchingRows.length;
-        const totalPages = Math.ceil(totalMatching / rowsPerPage) || 1;
-
-        if (currentPage > totalPages) {
-            currentPage = totalPages;
-        }
-
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
-
-        matchingRows.forEach((row, index) => {
-            if (index >= startIdx && index < endIdx) {
-                row.style.display = "";
-                
-                let nextRow = row.nextElementSibling;
-                if (nextRow && nextRow.classList.contains('row-technical-details')) {
-                    nextRow.style.display = nextRow.classList.contains('show') ? "" : "none";
-                }
-            } else {
-                row.style.display = "none";
-                ocultarDetallesTecnicos(row);
-            }
-        });
-
-        actualizarControlesUI(totalMatching, totalPages, startIdx, endIdx);
-    }
-
-    function ocultarDetallesTecnicos(mainRow) {
-        let nextRow = mainRow.nextElementSibling;
-        if (nextRow && nextRow.classList.contains('row-technical-details')) {
-            nextRow.style.display = "none";
-        }
-    }
-
-    function actualizarControlesUI(totalMatching, totalPages, startIdx, endIdx) {
-        const paginationWrapper = document.getElementById('paginationWrapper');
-        
-        if (totalMatching === 0) {
-            paginationWrapper.style.setProperty('display', 'none', 'important');
-            if (noResultsRow) noResultsRow.style.display = "";
-            return;
-        }
-        if (noResultsRow) noResultsRow.style.display = "none";
-
-        if (totalPages <= 1) {
-            paginationWrapper.style.setProperty('display', 'none', 'important');
-            return;
-        } else {
-            paginationWrapper.style.setProperty('display', 'flex', 'important');
-        }
-
-        const registroInicial = startIdx + 1;
-        const registroFinal = Math.min(endIdx, totalMatching);
-        paginationInfo.textContent = `Mostrando registros del ${registroInicial} al ${registroFinal} de un total de ${totalMatching}`;
-
-        let htmlBotones = '';
-
-        htmlBotones += `
-            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link border-0 rounded-pill px-3 mx-1 bg-light text-dark shadow-sm" href="#" data-page="${currentPage - 1}">&laquo;</a>
-            </li>`;
-
-        for (let i = 1; i <= totalPages; i++) {
-            const esActiva = currentPage === i;
-            htmlBotones += `
-                <li class="page-item ${esActiva ? 'active' : ''}">
-                    <a class="page-link border-0 rounded-pill px-3 mx-1 shadow-sm ${esActiva ? 'bg-mariuska-red text-white fw-bold' : 'bg-light text-dark'}" href="#" data-page="${i}">${i}</a>
-                </li>`;
-        }
-
-        htmlBotones += `
-            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link border-0 rounded-pill px-3 mx-1 bg-light text-dark shadow-sm" href="#" data-page="${currentPage + 1}">&raquo;</a>
-            </li>`;
-
-        paginationControls.innerHTML = htmlBotones;
-
-        paginationControls.querySelectorAll('a').forEach(boton => {
-            boton.addEventListener('click', function(e) {
-                e.preventDefault();
-                const paginaDestino = parseInt(this.getAttribute('data-page'));
-                if (paginaDestino && paginaDestino !== currentPage && paginaDestino >= 1 && paginaDestino <= totalPages) {
-                    currentPage = paginaDestino;
-                    filtrarYPaginarInsumos();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-            });
-        });
-    }
-
-    searchInput.addEventListener('input', () => { currentPage = 1; filtrarYPaginarInsumos(); });
-    statusSelect.addEventListener('change', () => { currentPage = 1; filtrarYPaginarInsumos(); });
-
-    filtrarYPaginarInsumos();
-
-    const statusSwitches = document.querySelectorAll('.toggle-status-switch');
-
-    statusSwitches.forEach(switchInput => {
-        switchInput.addEventListener('change', function() {
-            const toggleUrl = this.getAttribute('data-url');
-            const row = this.closest('.main-product-row');
-            const badgeCell = row.querySelector('.status-badge-cell');
-
-            fetch(toggleUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    if (data.is_active) {
-                        row.classList.remove('row-inhabilitada');
-                        row.setAttribute('data-status', 'active');
-                        badgeCell.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>`;
-                    } else {
-                        row.classList.add('row-inhabilitada');
-                        row.setAttribute('data-status', 'inactive');
-                        badgeCell.innerHTML = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>`;
-                    }
-                    filtrarYPaginarInsumos();
-                } else {
-                    this.checked = !this.checked;
-                    alert("No se pudo cambiar el estado: " + data.error);
-                }
-            })
-            .catch(error => {
-                this.checked = !this.checked;
-                console.error("Error en la petición:", error);
-                alert("Ocurrió un error de comunicación con el servidor.");
-            });
-        });
-    });
-});
-</script>
+{# 8. Enlace al archivo JS externo #}
+{% block extra_js %}
+    <script src="{{ url_for('static', filename='js/inventory/list_products.js') }}"></script>
 {% endblock %}

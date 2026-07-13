@@ -1,235 +1,226 @@
 /* =========================================================================
-   PALETA DE COLORES Y BRILLOS CORPORATIVOS (Estilo Mariuska)
+   PALETA DE COLORES CORPORATIVA (Sincronizada con Directorio de Personal)
+   ========================================================================= css de listado de productos*/
+:root {
+    --ph-red: #b01212;        /* Rojo exacto de la marca */
+    --ph-red-hover: #8c0e0e;  /* Variación oscura para hovers */
+    --ph-red-light: #fdf2f2;  /* Fondos suaves o alertas */
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-border-soft: #E2E8F0;
+}
+
+/* Fondo general del módulo */
+.container-fluid {
+    background-color: var(--ph-bg-main) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* =========================================================================
+   CONTENEDOR CENTRAL PANEL BLANCO (Aislamiento Premium)
    ========================================================================= */
-   body {
-    background-color: #ebedf1 !important; /* Un gris claro ideal para tableros y reportes */
+.custom-card-list {
+    background-color: #FFFFFF !important;
+    border-radius: 24px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    padding: 2rem !important;
 }
 
-.bg-mariuska-red {
-    background-color: #B31F24 !important;
-}
-
-/* Caja de "Gestión de Insumos" con Brillo Elegante y Más Redondeada */
+/* Icono principal del módulo */
 .brand-icon-box {
-    border-radius: 16px !important;
-    box-shadow: 0 4px 15px rgba(179, 31, 36, 0.35) !important;
+    background-color: var(--ph-red) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
 }
 
-.border-mariuska {
-    border-color: #B31F24 !important;
-}
-
-/* Botón Nuevo Insumo con Brillo Inicial y Dinámico en Hover */
+/* =========================================================================
+   BOTONES Y ACCIONES CORPORATIVAS
+   ========================================================================= */
 .btn-mariuska-red {
-    background-color: #B31F24 !important;
-    color: #ffffff !important;
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
     border: none !important;
-    border-radius: 50px !important; /* Forma de píldora como Mariuska */
-    box-shadow: 0 4px 12px rgba(179, 31, 36, 0.3) !important;
-    transition: all 0.25s ease-in-out;
-}
-.btn-mariuska-red:hover {
-    background-color: #8a1619 !important;
-    color: #ffffff !important;
-    box-shadow: 0 6px 20px rgba(179, 31, 36, 0.55) !important;
-    transform: translateY(-1.5px);
-}
-
-/* Cabecera de la Tabla estilo Mariuska */
-.custom-insumos-table thead.table-mariuska-header th {
-    background-color: #B31F24 !important;
-    color: #ffffff !important;
+    border-radius: 50px !important; /* Cambiado a forma de píldora */
     font-weight: 600;
-    font-size: 0.78rem;
-    letter-spacing: 0.05em;
-    padding-top: 14px;
-    padding-bottom: 14px;
-    border-bottom: none;
+    transition: all 0.2s ease-in-out !important;
 }
 
-/* Botón de Filtro Estilo Oscuro Redondeado */
-.btn-filter-dark {
-    background-color: #212529 !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 50px !important;
-    transition: background-color 0.2s ease;
-}
-.btn-filter-dark:hover {
-    background-color: #000000 !important;
+.btn-mariuska-red:hover {
+    background-color: var(--ph-red-hover) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    /* Aura/Brillo rojo sutil */
+    box-shadow: 0 0 14px rgba(176, 18, 18, 0.45) !important; 
 }
 
-/* =========================================================================
-   CONTROLES: BOTÓN EDITAR AZUL SUAVE Y COMPONENTES
-   ========================================================================= */
-/* Lápiz en Azul Suave de Base */
+/* Lápiz de edición en azul premium sutil */
 .btn-action-edit {
-    color: #5c93ed !important; 
-    transition: all 0.2s ease-in-out;
-    text-decoration: none;
+    color: #4B5563 !important;
+    transition: color 0.15s ease, transform 0.15s ease;
 }
-/* Contraste Intenso en Hover */
 .btn-action-edit:hover {
-    color: #0d6efd !important; 
-    transform: scale(1.18);
+    color: var(--ph-red) !important;
+    transform: scale(1.1);
 }
 
 /* =========================================================================
-   ESTRUCTURA DE FILTROS ULTRA-REDONDEADA CON BRILLO AL HACER CLICK
+   TABLA DE PRODUCTOS (Mapeado sobre la estructura de base_list)
    ========================================================================= */
-.filter-card {
-    border-radius: 20px !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+#genericTable {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
 }
 
-/* Barra de Entrada Píldora Completa */
-.search-input-group {
-    border-radius: 50px !important;
-    overflow: hidden;
-    background-color: #ffffff;
-    transition: all 0.3s ease-in-out;
+/* Encabezado elegante */
+#genericTable .content-table-header th {
+    background-color: var(--ph-red) !important; /* Cambiado a rojo */
+    color: #FFFFFF !important; /* Letras blancas para contraste */
+    font-weight: 700;
+    font-size: 0.78rem; /* Tamaño incrementado */
+    letter-spacing: 0.5px;
+    padding: 14px 16px !important;
+    border-bottom: 2px solid var(--ph-border-soft) !important;
+    text-transform: uppercase;
 }
 
-/* TRUCO INTERACTIVO: Brillo en toda la barra al hacer clic en el input */
-.search-input-group:focus-within {
-    border-color: #B31F24 !important;
-    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
-    background-color: #ffffff;
+/* Redondeado para las esquinas superiores de la tabla */
+#genericTable .content-table-header th:first-child {
+    border-top-left-radius: 14px !important;
+}
+#genericTable .content-table-header th:last-child {
+    border-top-right-radius: 14px !important;
 }
 
-/* Forzar que los componentes internos hereden la forma sin romperse */
-.search-input-group .input-group-text,
-.search-input-group input {
-    border-radius: 0 !important;
+/* Celdas del cuerpo más grandes y legibles */
+#genericTable td {
+    padding: 16px !important; /* Mayor separación */
+    border-bottom: 1px solid var(--ph-border-soft) !important;
+    color: var(--ph-text-main) !important;
+    font-size: 0.88rem; /* Tamaño de letra más cómodo para leer */
+    background-color: #FFFFFF;
 }
 
-/* =========================================================================
-   INTERACTIVIDAD, FILAS Y ENFASIS AMARILLO (Fuerza Bruta para Bootstrap 5)
-   ========================================================================= */
+/* Ajuste de tamaño para los estados (badges) dentro de la tabla */
+#genericTable td .badge {
+    font-size: 0.82rem !important;
+    padding: 6px 14px !important;
+}
+
+/* Efecto hover en las filas principales */
 .main-product-row {
-    transition: background-color 0.2s ease;
-    border-bottom: 1px solid #f1f3f5;
+    transition: background-color 0.15s ease;
+}
+.main-product-row:hover td {
+    background-color: #F8FAFC !important;
 }
 
-/* Hover Oscurecido sobre Celdas Activas */
-.custom-insumos-table tbody tr.main-product-row:hover td {
-    background-color: #f1f3f5 !important;
-    --bs-table-bg: #f1f3f5 !important;
+/* =========================================================================
+   COMPORTAMIENTO DE FILAS INHABILITADAS
+   ========================================================================= */
+.main-product-row.row-inhabilitada td {
+    background-color: #FAFAFA !important;
+    color: var(--ph-text-muted) !important;
 }
 
-/* REGISTRO INHABILITADO: Forzado total de variables de Bootstrap 5 */
-.custom-insumos-table tbody tr.main-product-row.row-inhabilitada > td {
-    background-color: #fffdf0 !important;
-    --bs-table-bg: #fffdf0 !important;       /* Corrección estructural vital para BS5 */
-    --bs-table-bg-type: #fffdf0 !important;  /* Evita que Bootstrap ignore tu color */
-    color: #6c757d !important;               /* Atenúa el texto para reflejar inactividad */
+/* Indicador lateral ámbar/amarillo para filas inactivas sin romper el diseño */
+.main-product-row.row-inhabilitada td:first-child {
+    box-shadow: inset 4px 0 0 #D97706 !important;
 }
 
-/* TRUCO MAESTRO: Usamos 'box-shadow inset' en el primer TD de la fila inhabilitada.
-   Esto genera una franja sólida de 5px simulando un borde limpio sin que Bootstrap lo tape. */
-.custom-insumos-table tbody tr.main-product-row.row-inhabilitada > td:first-child {
-    box-shadow: inset 5px 0 0 #ffc107 !important;
-    border-left: none !important;            /* Limpiamos el borde viejo que no funcionaba */
+.row-inhabilitada .badge.bg-light {
+    opacity: 0.6;
 }
 
-/* Badges de Estado Limpios */
-.bg-success-subtle { background-color: #e6f4ea !important; }
-.bg-warning-subtle { background-color: #fff3cd !important; }
-.text-warning-emphasis { color: #664d03 !important; }
-
-/* Barra de búsqueda */
-.search-input-group {
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #dee2e6;
-}
-/* CORREGIDO: Eliminamos el sombreado azul intruso del foco */
-.search-input-group input:focus {
-    outline: none !important;
-    box-shadow: none !important;
-    border-color: transparent !important;
-    background-color: #ffffff !important; /* Cambiado a blanco para que combine con el brillo externo */
+/* Detalle desplegable de especificaciones */
+.row-technical-details td {
+    background-color: #F8FAFC !important;
+    border-bottom: 1px solid var(--ph-border-soft) !important;
 }
 
-/* Misceláneos */
-.cursor-pointer { cursor: pointer; }
-.fs-7 { font-size: 0.8rem !important; }
-.tracking-wider { letter-spacing: 0.06em; }
+.row-technical-details div {
+    border-left: 4px solid var(--ph-red) !important;
+}
 
-/* Switch de Mariuska */
+/* =========================================================================
+   ELEMENTOS DE INTERFAZ (Buscadores, Switches y Desplegables)
+   ========================================================================= */
+/* Custom Switch estilo Pizza Hut */
 .mariuska-custom-switch:checked {
-    background-color: #B31F24 !important;
-    border-color: #B31F24 !important;
+    background-color: var(--ph-red) !important;
+    border-color: var(--ph-red) !important;
 }
-/* El icono del lápiz cambia de azul suave a un tono ámbar corporativo */
-.row-inhabilitada .btn-action-edit {
-    color: #ffc107 !important;
-}
-.row-inhabilitada .btn-action-edit:hover {
-    color: #db9a04 !important;
+.mariuska-custom-switch:focus {
+    box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.15) !important;
 }
 
-/* El switch apagado muestra un borde y fondo sutil color amarillo en lugar de gris */
-.row-inhabilitada .mariuska-custom-switch:not(:checked) {
-    background-color: #fff3cd !important;
-    border-color: #ffc107 !important;
-}
-/* =========================================================================
-   ELIMINAR HALO AZUL DE ENFOQUE EN EL SWITCH DE MARIUSKA
-   ========================================================================= */
-.mariuska-custom-switch:focus,
-.mariuska-custom-switch:active {
-    box-shadow: none !important;
-    outline: 0 !important;
-    border-color: rgba(0, 0, 0, 0.25) !important; /* Mantiene un borde sutil neutro al hacer clic */
+/* Contenedor del filtro select */
+.mariuska-select-group {
+    border: 1px solid var(--ph-border-soft) !important;
+    background-color: #FFFFFF !important;
+    border-radius: 50px !important; /* Cambiado a píldora */
+    transition: all 0.2s ease-in-out !important;
 }
 
-/* Evitar también el halo amarillo residual cuando el registro está inhabilitado */
-.row-inhabilitada .mariuska-custom-switch:focus {
-    box-shadow: none !important;
-    outline: 0 !important;
-    border-color: #ffc107 !important; /* Mantiene su borde amarillo corporativo sin resplandor */
+/* Brillo rojo al hacer click o interactuar */
+.mariuska-select-group:focus-within {
+    border-color: var(--ph-red) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
 }
-/* =========================================================================
-   SELECTOR DESPLEGABLE ULTRA-REDONDEADO (Estilo Píldora Mariuska)
-   ========================================================================= */
-.mariuska-custom-select {
-    border-radius: 50px !important;
-    border: 1px solid #dee2e6 !important;
-    background-color: #f8f9fa !important;
-    color: #495057 !important;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.3s ease-in-out;
+
+.product-clickable-cell {
     cursor: pointer;
 }
-
-/* Brillo interactivo de enfoque a juego con la identidad visual */
-.mariuska-custom-select:focus {
-    border-color: #B31F24 !important;
-    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
-    background-color: #ffffff !important;
-    outline: none !important;
-}
-.mariuska-select-group {
-    border-radius: 50px !important;
-    border: 1px solid #dee2e6 !important;
+/* Unificar barra de búsqueda con el estilo del filtro select */
+#categorySearchInput {
+    border: 1px solid var(--ph-border-soft, #dee2e6) !important;
     background-color: #f8f9fa !important;
-    transition: all 0.3s ease-in-out;
-    overflow: hidden;
+    transition: all 0.3s ease-in-out !important;
+    color: var(--ph-text-main, #1F2937) !important;
 }
 
-.mariuska-select-group select {
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: #495057 !important;
-    box-shadow: none !important;
+/* Brillo interactivo rojo corporativo al usar la barra de búsqueda */
+#categorySearchInput:focus {
+    border-color: var(--ph-red, #b01212) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
+    background-color: #ffffff !important;
     outline: none !important;
 }
+/* Botón de acción Editar - Estilo de celda limpia */
+/* Botón de acción Editar - Adaptado para contener Texto + Icono */
+.btn-action-edit {
+    height: 36px;
+    padding: 0 16px; /* Relleno horizontal para que respire el texto */
+    background-color: #f8f9fa;
+    color: var(--ph-text-soft, #4B5563);
+    border: 1px solid var(--ph-border-soft, #E2E8F0);
+    border-radius: 10px; /* Esquinas redondeadas suaves */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    
+    /* Tipografía alineada al estilo Mariuska */
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    white-space: nowrap; /* Evita que el texto se salte de línea */
+}
 
-/* Halo interactivo rojo cuando el usuario despliega las opciones */
-.mariuska-select-group:focus-within {
-    border-color: #B31F24 !important;
-    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
-    background-color: #ffffff !important;
+/* Efecto Hover interactivo */
+.btn-action-edit:hover {
+    background-color: var(--ph-red-light, #fdf2f2) !important; /* Fondo rojo claro suave */
+    color: var(--ph-red, #b01212) !important; /* Texto e Icono rojo corporativo */
+    border-color: rgba(176, 18, 18, 0.2) !important;
+    transform: translateY(-1.5px); /* Micro-levantamiento visual */
+    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
+}
+
+/* Alineación exacta del icono con el nuevo texto */
+.btn-action-edit i {
+    line-height: 1;
 }
