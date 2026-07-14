@@ -1,25 +1,32 @@
 /* =========================================================
-   ESTILOS BASE Y ESTRUCTURA (PROTEGIDOS)
+   ESTILOS BASE Y ESTRUCTURA (PROTEGIDOS Y CORREGIDOS)
    ========================================================= */
-body { 
+html, body { 
     margin: 0; 
+    padding: 0;
+    height: 100vh; /* Fija el alto al tamaño de la pantalla */
     font-family: 'Segoe UI', Arial, sans-serif; 
     background-color: #f4f4f9; 
-    overflow-x: hidden;
+    overflow: hidden; /* Bloquea el scroll exterior para evitar barras dobles */
 }
 
 .wrapper { 
     display: flex; 
-    min-height: 100vh; 
-    width: 100%;
-    overflow-x: hidden; 
+    height: 100vh; 
+    width: 100vw;
+    overflow: hidden; 
 }
 
 .sidebar { 
     width: 275px; 
+    height: 100vh; 
     background-color: #0d0e0e; 
     color: #ffffff; 
     flex-shrink: 0; 
+    display: flex; 
+    flex-direction: column;
+    /* CLAVE: Permitir que los elementos salgan de la barra lateral (como el botón y submenús flotantes) */
+    overflow: visible; 
     position: relative;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
@@ -33,6 +40,9 @@ body {
     flex-grow: 1; 
     flex-shrink: 1;
     min-width: 0; 
+    height: 100vh; /* Ocupa el alto completo de la pantalla */
+    overflow-y: auto; /* El listado del personal se desplazará libremente de forma independiente */
+    overflow-x: hidden; /* Evita desbordamiento horizontal en el listado */
     padding: 40px; 
     background-color: #f4f4f9;
 }
@@ -61,7 +71,7 @@ body {
 .toggle-sidebar-btn {
     position: absolute;
     top: 40px; 
-    right: -16px; 
+    right: -16px; /* Se posiciona a la mitad del borde */
     width: 32px; 
     height: 32px; 
     background-color: #e31937;
