@@ -287,3 +287,167 @@ body, html {
     font-size: 0.8rem; margin-top: 5px;
     display: none; text-align: center;
 }
+/* ==========================================================================
+   ADAPTACIÓN FIEL AL MOCKUP PARA DISPOSITIVOS MÓVILES (PANTALLAS MENORES A 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+    body, html {
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    /* Aseguramos que el contenedor general no tranque la altura en móviles */
+    .login-wrapper {
+        flex-direction: column; /* Apila la sección blanca arriba y la roja abajo */
+        height: auto !important; /* Rompe el height: 100vh de escritorio si existía */
+        width: 100%;
+        min-height: 100vh;
+    }
+
+    /* ----------------------------------------------------
+       COLUMNA IZQUIERDA (Sección Blanca Superior - Centrada y Limpia)
+       ---------------------------------------------------- */
+    .col-left {
+        flex: none;
+        width: 100%;
+        height: auto;
+        padding: 25px 15px 25px 15px;
+        background-color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-sizing: border-box;
+    }
+
+    /* Logo principal centrado arriba */
+    .brand-logo-main {
+        width: 120px; 
+        height: auto;
+        margin: 0 0 15px 0 !important;
+    }
+
+    /* Contenedor vertical de elementos */
+    .left-center-content {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* Primera burbuja de texto */
+    .info-text-peach:nth-of-type(1) {
+        font-size: 0.95rem;
+        padding: 10px 20px;
+        margin: 0 0 10px 0 !important;
+        width: 85%;
+        max-width: 320px;
+        box-sizing: border-box;
+        text-align: center;
+    }
+
+    /* Segunda burbuja de texto */
+    .info-text-peach:nth-of-type(2) {
+        font-size: 0.95rem;
+        padding: 10px 20px;
+        margin: 0 0 12px 0 !important;
+        width: 85%;
+        max-width: 320px;
+        box-sizing: border-box;
+        text-align: center;
+    }
+
+    /* Pizza flotante que se muestra de forma limpia debajo de los textos */
+    .pizza-slice-image {
+        display: block !important;
+        width: 100px;
+        height: auto;
+        margin: 0 0 15px 0 !important;
+        position: relative; /* Necesario para activar el z-index */
+        z-index: 15;        /* Mayor que la salsa (10), pasa al frente */
+    }
+
+    /* Botón de Registro Aquí centrado y completo */
+    .btn-registro-link {
+        font-size: 1.15rem;
+        padding: 8px 25px;
+        margin: 5px 0 0 0 !important;
+        text-align: center;
+        display: inline-block;
+        border-radius: 10px;
+    }
+
+    /* ----------------------------------------------------
+       COLUMNA DERECHA (Sección Roja Inferior)
+       ---------------------------------------------------- */
+    .col-right {
+        flex: none;
+        width: 100%;
+        /* Espaciado inferior de 80px para que el botón negro no sea bloqueado por el borde inferior */
+        padding: 10px 20px 80px 20px; 
+        box-sizing: border-box;
+        position: relative;
+        background-color: var(--ph-red-dark);
+        overflow: visible;
+        height: auto !important; 
+    }
+
+    /* EFECTO CHORREADO: Versión optimizada de alta densidad (más repeticiones) */
+    .col-right::before {
+        content: '';
+        position: absolute;
+        top: -65px;       
+        left: 0px;
+        width: 105px;      /* Alto de las gotas (grosor) */
+        height: 100vw;     /* Cubre todo el ancho de la pantalla */
+        
+        /* Repetimos la imagen en el eje vertical (que por la rotación es el horizontal) */
+        background: url('/static/img/website_icons/security/hero_icons/fondo_rojo.png') repeat-y left top;
+        
+        /* Reducido a 130px para que el patrón se repita muchas más veces sin perder definición */
+        background-size: 100% 130px; 
+        
+        z-index: 10;
+        pointer-events: none;
+        
+        transform: rotate(90deg) translateY(-100%);
+        transform-origin: top left;
+    }
+
+    .col-right::after {
+        display: none;
+    }
+
+    /* Contenedor del formulario: Bajado sutilmente a -40px para despegarlos del borde del chorreado */
+    .right-content-wrapper {
+        position: relative;
+        z-index: 20; 
+        width: 100%;
+        max-width: 360px;
+        /* Bajamos un poquito el formulario con un margen negativo más suave */
+        margin: -40px auto 0 auto; 
+    }
+
+    /* Icono de grupo de usuarios */
+    .group-icon {
+        width: 85px; 
+        height: auto;
+        margin-bottom: 0.4rem;
+        display: inline-block;
+    }
+
+    .agbalumo-subtitle-white {
+        font-size: 1.5rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .input-with-icon {
+        height: 50px;
+    }
+
+    .btn-final-negro {
+        width: 100%;
+        font-size: 1.4rem;
+    }
+}
