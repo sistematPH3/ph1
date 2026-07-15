@@ -26,6 +26,13 @@ def create_app():
         from .security.routes.audit_routes import audit_bp
         app.register_blueprint(audit_bp)
         # ==========================================================
+
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA DE PERSONAL (NUEVO)
+        # ==========================================================
+        from .security.routes.audit_user_routes import audit_user_bp
+        app.register_blueprint(audit_user_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)

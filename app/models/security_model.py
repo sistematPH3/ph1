@@ -2,6 +2,7 @@ from app.extensions import db
 from flask_login import UserMixin
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import validates
+from sqlalchemy.dialects.postgresql import JSONB
 
 # ⚠️ SE ELIMINÓ EL IMPORT GLOBAL DE AUDIT_VALIDATORS PARA EVITAR LA IMPORTACIÓN CIRCULAR
 
@@ -190,3 +191,34 @@ class LoginAudit(db.Model):
 
     def __repr__(self):
         return f'<LoginAudit {self.action} - User ID: {self.user_id} - Role ID: {self.role_id} at {self.timestamp}>'
+
+class UserAudit(db.Model):
+    __tablename__ = 'user_audit'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    responsible_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    target_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    changed_data = db.Column(JSONB)
+
+    responsible_user = db.relationship('User', foreign_keys=[responsible_user_id])
+    target_user = db.relationship('User', foreign_keys=[target_user_id])
+    role = db.relationship('Role')
+
+    @validates('responsible_user_id', 'target_user_id', 'role_id')
+    def validate_ids(self, key, value):
+        from app.security.requests.audit_validators import validar_id_entidad
+        obligatorio = False if key == 'location_id' else True
+        return validar_id_entidad(key, value, obligatorio=obligatorio)
+
+    @validates('action')
+    def validate_action(self, key, value):
+        from app.security.requests.audit_validators import validar_accion_auditoria
+        return validar_accion_auditoria(value)
+
+    @validates('timestamp')
+    def validate_timestamp(self, key, value):
+        from app.security.requests.audit_validators import validar_timestamp_auditoria
+        return validar_timestamp_auditoria(value)
