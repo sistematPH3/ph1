@@ -13,7 +13,7 @@
         <div class="icon-wrapper me-3 shadow-sm d-flex align-items-center justify-content-center" style="background-color: #d61c2c; color: white; width: 44px; height: 44px; border-radius: 10px; font-size: 1.25rem;">
             <i class="bi bi-shield-lock-fill"></i>
         </div>
-        <span style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px; font-size: 1.75rem;">Gestión de Auditoría</span>
+        <span style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px; font-size: 1.75rem;">Gestión de Auditoría de Accesos</span>
     </div>
 {% endblock %}
 
@@ -22,140 +22,136 @@
 {% block actions_filter %}
     <div class="filters-responsive-wrapper d-flex gap-2 align-items-center justify-content-end">
         <select id="locationFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted" style="font-size: 0.88rem;">
-            <option value="">Todas las sedes</option>
-            <option value="Global / Sin Sede">Global / Sin Sede</option>
+            <option value="all">Todas las sedes</option>
+            <option value="global">Global / Sin Sede</option>
             {% for sede in sedes %}
-                <option value="{{ sede.name }}">{{ sede.name }}</option>
+                <option value="{{ sede.id }}">{{ sede.name }}</option>
             {% endfor %}
         </select>
 
-        <input type="date" id="dateFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted" style="font-size: 0.88rem;" title="Filtrar por fecha">
+        <input type="date" id="dateFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted" style="width: 140px; font-size: 0.88rem;">
 
-        <div class="time-filter-container position-relative d-inline-block">
-            <input type="time" id="hourFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted pe-5" style="font-size: 0.88rem;" title="Filtrar por hora y minutos">
-            <button type="button" id="clearTimeBtn" class="btn btn-clear-time position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent text-muted px-2" title="Limpiar hora" style="display: none;">
-                <i class="bi bi-x-circle-fill"></i>
-            </button>
+        <div class="position-relative time-filter-container">
+            <select id="hourFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted" style="width: 130px; font-size: 0.88rem;">
+                <option value="">Todas las horas</option>
+                <option value="12 AM">12:00 AM</option>
+                <option value="01 AM">01:00 AM</option>
+                <option value="02 AM">02:00 AM</option>
+                <option value="03 AM">03:00 AM</option>
+                <option value="04 AM">04:00 AM</option>
+                <option value="05 AM">05:00 AM</option>
+                <option value="06 AM">06:00 AM</option>
+                <option value="07 AM">07:00 AM</option>
+                <option value="08 AM">08:00 AM</option>
+                <option value="09 AM">09:00 AM</option>
+                <option value="10 AM">10:00 AM</option>
+                <option value="11 AM">11:00 AM</option>
+                <option value="12 PM">12:00 PM</option>
+                <option value="01 PM">01:00 PM</option>
+                <option value="02 PM">02:00 PM</option>
+                <option value="03 PM">03:00 PM</option>
+                <option value="04 PM">04:00 PM</option>
+                <option value="05 PM">05:00 PM</option>
+                <option value="06 PM">06:00 PM</option>
+                <option value="07 PM">07:00 PM</option>
+                <option value="08 PM">08:00 PM</option>
+                <option value="09 PM">09:00 PM</option>
+                <option value="10 PM">10:00 PM</option>
+                <option value="11 PM">11:00 PM</option>
+            </select>
         </div>
     </div>
 {% endblock %}
 
 {% block table_head %}
-    <th scope="col" class="text-center" style="width: 80px;">ID</th>
-    <th scope="col">USUARIO</th>
-    <th scope="col">ROL</th>
-    <th scope="col">UBICACIÓN</th>
-    <th scope="col">ACCIÓN</th>
-    <th scope="col">FECHA Y HORA</th>
+    <th class="ps-4" style="width: 8%;">ID</th>
+    <th style="width: 22%;">USUARIO</th>
+    <th style="width: 15%;">ROL</th>
+    <th style="width: 20%;">UBICACIÓN</th>
+    <th style="width: 15%;">ACCIÓN</th>
+    <th style="width: 20%;">FECHA Y HORA</th>
 {% endblock %}
 
 {% block table_body %}
-    <!-- 1. VISTA EXCLUSIVA DE ESCRITORIO (Se oculta por completo en móviles) -->
     {% for log in historial %}
-    <tr class="audit-data-row d-none d-md-table-row">
-        <td class="text-center text-muted fw-bold">{{ log.id }}</td>
+    <tr class="audit-data-row border-bottom" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
+        <td class="ps-4 fw-bold text-dark" style="font-size: 0.9rem;">{{ log.id }}</td>
         
         <td>
-            <div class="fw-bold text-dark user-name-text">{{ log.user.name if log.user else 'Usuario Desconocido' }}</div>
-            <div class="text-muted email-subtext">{{ log.user.email if log.user else '---' }}</div>
+            <div class="d-flex flex-column">
+                <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ log.user.name }}</span>
+                <span class="text-muted small" style="font-size: 0.82rem;">{{ log.user.email }}</span>
+            </div>
         </td>
         
         <td>
-            {% set traducciones = {
-                'Administrator': 'Administrador',
-                'Manager': 'Gerente',
-                'Assistant Manager': 'Asistente de Gerente',
-                'Guest': 'Invitado',
-                'Management': 'Director',
-                'Operations': 'Operaciones',
-                'Finance': 'Finanzas'
-            } %}
-            <span class="badge role-badge">
-                {{ traducciones.get(log.role.name, log.role.name) if log.role else 'Sin rol' }}
+            <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill" style="font-weight: 600;">
+                {{ log.role.name }}
             </span>
         </td>
         
-        <td class="location-cell-data">
+        <td>
             {% if log.location %}
-                <i class="bi bi-geo-alt-fill text-danger me-1"></i>
-                <span class="fw-semibold text-secondary">{{ log.location.name }}</span>
-            {% else %}
-                <span class="text-muted fst-italic">Global / Sin Sede</span>
-            {% endif %}
-        </td>
-        
-        <td>
-            <span class="badge status-badge {{ 'bg-danger-subtle text-danger' if 'FALLIDO' in (log.action or '')|upper else 'bg-success-subtle text-success' }}">
-                {{ log.action or 'Sin acción' }}
-            </span>
-        </td>
-
-        <td class="datetime-column-cell" data-timestamp="{{ log.timestamp.strftime('%Y-%m-%dT%H:%M') if log.timestamp else '' }}">
-            {% if log.timestamp %}
-                <span class="fw-semibold text-dark">{{ log.timestamp.strftime('%d/%m/%Y') }}</span>
-                <span class="text-muted time-subtext ms-2">
-                    <i class="bi bi-clock me-1"></i>{{ log.timestamp.strftime('%I:%M %p') }}
+                <span class="text-dark d-flex align-items-center" style="font-size: 0.9rem;">
+                    <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
                 </span>
             {% else %}
-                <span class="text-warning fw-bold small"><i class="bi bi-exclamation-triangle"></i> Pendiente</span>
+                <span class="text-muted font-italic d-flex align-items-center" style="font-size: 0.9rem;">
+                    Global / Sin Sede
+                </span>
             {% endif %}
+        </td>
+        
+        <td>
+            {% if log.action == 'INICIO_SESION' %}
+                <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">INICIO_SESION</span>
+            {% elif log.action == 'CERRAR_SESION' %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">CERRAR_SESION</span>
+            {% else %}
+                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">{{ log.action }}</span>
+            {% endif %}
+        </td>
+        
+        <td class="text-muted small" style="font-size: 0.85rem;">
+            <i class="bi bi-calendar3 me-1"></i> <span class="audit-date">{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span> <br>
+            <i class="bi bi-clock me-1 mt-1"></i> <span class="audit-time">{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
         </td>
     </tr>
     {% endfor %}
 
-    <!-- 2. VISTA EXCLUSIVA DE MÓVIL (Solo se renderiza en pantallas pequeñas) -->
-    <tr class="d-md-none border-0 bg-transparent">
-        <td colspan="6" class="p-0 border-0 bg-transparent">
-            <div class="mobile-audit-container p-2" id="auditCardsContainer">
+    <tr class="d-md-none p-0 border-0 bg-transparent">
+        <td colspan="6" class="p-0 border-0">
+            <div id="auditCardsContainer" class="mobile-audit-container">
                 {% for log in historial %}
-                <div class="mobile-audit-card p-3 mb-3 rounded-4 shadow-sm bg-white" 
-                     data-location="{{ log.location.name if log.location else 'Global / Sin Sede' }}"
-                     data-timestamp="{{ log.timestamp.strftime('%Y-%m-%dT%H:%M') if log.timestamp else '' }}">
-                    
-                    <!-- ID y Acción -->
-                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                        <span class="badge bg-secondary text-white fw-bold px-3 py-1.5 rounded-pill" style="font-size: 0.78rem;">#{{ log.id }}</span>
-                        <span class="badge status-badge px-3 py-1.5 rounded-pill {{ 'bg-danger-subtle text-danger' if 'FALLIDO' in (log.action or '')|upper else 'bg-success-subtle text-success' }}">
-                            {{ log.action or 'Sin acción' }}
-                        </span>
-                    </div>
-
-                    <!-- Datos del Usuario -->
-                    <div class="mb-3">
-                        <div class="fw-bold text-dark user-name-text target-name-mobile mb-1" style="font-size: 1.1rem; letter-spacing: -0.2px;">
-                            {{ log.user.name if log.user else 'Usuario Desconocido' }}
-                        </div>
-                        <div class="text-muted email-subtext target-email-mobile" style="word-break: break-all; font-size: 0.85rem;">
-                            {{ log.user.email if log.user else '---' }}
-                        </div>
-                    </div>
-
-                    <!-- Rol y Ubicación -->
-                    <div class="d-flex flex-wrap gap-2 align-items-center mb-3 justify-content-between py-2 border-top border-bottom">
-                        {% set traducciones = {
-                            'Administrator': 'Administrador',
-                            'Manager': 'Gerente',
-                            'Assistant Manager': 'Asistente de Gerente',
-                            'Guest': 'Invitado',
-                            'Management': 'Director',
-                            'Operations': 'Operaciones',
-                            'Finance': 'Finanzas'
-                        } %}
-                        <span class="badge role-badge px-3 py-1.5 rounded-pill" style="background-color: #f1f3f5; color: #495057; border: 1px solid #dee2e6; font-size: 0.8rem; font-weight: 600;">
-                            {{ traducciones.get(log.role.name, log.role.name) if log.role else 'Sin rol' }}
-                        </span>
-
-                        <span class="text-muted small d-flex align-items-center" style="font-size: 0.85rem;">
-                            {% if log.location %}
-                                <i class="bi bi-geo-alt-fill text-danger me-1.5"></i><strong class="text-secondary">{{ log.location.name }}</strong>
+                <div class="mobile-audit-card mb-3" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold text-dark fs-6">#{{ log.id }}</span>
+                            {% if log.action == 'INICIO_SESION' %}
+                                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">INICIO_SESION</span>
+                            {% elif log.action == 'CERRAR_SESION' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">CERRAR_SESION</span>
                             {% else %}
-                                <i class="bi bi-globe me-1.5 text-muted"></i><span class="fst-italic text-muted">Global / Sin Sede</span>
+                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ log.action }}</span>
                             {% endif %}
-                        </span>
+                        </div>
+                        <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill" style="font-size: 0.75rem;">{{ log.role.name }}</span>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <span class="d-block fw-bold text-dark user-name-text">{{ log.user.name }}</span>
+                        <span class="d-block text-muted small email-subtext">{{ log.user.email }}</span>
                     </div>
 
-                    <!-- Fecha y Hora -->
-                    <div class="pt-1 d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
+                    <div class="mb-3 d-flex align-items-center text-dark" style="font-size: 0.85rem;">
+                        {% if log.location %}
+                            <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
+                        {% else %}
+                            <i class="bi bi-globe me-2 text-muted"></i> <span class="text-muted font-italic">Global / Sin Sede</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-calendar3 me-1.5 text-muted"></i>
                             <span>{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span>

@@ -1,16 +1,13 @@
 <nav class="sidebar d-flex flex-column">
-    <!-- Botón Flotante para Colapsar/Expandir la Barra Lateral -->
     <button id="toggle-btn" class="toggle-sidebar-btn">
         <i class="bi bi-chevron-left"></i>
     </button>
 
-    <!-- Sección del Logo (Sombrero + Letras) -->
     <div class="sidebar-header d-flex align-items-center px-4">
         <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/sombrero.png') }}" alt="Logo" class="img-fluid logo-hat me-2">
         <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/letra_logo.png') }}" alt="Pizza Hut" class="img-fluid logo-letters">
     </div>
 
-    <!-- Barra de Búsqueda Estilizada -->
     <div class="sidebar-search">
         <div class="search-box">
             <i class="bi bi-search search-icon"></i>
@@ -18,13 +15,10 @@
         </div>
     </div>
 
-    <!-- Menú Principal con Bloques Grisáceos en Mayúsculas -->
     <ul class="nav flex-column sidebar-menu">
         
-        <!-- 1. PANEL (DASHBOARD) -->
-{% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
 <li class="nav-item">
-    <!-- Apunta a la nueva ruta enrutadora -->
     <a class="nav-link sidebar-toggler" href="{{ url_for('dashboard.index') }}">
         <i class="bi bi-house-door main-icon"></i>
         <span class="link-text">PANEL</span>
@@ -33,7 +27,6 @@
 
         {% endif %}
 
-        <!-- 2. USUARIOS -->
         {% if current_user.is_admin %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
@@ -48,7 +41,20 @@
         </li>
         {% endif %}
 
-        <!-- 3. INVENTARIO -->
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-building main-icon"></i>
+                <span class="link-text">SEDES</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('locations.register_location') }}">Registro de Sedes</a>
+                <a class="nav-link sub-link" href="{{ url_for('list_sedes_bp.list_sedes') }}">Gestión de Sedes</a>
+            </div>
+        </li>
+        {% endif %}
+
         {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
@@ -64,22 +70,6 @@
         </li>
         {% endif %}
 
-        <!-- 4. SEDES -->
-        {% if current_user.is_admin %}
-        <li class="nav-item">
-            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
-                <i class="bi bi-building main-icon"></i>
-                <span class="link-text">SEDES</span>
-                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
-            </a>
-            <div class="menu-desplegable">
-                <a class="nav-link sub-link" href="{{ url_for('locations.register_location') }}">Registro de Sedes</a>
-                <a class="nav-link sub-link" href="{{ url_for('list_sedes_bp.list_sedes') }}">Gestión de Sedes</a>
-            </div>
-        </li>
-        {% endif %}
-
-        <!-- 5. COMPRAS -->
         {% if current_user.is_admin or current_user.is_management or current_user.is_manager %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
@@ -96,7 +86,6 @@
         </li>
         {% endif %}
 
-        <!-- 6. TRASLADOS Y MERMAS -->
         {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
@@ -111,18 +100,21 @@
         </li>
         {% endif %}
 
-        <!-- 7. AUDITORÍA -->
-        {% if current_user.is_admin or current_user.is_finance %}
+        {% if current_user.is_admin or current_user.is_management or current_user.is_finance %}
         <li class="nav-item">
-            <a class="nav-link sidebar-toggler" href="{{ url_for('audit.ver_auditoria_accesos') }}">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-shield-lock main-icon"></i>
                 <span class="link-text">AUDITORÍA</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
             </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
+                <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
+            </div>
         </li>
         {% endif %}
     </ul>
 
-    <!-- Opciones de Cierre de Sesión y Perfil Inferiores -->
     <div class="sidebar-actions mt-3 px-3 pb-4">
         <a class="nav-link logout-action d-flex align-items-center mb-2" href="{{ url_for('security.logout') }}">
             <i class="bi bi-box-arrow-left main-icon"></i>

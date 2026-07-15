@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const locationFilterSelect = document.getElementById("locationFilter");
     const dateFilterInput = document.getElementById("dateFilter");
     const hourFilterSelect = document.getElementById("hourFilter");
-    const clearTimeBtn = document.getElementById("clearTimeBtn");
     
     const dataRows = document.querySelectorAll(".audit-data-row");
     const mobileCards = document.querySelectorAll("#auditCardsContainer .mobile-audit-card");
@@ -16,62 +15,34 @@ document.addEventListener("DOMContentLoaded", function() {
     const currentDateTime = new Date();
     const offset = currentDateTime.getTimezoneOffset() * 60000;
     const maxDateString = (new Date(currentDateTime - offset)).toISOString().split('T')[0];
+    
     if (dateFilterInput) {
         dateFilterInput.max = maxDateString;
     }
 
-    function toggleClearButton() {
-        if (hourFilterSelect && clearTimeBtn) {
-            if (hourFilterSelect.value) {
-                clearTimeBtn.style.display = "block";
-            } else {
-                clearTimeBtn.style.display = "none";
-            }
-        }
-    }
-
-    if (clearTimeBtn && hourFilterSelect) {
-        clearTimeBtn.addEventListener("click", function() {
-            hourFilterSelect.value = "";
-            toggleClearButton();
-            processTableFilters();
-        });
-    }
-
     function processTableFilters() {
-        toggleClearButton();
-
-        const searchKeyword = searchInput ? searchInput.value.toLowerCase() : "";
-        const selectedLocation = locationFilterSelect ? locationFilterSelect.value : "";
+        const searchText = searchInput ? searchInput.value.toLowerCase() : "";
+        const selectedLocation = locationFilterSelect ? locationFilterSelect.value : "all";
         const selectedDate = dateFilterInput ? dateFilterInput.value : "";
         const selectedHour = hourFilterSelect ? hourFilterSelect.value : "";
-        
+
         let visibleRowsCount = 0;
         let visibleCardsCount = 0;
 
-        dataRows.forEach(row => {
-            const rowFullText = row.textContent.toLowerCase();
-            const locationCell = row.querySelector(".location-cell-data");
-            const locationText = locationCell ? locationCell.textContent.trim() : "";
-            const matchesLocation = !selectedLocation || locationText.includes(selectedLocation);
-            const matchesSearch = rowFullText.includes(searchKeyword);
-            const datetimeCell = row.querySelector(".datetime-column-cell");
-            const rowTimestampFull = datetimeCell ? datetimeCell.getAttribute("data-timestamp") : "";
-            
+        function filterElement(el) {
+            const rText = el.textContent.toLowerCase();
+            const rLoc = el.getAttribute("data-location") || "";
+            const rDate = el.getAttribute("data-date") || "";
+            const rTime12 = el.getAttribute("data-time12") || "";
+
+            let matchesSearch = searchText === "" || rText.includes(searchText);
+            let matchesLocation = selectedLocation === "all" || rLoc === selectedLocation;
             let matchesDate = true;
             let matchesHour = true;
 
-            if (rowTimestampFull) {
-                const parts = rowTimestampFull.split('T');
-                const rDate = parts[0];
-                const rTime = parts[1] ? parts[1].substring(0, 5) : "";
-
-                if (selectedDate) {
-                    matchesDate = (selectedDate === rDate);
-                }
-                if (selectedHour) {
-                    matchesHour = (selectedHour === rTime);
-                }
+            if (rDate) {
+                if (selectedDate) matchesDate = (selectedDate === rDate);
+                if (selectedHour) matchesHour = (selectedHour === rTime12);
             } else {
                 if (selectedDate || selectedHour) {
                     matchesDate = false;
@@ -79,43 +50,20 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
 
-            if (matchesLocation && matchesSearch && matchesDate && matchesHour) {
-                row.style.setProperty("display", "", "important");
+            return matchesLocation && matchesSearch && matchesDate && matchesHour;
+        }
+
+        dataRows.forEach(row => {
+            if (filterElement(row)) {
+                row.style.display = "";
                 visibleRowsCount++;
             } else {
-                row.style.setProperty("display", "none", "important");
+                row.style.display = "none";
             }
         });
 
         mobileCards.forEach(card => {
-            const cardFullText = card.textContent.toLowerCase();
-            const cardLocation = card.getAttribute("data-location") || "";
-            const matchesLocation = !selectedLocation || cardLocation.includes(selectedLocation);
-            const matchesSearch = cardFullText.includes(searchKeyword);
-            const cardTimestampFull = card.getAttribute("data-timestamp") || "";
-            
-            let matchesDate = true;
-            let matchesHour = true;
-
-            if (cardTimestampFull) {
-                const parts = cardTimestampFull.split('T');
-                const rDate = parts[0];
-                const rTime = parts[1] ? parts[1].substring(0, 5) : "";
-
-                if (selectedDate) {
-                    matchesDate = (selectedDate === rDate);
-                }
-                if (selectedHour) {
-                    matchesHour = (selectedHour === rTime);
-                }
-            } else {
-                if (selectedDate || selectedHour) {
-                    matchesDate = false;
-                    matchesHour = false;
-                }
-            }
-
-            if (matchesLocation && matchesSearch && matchesDate && matchesHour) {
+            if (filterElement(card)) {
                 card.style.setProperty("display", "block", "important");
                 visibleCardsCount++;
             } else {
@@ -126,9 +74,9 @@ document.addEventListener("DOMContentLoaded", function() {
         if (noResultsRow) {
             const isMobile = window.innerWidth < 768;
             if (isMobile) {
-                noResultsRow.style.setProperty("display", (visibleCardsCount === 0) ? "block" : "none", "important");
+                noResultsRow.style.setProperty("display", (visibleCardsCount === 0) ? "table-row" : "none", "important");
             } else {
-                noResultsRow.style.setProperty("display", (visibleRowsCount === 0) ? "" : "none", "important");
+                noResultsRow.style.setProperty("display", (visibleRowsCount === 0) ? "table-row" : "none", "important");
             }
         }
     }
@@ -136,5 +84,5 @@ document.addEventListener("DOMContentLoaded", function() {
     if (searchInput) searchInput.addEventListener("input", processTableFilters);
     if (locationFilterSelect) locationFilterSelect.addEventListener("change", processTableFilters);
     if (dateFilterInput) dateFilterInput.addEventListener("input", processTableFilters);
-    if (hourFilterSelect) hourFilterSelect.addEventListener("input", processTableFilters);
+    if (hourFilterSelect) hourFilterSelect.addEventListener("change", processTableFilters);
 });
