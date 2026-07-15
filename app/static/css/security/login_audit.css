@@ -190,24 +190,34 @@
     width: auto;
 }
 
+/* ==========================================
+   VISTA RESPONSIVE (CELULARES) - OPTIMIZADA
+   ========================================== */
 @media (max-width: 767.98px) {
-    /* Ocultar la cabecera original de la tabla en móvil */
-    #auditDataTable thead {
+    /* OCULTAR COMPLETAMENTE las filas de escritorio para evitar duplicaciones */
+    #auditDataTable thead,
+    tr.audit-data-row {
         display: none !important;
     }
 
     #auditDataTable, 
-    #auditDataTable tbody, 
-    #auditDataTable tr, 
-    #auditDataTable td {
+    #auditDataTable tbody {
         display: block !important;
         width: 100% !important;
         border: none !important;
-        padding: 0 !important;
         background-color: transparent !important;
     }
 
-    /* Modificación del wrapper de filtros en móvil */
+    /* Aseguramos que la fila que envuelve a las tarjetas móviles no tenga bordes raros */
+    tr.d-md-none,
+    tr.d-md-none td {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        background-color: transparent !important;
+        padding: 0 !important;
+    }
+
     .filters-responsive-wrapper {
         display: flex !important;
         flex-direction: column !important;
@@ -221,37 +231,45 @@
         width: 100% !important;
     }
 
-    /* Estilos mejorados para las tarjetas móviles */
     .mobile-audit-container {
         padding: 10px 0 !important;
     }
 
+    /* Estilo premium e idéntico de tarjetas para móviles */
     .mobile-audit-card {
         border: 1px solid var(--interface-border-color) !important;
         background-color: #ffffff !important;
         border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+        padding: 1.25rem !important;
         transition: transform 0.2s ease;
     }
 
     .mobile-audit-card .user-name-text {
-        font-size: 1rem !important;
+        font-size: 1.1rem !important;
         font-weight: 700 !important;
     }
 
     .mobile-audit-card .email-subtext {
-        font-size: 0.82rem !important;
+        font-size: 0.85rem !important;
         color: #6c757d !important;
     }
 
+    /* Estilo píldora para los badges */
     .mobile-audit-card .role-badge {
-        font-size: 0.75rem !important;
-        padding: 4px 10px !important;
+        font-size: 0.8rem !important;
+        padding: 4px 12px !important;
         background-color: #f1f3f5 !important;
+        border-radius: 30px !important;
+        border: 1px solid #e2e8f0 !important;
     }
 
     .mobile-audit-card .status-badge {
         font-size: 0.75rem !important;
-        padding: 4px 10px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 4px 12px !important;
+        border-radius: 30px !important;
     }
 }
