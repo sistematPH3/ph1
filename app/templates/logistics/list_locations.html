@@ -1,244 +1,141 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sedes | Sistema de Gestión PH</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/list_locations.css') }}">
-</head>
-<body class="bg-main">
+{% extends "base_list.html" %}
 
-<div class="container-fluid py-4 px-md-5">
-    <div class="header-container mb-4">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <div class="d-flex align-items-center">
-                    <div class="brand-box me-3">
-                        <i class="bi bi-geo-alt-fill text-white"></i>
-                    </div>
-                    <div>
-                        <h1 class="title-main">Gestión de Sedes</h1>
-                        <p class="subtitle-main">Control y estado de sucursales a nivel nacional</p>
-                    </div>
-                </div>
+{% block extra_css %}
+    {{ super() }}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/list_locations.css') }}">
+{% endblock %}
+
+{% block title_list %}
+    <span class="d-flex align-items-center">
+        <span class="brand-box me-3">
+            <i class="bi bi-geo-alt-fill text-white"></i>
+        </span>
+        <span>Gestión de Sedes</span>
+    </span>
+{% endblock %}
+
+{% block subtitle_list %}Control y estado de sucursales a nivel nacional{% endblock %}
+
+{% block actions_top %}
+    <button class="btn btn-ph-red" onclick="location.href='/logistics/locations'">
+        <i class="bi bi-plus-circle me-2"></i>Nueva Sucursal
+    </button>
+{% endblock %}
+
+{% block search_input_id %}searchInput{% endblock %}
+{% block search_placeholder %}Buscar por nombre o ubicación...{% endblock %}
+
+{% block actions_filter %}
+    <div class="dropdown custom-ph-dropdown" style="min-width: 200px;">
+        <!-- Se removió la clase "btn" para evitar conflictos visuales -->
+        <button class="form-select-ph-sm d-flex align-items-center justify-content-between w-100" 
+                type="button" id="statusDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <span id="selectedStatusText">
+                <i class="bi bi-funnel me-2"></i> Todos los estatus
+            </span>
+            <i class="bi bi-chevron-down small ms-2"></i>
+        </button>
+        <ul class="dropdown-menu shadow-sm custom-rounded-menu w-100">
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('all', 'Todos los estatus')">Todos los estatus</a></li>
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('active', 'Solo Operativas')">Solo Operativas</a></li>
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('inactive', 'Fuera de Servicio')">Fuera de Servicio</a></li>
+        </ul>
+        <input type="hidden" id="statusFilter" value="all">
+    </div>
+{% endblock %}
+
+{% block table_id %}phTableCustom{% endblock %}
+
+{% block table_head %}
+    <th class="ps-4">Código / Nombre</th>
+    <th>Dirección Sucursal</th>
+    <th>Contacto Directo</th>
+    <th>Estatus Operativo</th>
+    <th class="text-center pe-4">Acciones</th>
+{% endblock %}
+
+{% block table_body %}
+    {% for location in locations %}
+    <tr class="sede-row {{ 'row-inactive' if not location.is_active }}">
+        <td class="ps-4">
+            <div class="d-flex align-items-center">
+                <span class="id-badge">{{ location.id }}</span>
+                <span class="ms-3 fw-bold text-ph-dark">{{ location.name }}</span>
             </div>
-            <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <button class="btn btn-ph-red" onclick="location.href='/logistics/locations'">
-                    <i class="bi bi-plus-circle me-2"></i>Nueva Sucursal
+        </td>
+        <td class="text-muted small">{{ location.address or 'Sin dirección asignada' }}</td>
+        <td>
+            <div class="contact-pill">
+                <i class="bi bi-phone me-2"></i>{{ location.phone or 'S/N' }}
+            </div>
+        </td>
+        <td>
+            {% if location.is_active %}
+                <span class="status-pill active">Operativa</span>
+            {% else %}
+                <span class="status-pill inactive">Fuera de Servicio</span>
+            {% endif %}
+        </td>
+        <td class="text-center pe-4">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <a href="{{ url_for('locations.edit_location', location_id=location.id) }}" class="btn-toggle text-primary" title="Editar Sede">
+                    <i class="bi bi-pencil-square fs-4"></i>
+                </a>
+                <button type="button" 
+                    class="btn-toggle {{ 'text-danger' if location.is_active else 'text-muted' }}"
+                    data-id="{{ location.id }}"
+                    data-name="{{ location.name }}"
+                    data-active="{{ 'true' if location.is_active else 'false' }}"
+                    onclick="prepararModal(this)">
+                    <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
                 </button>
             </div>
-        </div>
-    </div>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="5" class="text-center py-5">
+            <div class="text-muted">
+                <i class="bi bi-search fs-1 d-block mb-3"></i>
+                <h5 class="fw-bold">No hay sedes registradas</h5>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+    
+    <tr id="noResultsRow" style="display: none;">
+        <td colspan="5" class="text-center py-5">
+            <div class="text-muted">
+                <i class="bi bi-search fs-1 d-block mb-3"></i>
+                <h5 class="fw-bold">No se encontraron resultados</h5>
+            </div>
+        </td>
+    </tr>
 
-    <div class="content-card shadow-sm">
-        <div class="p-4 border-bottom bg-white">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-8">
-                    <div class="search-box-improved">
-                        <i class="bi bi-search"></i>
-                        <input type="text" id="searchInput" class="form-control-ph-sm" placeholder="Buscar por nombre o ubicación...">
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="dropdown custom-ph-dropdown">
-                        <button class="btn form-select-ph-sm d-flex align-items-center justify-content-between w-100" 
-                                type="button" id="statusDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span id="selectedStatusText">
-                                <i class="bi bi-funnel me-2"></i> Todos los estatus
-                            </span>
-                            <i class="bi bi-chevron-down small ms-2"></i>
+    <div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 25px; border: none; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.2);">
+                <div id="modalAccentBar" style="height: 8px; transition: 0.3s;"></div>
+                <div class="modal-body p-5 text-center">
+                    <div id="modalIconContainer" class="display-1 mb-4"></div>
+                    <h3 class="fw-bold text-dark" id="modalTitle">¿Cambiar Estatus?</h3>
+                    <p class="text-muted mt-3" id="modalMessage"></p>
+                    <div class="d-grid gap-2 mt-4">
+                        <form id="confirmStatusForm" method="POST">
+                            <input type="hidden" name="current_status" id="modalCurrentStatus">
+                            <button type="submit" id="modalConfirmBtn" class="btn btn-lg w-100 mb-2 shadow-sm text-white" style="border-radius: 15px; font-weight: 600;">
+                                Confirmar
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">
+                            <i class="bi bi-arrow-left"></i> Cancelar y volver
                         </button>
-                        <ul class="dropdown-menu shadow-sm custom-rounded-menu w-100">
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('all', 'Todos los estatus')">Todos los estatus</a></li>
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('active', 'Solo Operativas')">Solo Operativas</a></li>
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('inactive', 'Fuera de Servicio')">Fuera de Servicio</a></li>
-                        </ul>
-                        <input type="hidden" id="statusFilter" value="all">
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="table-responsive">
-            <table class="table ph-table-custom mb-0">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Código / Nombre</th>
-                        <th>Dirección Sucursal</th>
-                        <th>Contacto Directo</th>
-                        <th>Estatus Operativo</th>
-                        <th class="text-center pe-4">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaSedesBody">
-                    {% for location in locations %}
-                    <tr class="sede-row {{ 'row-inactive' if not location.is_active }}">
-                        <td class="ps-4">
-                            <div class="d-flex align-items-center">
-                                <span class="id-badge">{{ location.id }}</span>
-                                <span class="ms-3 fw-bold text-ph-dark">{{ location.name }}</span>
-                            </div>
-                        </td>
-                        <td class="text-muted small">{{ location.address or 'Sin dirección asignada' }}</td>
-                        <td>
-                            <div class="contact-pill">
-                                <i class="bi bi-phone me-2"></i>{{ location.phone or 'S/N' }}
-                            </div>
-                        </td>
-                        <td>
-                            {% if location.is_active %}
-                                <span class="status-pill active">Operativa</span>
-                            {% else %}
-                                <span class="status-pill inactive">Fuera de Servicio</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center pe-4">
-                            <div class="d-flex align-items-center justify-content-center gap-3">
-                                <a href="{{ url_for('locations.edit_location', location_id=location.id) }}" class="btn-toggle text-primary" title="Editar Sede">
-                                    <i class="bi bi-pencil-square fs-4"></i>
-                                </a>
-                                <button type="button" 
-                                    class="btn-toggle {{ 'text-danger' if location.is_active else 'text-muted' }}"
-                                    data-id="{{ location.id }}"
-                                    data-name="{{ location.name }}"
-                                    data-active="{{ 'true' if location.is_active else 'false' }}"
-                                    onclick="prepararModal(this)">
-                                    <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center py-5">
-                            <div class="text-muted">
-                                <i class="bi bi-search fs-1 d-block mb-3"></i>
-                                <h5 class="fw-bold">No hay sedes registradas</h5>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    
-                    <tr id="noResultsRow" style="display: none;">
-                        <td colspan="5" class="text-center py-5">
-                            <div class="text-muted">
-                                <i class="bi bi-search fs-1 d-block mb-3"></i>
-                                <h5 class="fw-bold">No se encontraron resultados</h5>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div> 
-</div> 
-
-<div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 25px; border: none; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.2);">
-            <div id="modalAccentBar" style="height: 8px; transition: 0.3s;"></div>
-            <div class="modal-body p-5 text-center">
-                <div id="modalIconContainer" class="display-1 mb-4"></div>
-                <h3 class="fw-bold text-dark" id="modalTitle">¿Cambiar Estatus?</h3>
-                <p class="text-muted mt-3" id="modalMessage"></p>
-                <div class="d-grid gap-2 mt-4">
-                    <form id="confirmStatusForm" method="POST">
-                        <input type="hidden" name="current_status" id="modalCurrentStatus">
-                        <button type="submit" id="modalConfirmBtn" class="btn btn-lg w-100 mb-2 shadow-sm text-white" style="border-radius: 15px; font-weight: 600;">
-                            Confirmar
-                        </button>
-                    </form>
-                    <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">
-                        <i class="bi bi-arrow-left"></i> Cancelar y volver
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
-</div>
 
-<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-
-<script>
-function prepararModal(btn) {
-    const id = btn.getAttribute('data-id');
-    const nombre = btn.getAttribute('data-name');
-    const estaActiva = btn.getAttribute('data-active') === 'true';
-
-    const modal = new bootstrap.Modal(document.getElementById('confirmStatusModal'));
-    const bar = document.getElementById('modalAccentBar');
-    const iconContainer = document.getElementById('modalIconContainer');
-    const title = document.getElementById('modalTitle');
-    const message = document.getElementById('modalMessage');
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    const form = document.getElementById('confirmStatusForm');
-    const inputStatus = document.getElementById('modalCurrentStatus');
-
-    if (estaActiva) {
-        bar.style.backgroundColor = "#ee3124";
-        iconContainer.innerHTML = '<i class="bi bi-exclamation-octagon-fill text-danger"></i>';
-        title.innerText = "¿Desactivar Sede?";
-        message.innerHTML = "Estás a punto de desactivar la sede <strong>" + nombre + "</strong>. Si decides desactivar esta sede, los usuarios asignados a ella serán desvinculados.";
-        confirmBtn.className = "btn btn-danger btn-lg w-100 mb-2 shadow-sm text-white";
-    } else {
-        bar.style.backgroundColor = "#198754";
-        iconContainer.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
-        title.innerText = "¿Activar Sede?";
-        message.innerHTML = "Vas a reactivar la sede <strong>" + nombre + "</strong>.";
-        confirmBtn.className = "btn btn-success btn-lg w-100 mb-2 shadow-sm text-white";
-    }
-
-    form.action = "/sedes/status/" + id;
-    inputStatus.value = estaActiva;
-    modal.show();
-}
-
-function updateFilter(value, text) {
-    document.getElementById('statusFilter').value = value;
-    document.getElementById('selectedStatusText').innerHTML = `<i class="bi bi-funnel me-2"></i> ${text}`;
-    filtrarTabla();
-}
-
-function filtrarTabla() {
-    let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
-    let statusFilter = document.getElementById('statusFilter').value;
-    let rows = document.querySelectorAll('.sede-row');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        let nameEl = row.querySelector('.fw-bold');
-        let addressEl = row.querySelector('.text-muted.small');
-        
-        let name = nameEl ? nameEl.textContent.toLowerCase() : "";
-        let address = addressEl ? addressEl.textContent.toLowerCase() : "";
-        
-        let statusPill = row.querySelector('.status-pill');
-        let isRowActive = statusPill ? statusPill.classList.contains('active') : false;
-
-        let matchesText = name.includes(searchText) || address.includes(searchText);
-        
-        let matchesStatus = (statusFilter === "all") || 
-                            (statusFilter === "active" && isRowActive) || 
-                            (statusFilter === "inactive" && !isRowActive);
-
-        if (matchesText && matchesStatus) {
-            row.style.display = "";
-            visibleCount++;
-        } else {
-            row.style.display = "none";
-        }
-    });
-
-    const noResultsRow = document.getElementById('noResultsRow');
-    if (noResultsRow) {
-        noResultsRow.style.display = visibleCount === 0 ? "" : "none";
-    }
-}
-
-document.getElementById('searchInput').addEventListener('keyup', filtrarTabla);
-</script>
-
-</body>
-</html>
+    <script src="{{ url_for('static', filename='js/logistics/list_locations.js') }}"></script>
+{% endblock %}
