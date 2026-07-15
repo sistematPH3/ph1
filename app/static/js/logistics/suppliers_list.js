@@ -2,8 +2,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const searchInput = document.getElementById('autoSearch');
     const statusFilter = document.getElementById('statusFilter');
     const noResults = document.getElementById('noResults');
-    const tableElement = document.getElementById('suppliersTable');
-    const tableHeader = tableElement.querySelector('thead');
 
     const modalDeactivate = new bootstrap.Modal(document.getElementById('modalDeactivate'));
     const modalActivate = new bootstrap.Modal(document.getElementById('modalActivate'));
@@ -14,10 +12,16 @@ document.addEventListener("DOMContentLoaded", function() {
     function applyFilters() {
         const searchValue = searchInput.value.toLowerCase().trim();
         const selectedStatus = statusFilter.value;
-        const rows = document.querySelectorAll('#suppliersTable tbody .supplier-row');
-        let visibleCount = 0;
+        
+        // Obtenemos los dos grupos de filas/tarjetas de manera independiente
+        const desktopRows = document.querySelectorAll('#suppliersTable tbody .supplier-row');
+        const mobileCards = document.querySelectorAll('#mobileSuppliersContainer .mobile-supplier-card');
+        
+        let visibleDesktopCount = 0;
+        let visibleMobileCount = 0;
 
-        rows.forEach(row => {
+        // 1. Filtrar filas de Escritorio
+        desktopRows.forEach(row => {
             const sName = (row.getAttribute('data-name') || '').toLowerCase().trim();
             const sTaxId = (row.getAttribute('data-taxid') || '').toLowerCase().trim();
             const rowStatus = row.getAttribute('data-status');
@@ -27,17 +31,36 @@ document.addEventListener("DOMContentLoaded", function() {
 
             if (matchesSearch && matchesStatus) {
                 row.style.display = "";
-                visibleCount++;
+                visibleDesktopCount++;
             } else {
                 row.style.display = "none";
             }
         });
 
-        if (visibleCount === 0) {
-            tableHeader.style.display = "none";
+        // 2. Filtrar tarjetas de Teléfono
+        mobileCards.forEach(card => {
+            const sName = (card.getAttribute('data-name') || '').toLowerCase().trim();
+            const sTaxId = (card.getAttribute('data-taxid') || '').toLowerCase().trim();
+            const cardStatus = card.getAttribute('data-status');
+
+            const matchesSearch = sName.includes(searchValue) || sTaxId.includes(searchValue);
+            const matchesStatus = (selectedStatus === "") || (cardStatus === selectedStatus);
+
+            if (matchesSearch && matchesStatus) {
+                card.style.display = "block";
+                visibleMobileCount++;
+            } else {
+                card.style.display = "none";
+            }
+        });
+
+        // 3. Manejo del estado vacío (noResults)
+        const isMobile = window.innerWidth < 768;
+        const finalCount = isMobile ? visibleMobileCount : visibleDesktopCount;
+
+        if (finalCount === 0) {
             noResults.classList.remove('d-none');
         } else {
-            tableHeader.style.display = "";
             noResults.classList.add('d-none');
         }
     }
@@ -46,34 +69,41 @@ document.addEventListener("DOMContentLoaded", function() {
     searchInput.addEventListener('input', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
 
-    const triggers = document.querySelectorAll('.clickable-trigger');
-    triggers.forEach(cell => {
-        cell.addEventListener('click', function() {
-            const row = this.closest('.supplier-row');
+    // Asociación de Modales de Detalles (Ambos entornos: Computadora y Celular)
+    function attachDetailsTrigger(selector) {
+        document.querySelectorAll(selector).forEach(element => {
+            element.addEventListener('click', function() {
+                const row = this.closest('.supplier-row, .mobile-supplier-card');
 
-            document.getElementById('detName').innerText = row.getAttribute('data-name');
-            document.getElementById('detTaxId').innerText = row.getAttribute('data-taxid');
-            document.getElementById('detContact').innerText = row.getAttribute('data-contact');
-            document.getElementById('detPhone').innerText = row.getAttribute('data-phone');
-            document.getElementById('detEmail').innerText = row.getAttribute('data-email');
-            document.getElementById('detDate').innerText = row.getAttribute('data-date');
+                document.getElementById('detName').innerText = row.getAttribute('data-name');
+                document.getElementById('detTaxId').innerText = row.getAttribute('data-taxid');
+                document.getElementById('detContact').innerText = row.getAttribute('data-contact');
+                document.getElementById('detPhone').innerText = row.getAttribute('data-phone');
+                document.getElementById('detEmail').innerText = row.getAttribute('data-email');
+                document.getElementById('detDate').innerText = row.getAttribute('data-date');
 
-            modalDetails.show();
+                modalDetails.show();
+            });
         });
-    });
+    }
 
-    const editButtons = document.querySelectorAll('.btn-action-edit');
-    editButtons.forEach(btn => {
+    attachDetailsTrigger('.clickable-trigger');          // Escritorio
+    attachDetailsTrigger('.clickable-trigger-mobile');   // Teléfono
+
+    // Redirección de Edición (Ambos entornos)
+    document.querySelectorAll('.btn-action-edit').forEach(btn => {
         btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Previene abrir el detalle en teléfono
             const supplierId = this.getAttribute('data-id');
             window.location.href = `/logistics/suppliers/edit/${supplierId}`;
         });
     });
 
-    const toggles = document.querySelectorAll('.status-toggle');
-    toggles.forEach(toggle => {
+    // Switches de estatus (Ambos entornos)
+    document.querySelectorAll('.status-toggle').forEach(toggle => {
         toggle.addEventListener('click', function(e) {
             e.preventDefault(); 
+            e.stopPropagation(); // Previene abrir el detalle en teléfono
             activeToggleTarget = this;
             const supplierName = this.getAttribute('data-name');
 
@@ -117,5 +147,9 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(err => console.error("Error:", err));
     }
 
+    // Inicializar filtros
     applyFilters();
+    
+    // Si la pantalla rota o cambia de tamaño, recalculamos la vista de resultados
+    window.addEventListener('resize', applyFilters);
 });

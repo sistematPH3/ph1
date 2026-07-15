@@ -1,12 +1,12 @@
 /* Paleta de Colores Dashboard Premium - Pizza Hut */
 :root {
-    --ph-red: #b01212;        /* Tu rojo exacto */
-    --ph-red-hover: #8c0e0e;  /* Rojo más oscuro para los efectos hover */
-    --ph-red-light: #fdf2f2;  /* Tonalidad clara para alertas o fondos suaves */
+    --ph-red: #b01212;
+    --ph-red-hover: #8c0e0e;
+    --ph-red-light: #fdf2f2;
     --ph-text-main: #1F2937;
     --ph-text-soft: #4B5563;
     --ph-text-muted: #8892A0;
-    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-bg-main: #F1F5F9;
     --ph-border-soft: #E2E8F0;
 }
 
@@ -17,7 +17,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Contenedor Blanco Central (Aísla el módulo sobre el fondo gris) */
+/* Contenedor Blanco Central */
 .main-white-panel {
     background-color: #FFFFFF;
     border-radius: 24px;
@@ -31,8 +31,6 @@
     font-weight: 700;
     font-size: 1.6rem;
     letter-spacing: -0.5px;
-    
-    /* Efecto flotante con doble capa */
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.15), 
                  2px 4px 8px rgba(0, 0, 0, 0.25);
 }
@@ -42,7 +40,7 @@
     font-size: 0.9rem;
 }
 
-/* Botón Añadir Proveedor - Estilo Corporativo Redondeado */
+/* Botón Añadir Proveedor */
 .btn-add-supplier {
     background-color: var(--ph-red) !important;
     border-color: var(--ph-red) !important;
@@ -57,21 +55,7 @@
     transform: translateY(-1px);
 }
 
-/* Contenedores de Entrada (Buscador y Filtro) */
-.search-box-container, .filter-box-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-icon {
-    position: absolute;
-    left: 16px;
-    color: var(--ph-text-muted);
-    font-size: 1.05rem;
-    pointer-events: none;
-}
-
+/* Contenedores de Entrada */
 .search-input, .filter-select {
     padding-left: 44px !important;
     height: 48px;
@@ -97,13 +81,12 @@
     overflow: hidden;
 }
 
-/* Asegura las esquinas redondeadas en el contenedor responsive */
 .table-responsive {
     border-radius: 16px 16px 0 0;
     overflow: hidden;
 }
 
-/* Cabecera Roja Corporativa con tu nuevo color */
+/* Cabecera Roja Corporativa */
 .table thead th {
     background-color: var(--ph-red) !important;
     color: #FFFFFF !important;
@@ -115,7 +98,6 @@
     border: none;
 }
 
-/* Ajustes de Filas */
 .table tbody tr {
     border-bottom: 1px solid var(--ph-border-soft);
     transition: background-color 0.2s ease;
@@ -125,25 +107,15 @@
     background-color: #FAFAFA !important;
 }
 
-.table tbody tr:last-child {
-    border-bottom: none;
-}
-
 .table td {
     padding: 16px 24px;
 }
 
-/* Estilos de las Filas de Proveedores */
 .supplier-tax-id {
     font-weight: 700;
     color: var(--ph-text-main);
 }
 
-.supplier-name {
-    font-weight: 600;
-}
-
-/* Estado Operativo (Píldoras) */
 .badge-ph-active {
     background-color: #D1FAE5;
     color: #065F46;
@@ -164,7 +136,6 @@
     display: inline-block;
 }
 
-/* Acciones en la Tabla */
 .btn-action-edit {
     transition: transform 0.2s ease;
     border: none;
@@ -178,11 +149,6 @@
     transform: scale(1.15);
 }
 
-.custom-edit-icon {
-    font-size: 1.25rem;
-    color: var(--ph-text-soft);
-}
-
 .status-toggle {
     cursor: pointer;
     transform: scale(1.25);
@@ -193,51 +159,61 @@
     border-color: var(--ph-red) !important;
 }
 
-/* Nuevo: Contenedor en cuadro rojo para el icono del título */
 .icon-box-red {
-    background-color: var(--ph-red); /* Usa tu rojo #b01212 */
-    color: #FFFFFF;                  /* Icono blanco */
+    background-color: var(--ph-red);
+    color: #FFFFFF;
     width: 46px;
     height: 46px;
-    border-radius: 12px;             /* Esquinas suavizadas idénticas */
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;               /* Tamaño del icono interno */
-    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2); /* Sutil reflejo inferior */
-    flex-shrink: 0;                  /* Evita que se deforme en pantallas chicas */
+    font-size: 1.3rem;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2);
+    flex-shrink: 0;
 }
 
-/* Estilos de Modales limpios */
-.modal-content {
-    border-radius: 24px !important;
-}
+/* ==========================================================================
+   DISEÑO EXCLUSIVO PARA DISPOSITIVOS MÓVILES (Celular)
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    /* Ajustes generales del contenedor blanco central */
+    .main-white-panel {
+        padding: 20px 15px !important;
+        border-radius: 20px;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
 
-.btn-confirm-deactivate {
-    background-color: #dc3545 !important;
-    border: none;
-    font-size: 1rem;
-}
+    /* Modificación del Header para evitar solapamientos en pantallas angostas */
+    .header-responsive-wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 15px;
+    }
 
-.btn-confirm-deactivate:hover {
-    background-color: #bb2d3b !important;
-}
+    .module-title {
+        font-size: 1.35rem;
+    }
 
-.btn-confirm-activate {
-    background-color: #198754 !important;
-    border: none;
-    font-size: 1rem;
-}
+    .btn-add-supplier {
+        width: 100% !important;
+        justify-content: center;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        border-radius: 50px !important;
+    }
 
-.btn-confirm-activate:hover {
-    background-color: #157347 !important;
-}
+    /* Tarjetas del Mazo Móvil */
+    .mobile-supplier-card {
+        border: 1px solid var(--ph-border-soft) !important;
+        background-color: #ffffff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02) !important;
+    }
 
-.label-cancel-return {
-    color: #6c757d !important;
-    transition: color 0.2s ease;
-}
-
-.label-cancel-return:hover {
-    color: #212529 !important;
+    .mobile-supplier-card.row-inactive {
+        opacity: 0.75;
+        background-color: #fcfcfc !important;
+    }
 }

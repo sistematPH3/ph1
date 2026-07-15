@@ -6,24 +6,21 @@
 {% block table_id %}suppliersTable{% endblock %}
 
 {% block content %}
-{# Enlace al CSS propio del módulo adaptado #}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier_list.css') }}?v=1.4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier_list.css') }}?v=1.5">
 
-<div class="container-fluid py-5 px-4">
-    <!-- GRAN CONTENEDOR BLANCO CENTRAL -->
-    <div class="main-white-panel p-4 p-md-5">
+<div class="container-fluid py-4 px-2 px-md-4">
+    <div class="main-white-panel p-3 p-md-5">
         
-        <!-- Encabezado del Módulo con el Icono en Cuadro Rojo -->
-        <div class="d-flex justify-content-between align-items-start mb-4">
-            <div>
-                <div class="d-flex align-items-center gap-3 mb-1">
-                    <!-- Cuadro rojo con el icono blanco adentro -->
-                    <div class="icon-box-red">
-                        <i class="bi bi-shop"></i>
-                    </div>
-                    <h3 class="module-title m-0">Gestión de Proveedores</h3>
+        <!-- ENCABEZADO RESPONSIVO MEJORADO -->
+        <div class="d-flex justify-content-between align-items-start mb-4 header-responsive-wrapper">
+            <div class="d-flex align-items-start gap-3">
+                <div class="icon-box-red">
+                    <i class="bi bi-shop"></i>
                 </div>
-                <p class="text-subtitle m-0">Control, estatus y compras consolidadas a nivel nacional</p>
+                <div>
+                    <h3 class="module-title m-0">Gestión de Proveedores</h3>
+                    <p class="text-subtitle m-0">Control, estatus y compras consolidadas a nivel nacional</p>
+                </div>
             </div>
             
             <a href="{{ url_for('supplier_list.register_supplier_view') }}" class="btn btn-add-supplier rounded-pill px-4 text-white shadow-sm d-inline-flex align-items-center text-decoration-none">
@@ -34,7 +31,6 @@
         <!-- CONTENEDOR PRINCIPAL DE BÚSQUEDA Y FILTROS -->
         <div class="filters-section-container mb-4">
             <div class="row g-3">
-                <!-- Barra de Búsqueda Homologada -->
                 <div class="col-12 col-md-8">
                     <div class="search-box-container w-100" style="position: relative;">
                         <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
@@ -44,7 +40,6 @@
                     </div>
                 </div>
 
-                <!-- Filtro de Estados Homologado -->
                 <div class="col-12 col-md-4">
                     <div class="filter-box-container w-100" style="position: relative;">
                         <i class="bi bi-funnel search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
@@ -58,8 +53,8 @@
             </div>
         </div>
 
-        <!-- Contenedor Limpio de la Tabla (Card-PH-Clean) -->
-        <div class="card card-ph-clean">
+        <!-- VISTA DE ESCRITORIO (TABLA INTACTA) -->
+        <div class="card card-ph-clean d-none d-md-block">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table align-middle m-0" id="suppliersTable">
@@ -112,24 +107,81 @@
                             {% endfor %}
                         </tbody>
                     </table>
-
-                    <!-- Mensaje de sin resultados con Lupa Informativa -->
-                    <div id="noResults" class="text-center py-5 d-none">
-                        <div class="py-4">
-                            <i class="bi bi-search text-muted mb-3 d-inline-block" style="font-size: 3.5rem; opacity: 0.6;"></i>
-                            <h5 class="fw-bold text-secondary mb-1">No se encontraron resultados</h5>
-                            <p class="text-muted small mb-0">Intenta ajustar los criterios de búsqueda.</p>
-                        </div>
-                    </div>
-
                 </div>
             </div>
         </div>
+
+        <!-- VISTA DE TELÉFONO (TARJETAS AJUSTADAS) -->
+        <div class="mobile-suppliers-deck d-block d-md-none" id="mobileSuppliersContainer">
+            {% for s in suppliers %}
+            {% set is_active = s.status.upper() == 'ACTIVE' or s.status.upper() == 'OPERATIVA' %}
+            <div class="mobile-supplier-card p-3 mb-3 rounded-4 shadow-sm bg-white supplier-row-mobile {{ 'row-inactive' if not is_active }}"
+                 data-status="{{ 'ACTIVE' if is_active else 'INACTIVE' }}"
+                 data-name="{{ s.name }}"
+                 data-taxid="{{ s.tax_id }}"
+                 data-contact="{{ s.contact_name }}"
+                 data-phone="{{ s.phone }}"
+                 data-email="{{ s.email }}"
+                 data-date="{% if s.last_purchase_date %}{{ s.last_purchase_date.strftime('%d/%m/%Y - %I:%M %p') }}{% else %}Ninguna compra registrada{% endif %}">
+                
+                <!-- Superior -->
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <span class="fw-bold text-dark mobile-tax-id clickable-trigger-mobile" style="cursor: pointer; font-size: 0.95rem;">
+                        {{ s.tax_id }}
+                    </span>
+                    <div class="d-flex align-items-center gap-3">
+                        <button class="btn btn-action-edit p-1" title="Editar Proveedor" data-id="{{ s.id }}">
+                            <i class="bi bi-pencil-square custom-edit-icon" style="font-size: 1.2rem; color: #4B5563;"></i>
+                        </button>
+                        <div class="form-check form-switch d-inline-block align-middle m-0">
+                            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                                   data-id="{{ s.id }}" data-name="{{ s.name }}"
+                                   {% if is_active %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalle Principal -->
+                <div class="clickable-trigger-mobile mb-2" style="cursor: pointer;">
+                    <div class="supplier-name text-dark fw-bold mb-1" style="font-size: 1.1rem;">
+                        {{ s.name }} 
+                        <i class="bi bi-window-fullscreen ms-1 text-muted small" style="font-size: 0.85rem;" title="Ver detalles"></i>
+                    </div>
+                    <div class="text-muted small">
+                        <i class="bi bi-envelope me-1"></i>{{ s.email if s.email else 'Sin correo' }}
+                    </div>
+                </div>
+
+                <!-- Footer de tarjeta -->
+                <div class="pt-2 border-top d-flex justify-content-between align-items-center">
+                    <div>
+                        {% if is_active %}
+                            <span class="badge badge-ph-active">Operativa</span>
+                        {% else %}
+                            <span class="badge badge-ph-inactive">Inactivo</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-muted small">
+                        <i class="bi bi-telephone me-1"></i>{{ s.phone if s.phone else 'Sin teléfono' }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Sin resultados -->
+        <div id="noResults" class="text-center py-5 d-none">
+            <div class="py-4">
+                <i class="bi bi-search text-muted mb-3 d-inline-block" style="font-size: 3.5rem; opacity: 0.6;"></i>
+                <h5 class="fw-bold text-secondary mb-1">No se encontraron resultados</h5>
+                <p class="text-muted small mb-0">Intenta ajustar los criterios de búsqueda.</p>
+            </div>
+        </div>
         
-    </div> <!-- FIN DEL CONTENEDOR BLANCO -->
+    </div>
 </div>
 
-<!-- Modales de detalle, activar y desactivar originales (conservando tus IDs para JS) -->
+<!-- Modales -->
 <div class="modal fade" id="modalDetails" tabindex="-1" aria-labelledby="modalDetailsLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg rounded-4">

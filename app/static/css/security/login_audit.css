@@ -166,3 +166,92 @@
 .text-warning-dark {
     color: #856404 !important;
 }
+
+.time-filter-container {
+    min-width: 150px;
+}
+
+.time-filter-container input[type="time"] {
+    height: 38px;
+    cursor: pointer;
+}
+
+.btn-clear-time {
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+    z-index: 5;
+}
+
+.btn-clear-time:hover {
+    color: var(--brand-icon-bg) !important;
+}
+
+.filters-responsive-wrapper {
+    width: auto;
+}
+
+@media (max-width: 767.98px) {
+    /* Ocultar la cabecera original de la tabla en móvil */
+    #auditDataTable thead {
+        display: none !important;
+    }
+
+    #auditDataTable, 
+    #auditDataTable tbody, 
+    #auditDataTable tr, 
+    #auditDataTable td {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        padding: 0 !important;
+        background-color: transparent !important;
+    }
+
+    /* Modificación del wrapper de filtros en móvil */
+    .filters-responsive-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+
+    #locationFilter, 
+    #dateFilter, 
+    .time-filter-container {
+        width: 100% !important;
+    }
+
+    /* Estilos mejorados para las tarjetas móviles */
+    .mobile-audit-container {
+        padding: 10px 0 !important;
+    }
+
+    .mobile-audit-card {
+        border: 1px solid var(--interface-border-color) !important;
+        background-color: #ffffff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+        transition: transform 0.2s ease;
+    }
+
+    .mobile-audit-card .user-name-text {
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+    }
+
+    .mobile-audit-card .email-subtext {
+        font-size: 0.82rem !important;
+        color: #6c757d !important;
+    }
+
+    .mobile-audit-card .role-badge {
+        font-size: 0.75rem !important;
+        padding: 4px 10px !important;
+        background-color: #f1f3f5 !important;
+    }
+
+    .mobile-audit-card .status-badge {
+        font-size: 0.75rem !important;
+        padding: 4px 10px !important;
+    }
+}

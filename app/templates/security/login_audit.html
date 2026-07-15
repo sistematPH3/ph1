@@ -20,8 +20,8 @@
 {% block subtitle_list %}Control y estado de historial de sesiones a nivel nacional{% endblock %}
 
 {% block actions_filter %}
-    <div class="d-flex gap-2 flex-nowrap align-items-center justify-content-end">
-        <select id="locationFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted w-auto" style="font-size: 0.88rem;">
+    <div class="filters-responsive-wrapper d-flex gap-2 align-items-center justify-content-end">
+        <select id="locationFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted" style="font-size: 0.88rem;">
             <option value="">Todas las sedes</option>
             <option value="Global / Sin Sede">Global / Sin Sede</option>
             {% for sede in sedes %}
@@ -29,35 +29,14 @@
             {% endfor %}
         </select>
 
-        <input type="date" id="dateFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted w-auto" style="font-size: 0.88rem;" title="Filtrar por fecha">
+        <input type="date" id="dateFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted" style="font-size: 0.88rem;" title="Filtrar por fecha">
 
-        <select id="hourFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted w-auto" style="font-size: 0.88rem;" title="Filtrar por hora exacta">
-            <option value="">Cualquier hora</option>
-            <option value="00">12:00 AM</option>
-            <option value="01">01:00 AM</option>
-            <option value="02">02:00 AM</option>
-            <option value="03">03:00 AM</option>
-            <option value="04">04:00 AM</option>
-            <option value="05">05:00 AM</option>
-            <option value="06">06:00 AM</option>
-            <option value="07">07:00 AM</option>
-            <option value="08">08:00 AM</option>
-            <option value="09">09:00 AM</option>
-            <option value="10">10:00 AM</option>
-            <option value="11">11:00 AM</option>
-            <option value="12">12:00 PM</option>
-            <option value="13">01:00 PM</option>
-            <option value="14">02:00 PM</option>
-            <option value="15">03:00 PM</option>
-            <option value="16">04:00 PM</option>
-            <option value="17">05:00 PM</option>
-            <option value="18">06:00 PM</option>
-            <option value="19">07:00 PM</option>
-            <option value="20">08:00 PM</option>
-            <option value="21">09:00 PM</option>
-            <option value="22">10:00 PM</option>
-            <option value="23">11:00 PM</option>
-        </select>
+        <div class="time-filter-container position-relative d-inline-block">
+            <input type="time" id="hourFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted pe-5" style="font-size: 0.88rem;" title="Filtrar por hora y minutos">
+            <button type="button" id="clearTimeBtn" class="btn btn-clear-time position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent text-muted px-2" title="Limpiar hora" style="display: none;">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+        </div>
     </div>
 {% endblock %}
 
@@ -72,7 +51,7 @@
 
 {% block table_body %}
     {% for log in historial %}
-    <tr class="audit-data-row">
+    <tr class="audit-data-row d-none d-md-table-row">
         <td class="text-center text-muted fw-bold">{{ log.id }}</td>
         
         <td>
@@ -122,10 +101,73 @@
         </td>
     </tr>
     {% endfor %}
+
+    <tr class="d-md-none border-0 bg-transparent">
+        <td colspan="6" class="p-0 border-0 bg-transparent">
+            <div class="mobile-audit-container p-2" id="auditCardsContainer">
+                {% for log in historial %}
+                <div class="mobile-audit-card p-3 mb-3 rounded-4 shadow-sm bg-white" 
+                     data-location="{{ log.location.name if log.location else 'Global / Sin Sede' }}"
+                     data-timestamp="{{ log.timestamp.strftime('%Y-%m-%dT%H:%M') if log.timestamp else '' }}">
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <span class="badge bg-secondary text-white fw-bold">#{{ log.id }}</span>
+                        <span class="badge status-badge {{ 'bg-danger-subtle text-danger' if 'FALLIDO' in (log.action or '')|upper else 'bg-success-subtle text-success' }}">
+                            {{ log.action or 'Sin acción' }}
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="fw-bold text-dark user-name-text target-name-mobile">{{ log.user.name if log.user else 'Usuario Desconocido' }}</div>
+                        <div class="text-muted email-subtext target-email-mobile" style="word-break: break-all;">{{ log.user.email if log.user else '---' }}</div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2 justify-content-between">
+                        {% set traducciones = {
+                            'Administrator': 'Administrador',
+                            'Manager': 'Gerente',
+                            'Assistant Manager': 'Asistente de Gerente',
+                            'Guest': 'Invitado',
+                            'Management': 'Director',
+                            'Operations': 'Operaciones',
+                            'Finance': 'Finanzas'
+                        } %}
+                        <span class="badge role-badge">
+                            {{ traducciones.get(log.role.name, log.role.name) if log.role else 'Sin rol' }}
+                        </span>
+
+                        <span class="text-muted small">
+                            {% if log.location %}
+                                <i class="bi bi-geo-alt-fill text-danger me-1"></i><strong class="text-secondary">{{ log.location.name }}</strong>
+                            {% else %}
+                                <i class="bi bi-globe me-1 text-muted"></i><span class="fst-italic text-muted">Global / Sin Sede</span>
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="pt-2 border-top d-flex justify-content-between align-items-center text-muted small">
+                        <div>
+                            <i class="bi bi-calendar3 me-1"></i>
+                            <span>{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span>
+                        </div>
+                        <div>
+                            <i class="bi bi-clock me-1"></i>
+                            <span>{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </td>
+    </tr>
     
     <tr id="noResultsRow" style="display: none;">
         <td colspan="6" class="text-center py-5 bg-white border-0">
-            <h5 class="text-muted m-0">No se encontraron resultados</h5>
+            <div class="py-4 text-muted">
+                <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
+                <h5 class="fw-bold mb-1" style="color: #4a5568;">No se encontraron resultados</h5>
+                <p class="small mb-0" style="color: #718096;">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
+            </div>
         </td>
     </tr>
 {% endblock %}
