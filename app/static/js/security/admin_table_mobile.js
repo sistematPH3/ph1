@@ -1,144 +1,65 @@
-document.addEventListener("DOMContentLoaded", function() {
-    const searchInput = document.getElementById("auditSearchInput");
-    const locationFilterSelect = document.getElementById("locationFilter");
-    const dateFilterInput = document.getElementById("dateFilter");
-    const hourFilterSelect = document.getElementById("hourFilter");
-    const clearTimeBtn = document.getElementById("clearTimeBtn");
+// admin_table_mobile.js - Control Unificado de Búsqueda para Gestión de Permisos
+
+function filterTable() {
+    const searchInput = document.getElementById("userInput");
+    if (!searchInput) return;
+
+    const query = searchInput.value.toLowerCase().trim();
     
-    const dataRows = document.querySelectorAll(".audit-data-row");
-    const noResultsRow = document.getElementById("noResultsRow");
-    const mobileCards = document.querySelectorAll("#auditCardsContainer .mobile-audit-card");
-    const noSearchResults = document.getElementById("noSearchResults");
+    // 1. FILTRADO PARA ESCRITORIO (Filas de la tabla)
+    const tableRows = document.querySelectorAll("#userTableBody tr");
+    let visibleRowsCount = 0;
 
-    if (dataRows.length === 0 && noResultsRow) {
-        noResultsRow.style.display = "";
-    }
-
-    const currentDateTime = new Date();
-    const offset = currentDateTime.getTimezoneOffset() * 60000;
-    const maxDateString = (new Date(currentDateTime - offset)).toISOString().split('T')[0];
-    if (dateFilterInput) {
-        dateFilterInput.max = maxDateString;
-    }
-
-    function toggleClearButton() {
-        if (hourFilterSelect && clearTimeBtn) {
-            if (hourFilterSelect.value) {
-                clearTimeBtn.style.display = "block";
-            } else {
-                clearTimeBtn.style.display = "none";
-            }
-        }
-    }
-
-    if (clearTimeBtn && hourFilterSelect) {
-        clearTimeBtn.addEventListener("click", function() {
-            hourFilterSelect.value = "";
-            toggleClearButton();
-            processTableFilters();
-        });
-    }
-
-    function processTableFilters() {
-        toggleClearButton();
-
-        const searchKeyword = searchInput ? searchInput.value.toLowerCase() : "";
-        const selectedLocation = locationFilterSelect ? locationFilterSelect.value : "";
-        const selectedDate = dateFilterInput ? dateFilterInput.value : "";
-        const selectedHour = hourFilterSelect ? hourFilterSelect.value : "";
+    tableRows.forEach(row => {
+        // Obtenemos el texto del nombre y correo del colaborador
+        const nameText = row.querySelector(".user-name-text") ? row.querySelector(".user-name-text").textContent.toLowerCase() : "";
+        const emailText = row.querySelector(".user-email-text") ? row.querySelector(".user-email-text").textContent.toLowerCase() : "";
         
-        let visibleRowsCount = 0;
-        let visibleCardsCount = 0;
+        if (nameText.includes(query) || emailText.includes(query)) {
+            row.style.setProperty("display", "", "important");
+            visibleRowsCount++;
+        } else {
+            row.style.setProperty("display", "none", "important");
+        }
+    });
 
-        dataRows.forEach(row => {
-            const isVisible = checkMatch(row, searchKeyword, selectedLocation, selectedDate, selectedHour, "table");
-            
-            if (isVisible) {
-                row.style.display = "";
-                visibleRowsCount++;
-            } else {
-                row.style.display = "none";
-            }
-        });
+    // 2. FILTRADO PARA MÓVIL (Tarjetas móviles)
+    const mobileCards = document.querySelectorAll("#userCardsContainer .mobile-user-card");
+    let visibleCardsCount = 0;
 
-        mobileCards.forEach(card => {
-            const isVisible = checkMatch(card, searchKeyword, selectedLocation, selectedDate, selectedHour, "card");
-            
-            if (isVisible) {
-                card.style.setProperty("display", "block", "important");
-                visibleCardsCount++;
-            } else {
-                card.style.setProperty("display", "none", "important");
-            }
-        });
+    mobileCards.forEach(card => {
+        // Obtenemos el nombre y correo de la tarjeta móvil
+        const nameText = card.querySelector(".target-name-mobile") ? card.querySelector(".target-name-mobile").textContent.toLowerCase() : "";
+        const emailText = card.querySelector(".target-email-mobile") ? card.querySelector(".target-email-mobile").textContent.toLowerCase() : "";
 
+        if (nameText.includes(query) || emailText.includes(query)) {
+            card.style.setProperty("display", "block", "important");
+            visibleCardsCount++;
+        } else {
+            card.style.setProperty("display", "none", "important");
+        }
+    });
+
+    // 3. CONTROL DE MENSAJE "SIN RESULTADOS"
+    const noSearchResults = document.getElementById("noSearchResults");
+    if (noSearchResults) {
         const isMobile = window.innerWidth < 768;
-        if (noSearchResults) {
-            if (isMobile) {
-                if (mobileCards.length > 0 && visibleCardsCount === 0) {
-                    noSearchResults.classList.remove("d-none");
-                } else {
-                    noSearchResults.classList.add("d-none");
-                }
+        
+        if (isMobile) {
+            if (mobileCards.length > 0 && visibleCardsCount === 0) {
+                noSearchResults.classList.remove("d-none");
             } else {
-                if (dataRows.length > 0 && visibleRowsCount === 0) {
-                    noSearchResults.classList.remove("d-none");
-                } else {
-                    noSearchResults.classList.add("d-none");
-                }
-            }
-        }
-
-        if (noResultsRow) {
-            noResultsRow.style.display = "none";
-        }
-    }
-
-    function checkMatch(element, searchKeyword, selectedLocation, selectedDate, selectedHour, type) {
-        let fullText = element.textContent.toLowerCase();
-        let locationText = "";
-        let timestampFull = "";
-
-        if (type === "table") {
-            const locationCell = element.querySelector(".location-cell-data");
-            locationText = locationCell ? locationCell.textContent.trim() : "";
-            const datetimeCell = element.querySelector(".datetime-column-cell");
-            timestampFull = datetimeCell ? datetimeCell.getAttribute("data-timestamp") : "";
-        } else {
-            locationText = element.getAttribute("data-location") || "";
-            timestampFull = element.getAttribute("data-timestamp") || "";
-        }
-
-        if (searchKeyword && !fullText.includes(searchKeyword)) {
-            return false;
-        }
-
-        if (selectedLocation && !locationText.includes(selectedLocation)) {
-            return false;
-        }
-
-        if (timestampFull) {
-            const parts = timestampFull.split('T');
-            const rDate = parts[0];
-            const rTime = parts[1] ? parts[1].substring(0, 5) : "";
-
-            if (selectedDate && selectedDate !== rDate) {
-                return false;
-            }
-            if (selectedHour && selectedHour !== rTime) {
-                return false;
+                noSearchResults.classList.add("d-none");
             }
         } else {
-            if (selectedDate || selectedHour) {
-                return false;
+            if (tableRows.length > 0 && visibleRowsCount === 0) {
+                noSearchResults.classList.remove("d-none");
+            } else {
+                noSearchResults.classList.add("d-none");
             }
         }
-
-        return true;
     }
+}
 
-    if (searchInput) searchInput.addEventListener("input", processTableFilters);
-    if (locationFilterSelect) locationFilterSelect.addEventListener("change", processTableFilters);
-    if (dateFilterInput) dateFilterInput.addEventListener("input", processTableFilters);
-    if (hourFilterSelect) hourFilterSelect.addEventListener("input", processTableFilters);
-});
+// Aseguramos que si cambia el tamaño de pantalla se reevalúe el aviso de resultados
+window.addEventListener("resize", filterTable);
