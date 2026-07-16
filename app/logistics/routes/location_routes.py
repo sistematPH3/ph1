@@ -61,6 +61,7 @@ def register_location():
 def check_name():
     data = request.get_json()
     name = data.get('name', '').strip()
+    
     # Aseguramos que loc_id sea un entero para la base de datos
     try:
         loc_id = int(data.get('location_id')) if data.get('location_id') else 0
@@ -68,12 +69,18 @@ def check_name():
         loc_id = 0
     
     from app.models import Location
-    # Buscamos una sede con ese nombre que NO sea la actual
-    exists = Location.query.filter(Location.name == name, Location.id != loc_id).first()
     
-    return {"available": not exists}
+    # CAMBIO CLAVE: .ilike() hace que la búsqueda ignore mayúsculas/minúsculas.
+    # Si en la BD existe 'ph37' y el usuario escribe 'PH37', 'Ph37' o 'pH37',
+    # se detectará perfectamente como un duplicado.
+    
+    exists = Location.query.filter(
+        Location.name.ilike(name), 
+        Location.id != loc_id
+    ).first()
+    
+    return {"available": exists is None}
 
-# app/logistics/routes/location_routes.py
 
 @location_bp.route('/check-phone', methods=['POST'])
 def check_phone():
@@ -82,11 +89,17 @@ def check_phone():
     loc_id = data.get('location_id')
     
     from app.models import Location
-    # Buscamos si el teléfono ya existe en otra sede
+    
     try:
         loc_id = int(loc_id) if loc_id else 0
-    except: loc_id = 0
+    except (ValueError, TypeError): 
+        loc_id = 0
 
-    exists = Location.query.filter(Location.phone == phone, Location.id != loc_id).first()
+    # Para consistencia, también puedes usar ilike en teléfono, aunque al ser
+    # numérico con el operador == suele bastar. Lo dejamos robusto:
+    exists = Location.query.filter(
+        Location.phone == phone, 
+        Location.id != loc_id
+    ).first()
     
-    return {"available": not exists}
+    return {"available": exists is None}

@@ -1,163 +1,91 @@
 {% extends "layout.html" %}
 
-{# 1. Importamos la macro desde la carpeta logistics #}
+{# Importamos la macro de los estados #}
 {% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
 
+{% block extra_css %}
+    {{ super() }}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow">
-                <div class="card-header bg-danger text-white text-center">
-                    <h3 class="mt-2">Registro de Nueva Sede</h3>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/register_location.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+
+<div class="container mt-0 pt-0">
+    <div class="register-wrapper">
+        <div class="form-card-premium">
+            
+            <h2>Registro de Nueva Sede</h2>
+            
+            <form method="POST" action="" id="registerLocationForm" 
+                  data-check-name-url="{{ url_for('locations.check_name') }}"
+                  data-check-phone-url="{{ url_for('locations.check_phone') }}"
+                  data-redirect-url="{{ url_for('list_sedes_bp.list_sedes') }}"
+                  data-success="{{ 'true' if success else 'false' }}" novalidate>
+                
+                {{ form.hidden_tag() }}
+                
+                <div class="form-group-premium">
+                    <label>{{ form.name.label }}</label>
+                    {{ form.name(class="form-control", id="name", placeholder="Ingrese un nombre") }}
+                    {% for error in form.name.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
                 </div>
-                <div class="card-body">
-                    <form method="POST" action="">
-                        {{ form.hidden_tag() }}
-                        
-                        <div class="mb-3">
-                            <label class="form-label">{{ form.name.label }}</label>
-                            {{ form.name(class="form-control", id="name", placeholder="Ingrese un nombre") }}
-                            {% for error in form.name.errors %}
-                                <small class="text-danger d-block">{{ error }}</small>
-                            {% endfor %}
-                        </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">{{ form.state.label }}</label>
-                            {# 2. Reemplazamos form.state por nuestra macro limpia #}
-                            {{ render_venezuela_states() }}
-                            {% for error in form.state.errors %}
-                                <small class="text-danger d-block">{{ error }}</small>
-                            {% endfor %}
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">{{ form.address.label }}</label>
-                            {{ form.address(class="form-control", rows="3", placeholder="Ingrese la direccion") }}
-                            {% for error in form.address.errors %}
-                                <small class="text-danger d-block">{{ error }}</small>
-                            {% endfor %}
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">{{ form.phone.label }}</label>
-                            {{ form.phone(class="form-control", placeholder="Ingrese un numero telefonico", maxlength="11") }}
-                            {% for error in form.phone.errors %}
-                                <small class="text-danger d-block">{{ error }}</small>
-                            {% endfor %}
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-danger btn-lg">Guardar Sede</button>
-                            <a href="{{ url_for('list_sedes_bp.list_sedes') }}" class="btn btn-outline-secondary">Cancelar</a>
-                        </div>
-                    </form>
+                <div class="form-group-premium">
+                    <label>{{ form.state.label }}</label>
+                    {{ render_venezuela_states() }}
+                    {% for error in form.state.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
                 </div>
-            </div>
+
+                <div class="form-group-premium">
+                    <label>{{ form.address.label }}</label>
+                    {{ form.address(class="form-control", rows="3", placeholder="Ingrese la dirección detallada") }}
+                    {% for error in form.address.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-group-premium">
+                    <label>{{ form.phone.label }}</label>
+                    {{ form.phone(class="form-control", placeholder="Ingrese un numero telefonico", maxlength="11") }}
+                    {% for error in form.phone.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-actions-premium">
+                    <a href="{{ url_for('list_sedes_bp.list_sedes') }}" class="btn-premium btn-premium-secondary">Cancelar</a>
+                    <button type="submit" class="btn-premium btn-premium-primary">Guardar Sede</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-{% if success %}
-<script>
-    // Esperar 4000ms (4 segundos)
-    setTimeout(function() {
-        // 1. Opcional: Cerrar la alerta visualmente antes de irse
-        let alert = document.querySelector('.alert');
-        if(alert) {
-            alert.classList.remove('show');
-        }
-
-        // 2. Redirigir al listado de Mariuska
-        window.location.href = "{{ url_for('list_sedes_bp.list_sedes') }}";
-    }, 4000);
-</script>
-{% endif %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-    const nameInput = document.querySelector('input[name="name"]');
-    const phoneInput = document.querySelector('input[name="phone"]');
-    const locationIdField = document.querySelector('input[name="location_id"]');
-    const locId = locationIdField ? locationIdField.value : 0;
-
-    let nameTimeout = null;
-    let phoneTimeout = null;
-
-    // --- VALIDACIÓN DE NOMBRE ---
-    nameInput.addEventListener('input', function() {
-        clearTimeout(nameTimeout);
-        const val = this.value.trim();
+<!-- Modal de Éxito Premium (Se muestra solo al registrar con éxito) -->
+<div id="successModal" class="custom-modal">
+    <div class="custom-modal-content">
+        <div class="success-icon-wrapper">
+            <div class="success-checkmark animate-check">
+                <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" fill="currentColor" class="bi bi-check-lg text-success" viewBox="0 0 16 16">
+                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
+                </svg>
+            </div>
+        </div>
+        <h3>¡Sede Registrada!</h3>
+        <p>La información de la sede se ha guardado de forma exitosa.</p>
         
-        // 1. Validación de caracteres (Tiempo real inmediato)
-        const regex = /^[a-zA-Z0-9 áéíóúÁÉÍÓÚñÑüÜ.]*$/;
-        if (val && !regex.test(val)) {
-            marcarError(this, "El nombre contiene caracteres inválidos.");
-            return; 
-        }
+        <!-- Barra de progreso visual -->
+        <div class="modal-loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+</div>
 
-        // 2. Validación de duplicados (Debounce de 500ms)
-        nameTimeout = setTimeout(async () => {
-            if (val.length < 3) return;
-            const response = await fetch("{{ url_for('locations.check_name') }}", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name: val, location_id: locId})
-            });
-            const data = await response.json();
-            if (!data.available) {
-                marcarError(nameInput, "Esta sede ya existe.");
-            } else {
-                marcarExito(nameInput);
-            }
-        }, 500);
-    });
-
-    // --- VALIDACIÓN DE TELÉFONO ---
-    phoneInput.addEventListener('input', function() {
-        clearTimeout(phoneTimeout);
-        const val = this.value.trim();
-        const pattern = /^(0414|0424|0412|0416|0426|0212)\d{7}$/;
-
-        // 1. Validación de formato (Tiempo real inmediato)
-        if (val && !pattern.test(val)) {
-            marcarError(this, "Formato telefonico invalido.");
-            return;
-        }
-
-        // 2. Validación de duplicados (Debounce de 500ms)
-        phoneTimeout = setTimeout(async () => {
-            if (val.length < 11) return; 
-            const response = await fetch("{{ url_for('locations.check_phone') }}", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({phone: val, location_id: locId})
-            });
-            const data = await response.json();
-            if (!data.available) {
-                marcarError(phoneInput, "Este número ya está asignado a otra sede.");
-            } else {
-                marcarExito(phoneInput);
-            }
-        }, 500);
-    });
-
-    // Funciones de utilidad para Bootstrap
-    function marcarError(el, msg) {
-        el.classList.add('is-invalid');
-        el.classList.remove('is-valid');
-        let feedback = el.nextElementSibling;
-        if (!feedback || !feedback.classList.contains('invalid-feedback')) {
-            feedback = document.createElement('div');
-            feedback.className = 'invalid-feedback';
-            el.parentNode.appendChild(feedback);
-        }
-        feedback.textContent = msg;
-    }
-
-    function marcarExito(el) {
-        el.classList.remove('is-invalid');
-        el.classList.add('is-valid');
-    }
-});
-</script>
+<script src="{{ url_for('static', filename='js/logistics/register_location.js') }}" defer></script>
 {% endblock %}
