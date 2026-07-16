@@ -1,10 +1,6 @@
-/* ==========================================================================
-   Módulo de Gestión de Permisos - Estilos Alineados al Directorio de Personal
-   ========================================================================== */
-
 :root {
-    --ph-red-solid: #b01212;         /* Rojo característico de la cabecera y botón */
-    --ph-red-icon: #bf1616;          /* Rojo para el contenedor del icono superior */
+    --ph-red-solid: #b01212;
+    --ph-red-icon: #bf1616;
     --ph-text-dark: #2c2c2c;
     --ph-text-soft: #7f8c8d;
     --ph-border-light: #e8ebed;
@@ -12,7 +8,6 @@
     --ph-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
-/* Panel de Fondo Principal */
 .main-white-panel {
     background-color: #ffffff;
     border-radius: 20px;
@@ -20,7 +15,6 @@
     border: none;
 }
 
-/* Encabezado del Módulo */
 .icon-box-red {
     background-color: var(--ph-red-icon);
     color: #ffffff;
@@ -34,110 +28,67 @@
 }
 
 .module-title {
-    color: var(--ph-red-solid);
+    color: var(--ph-red-solid) !important;
     font-weight: 700;
-    font-size: 1.6rem;
-    letter-spacing: -0.5px;
 }
 
 .text-subtitle {
     color: var(--ph-text-soft);
-    font-size: 0.88rem;
+    font-size: 0.95rem;
 }
 
 .badge-module-tag {
-    background-color: var(--ph-red-solid) !important;
-    color: #ffffff !important;
-    font-size: 0.75rem;
-    padding: 8px 16px !important;
-    border: none;
+    background-color: #fef2f2;
+    color: var(--ph-red-solid);
+    border: 1px solid #fecaca;
 }
 
-/* Buscador y Contenedor de Filtros */
-.filters-section-container {
-    background-color: transparent;
-    padding: 0;
-    border: none;
+.search-box-container input {
+    height: 45px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
 }
 
-/* Input de Búsqueda estilo Foto 2 */
-.search-input {
-    background-color: #f8f9fa !important;
-    border: 1px solid #e2e5e8 !important;
-    color: var(--ph-text-dark);
-    font-size: 0.9rem;
-    border-radius: 30px !important;
-    height: 46px;
-    transition: all 0.2s ease;
-}
-
-.search-input:focus {
+.search-box-container input:focus {
     background-color: #ffffff !important;
-    border-color: #cbd5e1 !important;
-    box-shadow: none !important;
+    border: 1px solid var(--ph-red-solid) !important;
+    box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.1) !important;
 }
 
-/* Botón del Dropdown Ordenar estilo Filtro de la Foto 2 */
-.btn-filter-sort {
-    background-color: #f8f9fa !important;
-    color: #64748b !important;
-    border: 1px solid #e2e5e8 !important;
-    font-size: 0.9rem;
-    border-radius: 30px !important;
-    height: 46px !important;
-    box-shadow: none !important;
-}
-
-.btn-filter-sort:hover {
-    background-color: #f1f3f5 !important;
-}
-
-/* Cabecera de la Tabla en Rojo Sólido (Idéntico a la Foto 2) */
-.table thead th {
-    background-color: var(--ph-red-solid) !important;
-    color: #ffffff !important;
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 14px 20px;
-    border: none;
-}
-
-/* Estilo para redondear las esquinas de la cabecera roja de la tabla */
 .table-responsive {
     border-radius: 12px;
     overflow: hidden;
+    border: 1px solid var(--ph-border-light);
 }
 
-.table {
-    border-collapse: separate;
-    border-spacing: 0;
+.content-table-header {
+    background-color: var(--ph-red-solid) !important;
 }
 
-.table tbody tr {
-    border-bottom: 1px solid var(--ph-border-light);
+.content-table-header th {
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 16px 20px;
+    border: none !important;
 }
 
-.table tbody tr:last-child {
-    border-bottom: none;
-}
-
-/* Círculos de Avatar */
 .avatar-circle-red {
-    background-color: var(--ph-red-solid);
-    color: #ffffff;
     width: 38px;
     height: 38px;
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 1rem;
+    flex-shrink: 0;
 }
 
-/* Textos de la Tabla */
 .user-name-text {
     color: #1e293b;
     font-weight: 600;
@@ -154,7 +105,6 @@
     font-size: 0.78rem;
 }
 
-/* Insignia de Estado Pendiente */
 .status-badge-pending {
     background-color: #fef3c7;
     color: #d97706;
@@ -165,7 +115,6 @@
     display: inline-block;
 }
 
-/* Botones de Acción (Estilo minimalista con bordes ligeros) */
 .btn-action-square {
     width: 34px;
     height: 34px;
@@ -177,16 +126,12 @@
     justify-content: center;
     font-size: 1.15rem;
     transition: all 0.2s ease;
+    padding: 0;
 }
 
-.btn-action-reject {
-    color: #ef4444;
-}
-
-.btn-action-reject:hover {
-    background-color: #fee2e2;
-    border-color: #fca5a5;
-    transform: translateY(-1px);
+.btn-action-square:hover {
+    background-color: #f8fafc;
+    transform: translateY(-2px);
 }
 
 .btn-action-approve {
@@ -194,22 +139,91 @@
 }
 
 .btn-action-approve:hover {
-    background-color: #d1fae5;
-    border-color: #6ee7b7;
-    transform: translateY(-1px);
+    border-color: #10b981;
+    background-color: #ecfdf5;
 }
 
-/* Tarjetas Responsivas para Celular */
-.mobile-user-card {
-    background-color: #ffffff;
-    border: 1px solid var(--ph-border-light) !important;
-    border-radius: 16px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+.btn-action-reject {
+    color: #ef4444;
 }
 
-/* Ajustes Responsivos Finos */
-@media (max-width: 767.98px) {
+.btn-action-reject:hover {
+    border-color: #ef4444;
+    background-color: #fef2f2;
+}
+
+.btn-confirm-red {
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+    border: none !important;
+    transition: background-color 0.2s ease;
+}
+
+.btn-confirm-red:hover {
+    background-color: #8c0e0e !important;
+    color: #ffffff !important;
+}
+
+.btn-outline-location-pill {
+    border: 1px solid #ced4da !important;
+    color: #495057 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-outline-location-pill:hover {
+    border-color: var(--ph-red-solid) !important;
+    color: var(--ph-red-solid) !important;
+}
+
+.btn-check:checked + .btn-outline-location-pill {
+    background-color: var(--ph-red-solid) !important;
+    border-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+}
+
+/* ==========================================================================
+   MEDIA QUERIES (TABLET Y MÓVIL) - MANTENIDOS INTACTOS
+   ========================================================================== */
+@media (max-width: 992px) {
+    /* Ajustes para Tablet */
     .main-white-panel {
-        border-radius: 16px;
+        padding: 1.5rem !important;
+    }
+    .module-title {
+        font-size: 1.5rem;
+    }
+    .text-subtitle {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Ajustes para Teléfonos */
+    .main-white-panel {
+        padding: 1rem !important;
+        border-radius: 15px;
+    }
+    .d-flex.flex-column.flex-md-row {
+        align-items: stretch !important;
+    }
+    .badge-module-tag {
+        align-self: flex-start;
+        margin-top: 0.5rem;
+    }
+    .search-box-container {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    .table-responsive {
+        border: none;
+    }
+    .content-table-header {
+        display: none; /* Ocultar cabecera en móvil si se usan tarjetas */
+    }
+    .btn-action-square {
+        width: 40px;
+        height: 40px;
     }
 }

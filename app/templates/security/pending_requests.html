@@ -6,12 +6,11 @@
 {% block table_id %}userTable{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}?v=2.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}?v=6.0">
 
 <div class="container-fluid py-3 py-md-5 px-2 px-md-4">
     <div class="main-white-panel p-3 p-md-5">
         
-        <!-- Encabezado del Módulo -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
             <div>
                 <div class="d-flex align-items-center gap-3 mb-2 mb-md-1">
@@ -27,10 +26,8 @@
             </span>
         </div>
 
-        <!-- CONTENEDOR DE BÚSQUEDA Y FILTROS -->
         <div class="filters-section-container mb-4">
             <div class="row g-3">
-                <!-- Barra de búsqueda -->
                 <div class="col-12 col-md-8">
                     <div class="search-box-container w-100" style="position: relative;">
                         <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
@@ -41,7 +38,6 @@
                     </div>
                 </div>
 
-                <!-- Botón de Ordenamiento -->
                 <div class="col-12 col-md-4">
                     <div class="dropdown h-100">
                         <button class="btn btn-filter-sort rounded-pill px-4 w-100 h-100 d-flex align-items-center justify-content-between shadow-sm fw-medium dropdown-toggle" 
@@ -65,15 +61,13 @@
             </div>
         </div>
 
-        <!-- TABLA O TARJETAS (CONTENEDOR DINÁMICO) -->
         <div class="card card-ph-clean border-0">
             <div class="card-body p-0">
                 
-                <!-- VISTA ESCRITORIO (Se oculta en celulares) -->
                 <div class="table-responsive d-none d-md-block">
                     <table class="table align-middle m-0" id="userTable">
                         <thead>
-                            <tr>
+                            <tr class="text-uppercase content-table-header">
                                 <th class="ps-4" style="width: 30%;">Usuario</th>
                                 <th style="width: 35%;">Correo y Registro</th>
                                 <th class="text-center" style="width: 15%;">Estado</th>
@@ -114,11 +108,9 @@
                     </table>
                 </div>
 
-                <!-- VISTA MÓVIL (Se activa en pantallas pequeñas) -->
                 <div class="mobile-cards-container d-block d-md-none" id="userCardsContainer">
                     {% for usuario in usuarios_espera %}
                     <div class="mobile-user-card p-3 mb-3 border rounded-4 shadow-sm">
-                        <!-- Avatar e info superior -->
                         <div class="d-flex align-items-center mb-3">
                             <div class="avatar-circle-red">{{ usuario.name[0] | upper }}</div>
                             <div class="ms-3">
@@ -127,7 +119,6 @@
                             </div>
                         </div>
                         
-                        <!-- Datos intermedios -->
                         <div class="mb-3 py-2 border-top border-bottom">
                             <div class="user-email-text fw-medium mb-1 target-email-mobile">
                                 <i class="bi bi-envelope me-2 text-muted"></i>{{ usuario.email }}
@@ -137,9 +128,7 @@
                             </div>
                         </div>
 
-                        <!-- Botoneras responsivas -->
                         <div class="d-flex gap-2 w-100">
-                            <!-- Comparte exactamente el ID rejectForm_... que requiere confirmReject() -->
                             <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="flex-fill" id="rejectForm_{{ usuario.id }}">
                                 <button type="button" class="btn btn-outline-danger rounded-pill w-100 py-2 d-flex align-items-center justify-content-center fw-semibold gap-1" onclick="confirmReject('{{ usuario.id }}')">
                                     <i class="bi bi-x-circle"></i> Rechazar
@@ -153,7 +142,6 @@
                     {% endfor %}
                 </div>
 
-                <!-- ESTADO DE BÚSQUEDA SIN RESULTADOS (Controlado dinámicamente por JS) -->
                 <div id="noSearchResults" class="text-center py-5 d-none">
                     <div class="py-4 text-muted">
                         <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
@@ -162,7 +150,6 @@
                     </div>
                 </div>
 
-                <!-- ESTADO VACÍO ORIGINAL (Si la base de datos viene vacía de origen) -->
                 {% if not usuarios_espera %}
                 <div class="text-center py-5 text-muted">
                     <div class="py-4">
@@ -179,12 +166,10 @@
     </div>
 </div>
 
-<!-- MODALES DE CONFIGURACIÓN DE ACCESOS -->
 {% for usuario in usuarios_espera %}
 <div class="modal fade text-start" id="approveModal{{ usuario.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <!-- Cabecera -->
             <div class="modal-header border-0 bg-light py-3 px-4">
                 <h5 class="modal-title fw-bold text-dark">
                     <i class="bi bi-shield-check-fill me-2 text-danger"></i>Asignar Credenciales
@@ -192,12 +177,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <!-- Formulario de Aprobación -->
             <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" onsubmit="validarFormularioAprobacion(event, this)">
                 <div class="modal-body p-4 text-dark">
                     <p class="text-muted small">Elige las propiedades de acceso para <strong>{{ usuario.name }}</strong>.</p>
                     
-                    <!-- Selección de Rol -->
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Cargo o Rol</label>
                         <select class="form-select select-custom-pill" name="role_id" onchange="toggleSedesContainer(this)">
@@ -211,7 +194,6 @@
                         </select>
                     </div>
 
-                    <!-- Contenedor de Sedes -->
                     <div class="mb-3 location-container-box">
                         <label class="form-label fw-bold small text-muted text-uppercase d-block mb-2">Sedes Habilitadas</label>
                         <div class="d-flex flex-wrap gap-2">
@@ -225,7 +207,6 @@
                     </div>
                 </div>
                 
-                <!-- Botoneras del modal -->
                 <div class="modal-footer border-0 bg-light py-3 px-4 d-flex gap-2 justify-content-end">
                     <button type="button" class="btn btn-secondary rounded-pill px-4 m-0" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-confirm-red rounded-pill px-4 text-white fw-bold m-0">Confirmar Acceso</button>
@@ -236,7 +217,6 @@
 </div>
 {% endfor %}
 
-<!-- CARGA EXCLUSIVA DE SCRIPTS EN ORDEN -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ url_for('static', filename='js/security/admin_table.js') }}?v=1.9"></script>
 <script src="{{ url_for('static', filename='js/security/admin_table_mobile.js') }}?v=1.0"></script>
