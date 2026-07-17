@@ -8,6 +8,8 @@
     --ph-text-muted: #8892A0;
     --ph-bg-main: #F1F5F9;
     --ph-border-soft: #E2E8F0;
+    --ph-green: #10B981;
+    --ph-green-hover: #059669;
 }
 
 /* Base general */
@@ -171,6 +173,31 @@
     font-size: 1.3rem;
     box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2);
     flex-shrink: 0;
+}
+
+/* ==========================================================================
+   BOTONES DE MODALES DE CONFIRMACIÓN
+   ========================================================================== */
+.btn-confirm-deactivate {
+    background-color: var(--ph-red) !important;
+    border: 1px solid var(--ph-red) !important;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-confirm-deactivate:hover {
+    background-color: var(--ph-red-hover) !important;
+    border-color: var(--ph-red-hover) !important;
+}
+
+.btn-confirm-activate {
+    background-color: var(--ph-green) !important;
+    border: 1px solid var(--ph-green) !important;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-confirm-activate:hover {
+    background-color: var(--ph-green-hover) !important;
+    border-color: var(--ph-green-hover) !important;
 }
 
 /* ==========================================================================

@@ -9,6 +9,36 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let activeToggleTarget = null;
 
+    // Función para formatear la fecha ISO UTC a la hora local del usuario
+    function formatToLocalTime(isoString) {
+        if (!isoString || isoString === "Ninguna compra registrada") {
+            return "Ninguna compra registrada";
+        }
+        try {
+            const dateObj = new Date(isoString);
+            if (isNaN(dateObj.getTime())) {
+                return isoString; // Si falla la conversión, devuelve el string original
+            }
+            
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            
+            let hours = dateObj.getHours();
+            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            
+            hours = hours % 12;
+            hours = hours ? hours : 12; // El valor '0' debe ser '12'
+            const formattedHours = String(hours).padStart(2, '0');
+            
+            return `${day}/${month}/${year} - ${formattedHours}:${minutes} ${ampm}`;
+        } catch (error) {
+            console.error("Error formateando fecha:", error);
+            return isoString;
+        }
+    }
+
     function applyFilters() {
         const searchValue = searchInput.value.toLowerCase().trim();
         const selectedStatus = statusFilter.value;
@@ -80,7 +110,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('detContact').innerText = row.getAttribute('data-contact');
                 document.getElementById('detPhone').innerText = row.getAttribute('data-phone');
                 document.getElementById('detEmail').innerText = row.getAttribute('data-email');
-                document.getElementById('detDate').innerText = row.getAttribute('data-date');
+                
+                // Formateamos la fecha ISO del atributo a hora local antes de mostrarla en el modal
+                const rawDate = row.getAttribute('data-date');
+                document.getElementById('detDate').innerText = formatToLocalTime(rawDate);
 
                 modalDetails.show();
             });
