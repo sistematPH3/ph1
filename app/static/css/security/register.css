@@ -288,3 +288,308 @@
     border-color: #000;     /* El borde se pone negro */
     transform: scale(1.03);
 }
+/* =========================================================================
+   MEDIA QUERIES PARA VISTA MÓVIL Y DISPOSITIVOS TÁCTILES
+   ========================================================================= */
+
+/* 1. Ajustes para Tablets y Pantallas Medianas (Laptops pequeñas) */
+@media (max-width: 1024px) {
+    .brand-section {
+        padding-right: 20px; /* Reducimos espaciado intermedio */
+    }
+    
+    .form-section {
+        padding-left: 20px; /* Reducimos espaciado intermedio */
+    }
+
+    .unete-text {
+        font-size: 2.8rem; /* Reducimos ligeramente el tamaño */
+        margin-left: 0 !important; /* Eliminamos el margen lateral que descuadra la pantalla[cite: 12] */
+        text-align: center;
+    }
+
+    .unete-banner {
+        margin-left: 0 !important; /* Alineamos el banner con el contenedor[cite: 12] */
+        width: 100% !important;
+    }
+}
+
+/* 2. Ajustes para Teléfonos Móviles Estándar (Vertical) */
+@media (max-width: 768px) {
+    .register-page-container {
+        flex-direction: column; /* Apilamos la sección de marca y el formulario verticalmente[cite: 12] */
+        height: auto; /* Permitimos que la altura crezca orgánicamente[cite: 12] */
+        min-height: 100vh; /* Aseguramos que cubra toda la pantalla[cite: 12] */
+        overflow-y: auto; /* Activamos el scroll vertical para que no se bloquee con el teclado[cite: 12] */
+        padding: 30px 15px;
+        display: flex;
+    }
+
+    /* Ocultamos elementos decorativos grandes para limpiar la pantalla y priorizar el registro */
+    .pizza-slice-footer {
+        display: none !important; /* La pizza gigante estorbaría en pantallas táctiles[cite: 11, 12] */
+    }
+
+    /* Reducimos la opacidad y tamaño de las pizzas de fondo para que no compitan con el formulario */
+    .register-page-container::before {
+        background-size: 220px, 150px; /* Reducimos las pizzas difuminadas[cite: 12] */
+        background-position: -60px -60px, calc(100% + 50px) -30px;
+        opacity: 0.08; /* Mucho más sutil para mejorar el contraste */
+    }
+
+    .register-page-container::after {
+        display: none !important; /* Quitamos la pizza del fondo inferior para ahorrar memoria[cite: 12] */
+    }
+
+    /* Ajustes para la sección superior (Marca/Logo) */
+    .brand-section {
+        width: 100%;
+        flex: none; /* Quitamos el flex distribuido de PC[cite: 12] */
+        padding: 0;
+        margin-bottom: 25px; /* Separación con la tarjeta del formulario */
+    }
+
+    .brand-section img[alt="Pizza Hut"] {
+        width: 150px !important; /* Logotipo más compacto[cite: 11, 12] */
+        margin-bottom: 15px !important;
+        transform: none !important;
+    }
+
+    .unete-banner {
+        background-color: rgba(255, 255, 255, 0.6); /* Un poco más contrastado */
+        padding: 10px 20px;
+        border-radius: 20px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .unete-text {
+        font-size: 1.8rem; /* Tamaño óptimo para móviles[cite: 12] */
+        margin-left: 0 !important; /* Centrado absoluto[cite: 12] */
+        text-align: center;
+        text-shadow: 
+            -2px -2px 0 var(--ph-red),  
+             2px -2px 0 var(--ph-red),
+            -2px  2px 0 var(--ph-red),
+             2px  2px 0 var(--ph-red),
+             4px  4px 0px rgba(0,0,0,0.1); /* Reducimos la escala de la sombra[cite: 12] */
+    }
+
+    /* Ajustes para la sección del Formulario */
+    .form-section {
+        width: 100%;
+        flex: none; /* Quitamos el flex distribuido[cite: 12] */
+        padding: 0;
+        align-items: center; /* Centramos el formulario en la pantalla[cite: 12] */
+    }
+
+    .register-card {
+        width: 100%;
+        max-width: 390px; /* Ancho ideal para sujetar con una sola mano[cite: 12] */
+        padding: 30px 20px; /* Padding interior más compacto para aprovechar espacio[cite: 12] */
+        border-radius: 24px; /* Bordes ligeramente más suaves para móviles[cite: 12] */
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        background: #ffffff; /* Sólido para legibilidad extrema */
+    }
+
+    .register-card h2 {
+        font-size: 1.8rem; /* Reducimos levemente el título de la tarjeta[cite: 12] */
+        margin-bottom: 20px;
+    }
+
+    /* Mejoras de usabilidad táctil para los campos de entrada */
+    .custom-input {
+        padding: 12px 18px; /* Altura ideal para presionar con el pulgar[cite: 12] */
+        font-size: 16px !important; /* CRÍTICO: En iOS (iPhone), si el tamaño de fuente en inputs es menor de 16px, Safari hace un zoom automático molesto al enfocar el campo. */
+    }
+
+    /* Grupo de botones optimizado para móviles */
+    .button-group {
+        flex-direction: column; /* Apilamos los botones verticalmente para facilitar el clic[cite: 12] */
+        gap: 12px;
+        margin-top: 25px;
+    }
+
+    .btn-reg {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+    }
+
+    /* Reordenamos visualmente los botones para que la acción principal esté arriba */
+    .btn-submit {
+        order: 1; /* El botón "Registrar" se sitúa primero[cite: 12] */
+    }
+
+    .btn-cancel {
+        order: 2; /* El botón "Cancelar" pasa abajo para un diseño más limpio[cite: 12] */
+    }
+}
+
+/* 3. Soporte específico para teléfonos ultra pequeños (como iPhone SE o pantallas de 320px) */
+@media (max-width: 350px) {
+    .register-card {
+        padding: 20px 15px; /* Reducción máxima del espacio interno[cite: 12] */
+    }
+    
+    .unete-text {
+        font-size: 1.5rem; /* Ajustamos el texto del banner[cite: 12] */
+    }
+}
+
+/* 4. Soporte para móviles en Orientación Horizontal (Landscape) */
+@media (max-height: 500px) and (orientation: landscape) {
+    .register-page-container {
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+        padding: 20px 10px;
+        flex-direction: row; /* Volvemos a colocar uno al lado del otro si hay suficiente ancho[cite: 12] */
+    }
+
+    .brand-section {
+        display: none !important; /* Ocultamos la marca para dejar todo el espacio útil al formulario */
+    }
+
+    .form-section {
+        width: 100%;
+        align-items: center;
+    }
+
+    .register-card {
+        max-width: 500px;
+        padding: 20px 30px;
+    }
+}
+/* =========================================================================
+   REDISEÑO IPAD MINI - AJUSTADO AL BOCETO DE FIGMA
+   ========================================================================= */
+@media (min-width: 740px) and (max-width: 1024px) {
+    
+    /* 1. Contenedor Principal */
+    .register-page-container {
+        flex-direction: column !important; /* Estructura vertical[cite: 12] */
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow-y: auto !important; /* Evita bloqueos con teclado virtual[cite: 12] */
+        padding: 40px 30px !important;
+        box-sizing: border-box;
+        position: relative;
+    }
+
+    /* 2. Distribución de las 3 Pizzas de Fondo (Esquinas según el dibujo) */
+    .register-page-container::before {
+        content: "" !important;
+        position: absolute !important;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        background-image: 
+            url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png'), /* Pizza 1: Superior Derecha */
+            url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png') !important; /* Pizza 2: Inferior Izquierda */
+        background-position: 
+            calc(100% + 120px) -120px,                     /* Arriba a la derecha */
+            -120px calc(100% + 120px) !important;          /* Abajo a la izquierda */
+        background-size: 380px, 380px !important;
+        background-repeat: no-repeat !important;
+        filter: blur(5px) rotate(-15deg) !important; /* Mantenemos el difuminado estético[cite: 12] */
+        opacity: 0.18 !important;
+        z-index: 0 !important;
+        display: block !important;
+    }
+
+    .register-page-container::after {
+        content: "" !important;
+        position: absolute !important;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        background-image: url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png') !important; /* Pizza 3: Inferior Derecha */
+        background-position: calc(100% + 100px) calc(100% + 100px) !important; /* Abajo a la derecha[cite: 12] */
+        background-size: 350px !important;
+        background-repeat: no-repeat !important;
+        filter: blur(6px) rotate(25deg) !important; /* Mantenemos el difuminado[cite: 12] */
+        opacity: 0.18 !important;
+        z-index: 0 !important;
+        display: block !important;
+    }
+
+    /* ELIMINAR LA PIZZA TACHADA: Ocultamos por completo la porción nítida */
+    .pizza-slice-footer {
+        display: none !important; /*[cite: 11, 12] */
+    }
+
+    /* 3. Ajustes de la sección del Logo */
+    .brand-section {
+        width: 100% !important;
+        flex: none !important; /*[cite: 12] */
+        padding: 0 10px !important;
+        margin-bottom: 35px !important;
+        align-items: flex-start !important; /* Alineación al borde izquierdo */
+    }
+
+    .brand-section img[alt="Pizza Hut"] {
+        width: 170px !important; /*[cite: 11, 12] */
+        margin-left: 0 !important;
+        margin-bottom: 20px !important;
+        transform: none !important;
+    }
+
+    /* 4. Banner extendido a la derecha (Efecto cápsula estirada) */
+    .unete-banner {
+        background-color: rgba(255, 255, 255, 0.45) !important; /*[cite: 12] */
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        
+        /* Padding extendido a la derecha para dar la forma de flecha horizontal del boceto */
+        padding: 15px 140px 15px 30px !important; 
+        
+        /* Esquina izquierda recta y lado derecho muy redondeado */
+        border-radius: 0 50px 50px 0 !important; 
+        margin-left: -30px !important; /* Anclado al borde izquierdo de la pantalla */
+        width: auto !important;
+        display: inline-flex !important;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-left: none;
+    }
+
+    /* 5. Letras de vuelta a su estado original (Passion One con relleno blanco y borde rojo) */
+    .unete-text {
+        font-family: 'Passion One', sans-serif !important; /* Revertido a la fuente original[cite: 12] */
+        font-size: 3.3rem !important; /* Tamaño proporcional para tablet */
+        line-height: 1.1 !important; /*[cite: 12] */
+        color: white !important; /* Relleno blanco de vuelta[cite: 12] */
+        text-align: left !important;
+        margin-left: 0 !important; /*[cite: 12] */
+        text-transform: uppercase; /*[cite: 12] */
+        
+        /* Efecto de borde rojo y sombra proyectada original */
+        -webkit-text-stroke: 1px var(--ph-red) !important; /*[cite: 12] */
+        text-shadow: 
+            -3px -3px 0 var(--ph-red),  
+             3px -3px 0 var(--ph-red),
+            -3px  3px 0 var(--ph-red),
+             3px  3px 0 var(--ph-red),
+             6px  6px 0px rgba(0,0,0,0.15) !important; /* Sombra proyectada original[cite: 12] */
+    }
+
+    /* 6. Tarjeta del Formulario */
+    .form-section {
+        width: 100% !important;
+        flex: none !important; /*[cite: 12] */
+        padding: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 2 !important; /* Se posiciona por encima de las pizzas de fondo */
+    }
+
+    .register-card {
+        width: 100% !important;
+        max-width: 450px !important; /*[cite: 12] */
+        padding: 40px !important;
+        border-radius: 28px !important;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.08) !important;
+        background: #ffffff !important;
+    }
+}
