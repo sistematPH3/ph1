@@ -3,7 +3,6 @@ let currentCurrency = "USD";
 
 const today = new Date();
 const formattedToday = today.toISOString().split('T')[0];
-
 const tenYearsAgo = new Date();
 tenYearsAgo.setFullYear(today.getFullYear() - 10);
 const formattedTenYearsAgo = tenYearsAgo.toISOString().split('T')[0];
@@ -17,11 +16,13 @@ if (dateFilterInput) {
 const searchInput = document.getElementById('search-input');
 const supplierFilter = document.getElementById('supplier-filter');
 const tableRows = Array.from(document.querySelectorAll('.purchase-row'));
+const mobileCards = Array.from(document.querySelectorAll('.mobile-purchase-card'));
 const noDataRow = document.getElementById('no-data-row');
 const paginationBox = document.getElementById('pagination-box');
 const paginationItems = document.getElementById('pagination-items');
 
 let filteredRows = [...tableRows];
+let filteredCards = [...mobileCards];
 let currentPage = 1;
 const rowsPerPage = 10;
 
@@ -37,20 +38,24 @@ function filterAndPaginate() {
 
     const cleanSearchText = searchText.replace('#', '');
 
-    filteredRows = tableRows.filter(row => {
-        const id = row.getAttribute('data-id').toLowerCase().trim();
-        const supplier = row.getAttribute('data-supplier').toLowerCase().trim(); 
-        const date = row.getAttribute('data-date'); 
+    const isMatch = (el) => {
+        const id = el.getAttribute('data-id').toLowerCase().trim();
+        const supplier = el.getAttribute('data-supplier').toLowerCase().trim(); 
+        const date = el.getAttribute('data-date'); 
 
         const matchesSearch = !cleanSearchText || id.includes(cleanSearchText) || supplier.includes(cleanSearchText);
         const matchesSupplier = !selectedSupplier || supplier === selectedSupplier; 
         const matchesDate = !selectedDate || date === selectedDate;
 
         return matchesSearch && matchesSupplier && matchesDate;
-    });
+    };
 
-    if (filteredRows.length === 0) {
-        tableRows.forEach(row => row.style.display = 'none');
+    filteredRows = tableRows.filter(isMatch);
+    filteredCards = mobileCards.filter(isMatch);
+
+    if (filteredRows.length === 0 && filteredCards.length === 0) {
+        tableRows.forEach(row => row.style.setProperty('display', 'none', 'important'));
+        mobileCards.forEach(card => card.style.setProperty('display', 'none', 'important'));
         document.querySelectorAll('.detail-row-container').forEach(row => row.classList.remove('show'));
         if (noDataRow) noDataRow.classList.remove('d-none');
         if (paginationBox) {
@@ -68,15 +73,14 @@ function filterAndPaginate() {
 }
 
 function renderTable() {
-    tableRows.forEach(row => row.style.display = 'none');
+    tableRows.forEach(row => row.style.setProperty('display', 'none', 'important'));
+    mobileCards.forEach(card => card.style.setProperty('display', 'none', 'important'));
 
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const pageRows = filteredRows.slice(startIndex, endIndex);
-
-    pageRows.forEach(row => {
-        row.style.display = 'table-row';
-    });
+    
+    filteredRows.slice(startIndex, endIndex).forEach(row => row.style.setProperty('display', 'table-row', 'important'));
+    filteredCards.slice(startIndex, endIndex).forEach(card => card.style.setProperty('display', 'block', 'important'));
 
     renderPagination();
 }
@@ -84,7 +88,9 @@ function renderTable() {
 function renderPagination() {
     if (!paginationItems) return;
     paginationItems.innerHTML = '';
-    const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+    const totalItems = Math.max(filteredRows.length, filteredCards.length);
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    
     if (totalPages <= 1) {
         if (paginationBox) paginationBox.classList.add('d-none');
         return;
@@ -118,9 +124,10 @@ if (dateFilterInput) dateFilterInput.addEventListener('change', filterAndPaginat
 filterAndPaginate();
 
 function loadCollapseDetails(purchaseId) {
-    const tbody = document.getElementById(`collapse-body-${purchaseId}`);
+    const tbodies = document.querySelectorAll(`.collapse-body-${purchaseId}`);
+    if (tbodies.length === 0) return;
     
-    if (!tbody || tbody.children.length > 1 || (tbody.children.length === 1 && !tbody.children[0].innerHTML.includes('Cargando'))) {
+    if (tbodies[0].children.length > 1 || (tbodies[0].children.length === 1 && !tbodies[0].children[0].innerHTML.includes('Cargando'))) {
         return;
     }
 
@@ -130,33 +137,61 @@ function loadCollapseDetails(purchaseId) {
             return response.json();
         })
         .then(data => {
-            tbody.innerHTML = '';
-            if(data.details.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
-                return;
-            }
+            tbodies.forEach(tbody => {
+                tbody.innerHTML = '';
+                if(data.details.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
+                    return;
+                }
 
-            data.details.forEach(detail => {
-                const subtotalBs = detail.quantity * detail.foreign_price * data.exchange_rate;
-                const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${detail.expiration_date.split('-').reverse().join('/')}</span>` : `<span class="text-muted small">N/A</span>`;
-                
-                const row = `
-                    <tr>
-                        <td class="text-secondary fw-bold">#${detail.id}</td>
-                        <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
-                        <td class="text-center fw-bold text-primary">${detail.quantity}</td>
-                        <td class="text-center">${expDateBadge}</td>
-                        <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
-                        <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
-                    </tr>
-                `;
-                tbody.insertAdjacentHTML('beforeend', row);
+                const isMobile = tbody.closest('.mobile-purchase-card') !== null;
+
+                data.details.forEach(detail => {
+                    const subtotalBs = detail.quantity * detail.foreign_price * data.exchange_rate;
+                    const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${detail.expiration_date.split('-').reverse().join('/')}</span>` : `<span class="text-muted small">N/A</span>`;
+                    
+                    let rowHtml = "";
+                    if (isMobile) {
+                        rowHtml = `
+                            <tr>
+                                <td class="p-2">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="fw-bold text-dark small">${detail.product_sku}</span>
+                                        <span class="text-secondary small fw-bold">#${detail.id}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted">Cant: <strong class="text-primary">${detail.quantity}</strong></span>
+                                        ${expDateBadge}
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-2 border-top pt-2">
+                                        <span class="text-success small fw-semibold">${data.currency} ${formattedForeignPrice}</span>
+                                        <span class="fw-bold text-dark small">Bs. ${formattedSubtotalBs}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        rowHtml = `
+                            <tr>
+                                <td class="text-secondary fw-bold">#${detail.id}</td>
+                                <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
+                                <td class="text-center fw-bold text-primary">${detail.quantity}</td>
+                                <td class="text-center">${expDateBadge}</td>
+                                <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
+                                <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
+                            </tr>
+                        `;
+                    }
+                    tbody.insertAdjacentHTML('beforeend', rowHtml);
+                });
             });
         })
         .catch(error => {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+            tbodies.forEach(tbody => {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+            });
         });
 }
 
@@ -167,20 +202,6 @@ if (modalAnnulElement) {
 }
 const annulPurchaseIdSpan = document.getElementById('annulPurchaseId');
 const formAnnulConfirm = document.getElementById('formAnnulConfirm');
-
-const tableBody = document.getElementById('table-body');
-if (tableBody) {
-    tableBody.addEventListener('click', function(e) {
-        const triggerButton = e.target.closest('.btn-annul-trigger');
-        if (triggerButton && modalAnnul) {
-            const purchaseId = triggerButton.getAttribute('data-id');
-            const annulUrl = triggerButton.getAttribute('data-url');
-            if (annulPurchaseIdSpan) annulPurchaseIdSpan.innerText = `#${purchaseId}`;
-            if (formAnnulConfirm) formAnnulConfirm.setAttribute('action', annulUrl);
-            modalAnnul.show();
-        }
-    });
-}
 
 const modalEditElement = document.getElementById('modalEdit');
 let modalEdit = null;
@@ -194,58 +215,75 @@ const editErrorAlert = document.getElementById('editErrorAlert');
 const editReasonInput = document.getElementById('editReason');
 let currentEditPurchaseId = null;
 
-if (tableBody) {
-    tableBody.addEventListener('click', function(e) {
-        const triggerButton = e.target.closest('.btn-edit-trigger');
-        if (triggerButton && modalEdit && editTableBody) {
-            const purchaseId = triggerButton.getAttribute('data-id');
-            currentEditPurchaseId = purchaseId;
-            if (editPurchaseIdSpan) editPurchaseIdSpan.innerText = purchaseId;
-            newRowCounter = 1;
-            
-            if (editErrorAlert) editErrorAlert.classList.add('d-none');
-            if (editReasonInput) editReasonInput.value = '';
-            editTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
-            modalEdit.show();
+const handleActionClick = function(e) {
+    const triggerAnnulButton = e.target.closest('.btn-annul-trigger');
+    if (triggerAnnulButton && modalAnnul) {
+        const purchaseId = triggerAnnulButton.getAttribute('data-id');
+        const annulUrl = triggerAnnulButton.getAttribute('data-url');
+        if (annulPurchaseIdSpan) annulPurchaseIdSpan.innerText = `#${purchaseId}`;
+        if (formAnnulConfirm) formAnnulConfirm.setAttribute('action', annulUrl);
+        modalAnnul.show();
+    }
 
-            fetch(`/logistics/purchases/history/${purchaseId}/details`)
-                .then(res => {
-                    if (!res.ok) throw new Error('Error en la red');
-                    return res.json();
-                })
-                .then(data => {
-                    editTableBody.innerHTML = '';
-                    currentCurrency = data.currency;
-                    
-                    if(data.details.length === 0) {
-                        editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
-                        return;
-                    }
-                    data.details.forEach(item => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td class="ps-3"><span class="badge bg-secondary mb-1">${item.product_sku}</span><br><small class="text-muted">Registro #${item.id}</small></td>
-                            <td class="text-center px-2">
-                                <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
-                            </td>
-                            <td class="text-center px-2">
-                                <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${item.expiration_date || ''}">
-                            </td>
-                            <td class="text-center px-2">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light border-secondary text-muted small px-1">${data.currency}</span>
-                                    <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${item.id}" value="${item.foreign_price}" min="0" step="0.01">
-                                </div>
-                            </td>
-                        `;
-                        editTableBody.appendChild(tr);
-                    });
-                })
-                .catch(err => {
-                    editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+    const triggerEditButton = e.target.closest('.btn-edit-trigger');
+    if (triggerEditButton && modalEdit && editTableBody) {
+        const purchaseId = triggerEditButton.getAttribute('data-id');
+        currentEditPurchaseId = purchaseId;
+        if (editPurchaseIdSpan) editPurchaseIdSpan.innerText = purchaseId;
+        newRowCounter = 1;
+        
+        if (editErrorAlert) editErrorAlert.classList.add('d-none');
+        if (editReasonInput) editReasonInput.value = '';
+        editTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
+        modalEdit.show();
+
+        fetch(`/logistics/purchases/history/${purchaseId}/details`)
+            .then(res => {
+                if (!res.ok) throw new Error('Error en la red');
+                return res.json();
+            })
+            .then(data => {
+                editTableBody.innerHTML = '';
+                currentCurrency = data.currency;
+                
+                if(data.details.length === 0) {
+                    editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
+                    return;
+                }
+                data.details.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="ps-3 pe-3">
+                            <div class="text-end text-md-start">
+                                <span class="badge bg-secondary mb-1">${item.product_sku}</span><br>
+                                <small class="text-muted">Registro #${item.id}</small>
+                            </div>
+                        </td>
+                        <td class="text-center px-2">
+                            <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
+                        </td>
+                        <td class="text-center px-2">
+                            <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${item.expiration_date || ''}">
+                        </td>
+                        <td class="text-center px-2">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-secondary text-muted small px-1">${data.currency}</span>
+                                <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${item.id}" value="${item.foreign_price}" min="0" step="0.01">
+                            </div>
+                        </td>
+                    `;
+                    editTableBody.appendChild(tr);
                 });
-        }
-    });
+            })
+            .catch(err => {
+                editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+            });
+    }
+};
+
+const mainContainer = document.getElementById('purchases-main-container');
+if (mainContainer) {
+    mainContainer.addEventListener('click', handleActionClick);
 }
 
 const btnAddRowEdit = document.getElementById('btnAddRowEdit');
@@ -256,11 +294,13 @@ if (btnAddRowEdit) {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td class="ps-3">
-                <select class="form-select form-select-sm edit-prod-id border-success text-dark fw-bold" data-id="new_${newRowCounter}">
-                    ${optionsHtml}
-                </select>
-                <small class="text-success fw-bold"><i class="bi bi-star-fill"></i> ANEXO</small>
+            <td class="ps-3 pe-3">
+                <div class="text-end text-md-start">
+                    <select class="form-select form-select-sm edit-prod-id border-success text-dark fw-bold mb-1 w-100" data-id="new_${newRowCounter}">
+                        ${optionsHtml}
+                    </select>
+                    <small class="text-success fw-bold"><i class="bi bi-star-fill"></i> ANEXO</small>
+                </div>
             </td>
             <td class="text-center px-2">
                 <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" min="0" step="0.01">

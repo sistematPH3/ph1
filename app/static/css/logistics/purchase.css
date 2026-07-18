@@ -1,20 +1,15 @@
-/* =========================================================================
-   PALETA DE COLORES Y ARMONÍA CORPORATIVA (Módulo de Compras)
-   ========================================================================= */
 body {
-    background-color: #ebedf1 !important; /* Gris claro idéntico al tablero de insumos */
+    background-color: #ebedf1 !important;
 }
 
-/* Encabezado Principal del Formulario */
 .purchase-card-header {
-    background-color: #B31F24 !important; /* Rojo Mariuska */
+    background-color: #B31F24 !important;
     color: #ffffff !important;
     border-bottom: none !important;
     padding-top: 20px;
     padding-bottom: 20px;
 }
 
-/* Contenedor de la Tarjeta */
 .purchase-card {
     border: none !important;
     border-radius: 20px !important;
@@ -22,19 +17,15 @@ body {
     overflow: hidden;
 }
 
-/* Títulos de Sección Secundarios */
 .section-subtitle {
     color: #212529 !important;
     font-weight: 700;
     letter-spacing: 0.03em;
 }
 
-/* =========================================================================
-   CONTROLES DE FORMULARIO: SELECTS E INPUTS ESTILO PÍLDORA
-   ========================================================================= */
 .purchase-form-control, 
 .purchase-form-select {
-    border-radius: 50px !important; /* Forma de píldora interactiva */
+    border-radius: 50px !important;
     border: 1px solid #dee2e6 !important;
     padding-left: 18px !important;
     padding-right: 18px !important;
@@ -42,7 +33,6 @@ body {
     transition: all 0.3s ease-in-out;
 }
 
-/* Enfoque con Brillo Rojo Corporativo */
 .purchase-form-control:focus, 
 .purchase-form-select:focus {
     border-color: #B31F24 !important;
@@ -51,10 +41,6 @@ body {
     outline: none !important;
 }
 
-/* =========================================================================
-   BOTONES CON BRILLO DINÁMICO
-   ========================================================================= */
-/* Botón Principal: Procesar Compra */
 .btn-purchase-primary {
     background-color: #B31F24 !important;
     color: #ffffff !important;
@@ -71,9 +57,6 @@ body {
     transform: translateY(-1.5px);
 }
 
-/* ==================================================================
-   EFECTO DINÁMICO DE LEVANTAMIENTO Y BRILLO PARA EL BOTÓN VERDE
-   =================================================================== */
 .btn-success {
     background-color: #198754 !important;
     border: none !important;
@@ -81,23 +64,16 @@ body {
     box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3) !important;
 }
 
-/* Al pasar el mouse: se eleva 2px y genera el resplandor verde */
 .btn-success:hover {
     transform: translateY(-2px) !important;
     background-color: #157347 !important;
     box-shadow: 0 6px 18px rgba(25, 135, 84, 0.45) !important;
 }
 
-/* Al hacer clic: regresa a su posición original */
 .btn-success:active {
     transform: translateY(0) !important;
 }
 
-
-/* =========================================================================
-   REMOCIÓN ABSOLUTA DEL EFECTO HOVER EN LAS TARJETAS DEL FORMULARIO
-   ========================================================================= */
-/* Bloqueamos el movimiento y mantenemos la sombra estática original de Bootstrap */
 #productsCard.filter-card:hover,
 #invoiceCard.filter-card:hover {
     transform: none !important;
@@ -105,7 +81,6 @@ body {
     cursor: default !important;
 }
 
-/* Botón de Acción: Eliminar Fila */
 .btn-purchase-danger {
     border-radius: 50px !important;
     padding-left: 12px;
@@ -113,11 +88,8 @@ body {
     font-size: 0.85rem;
 }
 
-/* =========================================================================
-   TABLA DE ITEMS DE COMPRA
-   ========================================================================= */
 .purchase-table thead {
-    background-color: #212529 !important; /* Mantiene un contraste oscuro elegante para los items */
+    background-color: #212529 !important;
     color: #ffffff !important;
 }
 
@@ -133,9 +105,7 @@ body {
 .purchase-table td {
     vertical-align: middle;
 }
-/* =========================================================================
-   ESTILOS ESPECÍFICOS DE LA TABLA DE INSUMOS (ESTILO MARIUSKA)
-   ========================================================================= */
+
 .form-label {
     font-weight: 600;
     font-size: 0.85rem;
@@ -220,4 +190,74 @@ body {
 
 .custom-insumos-table .form-select {
     padding-left: 1.2rem !important;
+}
+
+@media (max-width: 767.98px) {
+    .header-container {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 1rem;
+    }
+    
+    .header-container .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .custom-insumos-table thead {
+        display: none !important;
+    }
+    
+    .custom-insumos-table tbody tr {
+        display: block !important;
+        border: 1px solid #dee2e6 !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+        margin-bottom: 1rem !important;
+        background-color: #fcfcfc !important;
+    }
+    
+    .custom-insumos-table tbody td {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 8px 0 !important;
+        border-bottom: 1px solid #e9ecef !important;
+    }
+    
+    .custom-insumos-table tbody td:last-child {
+        border-bottom: none !important;
+        justify-content: center !important;
+        margin-top: 10px !important;
+    }
+    
+    .custom-insumos-table tbody td::before {
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: #495057;
+        text-transform: uppercase;
+        flex-shrink: 0;
+        margin-right: 15px;
+    }
+    
+    .custom-insumos-table tbody td:nth-child(1)::before { content: "Producto:"; }
+    .custom-insumos-table tbody td:nth-child(2)::before { content: "Cantidad:"; }
+    .custom-insumos-table tbody td:nth-child(3)::before { content: "Vencimiento:"; }
+    .custom-insumos-table tbody td:nth-child(4)::before { content: "Precio:"; }
+    
+    .custom-insumos-table tbody td .table-field-wrapper {
+        width: 60%;
+        max-width: 250px;
+        margin: 0;
+    }
+    
+    #productsCard .d-flex.justify-content-end.gap-3 {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    #productsCard .d-flex.justify-content-end.gap-3 button {
+        width: 100%;
+        justify-content: center;
+    }
 }

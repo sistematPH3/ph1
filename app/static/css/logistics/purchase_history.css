@@ -1,6 +1,3 @@
-/* static/css/logistics/purchase_history.css */
-
-/* Declaración de Fuentes Locales */
 @font-face {
     font-family: 'Inter';
     src: url('../../fonts/Inter-Regular.ttf') format('truetype');
@@ -32,7 +29,6 @@ body {
     font-family: 'Inter', sans-serif;
 }
 
-/* Contenedor Principal Limitador de Margen */
 .main-container {
     max-width: 1400px;
     margin: 0 auto;
@@ -45,7 +41,6 @@ body {
     font-size: 1.6rem;
 }
 
-/* Icono Header Redondeado tipo Auditoría */
 .icon-container-audit {
     background-color: #b0121a;
     color: #ffffff;
@@ -65,7 +60,6 @@ body {
     background-color: #ffffff;
 }
 
-/* Inputs idénticos a los de Auditoría */
 .filter-input-group {
     background-color: #f8f9fa;
     border: 1px solid #e9ecef;
@@ -91,7 +85,6 @@ body {
     font-size: 0.88rem;
 }
 
-/* Tabla Estilo Auditoría */
 .table-custom-audit {
     width: 100%;
     margin-bottom: 0;
@@ -121,7 +114,6 @@ body {
     border-bottom: none;
 }
 
-/* Badges de Estado Redondeados */
 .status-badge-completed {
     background-color: #e6f6ec;
     color: #15803d;
@@ -146,7 +138,6 @@ body {
     gap: 4px;
 }
 
-/* Paginación */
 .pagination-container {
     display: flex;
     justify-content: center;
@@ -155,9 +146,65 @@ body {
     border-top: 1px solid #f1f3f5;
 }
 
-/* Botones de acción */
 .btn-audit-action {
     border-radius: 6px;
     font-size: 0.82rem;
     padding: 5px 12px;
+}
+
+.mobile-purchase-card {
+    border: 1px solid #f0f0f0;
+    border-radius: 14px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    margin-bottom: 1rem;
+    padding: 1.25rem;
+}
+
+@media (max-width: 767.98px) {
+    #edit-table thead {
+        display: none;
+    }
+    
+    #edit-table tbody tr {
+        display: block;
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 1rem;
+        background-color: #fcfcfc;
+    }
+    
+    #edit-table tbody td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0 !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+    }
+    
+    #edit-table tbody td:last-child {
+        border-bottom: none !important;
+    }
+    
+    #edit-table tbody td::before {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-right: 15px;
+    }
+    
+    #edit-table tbody td:nth-child(1)::before { content: "Insumo:"; }
+    #edit-table tbody td:nth-child(2)::before { content: "Cant:"; }
+    #edit-table tbody td:nth-child(3)::before { content: "Vence:"; }
+    #edit-table tbody td:nth-child(4)::before { content: "Precio:"; }
+
+    #edit-table tbody td > input,
+    #edit-table tbody td > select,
+    #edit-table tbody td > .input-group,
+    #edit-table tbody td > div {
+        width: 65% !important;
+        max-width: 250px;
+    }
 }
