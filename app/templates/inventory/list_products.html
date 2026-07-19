@@ -25,11 +25,11 @@
 {% block subtitle_list %}Control, stock y descripciones técnicas de insumos a nivel nacional{% endblock %}
 
 {% block actions_top %}
-    <div class="d-flex flex-column flex-md-row gap-2 w-100">
-        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center justify-content-center gap-2" style="font-size: 0.88rem;">
+    <div class="d-flex flex-column flex-md-row justify-content-md-end gap-2 w-100 w-md-auto">
+        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red d-flex align-items-center justify-content-center gap-2">
             <i class="bi bi-tags"></i> Ver Categorías
         </a>
-        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center justify-content-center gap-2" style="font-size: 0.88rem;">
+        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red d-flex align-items-center justify-content-center gap-2">
             <i class="bi bi-plus-lg"></i> Nuevo Insumo
         </a>
     </div>

@@ -182,6 +182,9 @@
     outline: none !important;
 }
 
+/* ==========================================================================
+   VISTA DE TELÉFONO - SE ACTIVA EN PANTALLAS MENORES A 768px
+   ========================================================================== */
 @media (max-width: 767.98px) {
     .module-title-text {
         font-size: 1.4rem !important;
@@ -199,9 +202,9 @@
     }
     
     .btn-mariuska-red {
-        width: 100%;
-        justify-content: center;
-        margin-bottom: 0.5rem;
+        width: 100% !important;
+        justify-content: center !important;
+        margin-bottom: 0.5rem !important;
     }
     
     .mariuska-select-group {
@@ -238,5 +241,83 @@
         background-color: #FAFAFA !important;
         opacity: 0.85;
         border-left: 4px solid #D97706 !important;
+    }
+}
+
+/* ==========================================================================
+   VISTA DE PC - SE ACTIVA EN PANTALLAS GRANDES DESDE 768px
+   ========================================================================== */
+@media (min-width: 768px) {
+    /* Ajuste de Barra de Filtro (Píldora fija, protegida contra aplastamiento y desplazada) */
+    .mariuska-select-group {
+        width: 240px !important; /* Ancho fijo perfecto para que el texto nunca se corte */
+        flex-shrink: 0 !important; /* Evita que el buscador gigante lo comprima */
+        margin-left: auto !important; /* Lo empuja hacia el lado derecho */
+        margin-right: 5rem !important; /* ¡CORRECCIÓN! Lo separa del borde y lo mueve a la izquierda */
+    }
+
+    /* Ajuste de Botones superiores (Más grandes y alineación derecha) */
+    .btn-mariuska-red {
+        font-size: 0.96rem !important;
+        padding: 0.55rem 1.7rem !important;
+        width: auto !important;
+    }
+}
+
+/* Limpieza de la fila de paginación para eliminar hovers fantasmas */
+#genericTable .generic-pagination-row td {
+    padding: 0 !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+#genericTable .generic-pagination-row:hover td {
+    background-color: transparent !important;
+}
+/* ==========================================================================
+   VISTA TABLET - OPTIMIZACIÓN COMPACTA PARA GESTIÓN DE INSUMOS
+   ========================================================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .custom-card-list {
+        padding: 1.25rem !important;
+    }
+
+    /* Píldora estable: subimos a 220px y evitamos que colapse */
+    .mariuska-select-group {
+        width: 220px !important;
+        flex-shrink: 0 !important;
+        margin-right: 7rem !important;
+    }
+
+    /* Protegemos el texto y la flecha internamente */
+    .mariuska-select-group .form-select {
+        font-size: 0.82rem !important; /* Letra ligeramente más compacta */
+        padding-right: 2rem !important; /* Espacio exclusivo para que la flecha no toque el texto */
+    }
+
+    .btn-mariuska-red {
+        font-size: 0.84rem !important;
+        padding: 0.45rem 1.1rem !important;
+    }
+
+    #genericTable td, 
+    #genericTable .content-table-header th {
+        padding: 10px 8px !important;
+        font-size: 0.80rem !important;
+    }
+
+    #genericTable .content-table-header th {
+        font-size: 0.72rem !important;
+    }
+
+    #genericTable td .badge {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+    }
+
+    .btn-action-edit {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 0.78rem;
     }
 }

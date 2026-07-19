@@ -14,14 +14,29 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     const searchInput = document.getElementById('searchInput');
+    const filterGroup = document.querySelector('.mariuska-select-group');
+
     if (searchInput) {
-        const searchWrapper = searchInput.closest('.d-flex.justify-content-between');
+        const searchWrapper = searchInput.closest('.d-flex.justify-content-between') || searchInput.closest('.d-flex');
         if (searchWrapper) {
             searchWrapper.classList.remove('align-items-center');
-            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3');
+            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3', 'w-100'); 
+            
             Array.from(searchWrapper.children).forEach(child => {
                 child.classList.add('w-100', 'w-md-auto');
             });
+        }
+    }
+
+    // Buscamos directamente el filtro por su clase para no depender de índices del DOM
+    if (filterGroup) {
+        filterGroup.classList.add('ms-md-auto');
+        
+        // Si la herencia de base_list envolvió el bloque en un contenedor div, lo empujamos también
+        const filterWrapper = filterGroup.parentElement;
+        if (filterWrapper && filterWrapper !== document.body) {
+            filterWrapper.classList.add('ms-md-auto', 'w-md-auto');
+            filterWrapper.classList.remove('w-100'); 
         }
     }
 
@@ -176,21 +191,24 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function actualizarControlesUI(totalMatching, totalPages, startIdx, endIdx) {
-        const paginationWrapper = document.getElementById('paginationWrapper');
-        
-        if (totalMatching === 0) {
-            if(paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
-            if (noResultsRow) noResultsRow.style.setProperty('display', 'table-row', 'important');
-            return;
-        }
-        if (noResultsRow) noResultsRow.style.setProperty('display', 'none', 'important');
+    const paginationWrapper = document.getElementById('paginationWrapper');
+    const paginationRow = paginationWrapper ? paginationWrapper.closest('.generic-pagination-row') : null; // <-- LÍNEA NUEVA
+    
+    if (totalMatching === 0) {
+        if(paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+        if (noResultsRow) noResultsRow.style.setProperty('display', 'table-row', 'important');
+        return;
+    }
+    if (noResultsRow) noResultsRow.style.setProperty('display', 'none', 'important');
 
-        if (totalPages <= 1) {
-            if(paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
-            return;
-        } else {
-            if(paginationWrapper) paginationWrapper.style.setProperty('display', 'flex', 'important');
-        }
+    if (totalPages <= 1) {
+        if(paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+        if(paginationRow) paginationRow.style.setProperty('display', 'none', 'important'); // <-- LÍNEA NUEVA
+        return;
+    } else {
+        if(paginationWrapper) paginationWrapper.style.setProperty('display', 'flex', 'important');
+        if(paginationRow) paginationRow.style.setProperty('display', '', 'important'); // <-- LÍNEA NUEVA
+    }
 
         if(paginationInfo && paginationControls) {
             const registroInicial = startIdx + 1;
