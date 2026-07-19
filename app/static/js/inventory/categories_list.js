@@ -1,5 +1,31 @@
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. Auto-cierre de alertas flash
+    
+    // --- FIX RESPONSIVO PARA CONTENEDORES NATIVOS DE BASE_LIST ---
+    const iconBox = document.querySelector('.brand-icon-box');
+    if (iconBox) {
+        const headerContainer = iconBox.closest('.d-flex.justify-content-between');
+        if (headerContainer) {
+            headerContainer.classList.remove('align-items-center');
+            headerContainer.classList.add('flex-column', 'flex-md-row', 'align-items-md-center', 'align-items-start', 'gap-3');
+            Array.from(headerContainer.children).forEach(child => {
+                child.classList.add('w-100', 'w-md-auto');
+            });
+        }
+    }
+
+    const searchInput = document.getElementById('categorySearchInput');
+    if (searchInput) {
+        const searchWrapper = searchInput.closest('.d-flex.justify-content-between');
+        if (searchWrapper) {
+            searchWrapper.classList.remove('align-items-center');
+            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3');
+            Array.from(searchWrapper.children).forEach(child => {
+                child.classList.add('w-100', 'w-md-auto');
+            });
+        }
+    }
+
+    // --- MANEJO DE ALERTAS Y LÓGICA ORIGINAL ---
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(function(alert) {
         setTimeout(function() {
@@ -14,50 +40,53 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 2000);
     });
 
-    // 2. Buscador y Filtro Cruzado en Tiempo Real
-    const searchInput = document.getElementById('categorySearchInput');
     const controlFilter = document.getElementById('controlTypeFilter');
     const noResultsRow = document.getElementById('noResultsRow');
-    const rows = document.querySelectorAll('.category-row');
+    
+    const desktopRows = document.querySelectorAll('.category-row.d-md-table-row');
+    const mobileCards = document.querySelectorAll('.category-row-mobile');
 
     function executeCombinedFilter() {
         const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
         const selectedFilter = controlFilter ? controlFilter.value : 'all';
-        let totalVisible = 0;
+        let totalVisibleDesktop = 0;
+        let totalVisibleMobile = 0;
 
-        rows.forEach(row => {
-            // Evaluamos el texto de la columna Categoría
+        desktopRows.forEach(row => {
             const categoryName = row.cells[0].textContent.toLowerCase();
-            // Evaluamos el atributo data-control-type que añadimos en el HTML
             const rowControlType = row.getAttribute('data-control-type');
-
-            const matchesText = categoryName.includes(query);
-            const matchesFilter = (selectedFilter === 'all' || rowControlType === selectedFilter);
-
-            // La fila se muestra únicamente si cumple ambas condiciones
-            if (matchesText && matchesFilter) {
-                row.style.display = "";
-                totalVisible++;
+            
+            if (categoryName.includes(query) && (selectedFilter === 'all' || rowControlType === selectedFilter)) {
+                row.style.setProperty('display', '', 'important');
+                totalVisibleDesktop++;
             } else {
-                row.style.display = "none";
+                row.style.setProperty('display', 'none', 'important');
             }
         });
 
-        // Control dinámico del mensaje "No se encontraron resultados"
-        if (noResultsRow) {
-            if (totalVisible === 0 && rows.length > 0) {
-                noResultsRow.style.display = "";
+        mobileCards.forEach(card => {
+            const categoryName = card.querySelector('h6').textContent.toLowerCase();
+            const rowControlType = card.getAttribute('data-control-type');
+
+            if (categoryName.includes(query) && (selectedFilter === 'all' || rowControlType === selectedFilter)) {
+                card.style.setProperty('display', 'block', 'important');
+                totalVisibleMobile++;
             } else {
-                noResultsRow.style.display = "none";
+                card.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        if (noResultsRow) {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+                noResultsRow.style.setProperty('display', (mobileCards.length > 0 && totalVisibleMobile === 0) ? 'table-row' : 'none', 'important');
+            } else {
+                noResultsRow.style.setProperty('display', (desktopRows.length > 0 && totalVisibleDesktop === 0) ? 'table-row' : 'none', 'important');
             }
         }
     }
 
-    // Escuchamos eventos en ambos componentes
-    if (searchInput) {
-        searchInput.addEventListener('input', executeCombinedFilter);
-    }
-    if (controlFilter) {
-        controlFilter.addEventListener('change', executeCombinedFilter);
-    }
+    if (searchInput) searchInput.addEventListener('input', executeCombinedFilter);
+    if (controlFilter) controlFilter.addEventListener('change', executeCombinedFilter);
+    window.addEventListener('resize', executeCombinedFilter);
 });

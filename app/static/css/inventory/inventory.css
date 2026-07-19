@@ -1,26 +1,19 @@
-/* =========================================================================
-   PALETA DE COLORES CORPORATIVA (Sincronizada con Directorio de Personal)
-   ========================================================================= css de listado de productos*/
 :root {
-    --ph-red: #b01212;        /* Rojo exacto de la marca */
-    --ph-red-hover: #8c0e0e;  /* Variación oscura para hovers */
-    --ph-red-light: #fdf2f2;  /* Fondos suaves o alertas */
+    --ph-red: #b01212;
+    --ph-red-hover: #8c0e0e;
+    --ph-red-light: #fdf2f2;
     --ph-text-main: #1F2937;
     --ph-text-soft: #4B5563;
     --ph-text-muted: #8892A0;
-    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-bg-main: #F1F5F9;
     --ph-border-soft: #E2E8F0;
 }
 
-/* Fondo general del módulo */
 .container-fluid {
     background-color: var(--ph-bg-main) !important;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* =========================================================================
-   CONTENEDOR CENTRAL PANEL BLANCO (Aislamiento Premium)
-   ========================================================================= */
 .custom-card-list {
     background-color: #FFFFFF !important;
     border-radius: 24px !important;
@@ -29,21 +22,21 @@
     padding: 2rem !important;
 }
 
-/* Icono principal del módulo */
 .brand-icon-box {
     background-color: var(--ph-red) !important;
     border-radius: 12px !important;
     box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
 }
 
-/* =========================================================================
-   BOTONES Y ACCIONES CORPORATIVAS
-   ========================================================================= */
+.module-title-text {
+    font-size: 1.75rem;
+}
+
 .btn-mariuska-red {
     background-color: var(--ph-red) !important;
     color: #FFFFFF !important;
     border: none !important;
-    border-radius: 50px !important; /* Cambiado a forma de píldora */
+    border-radius: 50px !important;
     font-weight: 600;
     transition: all 0.2s ease-in-out !important;
 }
@@ -52,42 +45,56 @@
     background-color: var(--ph-red-hover) !important;
     color: #FFFFFF !important;
     transform: translateY(-1px);
-    /* Aura/Brillo rojo sutil */
     box-shadow: 0 0 14px rgba(176, 18, 18, 0.45) !important; 
 }
 
-/* Lápiz de edición en azul premium sutil */
 .btn-action-edit {
-    color: #4B5563 !important;
-    transition: color 0.15s ease, transform 0.15s ease;
-}
-.btn-action-edit:hover {
-    color: var(--ph-red) !important;
-    transform: scale(1.1);
+    height: 36px;
+    padding: 0 16px;
+    background-color: #f8f9fa;
+    color: var(--ph-text-soft, #4B5563);
+    border: 1px solid var(--ph-border-soft, #E2E8F0);
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
 }
 
-/* =========================================================================
-   TABLA DE PRODUCTOS (Mapeado sobre la estructura de base_list)
-   ========================================================================= */
+.btn-action-edit:hover {
+    background-color: var(--ph-red-light, #fdf2f2) !important;
+    color: var(--ph-red, #b01212) !important;
+    border-color: rgba(176, 18, 18, 0.2) !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
+}
+
+.btn-action-edit i {
+    line-height: 1;
+}
+
 #genericTable {
     border-collapse: separate !important;
     border-spacing: 0 !important;
     width: 100%;
 }
 
-/* Encabezado elegante */
 #genericTable .content-table-header th {
-    background-color: var(--ph-red) !important; /* Cambiado a rojo */
-    color: #FFFFFF !important; /* Letras blancas para contraste */
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
     font-weight: 700;
-    font-size: 0.78rem; /* Tamaño incrementado */
+    font-size: 0.78rem;
     letter-spacing: 0.5px;
     padding: 14px 16px !important;
     border-bottom: 2px solid var(--ph-border-soft) !important;
     text-transform: uppercase;
 }
 
-/* Redondeado para las esquinas superiores de la tabla */
 #genericTable .content-table-header th:first-child {
     border-top-left-radius: 14px !important;
 }
@@ -95,22 +102,19 @@
     border-top-right-radius: 14px !important;
 }
 
-/* Celdas del cuerpo más grandes y legibles */
 #genericTable td {
-    padding: 16px !important; /* Mayor separación */
+    padding: 16px !important;
     border-bottom: 1px solid var(--ph-border-soft) !important;
     color: var(--ph-text-main) !important;
-    font-size: 0.88rem; /* Tamaño de letra más cómodo para leer */
+    font-size: 0.88rem;
     background-color: #FFFFFF;
 }
 
-/* Ajuste de tamaño para los estados (badges) dentro de la tabla */
 #genericTable td .badge {
     font-size: 0.82rem !important;
     padding: 6px 14px !important;
 }
 
-/* Efecto hover en las filas principales */
 .main-product-row {
     transition: background-color 0.15s ease;
 }
@@ -118,15 +122,11 @@
     background-color: #F8FAFC !important;
 }
 
-/* =========================================================================
-   COMPORTAMIENTO DE FILAS INHABILITADAS
-   ========================================================================= */
 .main-product-row.row-inhabilitada td {
     background-color: #FAFAFA !important;
     color: var(--ph-text-muted) !important;
 }
 
-/* Indicador lateral ámbar/amarillo para filas inactivas sin romper el diseño */
 .main-product-row.row-inhabilitada td:first-child {
     box-shadow: inset 4px 0 0 #D97706 !important;
 }
@@ -135,7 +135,6 @@
     opacity: 0.6;
 }
 
-/* Detalle desplegable de especificaciones */
 .row-technical-details td {
     background-color: #F8FAFC !important;
     border-bottom: 1px solid var(--ph-border-soft) !important;
@@ -145,10 +144,6 @@
     border-left: 4px solid var(--ph-red) !important;
 }
 
-/* =========================================================================
-   ELEMENTOS DE INTERFAZ (Buscadores, Switches y Desplegables)
-   ========================================================================= */
-/* Custom Switch estilo Pizza Hut */
 .mariuska-custom-switch:checked {
     background-color: var(--ph-red) !important;
     border-color: var(--ph-red) !important;
@@ -157,15 +152,13 @@
     box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.15) !important;
 }
 
-/* Contenedor del filtro select */
 .mariuska-select-group {
     border: 1px solid var(--ph-border-soft) !important;
     background-color: #FFFFFF !important;
-    border-radius: 50px !important; /* Cambiado a píldora */
+    border-radius: 50px !important;
     transition: all 0.2s ease-in-out !important;
 }
 
-/* Brillo rojo al hacer click o interactuar */
 .mariuska-select-group:focus-within {
     border-color: var(--ph-red) !important;
     box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
@@ -174,53 +167,76 @@
 .product-clickable-cell {
     cursor: pointer;
 }
-/* Unificar barra de búsqueda con el estilo del filtro select */
-#categorySearchInput {
+
+#categorySearchInput, #searchInput {
     border: 1px solid var(--ph-border-soft, #dee2e6) !important;
     background-color: #f8f9fa !important;
     transition: all 0.3s ease-in-out !important;
     color: var(--ph-text-main, #1F2937) !important;
 }
 
-/* Brillo interactivo rojo corporativo al usar la barra de búsqueda */
-#categorySearchInput:focus {
+#categorySearchInput:focus, #searchInput:focus {
     border-color: var(--ph-red, #b01212) !important;
     box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
     background-color: #ffffff !important;
     outline: none !important;
 }
-/* Botón de acción Editar - Estilo de celda limpia */
-/* Botón de acción Editar - Adaptado para contener Texto + Icono */
-.btn-action-edit {
-    height: 36px;
-    padding: 0 16px; /* Relleno horizontal para que respire el texto */
-    background-color: #f8f9fa;
-    color: var(--ph-text-soft, #4B5563);
-    border: 1px solid var(--ph-border-soft, #E2E8F0);
-    border-radius: 10px; /* Esquinas redondeadas suaves */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease-in-out;
-    cursor: pointer;
+
+@media (max-width: 767.98px) {
+    .module-title-text {
+        font-size: 1.4rem !important;
+        line-height: 1.2;
+    }
     
-    /* Tipografía alineada al estilo Mariuska */
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: -0.1px;
-    white-space: nowrap; /* Evita que el texto se salte de línea */
-}
+    .brand-icon-box {
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0.5rem !important;
+    }
+    
+    .brand-icon-box i {
+        font-size: 1.25rem !important;
+    }
+    
+    .btn-mariuska-red {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mariuska-select-group {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
 
-/* Efecto Hover interactivo */
-.btn-action-edit:hover {
-    background-color: var(--ph-red-light, #fdf2f2) !important; /* Fondo rojo claro suave */
-    color: var(--ph-red, #b01212) !important; /* Texto e Icono rojo corporativo */
-    border-color: rgba(176, 18, 18, 0.2) !important;
-    transform: translateY(-1.5px); /* Micro-levantamiento visual */
-    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
-}
+    .content-table-header {
+        display: none !important;
+    }
+    
+    #genericTable, #genericTable tbody,
+    #genericTable tr.d-md-none, #genericTable tr.d-md-none td,
+    .alert-row, .alert-row td,
+    .generic-pagination-row, .generic-pagination-row td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
 
-/* Alineación exacta del icono con el nuevo texto */
-.btn-action-edit i {
-    line-height: 1;
+    .mobile-card-item {
+        background-color: #ffffff;
+        border: 1px solid var(--ph-border-soft);
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-card-item.row-inhabilitada {
+        background-color: #FAFAFA !important;
+        opacity: 0.85;
+        border-left: 4px solid #D97706 !important;
+    }
 }

@@ -1,47 +1,42 @@
-{% extends 'base_list.html' %} #listado de productos#
+{% extends 'base_list.html' %} 
 
 {% block title %}Insumos | Sistema de Gestion PH{% endblock %}
 
 {% block extra_css %}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/base_list.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
 {% endblock %}
 
-{# 1. Configuración de la barra de búsqueda nativa de la plantilla base #}
 {% block search_input_id %}searchInput{% endblock %}
 {% block search_placeholder %}Buscar por nombre o SKU...{% endblock %}
 
-{# 2. Título e Icono principal #}
 {% block title_list %}
     <div class="d-flex align-items-center">
         <div class="bg-mariuska-red text-white p-2 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 45px; height: 45px; border-radius: 10px;">
             <i class="bi bi-boxes fs-4"></i>
         </div>
-        <span style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px; font-size: 1.75rem;">Gestión de Insumos</span>
+        <span class="module-title-text" style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px;">Gestión de Insumos</span>
     </div>
 {% endblock %}
 
-{# 3. Subtítulo #}
 {% block subtitle_list %}Control, stock y descripciones técnicas de insumos a nivel nacional{% endblock %}
 
-{# 4. Botones de acción superiores (Forma de píldora con padding armónico) #}
 {% block actions_top %}
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
+    <div class="d-flex flex-column flex-md-row gap-2 w-100">
+        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center justify-content-center gap-2" style="font-size: 0.88rem;">
             <i class="bi bi-tags"></i> Ver Categorías
         </a>
-        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
+        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center justify-content-center gap-2" style="font-size: 0.88rem;">
             <i class="bi bi-plus-lg"></i> Nuevo Insumo
         </a>
     </div>
 {% endblock %}
 
-{# 5. Filtro de estatus adaptado a píldora ultra-redondeada #}
 {% block actions_filter %}
-    <div class="input-group mariuska-select-group bg-white px-3 py-1" style="min-width: 200px;">
+    <div class="input-group mariuska-select-group bg-white px-3 py-1 w-100 mt-3 mt-md-0">
         <span class="input-group-text bg-transparent border-0 text-muted ps-1 pe-1">
             <i class="bi bi-funnel"></i>
         </span>
@@ -53,7 +48,6 @@
     </div>
 {% endblock %}
 
-{# 6. Encabezados de la Tabla #}
 {% block table_head %}
     <th class="text-center text-uppercase tracking-wider">SKU</th>
     <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
@@ -64,15 +58,13 @@
     <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
 {% endblock %}
 
-{# 7. Cuerpo de la tabla y filas de datos #}
 {% block table_body %}
     
-    {# Zona de Mensajes Flash integrada elegantemente como fila al inicio de la tabla #}
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <tr class="border-0 alert-row">
-                    <td colspan="7" class="border-0 p-2">
+                <tr class="border-0 alert-row d-md-table-row">
+                    <td colspan="7" class="border-0 p-2 d-block d-md-table-cell">
                         <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-2 py-2" role="alert">
                             <small class="fw-semibold">{{ message }}</small>
                             <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -97,7 +89,7 @@
 
     {% if products %}
         {% for product in products %}
-            <tr class="main-product-row {% if not product.is_active %}row-inhabilitada{% endif %} border-bottom" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
+            <tr class="main-product-row d-none d-md-table-row {% if not product.is_active %}row-inhabilitada{% endif %} border-bottom" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
                 <td class="text-center product-clickable-cell">
                     <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold fs-7">{{ product.sku }}</span>
                 </td>
@@ -141,7 +133,7 @@
                 </td>
             </tr>
 
-            <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details bg-light-subtle">
+            <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details d-none d-md-table-row bg-light-subtle">
                 <td colspan="7" class="p-0">
                     <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
                         <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
@@ -154,11 +146,67 @@
                 </td>
             </tr>
         {% endfor %}
+
+        <tr class="d-md-none p-0 border-0 bg-transparent">
+            <td colspan="7" class="p-0 border-0 bg-transparent">
+                <div id="mobileProductsContainer">
+                    {% for product in products %}
+                    <div class="mobile-card-item main-product-row-mobile {% if not product.is_active %}row-inhabilitada{% endif %}" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
+                        <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+                            <div>
+                                <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold mb-1">{{ product.sku }}</span>
+                                <h6 class="fw-bold text-dark m-0">{{ product.name }}</h6>
+                                <span class="text-secondary small">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
+                            </div>
+                            <div class="status-badge-cell-mobile">
+                                {% if product.is_active %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 status-badge" style="font-size: 0.75rem;">Operativa</span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1 status-badge" style="font-size: 0.75rem;">Inactiva</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted small fw-bold">Cantidad Actual:</span>
+                            <span class="fw-bold text-dark">{{ product.quantity }} <span class="text-muted fw-normal">{{ product.unit_of_measure }}</span></span>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                            <button class="btn btn-sm btn-light border flex-grow-1 text-muted fw-bold" data-bs-toggle="collapse" data-bs-target="#tech-desc-mobile-{{ product.id }}">
+                                <i class="bi bi-info-circle"></i> Info
+                            </button>
+                            <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-sm btn-light border flex-grow-1 text-muted fw-bold">
+                                <i class="bi bi-pencil-square"></i> Editar
+                            </a>
+                            <div class="form-check form-switch m-0 d-flex align-items-center justify-content-center border rounded px-3 bg-light">
+                                <input class="form-check-input mariuska-custom-switch toggle-status-switch m-0 cursor-pointer" 
+                                    type="checkbox" 
+                                    role="switch" 
+                                    data-url="{{ url_for('inventory.toggle_product_status', product_id=product.id) }}"
+                                    {% if product.is_active %}checked{% endif %}>
+                            </div>
+                        </div>
+
+                        <div id="tech-desc-mobile-{{ product.id }}" class="collapse mt-3 row-technical-details-mobile">
+                            <div class="p-3 bg-light-subtle border-start border-4 border-mariuska rounded">
+                                <div class="fw-bold mb-1 text-uppercase text-secondary" style="font-size: 0.7rem;">
+                                    <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica
+                                </div>
+                                <p class="m-0 text-muted small lh-base">
+                                    {{ product.technical_description if product.technical_description else 'No se ha registrado ninguna especificación técnica de almacenamiento para este insumo.' }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </td>
+        </tr>
     {% endif %}
 
-    {# Inyección limpia de la paginación dentro del cuerpo de la tabla #}
-    <tr class="border-0 generic-pagination-row">
-        <td colspan="7" class="border-0 bg-transparent p-0">
+    <tr class="border-0 generic-pagination-row d-md-table-row d-block">
+        <td colspan="7" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
             <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-3 gap-2" style="display: none !important;">
                 <nav aria-label="Paginación de insumos">
                     <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
@@ -169,7 +217,6 @@
     </tr>
 {% endblock %}
 
-{# 8. Enlace al archivo JS externo #}
 {% block extra_js %}
-    <script src="{{ url_for('static', filename='js/inventory/list_products.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/inventory/list_products.js') }}?v=3.0"></script>
 {% endblock %}
