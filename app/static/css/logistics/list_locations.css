@@ -124,7 +124,11 @@ body.bg-main {
 }
 
 /* Botón Dropdown Estilo Píldora */
+/* Botón Dropdown Estilo Píldora - Base General */
 .form-select-ph-sm {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important; /* Distribuye el texto a la izquierda y la flecha a la derecha */
     height: 44px !important;
     border-radius: 50px !important;
     background-color: #F8FAFC !important;
@@ -134,7 +138,6 @@ body.bg-main {
     font-weight: 500 !important;
     padding: 0 20px !important;
     width: 100% !important;
-    text-align: left !important;
     transition: all 0.2s ease-in-out !important;
 }
 
@@ -331,4 +334,214 @@ body.bg-main {
 
 .row-inactive .btn-toggle i {
     color: #D97706 !important;
+}
+/* ==========================================================================
+   VISTA MÓVIL PERFECCIONADA - SIN HOVER Y FILTROS CENTRADOS
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    
+    /* 1. Forzar alineación vertical perfecta al 100% de ancho */
+    .d-flex.justify-content-between.align-items-center,
+    .d-flex.flex-column.flex-md-row {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 0.75rem !important;
+    }
+
+    /* 2. CORRECCIÓN FILTRO: Centrado absoluto sin rupturas de línea */
+    .custom-ph-dropdown {
+        width: 100% !important;
+        min-width: auto !important; 
+        margin-top: 0.25rem;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* Forzar que el botón interno agrupe el contenido inline en el medio */
+    .form-select-ph-sm, 
+    .custom-ph-dropdown button {
+        width: 100% !important;
+        height: 44px !important;            /* Mantiene la altura limpia de la píldora */
+        display: flex !important;
+        flex-direction: row !important;     /* ¡CLAVE! Contrarresta el choque y lo obliga a ser fila */
+        align-items: center !important;     /* Alineación vertical perfecta */
+        justify-content: center !important; /* Junta el grupo del texto y la flecha en el centro */
+        gap: 4px !important;                /* Separación milimétrica entre el texto y el chevron */
+        text-align: center !important;
+        flex-wrap: nowrap !important;       /* Bloquea por completo cualquier mutación de línea */
+        padding: 0 15px !important;
+    }
+
+    /* Forzar que el texto y el icono del embudo mantengan su flujo flex */
+    .custom-ph-dropdown #selectedStatusText {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;                /* Separación limpia entre el embudo y las palabras */
+        white-space: nowrap !important;
+    }
+
+    /* Evitar desfases visuales con el icono del chevron descendente */
+    .custom-ph-dropdown .bi-chevron-down {
+        display: inline-block !important;
+        margin: 0 !important;
+    }
+
+    /* Forzar que el texto y el icono del embudo mantengan su flujo flex */
+    .custom-ph-dropdown #selectedStatusText {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        white-space: nowrap !important;
+    }
+
+    /* Evitar desfases visuales con el icono del chevron descendente */
+    .custom-ph-dropdown .bi-chevron-down {
+        display: inline-block !important;
+        margin: 0 !important;
+    }
+
+    /* 3. Homologar el tamaño idéntico para todos los controles superiores */
+    .btn-ph-red,
+    .search-box-improved, 
+    #searchInput {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 4. ESTRUCTURA DE TARJETAS (Desarmado de tabla nativa) */
+    #phTableCustom, #phTableCustom tbody,
+    tr.sede-row-mobile, tr.sede-row-mobile td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    #phTableCustom thead {
+        display: none !important;
+    }
+
+    /* CORRECCIÓN HOVER: Anular por completo el fondo gris de Bootstrap al hacer clic o tap */
+    tr.sede-row-mobile,
+    tr.sede-row-mobile:hover,
+    tr.sede-row-mobile:active,
+    tr.sede-row-mobile:focus,
+    tr.sede-row-mobile td,
+    tr.sede-row-mobile td:hover,
+    tr.sede-row-mobile td:active {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* El contenedor blanco interno mantiene su comportamiento limpio */
+    .mobile-card-item {
+        background-color: #ffffff !important;
+        border: 1px solid var(--ph-border-soft);
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    /* Estado Inactivo */
+    tr.row-inactive .mobile-card-item {
+        background-color: #FFF9F2 !important;
+        border-left: 4px solid #F59E0B !important;
+    }
+    
+    tr.row-inactive .mobile-card-item .fw-bold {
+        color: #875103 !important;
+    }
+
+    /* ==========================================================================
+       CUADRITOS DE ACCIÓN MINIMALISTAS (SOLO ICONO)
+       ========================================================================== */
+    .btn-mobile-action {
+        background-color: #ffffff !important;
+        border: 1px solid var(--ph-border-soft) !important;
+        border-radius: 10px !important;
+        height: 40px;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+        padding: 0 !important;
+    }
+    
+    .btn-mobile-action:hover {
+        background-color: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .icon-mobile-edit { color: #0284c7 !important; }
+    .icon-mobile-status-active { color: var(--ph-red) !important; }
+    .icon-mobile-status-inactive { color: #16a34a !important; }
+}
+
+/* ==========================================================================
+   VISTA TABLET OPTIMIZADA (Pantallas medianas 768px - 1024px)
+   Asegura que el listado de PC respire perfecto sin deformar textos ni píldoras
+   ========================================================================== */
+@media (min-width: 768px) {
+    /* Ocultar la fila móvil nativa en tablets y escritorios */
+    tr.sede-row-mobile {
+        display: none !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* 1. Reducir ligeramente el relleno de la tarjeta blanca contenedora */
+    .content-card {
+        padding: 1rem !important;
+    }
+
+    /* 2. Compactar el acolchado (padding) de las celdas para ganar valioso espacio horizontal */
+    #phTableCustom thead th,
+    #phTableCustom tbody td {
+        padding: 12px 10px !important; /* Bajamos de 16px/20px para ensanchar las columnas */
+        font-size: 0.85rem !important;   /* Ajuste milimétrico de fuente */
+    }
+
+    /* Evitar que los nombres largos colapsen en demasiadas líneas */
+    #phTableCustom tbody tr td .fw-bold.text-ph-dark {
+        font-size: 0.85rem !important;
+        display: block;
+        line-height: 1.2;
+    }
+
+    /* 3. Reducir las dimensiones de las píldoras internas */
+    .contact-pill {
+        padding: 4px 10px !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap !important; /* Evita que el teléfono se divida */
+    }
+
+    .status-pill {
+        padding: 4px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* 4. Evitar que la columna de acciones se desborde */
+    #phTableCustom td:last-child {
+        padding-right: 10px !important;
+    }
+    
+    /* Reducir la separación de los iconos de edición y switch */
+    #phTableCustom .gap-3 {
+        gap: 0.5rem !important;
+    }
+    
+    .btn-toggle i.fs-3 {
+        font-size: 1.5rem !important; /* Ajusta levemente el tamaño del interruptor toggle */
+    }
+    .btn-toggle i.fs-4 {
+        font-size: 1.25rem !important; /* Ajusta levemente el tamaño del lápiz */
+    }
 }

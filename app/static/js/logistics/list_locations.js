@@ -61,19 +61,30 @@ function filtrarTabla() {
                             (statusFilter === "active" && isRowActive) || 
                             (statusFilter === "inactive" && !isRowActive);
 
+        // SOLUCIÓN AL BUG DE RENDERS: Forzar !important inline para ganarle a Bootstrap
         if (matchesText && matchesStatus) {
-            row.style.display = "";
+            row.style.removeProperty('display'); // Remueve el override y deja que actúe el CSS nativo
             visibleCount++;
         } else {
-            row.style.display = "none";
+            row.style.setProperty('display', 'none', 'important'); // Oculta con máxima prioridad
         }
     });
 
     const noResultsRow = document.getElementById('noResultsRow');
     if (noResultsRow) {
-        noResultsRow.style.display = visibleCount === 0 ? "" : "none";
+        if (visibleCount === 0) {
+            noResultsRow.style.removeProperty('display');
+        } else {
+            noResultsRow.style.setProperty('display', 'none', 'important');
+        }
     }
 }
 
-// Escuchar los eventos del buscador
-document.getElementById('searchInput').addEventListener('keyup', filtrarTabla);
+// Escuchar eventos en tiempo real garantizando la carga completa del DOM
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        // 'input' es más preciso que 'keyup' para entornos móviles
+        searchInput.addEventListener('input', filtrarTabla);
+    }
+});

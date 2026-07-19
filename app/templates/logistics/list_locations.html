@@ -30,8 +30,8 @@
 
 {% block actions_filter %}
     <div class="dropdown custom-ph-dropdown" style="min-width: 200px;">
-        <!-- Se removió la clase "btn" para evitar conflictos visuales -->
-        <button class="form-select-ph-sm d-flex align-items-center justify-content-between w-100" 
+        <!-- CLAVE: Limpiamos las clases que causaban el choque para que herede el CSS puro -->
+        <button class="form-select-ph-sm w-100" 
                 type="button" id="statusDropdown" data-bs-toggle="dropdown" aria-expanded="false">
             <span id="selectedStatusText">
                 <i class="bi bi-funnel me-2"></i> Todos los estatus
@@ -59,7 +59,8 @@
 
 {% block table_body %}
     {% for location in locations %}
-    <tr class="sede-row {{ 'row-inactive' if not location.is_active }}">
+    <!-- VISTA PC: Se oculta en móviles -->
+    <tr class="sede-row d-none d-md-table-row {{ 'row-inactive' if not location.is_active }}">
         <td class="ps-4">
             <div class="d-flex align-items-center">
                 <span class="id-badge">{{ location.id }}</span>
@@ -92,6 +93,61 @@
                     onclick="prepararModal(this)">
                     <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
                 </button>
+            </div>
+        </td>
+    </tr>
+
+    <!-- VISTA MÓVIL: Tarjeta limpia con acciones representadas únicamente por iconos -->
+    <tr class="sede-row sede-row-mobile d-md-none {{ 'row-inactive' if not location.is_active }}" style="background: transparent !important; border: none !important;">
+        <td colspan="5" class="p-0 border-0 bg-transparent">
+            <div class="mobile-card-item">
+                
+                <!-- Encabezado de la Tarjeta (Badge ID + Nombre y Estatus) -->
+                <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+                    <div>
+                        <span class="id-badge mb-1 d-inline-block">#{{ location.id }}</span>
+                        <h6 class="fw-bold text-dark m-0">{{ location.name }}</h6>
+                    </div>
+                    <div>
+                        {% if location.is_active %}
+                            <span class="status-pill active badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; font-weight: 700;">Operativa</span>
+                        {% else %}
+                            <span class="status-pill inactive badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; font-weight: 700;">Fuera de Servicio</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Cuerpo: Dirección de la Sucursal -->
+                <div class="mb-3">
+                    <span class="text-muted small fw-bold d-block mb-1">Dirección Sucursal:</span>
+                    <span class="text-muted small d-block lh-sm">{{ location.address or 'Sin dirección asignada' }}</span>
+                </div>
+
+                <!-- Cuerpo: Contacto Directo -->
+                <div class="mb-3">
+                    <span class="text-muted small fw-bold d-block mb-1">Contacto Directo:</span>
+                    <div class="contact-pill py-1 px-3 d-inline-flex" style="font-size: 0.85rem;">
+                        <i class="bi bi-phone me-2"></i>{{ location.phone or 'S/N' }}
+                    </div>
+                </div>
+
+                <!-- Acciones: Cuadritos limpios que solo colorean el icono interno -->
+                <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                    <a href="{{ url_for('locations.edit_location', location_id=location.id) }}" class="btn-mobile-action flex-grow-1" title="Editar Sede">
+                        <i class="bi bi-pencil-square icon-mobile-edit fs-5"></i>
+                    </a>
+                    
+                    <button type="button" 
+                        class="btn-mobile-action flex-grow-1"
+                        data-id="{{ location.id }}"
+                        data-name="{{ location.name }}"
+                        data-active="{{ 'true' if location.is_active else 'false' }}"
+                        onclick="prepararModal(this)"
+                        title="Cambiar Estado">
+                        <i class="bi {{ 'bi-toggle-on icon-mobile-status-active' if location.is_active else 'bi-toggle-off icon-mobile-status-inactive' }} fs-4"></i>
+                    </button>
+                </div>
+
             </div>
         </td>
     </tr>
