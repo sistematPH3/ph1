@@ -1,0 +1,272 @@
+/* ==========================================================================
+   ESTILOS DEDICADOS EXCLUSIVAMENTE PARA LA GESTIÓN DE CATEGORÍAS
+   ========================================================================== */
+
+:root {
+    --ph-red: #b01212;
+    --ph-red-hover: #8c0e0e;
+    --ph-red-light: #fdf2f2;
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;
+    --ph-border-soft: #E2E8F0;
+}
+
+.container-fluid {
+    background-color: var(--ph-bg-main) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.custom-card-list {
+    background-color: #FFFFFF !important;
+    border-radius: 24px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    padding: 2rem !important;
+}
+
+.brand-icon-box {
+    background-color: var(--ph-red) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
+}
+
+.module-title-text {
+    font-size: 1.75rem;
+}
+
+.btn-mariuska-red {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.btn-mariuska-red:hover {
+    background-color: var(--ph-red-hover) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 0 14px rgba(176, 18, 18, 0.45) !important; 
+}
+
+.btn-action-edit {
+    height: 36px;
+    padding: 0 16px;
+    background-color: #f8f9fa;
+    color: var(--ph-text-soft, #4B5563);
+    border: 1px solid var(--ph-border-soft, #E2E8F0);
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+}
+
+.btn-action-edit:hover {
+    background-color: var(--ph-red-light, #fdf2f2) !important;
+    color: var(--ph-red, #b01212) !important;
+    border-color: rgba(176, 18, 18, 0.2) !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
+}
+
+.btn-action-edit i {
+    line-height: 1;
+}
+
+#genericTable {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+}
+
+#genericTable .content-table-header th {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.5px;
+    padding: 14px 16px !important;
+    border-bottom: 2px solid var(--ph-border-soft) !important;
+    text-transform: uppercase;
+}
+
+#genericTable .content-table-header th:first-child {
+    border-top-left-radius: 14px !important;
+}
+#genericTable .content-table-header th:last-child {
+    border-top-right-radius: 14px !important;
+}
+
+#genericTable td {
+    padding: 16px !important;
+    border-bottom: 1px solid var(--ph-border-soft) !important;
+    color: var(--ph-text-main) !important;
+    font-size: 0.88rem;
+    background-color: #FFFFFF;
+}
+
+#genericTable td .badge {
+    font-size: 0.82rem !important;
+    padding: 6px 14px !important;
+}
+
+.mariuska-select-group {
+    border: 1px solid var(--ph-border-soft) !important;
+    background-color: #FFFFFF !important;
+    border-radius: 50px !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.mariuska-select-group:focus-within {
+    border-color: var(--ph-red) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
+}
+
+#categorySearchInput {
+    border: 1px solid var(--ph-border-soft, #dee2e6) !important;
+    background-color: #f8f9fa !important;
+    transition: all 0.3s ease-in-out !important;
+    color: var(--ph-text-main, #1F2937) !important;
+}
+
+#categorySearchInput:focus {
+    border-color: var(--ph-red, #b01212) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
+    background-color: #ffffff !important;
+    outline: none !important;
+}
+
+/* ==========================================================================
+   VISTA DE TELÉFONO - SE ACTIVA EN PANTALLAS MENORES A 768px
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .module-title-text {
+        font-size: 1.4rem !important;
+        line-height: 1.2;
+    }
+    
+    .brand-icon-box {
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0.5rem !important;
+    }
+    
+    .brand-icon-box i {
+        font-size: 1.25rem !important;
+    }
+    
+    .btn-mariuska-red {
+        width: 100% !important;
+        justify-content: center !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .mariuska-select-group {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .content-table-header {
+        display: none !important;
+    }
+    
+    #genericTable, #genericTable tbody,
+    #genericTable tr.d-md-none, #genericTable tr.d-md-none td,
+    .alert-row, .alert-row td,
+    .generic-pagination-row, .generic-pagination-row td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    .mobile-card-item {
+        background-color: #ffffff;
+        border: 1px solid var(--ph-border-soft);
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+}
+
+/* ==========================================================================
+   VISTA DE PC - SE ACTIVA EN PANTALLAS GRANDES DESDE 768px
+   ========================================================================== */
+@media (min-width: 768px) {
+    /* Ajuste único para Categorías: Pegado al ras derecho sin espacio muerto */
+    .mariuska-select-group {
+        width: 240px !important;
+        flex-shrink: 0 !important;
+        margin-left: auto !important;
+        margin-right: 0 !important; /* Al ras de la derecha como deseas */
+    }
+
+    .btn-mariuska-red {
+        font-size: 0.96rem !important;
+        padding: 0.55rem 1.7rem !important;
+        width: auto !important;
+    }
+}
+
+#genericTable .generic-pagination-row td {
+    padding: 0 !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+#genericTable .generic-pagination-row:hover td {
+    background-color: transparent !important;
+}
+/* ==========================================================================
+   VISTA TABLET - OPTIMIZACIÓN COMPACTA PARA CONFIGURACIÓN DE CATEGORÍAS
+   ========================================================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .custom-card-list {
+        padding: 1.25rem !important;
+    }
+
+    /* Píldora estable: Ancho ideal para "Todos los controles" + Iconos */
+    .mariuska-select-group {
+        width: 235px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Ajuste select interno para blindar el texto y su flecha */
+    .mariuska-select-group .form-select {
+        font-size: 0.82rem !important;
+        padding-right: 2rem !important; /* Mantiene la flecha en su zona segura */
+    }
+
+    .btn-mariuska-red {
+        font-size: 0.85rem !important;
+        padding: 0.45rem 1.2rem !important;
+    }
+
+    #genericTable td, 
+    #genericTable .content-table-header th {
+        padding: 12px 10px !important;
+        font-size: 0.82rem !important;
+    }
+
+    #genericTable .content-table-header th {
+        font-size: 0.75rem !important;
+    }
+
+    .btn-action-edit {
+        height: 32px;
+        padding: 0 12px;
+        font-size: 0.80rem;
+    }
+}

@@ -5,7 +5,7 @@
 {% block extra_css %}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/base_list.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/categories.css') }}?v=3.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
 {% endblock %}
@@ -38,7 +38,8 @@
 {% block subtitle_list %}Reglas de automatización de fechas de control y vencimientos{% endblock %}
 
 {% block actions_top %}
-    <div class="d-flex flex-column flex-md-row gap-2 w-100">
+    <!-- Añadimos justify-content-md-end para alinear los botones a la derecha en PC -->
+    <div class="d-flex flex-column flex-md-row gap-2 justify-content-md-end w-100">
         <a href="{{ url_for('inventory.list_products') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
             <i class="bi bi-boxes"></i> Volver al Listado
         </a>
@@ -56,15 +57,14 @@
 {% endblock %}
 
 {% block actions_filter %}
-    <div class="d-flex align-items-center w-100 mt-3 mt-md-0">
-        <div class="mariuska-select-group d-flex align-items-center px-3 w-100">
-            <i class="bi bi-filter text-muted me-2"></i>
-            <select id="controlTypeFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important; font-size: 0.88rem;">
-                <option value="all">Todos los controles</option>
-                <option value="automatic">Automático (Días Hábiles)</option>
-                <option value="manual">Manual (Lote / Compras)</option>
-            </select>
-        </div>
+    <!-- Eliminamos el div contenedor externo y removemos la clase 'w-100' de la píldora -->
+    <div class="mariuska-select-group d-flex align-items-center px-3">
+        <i class="bi bi-filter text-muted me-2"></i>
+        <select id="controlTypeFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important; font-size: 0.88rem;">
+            <option value="all">Todos los controles</option>
+            <option value="automatic">Automático (Días Hábiles)</option>
+            <option value="manual">Manual (Lote / Compras)</option>
+        </select>
     </div>
 {% endblock %}
 

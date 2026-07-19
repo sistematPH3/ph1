@@ -14,14 +14,29 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     const searchInput = document.getElementById('categorySearchInput');
+    const filterGroup = document.querySelector('.mariuska-select-group');
+
     if (searchInput) {
-        const searchWrapper = searchInput.closest('.d-flex.justify-content-between');
+        const searchWrapper = searchInput.closest('.d-flex.justify-content-between') || searchInput.closest('.d-flex');
         if (searchWrapper) {
             searchWrapper.classList.remove('align-items-center');
-            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3');
+            // Añadimos 'w-100' para expandir la fila correctamente
+            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3', 'w-100'); 
+            
             Array.from(searchWrapper.children).forEach(child => {
                 child.classList.add('w-100', 'w-md-auto');
             });
+        }
+    }
+
+    // Corregimos los posibles contenedores que herede de base_list
+    if (filterGroup) {
+        filterGroup.classList.remove('w-100');
+        
+        const filterWrapper = filterGroup.parentElement;
+        if (filterWrapper && filterWrapper !== document.body) {
+            filterWrapper.classList.add('ms-md-auto', 'w-md-auto');
+            filterWrapper.classList.remove('w-100'); 
         }
     }
 
