@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/finance_dashboard.css') }}">
+
+<header class="dashboard-header">
+    <h1>Panel de Finanzas</h1>
+    <p>Bienvenido al módulo financiero, <strong>{{ current_user.name }}</strong>.</p>
+</header>
+
+<!-- Grid superior con las 2 tarjetas de auditoría (más grandes y espaciosas) -->
+<div class="metrics-grid finance-metrics">
+    <a href="{{ url_for('audit.ver_auditoria_accesos') }}" class="metric-card">
+        <div class="metric-info">
+            <h3>Auditoría de Accesos</h3>
+            <div class="subtitle-desc">Monitoreo de entradas y sesiones</div>
+        </div>
+        <div class="metric-icon">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+    </a>
+
+    <a href="{{ url_for('audit_user.list_user_audits') }}" class="metric-card">
+        <div class="metric-info">
+            <h3>Auditoría de Personal</h3>
+            <div class="subtitle-desc">Control y trazabilidad de acciones</div>
+        </div>
+        <div class="metric-icon">
+            <i class="fas fa-user-shield"></i>
+        </div>
+    </a>
+</div>
+
+<!-- Panel inferior extendido para Reportes -->
+<div class="dashboard-content-single">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Reportes Financieros</h2>
+            <a href="#" class="panel-link">Ver Detalles</a>
+        </div>
+        <div class="report-card-body" onclick="location.href='#'" title="Click para ver reportes">
+            <div class="report-content-placeholder">
+                <i class="fas fa-chart-line report-large-icon"></i>
+                <div>
+                    <h4>Generación y análisis de informes</h4>
+                    <p>Visualiza balances generales, ingresos, gastos y estadísticas de caja.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
