@@ -38,6 +38,8 @@ def login():
                 return redirect(url_for('dashboard.director_dashboard'))
             elif getattr(usuario, 'is_manager', False) or usuario.role_id == 2:
                 return redirect(url_for('dashboard.manager_dashboard'))
+            elif getattr(usuario, 'is_finance', False):
+                return redirect(url_for('dashboard.finance_dashboard'))
             elif usuario.is_guest:
                 return redirect(url_for('security.waiting_room'))
             else:
