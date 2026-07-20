@@ -451,3 +451,43 @@ body, html {
         font-size: 1.4rem;
     }
 }
+
+/* AJUSTES ESPECÍFICOS PARA TABLET (Entre 769px y 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    
+    /* 1. ELIMINACIÓN DE LÍNEAS EN CONTENEDORES */
+    .login-wrapper, .col-left, .col-right {
+        border: none !important;
+        outline: none !important;
+        background-clip: padding-box !important; /* Ayuda a evitar líneas de borde residuales */
+    }
+
+    /* 2. AJUSTE FINO DE LA MANCHA ROJA */
+    .col-right::before {
+        /* Desplazamos la mancha hacia la derecha cambiando de -200px a -120px */
+        left: -120px !important; 
+        /* Reducimos el ancho proporcionalmente para que encaje bien */
+        width: calc(100% + 120px) !important;
+    }
+
+    /* 3. Icono de usuario totalmente blanco */
+    .right-content-wrapper .group-icon {
+        opacity: 1 !important;
+    }
+
+    /* 4. Mover la pizza más arriba */
+    .col-left {
+        justify-content: flex-start !important;
+        padding-top: 60px !important;
+    }
+    
+    .pizza-slice-image {
+        margin-top: 40px !important;
+        margin-bottom: auto !important;
+    }
+
+    /* 5. Eliminar línea divisoria de los inputs */
+    .input-with-icon .vertical-divider {
+        display: none !important;
+    }
+}

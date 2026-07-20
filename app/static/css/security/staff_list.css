@@ -381,3 +381,236 @@
     font-weight: 300;
     line-height: 1;
 }
+/* ==========================================================================
+   ADAPTACIÓN A TARJETAS MÓVILES (Estilo "Gestión de Insumos")
+   ========================================================================== */
+@media (max-width: 992px) {
+    /* 1. Limpiar el contenedor base y ocultar la cabecera de la tabla */
+    .card-ph-clean {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .table-responsive {
+        background-color: transparent;
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+    }
+    #staffTable thead {
+        display: none;
+    }
+    #staffTable {
+        background-color: transparent;
+    }
+    
+    /* 2. Convertir el cuerpo de la tabla en un contenedor Flex apilado */
+    #staffTable tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 16px; 
+    }
+    
+    /* 3. Transformar cada fila (tr) en una Tarjeta Blanca Independiente */
+    #staffTable tbody tr {
+        display: flex;
+        flex-direction: column;
+        background-color: #FFFFFF !important;
+        border: 1px solid var(--ph-border-soft) !important;
+        border-radius: 16px;
+        /* Padding superior de 75px diseñado para alojar el ID y el Estado */
+        padding: 75px 20px 20px 20px; 
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        position: relative;
+    }
+
+    #staffTable td {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none !important;
+    }
+
+    /* 4. REUBICACIÓN ESTRATÉGICA DE ELEMENTOS */
+    
+    /* ESTADO (TD 4): Posicionamiento absoluto arriba a la derecha */
+    #staffTable td:nth-child(4) {
+        position: absolute;
+        top: 22px;
+        right: 20px;
+        width: auto;
+    }
+    #staffTable td:nth-child(4) .badge {
+        font-size: 0.85rem;
+        padding: 6px 16px;
+    }
+
+    /* ID DE REGISTRO (Dentro del TD 2): Posicionamiento absoluto arriba a la izquierda */
+    #staffTable td:nth-child(2) .user-id-subtext {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background-color: #FFFFFF;
+        border: 1px solid var(--ph-border-soft);
+        padding: 6px 14px;
+        border-radius: 50px; /* Estilo píldora delineado */
+        font-weight: 600;
+        color: var(--ph-text-soft);
+        font-size: 0.8rem;
+        margin: 0;
+    }
+
+    /* USUARIO (TD 1): Título Principal fluyendo justo debajo de la cabecera */
+    #staffTable td:nth-child(1) {
+        margin-bottom: 8px;
+    }
+    #staffTable td:nth-child(1) .user-name-text {
+        font-size: 1.25rem; 
+        color: var(--ph-text-main);
+        letter-spacing: -0.3px;
+    }
+    #staffTable td:nth-child(1) .user-role-subtext {
+        font-size: 0.95rem;
+    }
+
+    /* CORREO (Dentro del TD 2): Actúa como el subtítulo y traza la línea divisoria inferior */
+    #staffTable td:nth-child(2) .user-email-text {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--ph-border-soft);
+        font-size: 0.95rem;
+    }
+
+    /* SEDES (TD 3): Propiedad descriptiva alineada con sus valores */
+    #staffTable td:nth-child(3) {
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    #staffTable td:nth-child(3)::before {
+        content: "Sedes Asignadas:";
+        display: block;
+        font-size: 0.9rem;
+        color: var(--ph-text-main);
+        font-weight: 600;
+    }
+    #staffTable td:nth-child(3) .d-flex {
+        justify-content: flex-end;
+        max-width: 60%;
+    }
+
+    /* ACCIONES (TD 5): Contenedor inferior centralizado en recuadro grisáceo */
+    #staffTable td:nth-child(5) .d-flex {
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F8FAFC; 
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--ph-border-soft);
+    }
+    
+    .btn-ph-edit {
+        background-color: #FFFFFF;
+        border-color: var(--ph-border-soft);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        padding: 8px 24px;
+        font-weight: 600;
+    }
+    
+    /* Calibración del switch de estado para ajustarse al contenedor de acciones */
+    .form-check.form-switch {
+        margin: 0 !important;
+        padding-left: 2.5em;
+    }
+    .form-check-input {
+        width: 3.2em !important;
+        height: 1.6em !important;
+        cursor: pointer;
+    }
+
+    /* ==========================================================================
+       5. REORGANIZACIÓN DEL ENCABEZADO (Evitar superposición en móviles)
+       ========================================================================== */
+       
+    /* Cambiamos la dirección del contenedor principal a columna */
+    .main-white-panel > .d-flex.justify-content-between.mb-4 {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 16px;
+    }
+
+    /* Alineamos el icono con la primera línea del texto por si el título ocupa dos líneas */
+    .main-white-panel .d-flex.align-items-center.gap-3 {
+        align-items: flex-start !important;
+    }
+
+    /* Protegemos el icono para que no se aplaste o deforme */
+    .icon-box-red {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    /* Reducimos ligeramente el tamaño de la fuente del título para que fluya mejor */
+    .module-title {
+        font-size: 1.45rem; 
+        line-height: 1.2;
+    }
+
+    /* Aseguramos que la etiqueta "Módulo Administrativo" se coloque ordenadamente abajo */
+    .bg-ph-red-pill {
+        align-self: flex-start;
+        margin-top: 8px;
+    }
+
+    /* ==========================================================================
+       6. ESTADO VACÍO: "SIN RESULTADOS" PARA MÓVILES
+       ========================================================================== */
+       
+    #staffTable tr#noResultsRow {
+        /* Forzamos el contenedor a ser una tarjeta flex centrada */
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        
+        /* Estilo visual de estado vacío */
+        background-color: #F8FAFC !important;
+        border: 2px dashed var(--ph-border-soft) !important;
+        border-radius: 16px;
+        padding: 40px 20px !important;
+        margin-top: 10px;
+        box-shadow: none !important;
+    }
+
+    #staffTable tr#noResultsRow td {
+        display: block;
+        width: 100%;
+        text-align: center;
+        border: none !important;
+        padding: 0 !important;
+        background-color: transparent !important;
+        color: var(--ph-text-soft);
+    }
+
+    /* Si tienes una imagen, icono o SVG dentro del mensaje, esto lo centra y ajusta */
+    #staffTable tr#noResultsRow td img,
+    #staffTable tr#noResultsRow td i,
+    #staffTable tr#noResultsRow td svg {
+        margin-bottom: 16px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        opacity: 0.6; 
+    }
+
+    /* Ajuste para el texto del mensaje */
+    #staffTable tr#noResultsRow td h5,
+    #staffTable tr#noResultsRow td p,
+    #staffTable tr#noResultsRow td span {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--ph-text-main);
+    }
+} /* <--- Cierre del @media query */

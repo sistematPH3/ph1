@@ -1,13 +1,13 @@
 /* =========================================================
-   ESTILOS BASE Y ESTRUCTURA (PROTEGIDOS Y CORREGIDOS)
+   ESTILOS BASE Y ESTRUCTURA (PROTEGIDOS Y OPTIMIZADOS)
    ========================================================= */
 html, body { 
     margin: 0; 
     padding: 0;
-    height: 100vh; /* Fija el alto al tamaño de la pantalla */
+    height: 100vh; /* Fija el alto al tamaño de la ventana */
     font-family: 'Segoe UI', Arial, sans-serif; 
     background-color: #f4f4f9; 
-    overflow: hidden; /* Bloquea el scroll exterior para evitar barras dobles */
+    overflow: hidden; /* Bloquea el scroll exterior de la pantalla */
 }
 
 .wrapper { 
@@ -20,15 +20,28 @@ html, body {
 .sidebar { 
     width: 275px; 
     height: 100vh; 
-    background-color: #0d0e0e; 
+    background-color: #000000; 
     color: #ffffff; 
     flex-shrink: 0; 
     display: flex; 
     flex-direction: column;
-    /* CLAVE: Permitir que los elementos salgan de la barra lateral (como el botón y submenús flotantes) */
+    /* Por defecto permitimos que todo sea visible para que floten tus menús */
     overflow: visible; 
     position: relative;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ¡LA CLAVE! Forzamos el scroll vertical independiente cuando se activa la búsqueda */
+.sidebar.searching {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none !important; /* Oculta barra en Firefox */
+    -ms-overflow-style: none !important; /* Oculta barra en Edge */
+}
+
+/* Oculta la barra de scroll visual en Chrome y Safari durante la búsqueda */
+.sidebar.searching::-webkit-scrollbar {
+    display: none !important;
 }
 
 /* CORRECTOR DE ALINEACIÓN: Permite que el menú flotante se alinee perfectamente al lado de su botón */
@@ -40,9 +53,9 @@ html, body {
     flex-grow: 1; 
     flex-shrink: 1;
     min-width: 0; 
-    height: 100vh; /* Ocupa el alto completo de la pantalla */
-    overflow-y: auto; /* El listado del personal se desplazará libremente de forma independiente */
-    overflow-x: hidden; /* Evita desbordamiento horizontal en el listado */
+    height: 100vh; 
+    overflow-y: auto; /* El listado del personal se desplaza de forma independiente */
+    overflow-x: hidden; 
     padding: 40px; 
     background-color: #f4f4f9;
 }
@@ -69,9 +82,9 @@ html, body {
 }
 
 .toggle-sidebar-btn {
-    position: absolute;
+    position: fixed;
     top: 40px; 
-    right: -16px; /* Se posiciona a la mitad del borde */
+    left: 259px; /* Posición exacta en el borde derecho cuando la barra mide 275px (275 - 16) */
     width: 32px; 
     height: 32px; 
     background-color: #e31937;
@@ -83,7 +96,7 @@ html, body {
     justify-content: center;
     cursor: pointer;
     z-index: 1090;
-    transition: background-color 0.2s, transform 0.3s ease;
+    transition: background-color 0.2s, transform 0.3s ease, left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 5px rgba(0,0,0,0.5);
 }
 
@@ -249,7 +262,11 @@ html, body {
     width: 80px !important; 
 }
 
-/* CORRECCIÓN: !important añadido para asegurar el cierre total de subenlaces al colapsar */
+/* Mueve el botón fijo a la coordenada correcta cuando la barra pasa a medir 80px (80 - 16) */
+.sidebar.collapsed .toggle-sidebar-btn {
+    left: 64px; 
+}
+
 .sidebar.collapsed .menu-desplegable,
 .sidebar.collapsed .sub-link {
     display: none !important;
@@ -321,7 +338,6 @@ html, body {
 /* =========================================================
    COMPORTAMIENTO DURANTE LA BÚSQUEDA (.searching)
    ========================================================= */
-/* CORRECCIÓN: :not(.collapsed) previene anomalías visuales en modo compacto */
 .sidebar.searching:not(.collapsed) .menu-desplegable {
     position: static !important; 
     display: block !important;   
@@ -332,12 +348,16 @@ html, body {
     padding: 0 !important;
 }
 
-/* CORRECCIÓN: :not(.collapsed) garantiza que los subenlaces filtrados se oculten si encoges la barra */
 .sidebar.searching:not(.collapsed) .sub-link {
     margin: 4px 14px 4px 25px !important;
     background-color: #17191c !important; 
     border-left: 3px solid #e31937 !important; 
     border-radius: 0 4px 4px 0 !important;
+}
+
+/* CORRECCIÓN DE SCROLL: Evita que el empuje elástico de Flexbox rompa el scroll vertical interno */
+.sidebar.searching .sidebar-actions {
+    margin-top: 30px !important; 
 }
 
 /* =========================================================
@@ -382,6 +402,7 @@ html, body {
     .sidebar.collapsed .logout-action i, .sidebar.collapsed .profile-action i { margin-right: 0 !important; }
     .sidebar.collapsed .toggle-sidebar-btn i { transform: rotate(180deg); }
 }
+
 /* =========================================================
    COMPORTAMIENTO MÓVIL Y TABLET (PANTALLAS <= 1024px)
    ========================================================= */
@@ -402,8 +423,10 @@ html, body {
         transform: translateX(-100%) !important;
     }
 
+    /* ¡CORREGIDO PARA TELÉFONOS! Evita el conflicto de coordenadas 'left' y la muestra visible */
     .sidebar.collapsed .toggle-sidebar-btn {
-        right: -45px; 
+        left: auto !important; /* Cancela el left fijo de PC */
+        right: -40px !important; /* Sobresale de la pantalla como una pestaña limpia */
         width: 40px;
         height: 40px;
         border-radius: 0 8px 8px 0; 
