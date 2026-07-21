@@ -5,7 +5,7 @@
 {% block extra_css %}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/base_list.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/categories.css') }}?v=3.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/categories.css') }}?v=3.5">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
 {% endblock %}
@@ -38,7 +38,6 @@
 {% block subtitle_list %}Reglas de automatización de fechas de control y vencimientos{% endblock %}
 
 {% block actions_top %}
-    <!-- Añadimos justify-content-md-end para alinear los botones a la derecha en PC -->
     <div class="d-flex flex-column flex-md-row gap-2 justify-content-md-end w-100">
         <a href="{{ url_for('inventory.list_products') }}" class="btn btn-mariuska-red px-4 py-2 d-flex align-items-center gap-2" style="font-size: 0.88rem;">
             <i class="bi bi-boxes"></i> Volver al Listado
@@ -53,11 +52,11 @@
     <th class="text-center text-uppercase tracking-wider">Categoría</th>
     <th class="text-center text-uppercase tracking-wider">Días de Vida Útil</th>
     <th class="text-center text-uppercase tracking-wider">Tipo de Control de Fecha</th>
+    <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
     <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
 {% endblock %}
 
 {% block actions_filter %}
-    <!-- Eliminamos el div contenedor externo y removemos la clase 'w-100' de la píldora -->
     <div class="mariuska-select-group d-flex align-items-center px-3">
         <i class="bi bi-filter text-muted me-2"></i>
         <select id="controlTypeFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important; font-size: 0.88rem;">
@@ -71,7 +70,10 @@
 {% block table_body %}
     {% if product_types %}
         {% for type in product_types %}
-            <tr class="category-row d-none d-md-table-row" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
+            <!-- ==========================================================================
+                 VISTA ESCRITORIO (>= 768px)
+                 ========================================================================== -->
+            <tr class="category-row d-none d-md-table-row {% if type.is_active == False %}row-inhabilitada{% endif %}" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
                 <td class="text-center fw-bold text-dark fs-6">
                     {{ type.name }}
                 </td>
@@ -95,56 +97,106 @@
                         </span>
                     {% endif %}
                 </td>
+
+                <td class="text-center status-badge-cell">
+                    {% if type.is_active != False %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>
+                    {% else %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>
+                    {% endif %}
+                </td>
+
                 <td class="text-center pe-4" style="width: 140px;">
                     <div class="d-flex justify-content-center align-items-center gap-3">
-                        <a href="{{ url_for('inventory.edit_category', type_id=type.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar">
-                            <i class="bi bi-pencil-square me-2" style="font-size: 1rem;"></i>
-                            <span>Editar</span>
+                        <a href="{{ url_for('inventory.edit_category', type_id=type.id) }}" 
+                           class="btn-action-edit" 
+                           title="Editar" 
+                           aria-label="Editar">
+                            <i class="bi bi-pencil-square"></i>
                         </a>
+                        <div class="form-check form-switch m-0 p-0 d-inline-flex align-items-center">
+                            <input class="form-check-input mariuska-custom-switch toggle-category-status-switch cursor-pointer m-0" 
+                                type="checkbox" 
+                                role="switch" 
+                                data-url="{{ url_for('inventory.toggle_category_status', type_id=type.id) }}"
+                                {% if type.is_active != False %}checked{% endif %}>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- ==========================================================================
+                 VISTA MÓVIL (< 768px)
+                 ========================================================================== -->
+            <tr class="category-row d-md-none p-0 border-0 bg-transparent {% if type.is_active == False %}row-inhabilitada{% endif %}" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
+                <td colspan="5" class="p-0 border-0 bg-transparent">
+                    <div class="mobile-card-item {% if type.is_active == False %}row-inhabilitada{% endif %}">
+                        
+                        <!-- 1. HEADER MÓVIL: Nombre y Estatus -->
+                        <div class="mobile-card-header">
+                            <h5 class="mobile-card-title">{{ type.name }}</h5>
+                            <div class="status-badge-cell-mobile">
+                                {% if type.is_active != False %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 status-badge">Operativa</span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 status-badge">Inactiva</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 2. BODY MÓVIL: Vida Útil y Tipo de Control -->
+                        <div class="mobile-card-body">
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Vida Útil:</span>
+                                <span class="mobile-card-value">
+                                    {% if type.shelf_life_days %}
+                                        {{ type.shelf_life_days }} días
+                                    {% else %}
+                                        No aplica
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Control:</span>
+                                <span class="mobile-card-value">
+                                    {% if type.requires_manual_date %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1 fs-7">
+                                            <i class="bi bi-pencil-square me-1"></i> Manual
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fs-7">
+                                            <i class="bi bi-cpu me-1"></i> Automático
+                                        </span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- 3. FOOTER MÓVIL: Botón y Switch centrados -->
+                        <div class="mobile-card-actions d-flex align-items-center justify-content-center gap-3">
+                            <a href="{{ url_for('inventory.edit_category', type_id=type.id) }}" 
+                               class="btn-action-edit" 
+                               title="Editar" 
+                               aria-label="Editar">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            
+                            <div class="form-check form-switch m-0 p-0">
+                                <input class="form-check-input mariuska-custom-switch toggle-category-status-switch" 
+                                       type="checkbox" 
+                                       role="switch" 
+                                       data-url="{{ url_for('inventory.toggle_category_status', type_id=type.id) }}"
+                                       {% if type.is_active != False %}checked{% endif %}>
+                            </div>
+                        </div>
+
                     </div>
                 </td>
             </tr>
         {% endfor %}
-        
-        <tr class="d-md-none p-0 border-0 bg-transparent">
-            <td colspan="4" class="p-0 border-0 bg-transparent">
-                <div id="mobileCategoriesContainer">
-                    {% for type in product_types %}
-                    <div class="mobile-card-item category-row-mobile" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
-                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                            <h6 class="fw-bold text-dark m-0">{{ type.name }}</h6>
-                            <a href="{{ url_for('inventory.edit_category', type_id=type.id) }}" class="btn-action-edit px-2 py-1" style="height: auto;">
-                                <i class="bi bi-pencil-square"></i>
-                            </a>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted small fw-bold">Vida Útil:</span>
-                            {% if type.shelf_life_days %}
-                                <span class="badge bg-light text-dark border px-2 py-1">{{ type.shelf_life_days }} días</span>
-                            {% else %}
-                                <span class="text-muted small">No aplica</span>
-                            {% endif %}
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted small fw-bold">Control:</span>
-                            {% if type.requires_manual_date %}
-                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1 fs-7">
-                                    <i class="bi bi-pencil-square me-1"></i> Manual
-                                </span>
-                            {% else %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fs-7">
-                                    <i class="bi bi-cpu me-1"></i> Automático
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </td>
-        </tr>
     {% else %}
         <tr class="empty-data-row">
-            <td colspan="4" class="text-center text-muted py-5 border-0 bg-transparent">
+            <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
                 <i class="bi bi-tag display-4 opacity-50 d-block mb-2"></i>
                 No hay categorías registradas.
             </td>
@@ -152,7 +204,7 @@
     {% endif %}
 
     <tr id="noResultsRow" style="display: none;">
-        <td colspan="4" class="text-center py-5 bg-white border-0">
+        <td colspan="5" class="text-center py-5 bg-white border-0">
             <div class="d-flex flex-column align-items-center justify-content-center py-3">
                 <i class="bi bi-search display-4 text-muted opacity-25 mb-3"></i>
                 <h5 class="fw-bold text-dark mb-1" style="letter-spacing: -0.2px;">No se encontraron categorías</h5>
@@ -165,5 +217,5 @@
 {% endblock %}
 
 {% block extra_js %}
-    <script src="{{ url_for('static', filename='js/inventory/categories_list.js') }}?v=3.0"></script>
+    <script src="{{ url_for('static', filename='js/inventory/categories_list.js') }}?v=3.5"></script>
 {% endblock %}

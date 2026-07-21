@@ -6,6 +6,8 @@
     --ph-red: #b01212;
     --ph-red-hover: #8c0e0e;
     --ph-red-light: #fdf2f2;
+    --ph-amber: #f59e0b;
+    --ph-amber-border: #d97706;
     --ph-text-main: #1F2937;
     --ph-text-soft: #4B5563;
     --ph-text-muted: #8892A0;
@@ -52,36 +54,84 @@
     box-shadow: 0 0 14px rgba(176, 18, 18, 0.45) !important; 
 }
 
+/* ==========================================================================
+   BOTÓN DE ACCIÓN EDITAR
+   ========================================================================== */
 .btn-action-edit {
+    width: 36px;
     height: 36px;
-    padding: 0 16px;
-    background-color: #f8f9fa;
-    color: var(--ph-text-soft, #4B5563);
-    border: 1px solid var(--ph-border-soft, #E2E8F0);
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    color: #0284c7 !important;
+    border: 1px solid var(--ph-border-soft, #E2E8F0) !important;
     border-radius: 10px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease-in-out;
     cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: -0.1px;
-    white-space: nowrap;
+    font-size: 0.95rem;
+    text-decoration: none !important;
 }
 
 .btn-action-edit:hover {
-    background-color: var(--ph-red-light, #fdf2f2) !important;
-    color: var(--ph-red, #b01212) !important;
-    border-color: rgba(176, 18, 18, 0.2) !important;
+    background-color: var(--ph-red, #b01212) !important;
+    color: #ffffff !important;
+    border-color: var(--ph-red, #b01212) !important;
     transform: translateY(-1.5px);
-    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
+    box-shadow: 0 4px 10px rgba(176, 18, 18, 0.2);
 }
 
 .btn-action-edit i {
     line-height: 1;
+    margin: 0 !important;
 }
 
+/* ==========================================================================
+   SWITCH PERSONALIZADO (PUNTO ROJO DESACTIVADO / FONDO ROJO ACTIVADO)
+   ========================================================================== */
+.mobile-card-actions .form-switch,
+.status-badge-cell .form-switch {
+    padding-left: 0 !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
+/* Estado INACTIVO: Fondo claro con PUNTO ROJO (#b01212) */
+.mariuska-custom-switch {
+    width: 2.65em !important;
+    height: 1.35em !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 11 !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    background-color: #f8fbff !important;
+    border: 1px solid #8c8e91 !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23b01212'/%3e%3c/svg%3e") !important;
+    background-position: left center !important;
+    background-repeat: no-repeat !important;
+    border-radius: 2em !important;
+    transition: background-position 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out !important;
+}
+
+/* Estado ACTIVO: Fondo Rojo Corporativo (#b01212) con PUNTO BLANCO */
+.mariuska-custom-switch:checked {
+    background-color: var(--ph-red, #b01212) !important;
+    border-color: var(--ph-red, #b01212) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+    background-position: right center !important;
+}
+
+.mariuska-custom-switch:focus {
+    box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.15) !important;
+}
+
+/* Estilos de Tabla */
 #genericTable {
     border-collapse: separate !important;
     border-spacing: 0 !important;
@@ -114,9 +164,13 @@
     background-color: #FFFFFF;
 }
 
-#genericTable td .badge {
-    font-size: 0.82rem !important;
-    padding: 6px 14px !important;
+.category-row.row-inhabilitada td {
+    background-color: #FAFAFA !important;
+    color: var(--ph-text-muted) !important;
+}
+
+.category-row.row-inhabilitada td:first-child {
+    box-shadow: inset 4px 0 0 var(--ph-amber-border) !important;
 }
 
 .mariuska-select-group {
@@ -146,22 +200,94 @@
 }
 
 /* ==========================================================================
-   VISTA DE TELÉFONO - SE ACTIVA EN PANTALLAS MENORES A 768px
+   ESTRUCTURA INTERNA DE TARJETAS MÓVILES
    ========================================================================== */
+.mobile-card-item {
+    background-color: #ffffff;
+    border: 1px solid var(--ph-border-soft);
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.mobile-card-item.row-inhabilitada {
+    background-color: #FAFAFA !important;
+    opacity: 0.9;
+    border-left: 4px solid var(--ph-amber-border) !important;
+}
+
+.mobile-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+}
+
+.mobile-card-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--ph-text-main);
+    margin: 0;
+}
+
+.mobile-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px dashed var(--ph-border-soft);
+    margin-bottom: 0.85rem;
+}
+
+.mobile-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.88rem;
+}
+
+.mobile-card-label {
+    color: var(--ph-text-soft);
+    font-weight: 500;
+}
+
+.mobile-card-value {
+    font-weight: 600;
+    color: var(--ph-text-main);
+}
+
+.mobile-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center !important;
+    gap: 1.25rem !important;
+}
+
+/* ==========================================================================
+   MEDIA QUERIES
+   ========================================================================== */
+
 @media (max-width: 767.98px) {
+    .custom-card-list {
+        padding: 1.25rem !important;
+        border-radius: 18px !important;
+    }
+
     .module-title-text {
-        font-size: 1.4rem !important;
+        font-size: 1.35rem !important;
         line-height: 1.2;
     }
     
     .brand-icon-box {
-        width: 40px !important;
-        height: 40px !important;
-        padding: 0.5rem !important;
+        width: 38px !important;
+        height: 38px !important;
+        padding: 0.45rem !important;
     }
     
     .brand-icon-box i {
-        font-size: 1.25rem !important;
+        font-size: 1.15rem !important;
     }
     
     .btn-mariuska-red {
@@ -189,28 +315,53 @@
         border: none !important;
         background: transparent !important;
     }
+}
 
-    .mobile-card-item {
-        background-color: #ffffff;
-        border: 1px solid var(--ph-border-soft);
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        transition: all 0.2s ease;
+@media (min-width: 768px) and (max-width: 1024px) {
+    .custom-card-list {
+        padding: 1.25rem !important;
+    }
+
+    .mariuska-select-group {
+        width: 220px !important;
+        flex-shrink: 0 !important;
+        margin-right: 7rem !important;
+    }
+
+    .mariuska-select-group .form-select {
+        font-size: 0.82rem !important;
+        padding-right: 2rem !important;
+    }
+
+    .btn-mariuska-red {
+        font-size: 0.84rem !important;
+        padding: 0.45rem 1.1rem !important;
+    }
+
+    #genericTable td, 
+    #genericTable .content-table-header th {
+        padding: 10px 8px !important;
+        font-size: 0.80rem !important;
+    }
+
+    #genericTable td .badge {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+    }
+
+    .btn-action-edit {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 0.78rem;
     }
 }
 
-/* ==========================================================================
-   VISTA DE PC - SE ACTIVA EN PANTALLAS GRANDES DESDE 768px
-   ========================================================================== */
 @media (min-width: 768px) {
-    /* Ajuste único para Categorías: Pegado al ras derecho sin espacio muerto */
     .mariuska-select-group {
         width: 240px !important;
         flex-shrink: 0 !important;
         margin-left: auto !important;
-        margin-right: 0 !important; /* Al ras de la derecha como deseas */
+        margin-right: 5rem !important;
     }
 
     .btn-mariuska-red {
@@ -230,43 +381,21 @@
     background-color: transparent !important;
 }
 /* ==========================================================================
-   VISTA TABLET - OPTIMIZACIÓN COMPACTA PARA CONFIGURACIÓN DE CATEGORÍAS
+   ELIMINACIÓN DE HOVER EN FILAS Y TARJETAS
    ========================================================================== */
-@media (min-width: 768px) and (max-width: 1024px) {
-    .custom-card-list {
-        padding: 1.25rem !important;
-    }
+#genericTable tbody tr:hover,
+#genericTable tbody tr:hover td,
+.category-row:hover,
+.category-row:hover td,
+.mobile-card-item:hover {
+    background-color: #FFFFFF !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
 
-    /* Píldora estable: Ancho ideal para "Todos los controles" + Iconos */
-    .mariuska-select-group {
-        width: 235px !important;
-        flex-shrink: 0 !important;
-    }
-
-    /* Ajuste select interno para blindar el texto y su flecha */
-    .mariuska-select-group .form-select {
-        font-size: 0.82rem !important;
-        padding-right: 2rem !important; /* Mantiene la flecha en su zona segura */
-    }
-
-    .btn-mariuska-red {
-        font-size: 0.85rem !important;
-        padding: 0.45rem 1.2rem !important;
-    }
-
-    #genericTable td, 
-    #genericTable .content-table-header th {
-        padding: 12px 10px !important;
-        font-size: 0.82rem !important;
-    }
-
-    #genericTable .content-table-header th {
-        font-size: 0.75rem !important;
-    }
-
-    .btn-action-edit {
-        height: 32px;
-        padding: 0 12px;
-        font-size: 0.80rem;
-    }
+/* Preservar fondo atenuado para registros inhabilitados en Hover */
+#genericTable tbody tr.row-inhabilitada:hover td,
+.category-row.row-inhabilitada:hover td,
+.mobile-card-item.row-inhabilitada:hover {
+    background-color: #FAFAFA !important;
 }
