@@ -21,11 +21,18 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{% if product_type %}{{ url_for('inventory.edit_category', type_id=product_type.id) }}{% else %}{{ url_for('inventory.create_category') }}{% endif %}">
+        <!-- NOVALIDATE DESACTIVA BURBUJAS NATIVAS Y DATA-EXISTING PASA LAS CATEGORÍAS REGISTRADAS A JS -->
+        <form method="POST" action="{% if product_type %}{{ url_for('inventory.edit_category', type_id=product_type.id) }}{% else %}{{ url_for('inventory.create_category') }}{% endif %}" data-existing='{{ existing_categories | tojson | safe if existing_categories else "[]" }}' novalidate>
             
             <div class="form-group">
                 <label for="name">Nombre de la Categoría</label>
-                <input type="text" id="name" name="name" value="{{ data.get('name', '') or (product_type.name if product_type else '') }}" placeholder="Ej. Lácteos, Embutidos, Salsas" maxlength="60" required>
+                <input type="text" id="name" name="name" 
+                       value="{% if data and data.get('name') %}{{ data.get('name') }}{% elif product_type %}{{ product_type.name }}{% endif %}" 
+                       placeholder="Ingrese un nombre para la categoría" maxlength="60" required>
+                
+                <span id="name-error-text" class="error-text {% if not (errors and errors.get('name')) %}d-none{% endif %}" style="color: #d62300; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">
+                    {% if errors and errors.get('name') %}{{ errors.get('name') }}{% endif %}
+                </span>
             </div>
 
             <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 0.5rem 10px;">
@@ -34,7 +41,7 @@
                     <small style="font-weight: 400; color: #6c757d; font-size: 0.8rem;">(Se digita manualmente en cada compra)</small>
                 </label>
                 <input type="checkbox" id="requires_manual_date" name="requires_manual_date" value="true"
-                       {% if data.get('requires_manual_date') or (product_type and product_type.requires_manual_date) %}checked{% endif %}
+                       {% if (data and data.get('requires_manual_date')) or (product_type and product_type.requires_manual_date) %}checked{% endif %}
                        style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
             </div>
 
@@ -43,14 +50,15 @@
                     ¿Cuenta con días de vida útil estándar?
                 </label>
                 <input type="checkbox" id="has_shelf_life" 
-                       {% if data.get('shelf_life_days', 0)|int > 0 or (product_type and product_type.shelf_life_days) %}checked{% endif %}
+                       {% if (data and data.get('shelf_life_days', 0)|int > 0) or (product_type and product_type.shelf_life_days) %}checked{% endif %}
                        style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
             </div>
 
             <div class="form-group" id="shelf_life_days_container" style="display: none;">
                 <label for="shelf_life_days">Cantidad de Días Hábiles en Cocina</label>
                 <input type="number" id="shelf_life_days" name="shelf_life_days" 
-                       value="{{ data.get('shelf_life_days', '') or (product_type.shelf_life_days if product_type else 0) }}" min="0" max="365" placeholder="Ej. 7, 15, 30">
+                       value="{% if data and data.get('shelf_life_days') %}{{ data.get('shelf_life_days') }}{% elif product_type and product_type.shelf_life_days %}{{ product_type.shelf_life_days }}{% else %}0{% endif %}" 
+                       min="0" max="365" placeholder="Ej. 7, 15, 30">
             </div>
 
             <div class="form-actions">
