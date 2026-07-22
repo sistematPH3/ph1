@@ -1,32 +1,8 @@
-@font-face {
-    font-family: 'Inter';
-    src: url('../../fonts/Inter-Regular.ttf') format('truetype');
-    font-weight: 400;
-}
-@font-face {
-    font-family: 'Inter';
-    src: url('../../fonts/Inter-Bold.ttf') format('truetype');
-    font-weight: 700;
-}
-@font-face {
-    font-family: 'Passion One';
-    src: url('../../fonts/PassionOne-Regular.ttf') format('truetype');
-    font-weight: 400;
-}
-@font-face {
-    font-family: 'Passion One';
-    src: url('../../fonts/PassionOne-Bold.ttf') format('truetype');
-    font-weight: 700;
-}
-@font-face {
-    font-family: 'Bootstrap-Icons';
-    src: url('../../fonts/bootstrap-icons.woff2') format('woff2'),
-         url('../../fonts/bootstrap-icons.woff') format('woff');
-}
+
 
 body {
-    background-color: #fcfcfc;
     font-family: 'Inter', sans-serif;
+    margin: 0;
 }
 
 .main-container {

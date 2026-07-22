@@ -1,84 +1,81 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if supplier %}Editar Proveedor{% else %}Registrar Proveedor{% endif %} - Pizza Hut</title>
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier.css') }}">
-</head>
-<body>
+{% extends 'layout.html' %}
 
-    <div class="form-container">
-        <div class="form-header">
-            <h2>
-                <i class="bi bi-shop"></i> 
-                {% if supplier %} Editar Proveedor {% else %} Registrar Proveedor {% endif %}
-            </h2>
-        </div>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        
-        <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" method="POST" class="supplier-form" id="supplierForm">
-            
-            <div class="form-group">
-                <label for="name">Razón Social / Nombre</label>
-                <input type="text" id="name" name="name" maxlength="150" required 
-                       placeholder="Ej. Distribuidora Alimentos C.A." 
-                       value="{{ supplier.name if supplier else '' }}">
-            </div>
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier.css') }}">
+{% endblock %}
 
-            <div class="form-group">
-                <label for="tax_id">RIF / Tax ID</label>
-                <input type="text" id="tax_id" name="tax_id" maxlength="20" required 
-                       placeholder="Ej. J-12345678-9" 
-                       value="{{ supplier.tax_id if supplier else '' }}">
-            </div>
-
-            <div class="form-group">
-                <label for="contact_name">Persona de Contacto</label>
-                <input type="text" id="contact_name" name="contact_name" maxlength="100" required 
-                       placeholder="Ej. María Pérez" 
-                       value="{{ supplier.contact_name if supplier else '' }}">
-            </div>
-
-            <div class="form-group">
-                <label for="phone">Teléfono</label>
-                <input type="tel" id="phone" name="phone" maxlength="20" required 
-                       placeholder="Ej. +58 412-0000000" 
-                       value="{{ supplier.phone if supplier else '' }}"
-                       oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')">
-                <small id="phone-error" class="validation-msg"></small>
-            </div>
-
-            <div class="form-group">
-                <label for="email">Correo Electrónico</label>
-                <input type="email" id="email" name="email" maxlength="100" required 
-                       placeholder="ejemplo@correo.com" 
-                       value="{{ supplier.email if supplier else '' }}">
-                <small id="email-error" class="validation-msg"></small>
-            </div>
-
-            <div class="form-actions">
-                <a href="{{ url_for('supplier_list.index') }}" class="btn-cancel">Cancelar</a>
-                <button type="submit" class="btn-submit" id="submitBtn">
-                    <span class="bi bi-save me-1"></span> {% if supplier %}Guardar Cambios{% else %}Guardar Proveedor{% endif %}
-                </button>
-            </div>
-        </form>
+{% block content %}
+<div class="form-container">
+    <div class="form-header">
+        <h2>
+            <i class="bi bi-shop"></i> 
+            {% if supplier %} Editar Proveedor {% else %} Registrar Proveedor {% endif %}
+        </h2>
     </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+    <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" method="POST" class="supplier-form" id="supplierForm">
+        
+        <div class="form-group">
+            <label for="name">Razón Social / Nombre</label>
+            <input type="text" id="name" name="name" maxlength="150" required 
+                   placeholder="Ej. Distribuidora Alimentos C.A." 
+                   value="{{ supplier.name if supplier else '' }}">
+        </div>
 
-    <script src="{{ url_for('static', filename='js/logistics/register_supplier.js') }}"></script>
-</body>
-</html>
+        <div class="form-group">
+            <label for="tax_id">RIF / Tax ID</label>
+            <input type="text" id="tax_id" name="tax_id" maxlength="20" required 
+                   placeholder="Ej. J-12345678-9" 
+                   value="{{ supplier.tax_id if supplier else '' }}">
+        </div>
+
+        <div class="form-group">
+            <label for="contact_name">Persona de Contacto</label>
+            <input type="text" id="contact_name" name="contact_name" maxlength="100" required 
+                   placeholder="Ej. María Pérez" 
+                   value="{{ supplier.contact_name if supplier else '' }}">
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Teléfono</label>
+            <input type="tel" id="phone" name="phone" maxlength="20" required 
+                   placeholder="Ej. +58 412-0000000" 
+                   value="{{ supplier.phone if supplier else '' }}"
+                   oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')">
+            <small id="phone-error" class="validation-msg"></small>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Correo Electrónico</label>
+            <input type="email" id="email" name="email" maxlength="100" required 
+                   placeholder="ejemplo@correo.com" 
+                   value="{{ supplier.email if supplier else '' }}">
+            <small id="email-error" class="validation-msg"></small>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('supplier_list.index') }}" class="btn-cancel">Cancelar</a>
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <span class="bi bi-save me-1"></span> {% if supplier %}Guardar Cambios{% else %}Guardar Proveedor{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/logistics/register_supplier.js') }}"></script>
+{% endblock %}

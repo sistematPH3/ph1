@@ -1,26 +1,4 @@
-@font-face {
-    font-family: 'Inter';
-    src: url('../fonts/Inter-Regular.ttf') format('truetype');
-    font-weight: normal;
-}
-@font-face {
-    font-family: 'Inter-Bold';
-    src: url('../fonts/Inter-Bold.ttf') format('truetype');
-    font-weight: bold;
-}
-@font-face {
-    font-family: 'PassionOne';
-    src: url('../fonts/PassionOne-Bold.ttf') format('truetype');
-    font-weight: bold;
-}
 
-@font-face {
-    font-family: "bootstrap-icons";
-    src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
-         url("../../fonts/bootstrap-icons.woff") format("woff");
-    font-weight: normal;
-    font-style: normal;
-}
 
 [class^="bi-"], [class*=" bi-"] {
     display: inline-block;
@@ -51,21 +29,18 @@
     --border-color: #dee2e6;
 }
 
+/* Nota: Se eliminó el display: flex y centrado del body para permitir que la barra lateral funcione correctamente */
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--light-bg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
     margin: 0;
-    padding: 20px 0;
 }
 
 .form-container {
     background-color: var(--white);
     width: 100%;
     max-width: 480px; 
+    margin: 3rem auto; /* Centra el formulario perfectamente dentro del área de contenido del layout */
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-top: 5px solid var(--primary-red);

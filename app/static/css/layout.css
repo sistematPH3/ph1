@@ -267,14 +267,17 @@ html, body {
     left: 64px; 
 }
 
-.sidebar.collapsed .menu-desplegable,
-.sidebar.collapsed .sub-link {
-    display: none !important;
-}
-
 .sidebar.collapsed .link-text,
 .sidebar.collapsed .chevron-icon,
 .sidebar.collapsed .logo-letters {
+    display: none !important;
+}
+
+/* Si la barra está colapsada, los submenús (incluso los abiertos por una búsqueda)
+   deben permanecer ocultos para que se vea limpia (solo íconos). El estado de la
+   búsqueda no se pierde: al expandir la barra de nuevo, .searching sigue activo
+   y los resultados se vuelven a mostrar automáticamente. */
+.sidebar.collapsed .menu-desplegable {
     display: none !important;
 }
 
@@ -384,7 +387,8 @@ html, body {
         padding: 5px 0;
     }
 
-    .sidebar:not(.searching) .nav-item:hover .menu-desplegable {
+    /* Mostrar el menú desplegable al hacer hover SOLO si la barra no está buscando y NO está colapsada */
+    .sidebar:not(.searching):not(.collapsed) .nav-item:hover .menu-desplegable {
         display: block !important;
     }
 
@@ -417,16 +421,21 @@ html, body {
         transform: translateX(0); 
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+        overflow: visible !important;
+    }
+
+    .sidebar.searching {
+        overflow: visible !important;
     }
 
     .sidebar.collapsed {
+        width: 275px !important; 
         transform: translateX(-100%) !important;
     }
 
-    /* ¡CORREGIDO PARA TELÉFONOS! Evita el conflicto de coordenadas 'left' y la muestra visible */
     .sidebar.collapsed .toggle-sidebar-btn {
-        left: auto !important; /* Cancela el left fijo de PC */
-        right: -40px !important; /* Sobresale de la pantalla como una pestaña limpia */
+        left: auto !important; 
+        right: -40px !important; 
         width: 40px;
         height: 40px;
         border-radius: 0 8px 8px 0; 
@@ -438,20 +447,26 @@ html, body {
         transform: rotate(180deg);
     }
 
+    /* --- CONTROL ABSOLUTO DEL ACORDEÓN POR CLASE .open --- */
+    /* --- CONTROL ABSOLUTO Y FORZADO DEL ACORDEÓN --- */
     .menu-desplegable {
-        display: none; 
+        display: none !important;
         position: static !important;
         box-shadow: none !important;
         background-color: #0d0e0e !important;
     }
 
+    /* Solo se muestra si tiene la clase .open inyectada por JS */
     .menu-desplegable.open {
         display: block !important;
     }
 
     .sidebar .nav-link.sidebar-toggler.active i.chevron-icon {
         transform: rotate(180deg);
+        transition: transform 0.2s ease;
     }
+    /* ------------------------------------------------------- */
+    /* ------------------------------------------------------- */
 
     .content {
         padding: 20px; 

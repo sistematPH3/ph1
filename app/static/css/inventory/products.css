@@ -1,19 +1,7 @@
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #fdfaf6;
-    color: #000000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 2rem;
-}
+/* ==========================================================================
+   ESTILOS DEL FORMULARIO DE PRODUCTOS
+   (Se eliminaron las reglas * y body para no interferir con layout.css)
+   ========================================================================== */
 
 .form-container {
     background-color: #ffffff;
@@ -21,7 +9,8 @@ body {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     padding: 2.5rem;
     width: 100%;
-    max-width: 500px;
+    max-width: 550px; /* Ancho máximo del formulario */
+    margin: 3rem auto; /* "auto" centra el contenedor a los lados, "3rem" le da espacio arriba y abajo */
     position: relative;
     z-index: 10;
 }
@@ -181,6 +170,7 @@ body {
     background-color: #b01d00;
     transform: translateY(-2px);
 }
+
 /* ==========================================================================
    ESTILOS PARA EL MODAL DE NUEVA CATEGORÍA
    ========================================================================== */
