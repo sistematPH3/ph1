@@ -4,13 +4,18 @@ from app.logistics.requests.supplier_request import SupplierRequest
 from app.logistics.services.supplier_service import SupplierService
 from app.logistics.repositories.supplier_repository import SupplierRepository
 
+# Importamos el decorador dinámico unificado
+from app.decorators.roles import require_roles
+
 suppliers_bp = Blueprint('suppliers', __name__)
 
 @suppliers_bp.route('/suppliers/register', methods=['GET'])
+@require_roles('admin', 'management', 'manager')
 def show_register_form():
     return render_template('logistics/register-supplier.html')
 
 @suppliers_bp.route('/suppliers/register', methods=['POST'])
+@require_roles('admin', 'management', 'manager')
 def handle_register():
     try:
         supplier_request = SupplierRequest(request.form)

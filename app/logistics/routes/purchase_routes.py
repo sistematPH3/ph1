@@ -14,6 +14,9 @@ from app.models.security_model import User
 from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, ExchangeRateHistory, PurchaseAuditLog
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
 
+# CAMBIO: Importamos el decorador dinámico unificado
+from app.decorators.roles import require_roles
+
 purchase_bp = Blueprint('purchase_routes', __name__)
 
 def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
@@ -32,6 +35,7 @@ def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
             db.session.rollback()
 
 @purchase_bp.route('/purchases/new', methods=['GET'])
+@require_roles('admin', 'management', 'manager')  # Protección dinámica aplicada aquí
 def new_purchase_form():
     products_query = db.session.query(Product, ProductType).outerjoin(
         ProductType, Product.product_type_id == ProductType.id
@@ -57,6 +61,7 @@ def new_purchase_form():
     )
 
 @purchase_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
+@require_roles('admin', 'management', 'manager')  # Protección dinámica aplicada aquí
 def view_purchase_details(purchase_id):
     purchase = Purchase.query.get_or_404(purchase_id)
     supplier = Supplier.query.get(purchase.supplier_id)
@@ -111,6 +116,7 @@ def view_purchase_details(purchase_id):
     )
 
 @purchase_bp.route('/purchases', methods=['POST'])
+@require_roles('admin', 'management', 'manager')  # Protección dinámica aplicada aquí
 def create_purchase():
     try:
         foto_factura = request.files.get('invoice_photo')

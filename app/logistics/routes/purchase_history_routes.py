@@ -7,6 +7,9 @@ from app.logistics.repositories.purchase_history_repository import PurchaseHisto
 from app.logistics.services.purchase_history_service import PurchaseHistoryService
 from app.logistics.requests.purchase_history_request import PurchaseHistoryFilterRequest
 
+# Importamos el decorador dinámico unificado
+from app.decorators.roles import require_roles
+
 purchase_history_bp = Blueprint('purchase_history', __name__)
 filter_request_validator = PurchaseHistoryFilterRequest()
 
@@ -15,6 +18,7 @@ def get_history_service():
     return PurchaseHistoryService(repository)
 
 @purchase_history_bp.route('/purchases/history', methods=['GET'], strict_slashes=False)
+@require_roles('admin', 'management', 'manager')
 def index():
     try:
         service = get_history_service()
@@ -53,6 +57,7 @@ def index():
         return render_template('logistics/purchase_history.html', purchases=[], suppliers=[], products=[])
 
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/details', methods=['GET'])
+@require_roles('admin', 'management', 'manager')
 def get_details(purchase_id):
     try:
         service = get_history_service()
@@ -90,6 +95,7 @@ def get_details(purchase_id):
         return jsonify({"error": f"Error interno en el servidor: {str(e)}"}), 500
 
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/annul', methods=['POST'])
+@require_roles('admin', 'management', 'manager')
 def annul(purchase_id):
     try:
         service = get_history_service()
@@ -107,6 +113,7 @@ def annul(purchase_id):
     return redirect(url_for('purchase_history.index'))
 
 @purchase_history_bp.route('/purchases/history/<int:purchase_id>/edit', methods=['POST'])
+@require_roles('admin', 'management', 'manager')
 def edit_purchase(purchase_id):
     try:
         service = get_history_service()

@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, abort
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from app.extensions import db
 from app.models import Supplier
 
@@ -7,17 +6,11 @@ from app.logistics.repositories.supplier_list_repository import SupplierListRepo
 from app.logistics.services.supplier_list_service import SupplierListService
 from app.logistics.requests.supplier_list_request import SupplierListFilterRequest
 
+# Importamos el decorador dinámico unificado
+from app.decorators.roles import require_roles
+
 supplier_list_bp = Blueprint('supplier_list', __name__)
 filter_request_validator = SupplierListFilterRequest()
-
-def check_supplier_roles():
-    """Verifica si el usuario actual tiene permisos para ver proveedores."""
-    roles_permitidos = ['Administrator', 'Management', 'Manager']
-    user_role_name = current_user.role.name if hasattr(current_user.role, 'name') else current_user.role
-    
-    # Si no tiene el rol, lanza el error 403 (Pantalla de Prohibido)
-    if user_role_name not in roles_permitidos:
-        abort(403)
 
 def get_supplier_list_service():
     repository = SupplierListRepository(db)
@@ -26,9 +19,8 @@ def get_supplier_list_service():
 
 # 1. VISTA PRINCIPAL DEL LISTADO
 @supplier_list_bp.route('/suppliers/list', methods=['GET'], strict_slashes=False)
-@login_required
+@require_roles('admin', 'management', 'manager')
 def index():
-    check_supplier_roles() # Muestra "Prohibido" si no tiene el rol
     try:
         service = get_supplier_list_service()
         raw_params = {
@@ -55,9 +47,8 @@ def index():
 
 # 2. VISTA PARA MOSTRAR EL FORMULARIO DE REGISTRO
 @supplier_list_bp.route('/suppliers/register', methods=['GET'])
-@login_required
+@require_roles('admin', 'management', 'manager')
 def register_supplier_view():
-    check_supplier_roles()
     try:
         return render_template('logistics/register-supplier.html', supplier=None)
     except Exception as e:
@@ -67,9 +58,8 @@ def register_supplier_view():
 
 # 3. PROCESAR EL REGISTRO DE UN NUEVO PROVEEDOR (POST)
 @supplier_list_bp.route('/suppliers/register', methods=['POST'])
-@login_required
+@require_roles('admin', 'management', 'manager')
 def handle_register_supplier():
-    check_supplier_roles()
     try:
         name = request.form.get('name')
         tax_id = request.form.get('tax_id')
@@ -99,9 +89,8 @@ def handle_register_supplier():
 
 # 4. VISTA PARA MOSTRAR EL FORMULARIO DE EDICIÓN
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['GET'])
-@login_required
+@require_roles('admin', 'management', 'manager')
 def edit_supplier_view(supplier_id):
-    check_supplier_roles()
     try:
         service = get_supplier_list_service()
         supplier = service.repository.get_by_id(supplier_id)
@@ -118,9 +107,8 @@ def edit_supplier_view(supplier_id):
 
 # 5. PROCESAR LA ACTUALIZACIÓN DE UN PROVEEDOR EXISTENTE (POST)
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['POST'])
-@login_required
+@require_roles('admin', 'management', 'manager')
 def handle_edit_supplier(supplier_id):
-    check_supplier_roles()
     try:
         service = get_supplier_list_service()
         supplier = service.repository.get_by_id(supplier_id)
@@ -148,9 +136,8 @@ def handle_edit_supplier(supplier_id):
 
 # 6. FUNCIONALIDAD DEL TOGGLE DE ESTADO
 @supplier_list_bp.route('/suppliers/list/<int:supplier_id>/toggle', methods=['POST'])
-@login_required
+@require_roles('admin', 'management', 'manager')
 def toggle_status(supplier_id):
-    check_supplier_roles()
     try:
         service = get_supplier_list_service()
         new_status = service.process_status_toggle(supplier_id)

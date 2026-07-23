@@ -6,12 +6,14 @@ from app import db
 from app.inventory import inventory_bp
 from app.inventory.services.category_service import CategoryService
 
+# CAMBIO: Importamos el decorador dinámico
+from app.decorators.roles import require_roles 
+
 
 def normalize_text(text: str) -> str:
     """
     Normaliza una cadena eliminando espacios, tildes/diacríticos, convirtiéndola a minúsculas,
     colapsando letras repetidas consecutivas y removiendo terminaciones plurales ('es' o 's').
-    Ejemplo: 'Hortalizaaaaa' -> 'hortaliza', 'Hortalizás' -> 'hortaliza'
     """
     if not text:
         return ""
@@ -22,12 +24,14 @@ def normalize_text(text: str) -> str:
 
 
 @inventory_bp.route('/categories', methods=['GET'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def list_categories():
     product_types = CategoryService.get_all_product_types()
     return render_template('inventory/categories_list.html', product_types=product_types)
 
 
 @inventory_bp.route('/categories/create', methods=['GET', 'POST'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def create_category():
     all_types = CategoryService.get_all_product_types()
     existing_names = [pt.name for pt in all_types]
@@ -43,7 +47,6 @@ def create_category():
                 errors={'name': 'El nombre de la categoría es obligatorio.'}
             )
 
-        # Control preventivo de duplicados (obtiene la coincidencia real)
         norm_name = normalize_text(name)
         match = next((pt for pt in all_types if normalize_text(pt.name) == norm_name), None)
 
@@ -82,6 +85,7 @@ def create_category():
 
 
 @inventory_bp.route('/categories/edit/<int:type_id>', methods=['GET', 'POST'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def edit_category(type_id):
     product_type = CategoryService.get_product_type_by_id(type_id)
     if not product_type:
@@ -150,6 +154,7 @@ def edit_category(type_id):
 
 
 @inventory_bp.route('/categories/<int:type_id>/toggle-status', methods=['POST'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def toggle_category_status(type_id):
     try:
         product_type = CategoryService.get_product_type_by_id(type_id)
@@ -166,6 +171,7 @@ def toggle_category_status(type_id):
 
 
 @inventory_bp.route('/categories/api/create', methods=['POST'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def api_create_category():
     try:
         raw_data = request.get_json() if request.is_json else request.form.to_dict()

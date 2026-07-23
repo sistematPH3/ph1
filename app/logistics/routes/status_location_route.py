@@ -1,9 +1,11 @@
 from flask import request, redirect, url_for, flash
 from app import db
 from app.models.logistics_model import Location
+from app.decorators.roles import admin_required
 from .. import status_location_bp 
 
 @status_location_bp.route('/sedes/status/<int:id>', methods=['POST'])
+@admin_required
 def change_status(id):
     location = Location.query.get_or_404(id)
     

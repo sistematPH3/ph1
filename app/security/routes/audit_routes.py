@@ -10,7 +10,7 @@ audit_bp = Blueprint('audit', __name__, url_prefix='/auditoria')
 def ver_auditoria_accesos():
     user_role = current_user.role.name if hasattr(current_user.role, 'name') else current_user.role
     
-    roles_autorizados = ['Administrator', 'Manager', 'Assistant Manager', 'Finance']
+    roles_autorizados = ['Administrator','Finance']
     if user_role not in roles_autorizados:
         flash("No tienes permisos para acceder a este módulo.", "danger")
         return redirect(url_for('security.login'))

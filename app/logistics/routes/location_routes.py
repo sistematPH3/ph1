@@ -1,12 +1,15 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import login_required
 from app.logistics.requests.location_request import LocationForm
 from app.logistics.services.register_location import register_location_service
 from app.logistics.services.query_location import get_location_details
 from app.logistics.services.update_location import update_location_service
+from app.decorators.roles import admin_required
 
 location_bp = Blueprint('locations', __name__)
 
 @location_bp.route('/locations/edit/<int:location_id>', methods=['GET', 'POST'])
+@admin_required
 def edit_location(location_id):
     # 1. Buscamos los datos de la sede primero
     location_data = get_location_details(location_id)
@@ -43,6 +46,7 @@ def edit_location(location_id):
     return render_template('logistics/edit_location.html', form=form, location_id=location_id)
 
 @location_bp.route('/locations', methods=['GET', 'POST'])
+@admin_required
 def register_location():
     form = LocationForm()
     
@@ -58,6 +62,7 @@ def register_location():
     return render_template('logistics/register_location.html', form=form)
 
 @location_bp.route('/check-name', methods=['POST'])
+@login_required
 def check_name():
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -83,6 +88,7 @@ def check_name():
 
 
 @location_bp.route('/check-phone', methods=['POST'])
+@login_required
 def check_phone():
     data = request.get_json()
     phone = data.get('phone', '').strip()

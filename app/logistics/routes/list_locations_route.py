@@ -1,8 +1,10 @@
 from flask import render_template
 from .. import list_sedes_bp # Importa el objeto desde app/logistics/__init__.py
 from app.models import Location  # Asegúrate de que tu modelo se llame Location
+from app.decorators.roles import admin_required
 
 @list_sedes_bp.route('/sedes')
+@admin_required
 def list_sedes():
     # 1. Consultamos todos los registros de la tabla 'locations'
     locations = Location.query.all()

@@ -1,23 +1,17 @@
-from flask import render_template, request, redirect, url_for, flash, abort
-from flask_login import login_required, current_user
+from flask import render_template, request, redirect, url_for, flash
+from flask_login import current_user
 from ..repositories.user_management_repository import UserManagementRepository
 from ..requests.user_management_validators import UserManagementValidator
 from .. import security_bp 
 from app.models.logistics_model import Location 
 
-def check_admin_roles():
-    """Verifica si el usuario actual tiene permisos de administración."""
-    roles_permitidos = ['Administrator', 'Manager', 'Assistant Manager']
-    user_role_name = current_user.role.name if hasattr(current_user.role, 'name') else current_user.role
-    
-    if user_role_name not in roles_permitidos:
-        abort(403) 
+# Importamos el decorador dinámico unificado
+from app.decorators.roles import require_roles
 
 @security_bp.route('/admin/pending-requests')
-@login_required
+@require_roles('admin')
 def admin_pending_requests():
     """Muestra la vista de solicitudes de registro pendientes."""
-    check_admin_roles() 
     order = request.args.get('sort', 'desc')
     
     # Obtenemos los usuarios en espera y las sedes habilitadas
@@ -27,11 +21,9 @@ def admin_pending_requests():
     return render_template('security/pending_requests.html', usuarios_espera=usuarios, sedes=sedes)
 
 @security_bp.route('/admin/approve/<int:user_id>', methods=['POST'])
-@login_required
+@require_roles('admin')
 def approve_user(user_id):
     """Aprueba a un usuario asignándole un rol y sus respectivas sedes laborales."""
-    check_admin_roles() 
-    
     role_id = request.form.get('role_id')
     # Capturamos la lista de IDs de las sedes desde los checkboxes de la interfaz
     location_ids = request.form.getlist('location_ids')
@@ -54,11 +46,9 @@ def approve_user(user_id):
     return redirect(url_for('security.admin_pending_requests'))
 
 @security_bp.route('/admin/reject/<int:user_id>', methods=['POST'])
-@login_required
+@require_roles('admin')
 def reject_user(user_id):
     """Rechaza una solicitud de registro, eliminando el aspirante de forma segura."""
-    check_admin_roles() 
-    
     # El repositorio ahora se encarga de limpiar auditorías y tablas intermedias primero
     if UserManagementRepository.delete_user(user_id):
         flash("La solicitud ha sido rechazada y eliminada de la base de datos.", "warning")
