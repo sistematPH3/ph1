@@ -160,6 +160,15 @@ function attachRowValidationListeners(row) {
     const prodId = row.querySelector('.prod-id');
     const prodQty = row.querySelector('.prod-qty');
     const prodPrice = row.querySelector('.prod-price');
+    const expInput = row.querySelector('.prod-exp');
+
+    // Obtener la fecha de hoy en formato YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. REGLA GENERAL: Ningún producto (Manual o Automático) puede tener fecha del pasado
+    if (expInput) {
+        expInput.min = today;
+    }
 
     if (prodId) {
         prodId.addEventListener('change', () => {
@@ -169,16 +178,36 @@ function attachRowValidationListeners(row) {
                 clearFieldError(prodId);
                 
                 const selectedOpt = prodId.options[prodId.selectedIndex];
+                // Leer días configurados en la categoría del producto (si es 0/null es Manual)
                 const days = parseInt(selectedOpt.getAttribute('data-days')) || 0;
-                const expInput = row.querySelector('.prod-exp');
                 
                 if (expInput) {
+                    expInput.min = today; // Reforzar que no se elijan fechas pasadas
+
                     if (days > 0) {
-                        const dateObj = new Date();
-                        dateObj.setDate(dateObj.getDate() + days);
-                        expInput.value = dateObj.toISOString().split('T')[0];
+                        // ==========================================================
+                        // MODO AUTOMÁTICO (Categoría con días de caducidad fijados)
+                        // ==========================================================
+                        const autoDateObj = new Date();
+                        autoDateObj.setDate(autoDateObj.getDate() + days);
+                        const autoDateStr = autoDateObj.toISOString().split('T')[0];
+
+                        expInput.max = autoDateStr;  // Límite máximo = fecha exacta calculada
+                        expInput.value = autoDateStr; // Se asigna automáticamente
+
                     } else {
-                        expInput.value = '';
+                        // ==========================================================
+                        // MODO MANUAL (El usuario debe ingresar la fecha a mano)
+                        // ==========================================================
+                        // Definimos un tope límite de seguridad para evitar errores (ej. 365 días)
+                        const MAX_LOGICAL_MANUAL_DAYS = 365; 
+
+                        const maxManualObj = new Date();
+                        maxManualObj.setDate(maxManualObj.getDate() + MAX_LOGICAL_MANUAL_DAYS);
+                        const maxManualStr = maxManualObj.toISOString().split('T')[0];
+
+                        expInput.max = maxManualStr; // Bloquea el calendario después de 1 año
+                        expInput.value = '';        // Se deja vacío para obligar al usuario a elegir
                     }
                 }
             }
@@ -214,6 +243,12 @@ function attachRowValidationListeners(row) {
 
 document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
     attachRowValidationListeners(row);
+    
+    // Si la primera fila ya tiene un producto cargado por defecto, dispara la lógica de fechas
+    const prodId = row.querySelector('.prod-id');
+    if (prodId && prodId.value) {
+        prodId.dispatchEvent(new Event('change'));
+    }
 });
 
 function addProductRow() {

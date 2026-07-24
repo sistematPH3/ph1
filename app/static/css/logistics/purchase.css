@@ -1,4 +1,51 @@
 
+/* ==========================================================================
+   ESTILOS CORPORATIVOS Y BOTONES (RECUPERADOS DE INVENTORY)
+   ========================================================================== */
+
+/* 1. Cuadro del ícono de carrito (Esquina superior izquierda) */
+.bg-mariuska-red {
+    background-color: #B31F24 !important;
+}
+
+.brand-icon-box {
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(179, 31, 36, 0.25) !important;
+}
+
+/* 2. Botón "Procesar y Guardar Compra" */
+.btn-mariuska-red {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(179, 31, 36, 0.3) !important;
+    transition: all 0.25s ease-in-out !important;
+}
+
+.btn-mariuska-red:hover {
+    background-color: #8a1619 !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 20px rgba(179, 31, 36, 0.55) !important;
+    transform: translateY(-1.5px);
+}
+
+/* 3. Botón "Volver al Stock" */
+.btn-filter-dark {
+    background-color: #212529 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 50px !important;
+    transition: all 0.25s ease-in-out !important;
+}
+
+.btn-filter-dark:hover {
+    background-color: #343a40 !important;
+    color: #ffffff !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 12px rgba(33, 37, 41, 0.25) !important;
+}
 .purchase-card-header {
     background-color: #B31F24 !important;
     color: #ffffff !important;
@@ -189,7 +236,41 @@
     padding-left: 1.2rem !important;
 }
 
+/* ==========================================================================
+   VISTA DE TELÉFONO - CENTRADO PERFECTO Y SIN DESBORDE HORIZONTAL
+   ========================================================================== */
 @media (max-width: 767.98px) {
+    /* 1. Desactivar el contenedor con scroll horizontal de Bootstrap */
+    .table-responsive {
+        overflow-x: visible !important;
+        overflow: visible !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* 2. Forzar que la tabla y su tbody se comporten como bloque fluido */
+    .custom-insumos-table,
+    .custom-insumos-table tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+    /* 1. Prevenir desborde horizontal en la página */
+    .container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        overflow-x: hidden;
+    }
+
+    /* 2. Reducir paddings internos excesivos de las tarjetas en móviles */
+    #productsCard .p-4,
+    #invoiceCard.p-4,
+    #productsCard .px-4,
+    #invoiceCard .px-4,
+    .table-responsive {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
     .header-container {
         flex-direction: column !important;
         align-items: flex-start !important;
@@ -201,17 +282,21 @@
         justify-content: center;
     }
     
+    /* 3. Ocultar cabecera de la tabla en móvil */
     .custom-insumos-table thead {
         display: none !important;
     }
     
+    /* 4. Convertir cada fila en una tarjeta independiente y centrada */
     .custom-insumos-table tbody tr {
         display: block !important;
         border: 1px solid #dee2e6 !important;
         border-radius: 12px !important;
-        padding: 15px !important;
+        padding: 12px !important;
         margin-bottom: 1rem !important;
         background-color: #fcfcfc !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .custom-insumos-table tbody td {
@@ -220,6 +305,7 @@
         justify-content: space-between !important;
         padding: 8px 0 !important;
         border-bottom: 1px solid #e9ecef !important;
+        gap: 8px;
     }
     
     .custom-insumos-table tbody td:last-child {
@@ -234,7 +320,6 @@
         color: #495057;
         text-transform: uppercase;
         flex-shrink: 0;
-        margin-right: 15px;
     }
     
     .custom-insumos-table tbody td:nth-child(1)::before { content: "Producto:"; }
@@ -242,19 +327,23 @@
     .custom-insumos-table tbody td:nth-child(3)::before { content: "Vencimiento:"; }
     .custom-insumos-table tbody td:nth-child(4)::before { content: "Precio:"; }
     
+    /* 5. Controlar ancho máximo de inputs para que no empujen el contenedor */
     .custom-insumos-table tbody td .table-field-wrapper {
-        width: 60%;
-        max-width: 250px;
+        width: 58%;
+        max-width: 210px;
         margin: 0;
     }
-    
-    #productsCard .d-flex.justify-content-end.gap-3 {
-        flex-direction: column;
+
+    /* 6. Botones inferiores apilados y centrados al 100% */
+    #productsCard .bg-light.border-top {
+        padding: 1rem !important;
+        flex-direction: column !important;
         width: 100%;
     }
-    
-    #productsCard .d-flex.justify-content-end.gap-3 button {
-        width: 100%;
-        justify-content: center;
+
+    #productsCard .bg-light.border-top button {
+        width: 100% !important;
+        justify-content: center !important;
+        margin: 0 !important;
     }
 }
