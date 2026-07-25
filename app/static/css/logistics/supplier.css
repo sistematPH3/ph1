@@ -1,195 +1,224 @@
 
-
-[class^="bi-"], [class*=" bi-"] {
-    display: inline-block;
-    font-family: "bootstrap-icons" !important;
-    font-style: normal;
-    font-weight: normal !important;
-    font-variant: normal;
-    text-transform: none;
-    line-height: 1;
-    vertical-align: -.125em;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    width: 1em; 
-    height: 1em;
-}
-
-.bi-truck::before { content: "\f603" !important; }
-.bi-save::before { content: "\f522" !important; }
-
 :root {
-    --primary-red: #d32f2f;
-    --dark-red: #b71c1c;
-    --success-green: #2e7d32;
-    --success-hover: #1b5e20;
-    --light-bg: #f8f9fa;
-    --white: #ffffff;
-    --text-dark: #212529;
-    --border-color: #dee2e6;
+    --ph-red: #b01212;        /* Rojo corporativo */
+    --ph-red-hover: #8c0e0e;  /* Variación hover */
+    --ph-red-light: #fdf2f2;  /* Fondo suave / Alertas */
+    --ph-text-main: #1F2937;  /* Texto principal */
+    --ph-text-soft: #4B5563;  /* Texto secundario */
+    --ph-text-muted: #8892A0; /* Subtextos */
+    --ph-border-soft: #E2E8F0;/* Borde gris sutil */
 }
 
-/* Nota: Se eliminó el display: flex y centrado del body para permitir que la barra lateral funcione correctamente */
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--light-bg);
-    margin: 0;
-}
-
-.form-container {
-    background-color: var(--white);
-    width: 100%;
-    max-width: 480px; 
-    margin: 3rem auto; /* Centra el formulario perfectamente dentro del área de contenido del layout */
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-top: 5px solid var(--primary-red);
-    overflow: hidden;
-}
-
-.form-header {
-    background-color: var(--white);
-    padding: 22px 25px 12px 25px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.form-header h2 {
-    font-family: 'PassionOne', sans-serif;
-    color: var(--primary-red);
-    margin: 0;
-    font-size: 1.9rem;
-    letter-spacing: 0.5px;
+/* 1. Contenedor Principal (Centrado de la tarjeta) */
+.register-wrapper {
     display: flex;
-    align-items: center;
-    gap: 10px; 
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0.3rem 1rem 2.5rem 1rem !important;
+    width: 100%;
 }
 
+/* 2. Tarjeta Blanca Redondeada (Form Card Premium) */
+.form-card-premium {
+    background-color: #ffffff !important;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    padding: 2.5rem !important;
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+}
+
+/* 3. Título del Formulario (Rojo, Itálico y Negrita) */
+.form-card-premium h2 {
+    margin-bottom: 2rem !important;
+    color: var(--ph-red) !important;
+    text-align: center !important;
+    font-weight: 800 !important;
+    font-size: 2.1rem !important;
+    font-style: italic !important;
+    letter-spacing: -0.5px !important;
+}
+
+/* 4. Contenedor de Campos */
+.form-group-premium {
+    margin-bottom: 1.35rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Etiquetas */
+.form-group-premium label {
+    margin-bottom: 0.45rem !important;
+    font-weight: 800 !important;
+    color: var(--ph-text-main) !important;
+    font-size: 0.9rem !important;
+    margin-left: 10px !important;
+}
+
+/* Inputs y Selects Estilo Píldora (Rounded 50px) */
+.form-group-premium input,
+.form-group-premium select,
+.form-group-premium .form-control {
+    padding: 0.85rem 1.25rem !important;
+    border: 2px solid var(--ph-border-soft) !important;
+    border-radius: 50px !important;
+    font-size: 0.95rem !important;
+    color: var(--ph-text-soft) !important;
+    background-color: #f9fafb !important;
+    transition: all 0.3s ease !important;
+    height: auto !important;
+}
+
+/* Textarea con esquinas suavizadas de 20px */
+.form-group-premium textarea {
+    padding: 0.85rem 1.25rem !important;
+    border: 2px solid var(--ph-border-soft) !important;
+    border-radius: 20px !important;
+    font-size: 0.95rem !important;
+    color: var(--ph-text-soft) !important;
+    background-color: #f9fafb !important;
+    transition: all 0.3s ease !important;
+    resize: none !important;
+}
+
+/* Focus Interactivo (Glow rojo sutil al escribir) */
+.form-group-premium input:focus,
+.form-group-premium select:focus,
+.form-group-premium textarea:focus,
+.form-group-premium .form-control:focus {
+    background-color: #ffffff !important;
+    border-color: var(--ph-red) !important;
+    outline: none !important;
+    box-shadow: 0 0 10px rgba(176, 18, 18, 0.12) !important;
+}
+
+/* 5. Mensajes y Errores del Validador JS */
+.form-group-premium .invalid-feedback,
+.error-feedback-premium {
+    color: var(--ph-red) !important;
+    font-size: 0.85rem !important;
+    margin-top: 0.4rem !important;
+    font-weight: 600 !important;
+    margin-left: 10px !important;
+    display: block !important;
+    min-height: 18px;
+}
+
+/* Estados de Validación Dinámica */
+.form-group-premium input.is-invalid,
+.form-group-premium textarea.is-invalid {
+    border-color: var(--ph-red) !important;
+    background-color: #fff8f8 !important;
+}
+
+.form-group-premium input.is-valid,
+.form-group-premium textarea.is-valid {
+    border-color: #28a745 !important;
+}
+
+/* 6. Botones de Acción Horizontales */
+.form-actions-premium {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    margin-top: 2.2rem !important;
+}
+
+.btn-premium {
+    flex: 1 !important;
+    padding: 0.85rem 1.5rem !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.25s ease-in-out !important;
+    text-decoration: none !important;
+    text-align: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Botón Guardar (Rojo Corporativo con Aura) */
+.btn-premium-primary {
+    background-color: var(--ph-red) !important;
+    color: #ffffff !important;
+}
+
+.btn-premium-primary:hover {
+    background-color: var(--ph-red) !important;
+    transform: translateY(-2.5px);
+    box-shadow: 0 6px 18px rgba(176, 18, 18, 0.4) !important;
+}
+
+/* Botón Cancelar (Negro Elegante con Aura) */
+.btn-premium-secondary {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+.btn-premium-secondary:hover {
+    background-color: #222222 !important;
+    transform: translateY(-2.5px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 7. Alertas de Flask Flash */
 .flash-messages {
-    padding: 0 25px;
-    margin-top: 15px;
+    width: 100%;
 }
 
-.alert {
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 5px;
+.flash-messages .alert {
+    padding: 0.8rem 1rem;
+    border-radius: 12px;
     font-size: 0.9rem;
-    font-weight: bold;
+    font-weight: 600;
+    margin-bottom: 1rem;
 }
 
-.alert-success {
+.flash-messages .alert-danger {
+    background-color: var(--ph-red-light);
+    color: var(--ph-red);
+    border: 1px solid rgba(176, 18, 18, 0.2);
+}
+
+.flash-messages .alert-success {
     background-color: #e8f5e9;
-    color: var(--success-green);
+    color: #2e7d32;
     border: 1px solid #a5d6a7;
 }
 
-.alert-danger {
-    background-color: #ffebee;
-    color: var(--dark-red);
-    border: 1px solid #ef9a9a;
-}
+/* 8. Adaptabilidad Responsive (Vista Móvil) */
+@media (max-width: 768px) {
+    .register-wrapper {
+        padding: 0.5rem 0.25rem 2rem 0.25rem !important;
+    }
 
-.supplier-form {
-    padding: 25px;
-    display: flex;
-    flex-direction: column; 
-    gap: 16px; 
-}
+    .form-card-premium {
+        padding: 1.5rem 1rem !important;
+        border-radius: 16px !important;
+        max-width: 100% !important;
+        border: none !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    }
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-}
+    .form-card-premium h2 {
+        font-size: 1.55rem !important;
+        margin-bottom: 1.25rem !important;
+    }
 
-label {
-    margin-bottom: 6px;
-    font-size: 0.88rem;
-    font-weight: bold;
-    color: var(--text-dark);
-}
+    .form-actions-premium {
+        flex-direction: column-reverse !important;
+        gap: 0.75rem !important;
+        margin-top: 1.5rem !important;
+    }
 
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-select {
-    width: 100%;
-    padding: 11px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    box-sizing: border-box;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.9rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-input:focus, select:focus {
-    outline: none;
-    border-color: var(--primary-red);
-    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
-}
-
-.form-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-.btn-submit {
-    background-color: var(--success-green);
-    color: var(--white);
-    border: none;
-    padding: 13px 20px;
-    font-size: 1rem;
-    font-weight: bold;
-    border-radius: 4px;
-    cursor: pointer;
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    transition: background-color 0.2s;
-}
-
-.btn-submit:hover {
-    background-color: var(--success-hover);
-}
-
-.btn-cancel {
-    background-color: var(--primary-red);
-    color: var(--white);
-    border: none;
-    padding: 13px 20px;
-    font-size: 1rem;
-    font-weight: bold;
-    border-radius: 4px;
-    cursor: pointer;
-    flex: 1;
-    text-align: center;
-    text-decoration: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: background-color 0.2s;
-}
-
-.btn-cancel:hover {
-    background-color: var(--dark-red);
-}
-
-.validation-msg {
-    display: block;
-    margin-top: 5px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    min-height: 16px; 
-}
-
-.text-danger {
-    color: var(--dark-red);
-}
-
-.text-success {
-    color: var(--success-green);
+    .btn-premium {
+        width: 100% !important;
+        flex: none !important;
+        padding: 0.75rem 1rem !important;
+    }
 }

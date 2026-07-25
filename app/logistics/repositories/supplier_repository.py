@@ -9,6 +9,17 @@ class SupplierRepository:
         result = self.db.session.execute(query, {'tax_id': tax_id}).fetchone()
         return result is not None
 
+    def find_by_name(self, name):
+        # LOWER(:name) asegura que 'PROVEEDOR', 'proveedor' o 'Proveedor' sean detectados como duplicados
+        query = text("SELECT id FROM suppliers WHERE LOWER(name) = LOWER(:name)")
+        result = self.db.session.execute(query, {'name': name.strip()}).fetchone()
+        return result is not None
+
+    def find_by_email(self, email):
+        query = text("SELECT id FROM suppliers WHERE LOWER(email) = LOWER(:email)")
+        result = self.db.session.execute(query, {'email': email.strip()}).fetchone()
+        return result is not None
+
     def save(self, supplier_data):
         query = text("""
             INSERT INTO suppliers (name, tax_id, contact_name, phone, email, status)

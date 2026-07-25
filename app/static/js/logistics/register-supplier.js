@@ -1,45 +1,208 @@
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('supplierForm');
+    if (!form) return;
+
+    // 1. Extraer URLs y datos del formulario
+    const checkNameUrl = form.getAttribute('data-check-name-url');
+    const checkPhoneUrl = form.getAttribute('data-check-phone-url');
+    const checkTaxIdUrl = form.getAttribute('data-check-tax-id-url');
+    const checkEmailUrl = form.getAttribute('data-check-email-url');
+    const supId = form.getAttribute('data-supplier-id') || 0;
+
+    // 2. Captura de inputs
+    const nameInput = document.getElementById('name');
+    const taxIdInput = document.getElementById('tax_id');
     const phoneInput = document.getElementById('phone');
-    const phoneError = document.getElementById('phone-error');
     const emailInput = document.getElementById('email');
-    const emailError = document.getElementById('email-error');
-    const submitBtn = document.getElementById('submitBtn');
 
-    const phoneRegex = /^\+?[0-9][0-9\-\s]{7,18}[0-9]$/;
-    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    let nameTimeout = null;
+    let taxIdTimeout = null;
+    let phoneTimeout = null;
+    let emailTimeout = null;
 
-    function validateForm() {
-        let isPhoneValid = phoneRegex.test(phoneInput.value);
-        let isEmailValid = emailRegex.test(emailInput.value);
-        
-        submitBtn.disabled = (!isPhoneValid && phoneInput.value !== '') || (!isEmailValid && emailInput.value !== '');
+    // --- VALIDACIÓN EN TIEMPO REAL: NOMBRE / RAZÓN SOCIAL ---
+    if (nameInput) {
+        nameInput.addEventListener('input', function() {
+            clearTimeout(nameTimeout);
+            const val = this.value.trim();
+
+            if (!val) {
+                marcarError(this, "El nombre o razón social es obligatorio.");
+                return;
+            }
+
+            nameTimeout = setTimeout(async () => {
+                if (val.length < 3) return;
+                try {
+                    const response = await fetch(checkNameUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ name: val, supplier_id: supId })
+                    });
+                    const data = await response.json();
+                    if (!data.available) {
+                        marcarError(nameInput, "Ya existe un proveedor con este nombre.");
+                    } else {
+                        marcarExito(nameInput);
+                    }
+                } catch (e) {
+                    console.error("Error verificando nombre:", e);
+                }
+            }, 500);
+        });
     }
 
-    phoneInput.addEventListener('input', function() {
-        if (this.value.length === 0) {
-            phoneError.textContent = '';
-        } else if (!phoneRegex.test(this.value)) {
-            phoneError.textContent = 'Formato inválido. Ej: +58 412-0000000';
-            phoneError.className = 'validation-msg text-danger';
-        } else {
-            phoneError.textContent = 'Formato válido';
-            phoneError.className = 'validation-msg text-success';
+    // --- VALIDACIÓN EN TIEMPO REAL: RIF / TAX ID ---
+    if (taxIdInput) {
+        taxIdInput.addEventListener('input', function() {
+            clearTimeout(taxIdTimeout);
+            const val = this.value.trim();
+
+            if (!val) {
+                marcarError(this, "El RIF / Tax ID es obligatorio.");
+                return;
+            }
+
+            taxIdTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(checkTaxIdUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ tax_id: val, supplier_id: supId })
+                    });
+                    const data = await response.json();
+                    if (!data.available) {
+                        marcarError(taxIdInput, "Este RIF / Tax ID ya se encuentra registrado.");
+                    } else {
+                        marcarExito(taxIdInput);
+                    }
+                } catch (e) {
+                    console.error("Error verificando Tax ID:", e);
+                }
+            }, 500);
+        });
+    }
+
+    // --- VALIDACIÓN EN TIEMPO REAL: TELÉFONO ---
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function() {
+            clearTimeout(phoneTimeout);
+            const val = this.value.trim();
+            const pattern = /^\+?[0-9][0-9\-\s]{7,18}[0-9]$/;
+
+            if (val && !pattern.test(val)) {
+                marcarError(this, "Formato telefónico inválido. Ej: +58 412-0000000");
+                return;
+            }
+
+            phoneTimeout = setTimeout(async () => {
+                if (!val) return;
+                try {
+                    const response = await fetch(checkPhoneUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ phone: val, supplier_id: supId })
+                    });
+                    const data = await response.json();
+                    if (!data.available) {
+                        marcarError(phoneInput, "Este número ya pertenece a otro proveedor.");
+                    } else {
+                        marcarExito(phoneInput);
+                    }
+                } catch (e) {
+                    console.error("Error verificando teléfono:", e);
+                }
+            }, 500);
+        });
+    }
+
+    // --- VALIDACIÓN EN TIEMPO REAL: CORREO ELECTRÓNICO ---
+    if (emailInput) {
+        const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+        emailInput.addEventListener('input', function() {
+            clearTimeout(emailTimeout);
+            const val = this.value.trim();
+
+            if (val && !emailRegex.test(val)) {
+                marcarError(this, "Formato de correo electrónico inválido.");
+                return;
+            }
+
+            emailTimeout = setTimeout(async () => {
+                if (!val) return;
+                try {
+                    const response = await fetch(checkEmailUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email: val, supplier_id: supId })
+                    });
+                    const data = await response.json();
+                    if (!data.available) {
+                        marcarError(emailInput, "Este correo ya pertenece a otro proveedor.");
+                    } else {
+                        marcarExito(emailInput);
+                    }
+                } catch (e) {
+                    console.error("Error verificando correo:", e);
+                }
+            }, 500);
+        });
+    }
+
+    // --- CONTROL DE ENVÍO (PREVENT DEFAULT SI HAY ERRORES) ---
+    form.addEventListener('submit', function(e) {
+        let isFormValid = true;
+
+        if (nameInput && (!nameInput.value.trim() || nameInput.classList.contains('is-invalid'))) {
+            if (!nameInput.value.trim()) marcarError(nameInput, "El nombre es obligatorio.");
+            isFormValid = false;
         }
-        validateForm();
+
+        if (taxIdInput && (!taxIdInput.value.trim() || taxIdInput.classList.contains('is-invalid'))) {
+            if (!taxIdInput.value.trim()) marcarError(taxIdInput, "El RIF / Tax ID es obligatorio.");
+            isFormValid = false;
+        }
+
+        if (phoneInput && (!phoneInput.value.trim() || phoneInput.classList.contains('is-invalid'))) {
+            if (!phoneInput.value.trim()) marcarError(phoneInput, "El teléfono es obligatorio.");
+            isFormValid = false;
+        }
+
+        if (emailInput && emailInput.classList.contains('is-invalid')) {
+            isFormValid = false;
+        }
+
+        if (!isFormValid) {
+            e.preventDefault();
+            const firstInvalidElement = form.querySelector('.is-invalid');
+            if (firstInvalidElement) {
+                firstInvalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidElement.focus();
+            }
+        }
     });
 
-    emailInput.addEventListener('input', function() {
-        if (this.value.length === 0) {
-            emailError.textContent = '';
-        } else if (!emailRegex.test(this.value)) {
-            emailError.textContent = 'Debe incluir "@" y un dominio válido';
-            emailError.className = 'validation-msg text-danger';
+    // --- FUNCIONES AUXILIARES DE ESTILO Y MENSAJES ROJOS ---
+    function marcarError(el, msg) {
+        el.classList.add('is-invalid');
+        el.classList.remove('is-valid');
+        let feedback = el.parentNode.querySelector('.validation-msg, .invalid-feedback');
+        if (!feedback) {
+            feedback = document.createElement('small');
+            feedback.className = 'validation-msg text-danger d-block mt-1';
+            el.parentNode.appendChild(feedback);
         } else {
-            emailError.textContent = 'Correo válido';
-            emailError.className = 'validation-msg text-success';
+            feedback.className = 'validation-msg text-danger d-block mt-1';
         }
-        validateForm();
-    });
+        feedback.textContent = msg;
+    }
 
-    validateForm();
+    function marcarExito(el) {
+        el.classList.remove('is-invalid');
+        el.classList.add('is-valid');
+        let feedback = el.parentNode.querySelector('.validation-msg, .invalid-feedback');
+        if (feedback) {
+            feedback.textContent = '';
+        }
+    }
 });

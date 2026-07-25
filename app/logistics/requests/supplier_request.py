@@ -7,6 +7,8 @@ class SupplierRequest:
         self.contact_name = form_data.get('contact_name', '').strip()
         self.phone = form_data.get('phone', '').strip()
         self.email = form_data.get('email', '').strip()
+        # 👇 Agregamos el status por defecto para que el Repository lo pueda leer
+        self.status = form_data.get('status', 'ACTIVE').strip()
 
     def validate(self):
         if not self.name or len(self.name) > 150:
