@@ -25,8 +25,8 @@
             {% endif %}
         {% endwith %}
 
-        <!-- FORMULARIO APUNTANDO A LAS RUTAS DE LOGISTICS.SUPPLIERS -->
-        <form action="{% if supplier %}{{ url_for('logistics.suppliers.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('logistics.suppliers.handle_register') }}{% endif %}" 
+        <!-- FORMULARIO CON ATRIBUTOS DATA INTAC TOS PARA LAS VALIDACIONES REAL-TIME -->
+        <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" 
               method="POST" 
               class="needs-validation" 
               id="supplierForm"
@@ -36,6 +36,10 @@
               data-check-email-url="{{ url_for('logistics.suppliers.check_email') }}"
               data-supplier-id="{{ supplier.id if supplier else 0 }}" novalidate>
             
+            {% if supplier %}
+                <input type="hidden" name="supplier_id" id="supplier_id" value="{{ supplier.id }}">
+            {% endif %}
+
             <!-- Razón Social / Nombre -->
             <div class="form-group-premium">
                 <label for="name">Razón Social / Nombre</label>
@@ -83,7 +87,7 @@
 
             <!-- Botones de Acción -->
             <div class="form-actions-premium">
-                <!-- Redirige al listado usando el Blueprint supplier_list -->
+                <!-- Redirige exactamente al listado de proveedores -->
                 <a href="{{ url_for('supplier_list.index') }}" class="btn-premium btn-premium-secondary">
                     Cancelar
                 </a>
