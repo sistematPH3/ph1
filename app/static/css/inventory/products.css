@@ -1,30 +1,56 @@
 /* ==========================================================================
-   ESTILOS DEL FORMULARIO DE PRODUCTOS
-   (Se eliminaron las reglas * y body para no interferir con layout.css)
+   ESTILOS DEL FORMULARIO DE PRODUCTOS Y MODAL DE CATEGORÍAS
    ========================================================================== */
 
+/* Fuente base unificada para formularios, modales, campos y botones */
+.form-container,
+.modal-card,
+.form-group input,
+.form-group select,
+.form-group textarea,
+.btn {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   CONTENEDOR DEL FORMULARIO PRINCIPAL
+   -------------------------------------------------------------------------- */
 .form-container {
     background-color: #ffffff;
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     padding: 2.5rem;
     width: 100%;
-    max-width: 550px; /* Ancho máximo del formulario */
-    margin: 3rem auto; /* "auto" centra el contenedor a los lados, "3rem" le da espacio arriba y abajo */
+    max-width: 550px;
+    margin: 3rem auto;
     position: relative;
     z-index: 10;
 }
 
-.form-container h2 {
-    margin-bottom: 2rem;
+/* Estilos unificados para títulos (Formulario Principal y Modal) */
+.form-container h2,
+.modal-card h2 {
     color: #d62300;
     text-align: center;
     font-weight: 800;
-    font-size: 2.2rem;
     font-style: italic;
     letter-spacing: -0.5px;
+    margin: 0 auto;
 }
 
+.form-container h2 {
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+}
+
+.modal-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   GRUPOS DE FORMULARIO, CAMPOS E INPUTS
+   -------------------------------------------------------------------------- */
 .form-group {
     margin-bottom: 1.25rem;
     display: flex;
@@ -112,6 +138,9 @@
     color: #000000;
 }
 
+/* --------------------------------------------------------------------------
+   MENSAJES DE ERROR Y ALERTAS
+   -------------------------------------------------------------------------- */
 .error-text {
     color: #d62300;
     font-size: 0.85rem;
@@ -131,6 +160,9 @@
     text-align: center;
 }
 
+/* --------------------------------------------------------------------------
+   BOTONES
+   -------------------------------------------------------------------------- */
 .form-actions {
     display: flex;
     justify-content: space-between;
@@ -219,6 +251,22 @@
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
 .d-none {
     display: none !important;
+}
+/* ==========================================================================
+   LAYOUT CENTRADO PARA PÁGINAS INDEPENDIENTES (SIN LAYOUT BASE)
+   ========================================================================== */
+body.centered-form-page {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;     /* Centra la tarjeta verticalmente */
+    justify-content: center; /* Centra la tarjeta horizontalmente */
+    background-color: #f8fafc;
+}
+
+body.centered-form-page .form-container {
+    margin: 0 auto; /* Desactiva el margin top/bottom para que Flexbox controle el centrado exacto */
 }
