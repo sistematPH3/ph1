@@ -1,27 +1,25 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask_login import current_user
 from app.extensions import db
 from app.models import Supplier  
 from app.models.inventory_model import Product
-
-from app.logistics.repositories.purchase_history_repository import PurchaseHistoryRepository
-from app.logistics.services.purchase_history_service import PurchaseHistoryService
-from app.logistics.requests.purchase_history_request import PurchaseHistoryFilterRequest
-
-# Importamos el decorador dinámico unificado
+from app.logistics.repositories.purchase_management_repository import PurchaseManagementRepository
+from app.logistics.services.purchase_management_service import PurchaseManagementService
+from app.logistics.requests.purchase_management_request import PurchaseManagementFilterRequest
 from app.decorators.roles import require_roles
 
-purchase_history_bp = Blueprint('purchase_history', __name__)
-filter_request_validator = PurchaseHistoryFilterRequest()
+purchase_management_bp = Blueprint('purchase_management', __name__)
+filter_request_validator = PurchaseManagementFilterRequest()
 
-def get_history_service():
-    repository = PurchaseHistoryRepository(db)
-    return PurchaseHistoryService(repository)
+def get_management_service():
+    repository = PurchaseManagementRepository(db)
+    return PurchaseManagementService(repository)
 
-@purchase_history_bp.route('/purchases/history', methods=['GET'], strict_slashes=False)
+@purchase_management_bp.route('/purchases/management', methods=['GET'], strict_slashes=False)
 @require_roles('admin', 'management', 'manager')
 def index():
     try:
-        service = get_history_service()
+        service = get_management_service()
         
         params = {
             'start_date': request.args.get('start_date'),
@@ -43,7 +41,7 @@ def index():
         )
         
         return render_template(
-            'logistics/purchase_history.html', 
+            'logistics/purchase_management.html', 
             purchases=purchases,
             suppliers=suppliers,
             products=products
@@ -51,16 +49,16 @@ def index():
         
     except ValueError as val_err:
         flash(f"Parámetros de búsqueda inválidos: {str(val_err)}", "warning")
-        return redirect(url_for('purchase_history.index'))
+        return redirect(url_for('purchase_management.index'))
     except Exception as e:
         flash(f"Error interno en el sistema: {str(e)}", "error")
-        return render_template('logistics/purchase_history.html', purchases=[], suppliers=[], products=[])
+        return render_template('logistics/purchase_management.html', purchases=[], suppliers=[], products=[])
 
-@purchase_history_bp.route('/purchases/history/<int:purchase_id>/details', methods=['GET'])
+@purchase_management_bp.route('/purchases/management/<int:purchase_id>/details', methods=['GET'])
 @require_roles('admin', 'management', 'manager')
 def get_details(purchase_id):
     try:
-        service = get_history_service()
+        service = get_management_service()
         data = service.get_purchase_details_summary(purchase_id)
         
         if not data:
@@ -94,12 +92,12 @@ def get_details(purchase_id):
     except Exception as e:
         return jsonify({"error": f"Error interno en el servidor: {str(e)}"}), 500
 
-@purchase_history_bp.route('/purchases/history/<int:purchase_id>/annul', methods=['POST'])
+@purchase_management_bp.route('/purchases/management/<int:purchase_id>/annul', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def annul(purchase_id):
     try:
-        service = get_history_service()
-        user_id = 1 
+        service = get_management_service()
+        user_id = current_user.id
         success = service.process_annulment(purchase_id, user_id)
         
         if success:
@@ -110,14 +108,14 @@ def annul(purchase_id):
     except Exception as e:
         flash(f"Ocurrió un error crítico durante la anulación: {str(e)}", "error")
         
-    return redirect(url_for('purchase_history.index'))
+    return redirect(url_for('purchase_management.index'))
 
-@purchase_history_bp.route('/purchases/history/<int:purchase_id>/edit', methods=['POST'])
+@purchase_management_bp.route('/purchases/management/<int:purchase_id>/edit', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def edit_purchase(purchase_id):
     try:
-        service = get_history_service()
-        user_id = 1 
+        service = get_management_service()
+        user_id = current_user.id
         
         data = request.get_json()
         if not data or 'items' not in data:

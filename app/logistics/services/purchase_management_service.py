@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-class PurchaseHistoryService:
+class PurchaseManagementService:
     def __init__(self, repository):
         self.repository = repository
 

@@ -1,10 +1,7 @@
-{% extends 'layout.html' %} {# Asegúrate de que este sea el nombre correcto de tu plantilla base #}
+{% extends 'layout.html' %} 
 
 {% block extra_css %}
-<!-- Hojas de estilo específicas para esta vista -->
-
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}?v=2.0">
-
 {% endblock %}
 
 {% block content %}
@@ -65,7 +62,7 @@
                                     <td>
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
-                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10" required>
+                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" required>
                                             </div>
                                         </div>
                                     </td>
@@ -80,7 +77,7 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
                                                 <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" value="5.50" required>
+                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
                                             </div>
                                         </div>
                                     </td>
@@ -118,11 +115,12 @@
                         <label class="form-label">Proveedor</label>
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-building"></i></span>
-                            <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" required>
+                            <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" data-new-url="{{ url_for('supplier_list.register_supplier_view') }}" required>
                                 <option value="" disabled selected>Seleccione Proveedor</option>
                                 {% for s in suppliers %}
                                     <option value="{{ s.id }}">{{ s.name }} ({{ s.tax_id }})</option>
                                 {% endfor %}
+                                <option value="new" class="text-danger fw-bold">+ Añadir nuevo proveedor...</option>
                             </select>
                         </div>
                     </div>
@@ -169,13 +167,18 @@
 
                     <div class="mb-2">
                         <label class="form-label fw-bold">Foto del Comprobante / Factura</label>
-                        <label class="border rounded-3 p-3 text-center bg-light shadow-sm d-block" 
-                               style="cursor: pointer; border: 2px dashed #adb5bd !important; transition: all 0.3s ease;" 
-                               id="dropzoneArea" for="invoice_photo">
-                            <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
-                            <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
-                            <input type="file" id="invoice_photo" name="invoice_photo" class="visually-hidden" accept="image/png, image/jpeg, image/jpg" required>
-                        </label>
+                        <div class="position-relative">
+                            <label class="border rounded-3 p-3 text-center bg-light shadow-sm d-block" 
+                                   style="cursor: pointer; border: 2px dashed #adb5bd !important; transition: all 0.3s ease;" 
+                                   id="dropzoneArea" for="invoice_photo">
+                                <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
+                                <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
+                                <input type="file" id="invoice_photo" name="invoice_photo" class="visually-hidden" accept="image/png, image/jpeg, image/jpg" required>
+                            </label>
+                            <button type="button" id="removePhotoBtn" class="btn btn-danger btn-sm rounded-circle position-absolute d-none d-flex align-items-center justify-content-center" style="top: -10px; right: -10px; width: 28px; height: 28px; padding: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                <i class="bi bi-x-lg" style="font-size: 0.85rem;"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -186,7 +189,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Scripts específicos de la vista -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}"></script>
 {% endblock %}

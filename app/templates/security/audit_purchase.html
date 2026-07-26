@@ -1,0 +1,181 @@
+{% extends "base_list.html" %}
+
+{% block extra_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/audit_purchase.css') }}">
+{% endblock %}
+
+{% block title_list %}
+    <span class="d-flex align-items-center gap-3">
+        <div style="background-color: #B31F24; color: #ffffff; width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(179, 31, 36, 0.2);">
+            <i class="bi bi-clipboard2-data-fill fs-5"></i>
+        </div>
+        <span>Auditoría de Compras</span>
+    </span>
+{% endblock %}
+
+{% block subtitle_list %}Registro de creación, edición y anulación de facturas de proveedores{% endblock %}
+
+{% block search_placeholder %}Buscar por usuario o factura...{% endblock %}
+
+{% block table_head %}
+    <th class="ps-3">Responsable</th>
+    <th>Acción</th>
+    <th>Compra</th>
+    <th>Detalles de la Operación</th>
+    <th>Fecha y Hora</th>
+{% endblock %}
+
+{% block table_body %}
+    {% for audit in audits %}
+    <tr class="audit-data-row d-none d-md-table-row">
+        <td class="ps-3">
+            <div class="d-flex align-items-center">
+                <div class="avatar-ph me-3 shadow-sm">
+                    {{ audit.user_initial }}
+                </div>
+                <div>
+                    <span class="d-block fw-bold text-dark">{{ audit.user_name }}</span>
+                    <small class="text-muted">{{ audit.role_name }}</small>
+                </div>
+            </div>
+        </td>
+        
+        <td>
+            {% if audit.action_type == 'CREATE' %}
+                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2">Creación</span>
+            {% elif audit.action_type == 'ANNULLED' %}
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-3 py-2">Anulación</span>
+            {% elif audit.action_type == 'EDIT' %}
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-3 py-2">Edición</span>
+            {% else %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-3 py-2">{{ audit.action_type }}</span>
+            {% endif %}
+        </td>
+        
+        <td>
+            <span class="d-block fw-bold text-dark fs-6">Factura #{{ audit.purchase_id }}</span>
+            <a href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=audit.purchase_id) }}" class="small text-decoration-none d-flex align-items-center gap-1 mt-1" style="color: #B31F24;">
+                <i class="bi bi-box-arrow-up-right"></i> Ver Compra
+            </a>
+        </td>
+        
+        <td>
+            {% if audit.changed_data %}
+                <ul class="list-unstyled mb-0 small text-muted">
+                {% for field, values in audit.changed_data.items() %}
+                    <li class="mb-1">
+                        <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                        {% if values.old %}
+                        <span class="text-decoration-line-through">{{ values.old }}</span> 
+                        <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                        {% endif %}
+                        <span class="fw-bold text-dark">{{ values.new }}</span>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <span class="text-muted fst-italic">Registro base sin detalles alterados</span>
+            {% endif %}
+        </td>
+        
+        <td>
+            <div class="text-muted small">
+                <span class="d-block fw-medium text-dark">{{ audit.timestamp.strftime('%d/%m/%Y') if audit.timestamp else '' }}</span>
+                <span>{{ audit.timestamp.strftime('%I:%M %p') if audit.timestamp else '' }}</span>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+
+    <tr class="d-md-none p-0 border-0 bg-transparent">
+        <td colspan="5" class="p-0 border-0 bg-transparent">
+            <div class="mobile-audit-container py-2" id="auditCardsContainer">
+                {% for audit in audits %}
+                <div class="mobile-audit-card mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-ph" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                {{ audit.user_initial }}
+                            </div>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-dark" style="font-size: 0.9rem;">{{ audit.user_name }}</span>
+                                <span class="text-muted" style="font-size: 0.75rem;">{{ audit.role_name }}</span>
+                            </div>
+                        </div>
+                        <div>
+                            {% if audit.action_type == 'CREATE' %}
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">Creación</span>
+                            {% elif audit.action_type == 'ANNULLED' %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2 py-1" style="font-size: 0.7rem;">Anulación</span>
+                            {% elif audit.action_type == 'EDIT' %}
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">Edición</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ audit.action_type }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-flex justify-content-between align-items-center">
+                        <span class="d-block fw-bold text-dark user-name-text m-0">Factura #{{ audit.purchase_id }}</span>
+                        <a href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=audit.purchase_id) }}" class="btn btn-sm btn-light border rounded-pill shadow-sm text-dark fw-medium" style="font-size: 0.75rem;">
+                            <i class="bi bi-box-arrow-up-right me-1 text-danger"></i> Revisar
+                        </a>
+                    </div>
+
+                    <div class="mb-3 bg-light p-2 rounded-3 border" style="border-color: #f1f5f9;">
+                        {% if audit.changed_data %}
+                            <ul class="list-unstyled mb-0 text-muted" style="font-size: 0.8rem;">
+                            {% for field, values in audit.changed_data.items() %}
+                                <li class="mb-1">
+                                    <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                                    {% if values.old %}
+                                    <span class="text-decoration-line-through">{{ values.old }}</span> 
+                                    <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                                    {% endif %}
+                                    <span class="fw-bold text-dark">{{ values.new }}</span>
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span class="text-muted fst-italic small">Registro base sin detalles alterados</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-calendar3 me-1.5 text-muted"></i>
+                            <span>{{ audit.timestamp.strftime('%d/%m/%Y') if audit.timestamp else '' }}</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-clock me-1.5 text-muted"></i>
+                            <span>{{ audit.timestamp.strftime('%I:%M %p') if audit.timestamp else '' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </td>
+    </tr>
+
+    <tr id="noResultsRow" style="display: none;">
+        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
+            <i class="bi bi-search fs-1 d-block mb-2" style="opacity: 0.5;"></i>
+            No se encontraron registros.
+        </td>
+    </tr>
+
+    {% if not audits %}
+    <tr class="original-empty-row">
+        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
+            <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>
+            No hay registros de auditoría de compras actualmente.
+        </td>
+    </tr>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/security/audit_purchase.js') }}"></script>
+{% endblock %}

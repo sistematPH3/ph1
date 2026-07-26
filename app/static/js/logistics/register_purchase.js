@@ -17,6 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setupHeaderValidation();
 
+    const supplierSelect = document.getElementById('supplier_id');
+    if (supplierSelect) {
+        supplierSelect.addEventListener('change', function() {
+            if (this.value === 'new') {
+                window.location.href = this.getAttribute('data-new-url');
+            }
+        });
+    }
+
     const currencySelect = document.getElementById('currency');
     const rateInput = document.getElementById('exchange_rate');
     const refreshRateBtn = document.getElementById('refreshRateBtn');
@@ -86,6 +95,7 @@ document.getElementById('invoice_photo').addEventListener('change', function(e) 
     const fileNameDisplay = document.getElementById('photoFileName');
     const icon = document.getElementById('cameraIcon');
     const dropzone = document.getElementById('dropzoneArea');
+    const removeBtn = document.getElementById('removePhotoBtn');
     
     if (this.files && this.files.length > 0) {
         fileNameDisplay.innerText = this.files[0].name;
@@ -93,14 +103,27 @@ document.getElementById('invoice_photo').addEventListener('change', function(e) 
         icon.classList.replace('bi-camera', 'bi-check-circle-fill');
         icon.classList.replace('text-muted', 'text-success');
         dropzone.style.borderColor = '#198754';
+        if (removeBtn) removeBtn.classList.remove('d-none');
     } else {
         fileNameDisplay.innerText = 'Toca aquí para tomar foto o abrir galería';
         fileNameDisplay.classList.replace('text-success', 'text-muted');
         icon.classList.replace('bi-check-circle-fill', 'bi-camera');
         icon.classList.replace('text-success', 'text-muted');
         dropzone.style.borderColor = '#adb5bd';
+        if (removeBtn) removeBtn.classList.add('d-none');
     }
 });
+
+const removePhotoBtn = document.getElementById('removePhotoBtn');
+if (removePhotoBtn) {
+    removePhotoBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const fileInput = document.getElementById('invoice_photo');
+        fileInput.value = '';
+        fileInput.dispatchEvent(new Event('change'));
+    });
+}
 
 function setFieldError(element, message) {
     if (!element) return;
@@ -149,7 +172,7 @@ function setupHeaderValidation() {
         const el = document.getElementById(field.id);
         if (el) {
             el.addEventListener(field.type, () => {
-                if (!el.value) setFieldError(el, field.msg);
+                if (!el.value || el.value === 'new') setFieldError(el, field.msg);
                 else clearFieldError(el);
             });
         }
@@ -162,10 +185,8 @@ function attachRowValidationListeners(row) {
     const prodPrice = row.querySelector('.prod-price');
     const expInput = row.querySelector('.prod-exp');
 
-    // Obtener la fecha de hoy en formato YYYY-MM-DD
     const today = new Date().toISOString().split('T')[0];
 
-    // 1. REGLA GENERAL: Ningún producto (Manual o Automático) puede tener fecha del pasado
     if (expInput) {
         expInput.min = today;
     }
@@ -178,36 +199,28 @@ function attachRowValidationListeners(row) {
                 clearFieldError(prodId);
                 
                 const selectedOpt = prodId.options[prodId.selectedIndex];
-                // Leer días configurados en la categoría del producto (si es 0/null es Manual)
                 const days = parseInt(selectedOpt.getAttribute('data-days')) || 0;
                 
                 if (expInput) {
-                    expInput.min = today; // Reforzar que no se elijan fechas pasadas
+                    expInput.min = today;
 
                     if (days > 0) {
-                        // ==========================================================
-                        // MODO AUTOMÁTICO (Categoría con días de caducidad fijados)
-                        // ==========================================================
                         const autoDateObj = new Date();
                         autoDateObj.setDate(autoDateObj.getDate() + days);
                         const autoDateStr = autoDateObj.toISOString().split('T')[0];
 
-                        expInput.max = autoDateStr;  // Límite máximo = fecha exacta calculada
-                        expInput.value = autoDateStr; // Se asigna automáticamente
+                        expInput.max = autoDateStr;
+                        expInput.value = autoDateStr;
 
                     } else {
-                        // ==========================================================
-                        // MODO MANUAL (El usuario debe ingresar la fecha a mano)
-                        // ==========================================================
-                        // Definimos un tope límite de seguridad para evitar errores (ej. 365 días)
                         const MAX_LOGICAL_MANUAL_DAYS = 365; 
 
                         const maxManualObj = new Date();
                         maxManualObj.setDate(maxManualObj.getDate() + MAX_LOGICAL_MANUAL_DAYS);
                         const maxManualStr = maxManualObj.toISOString().split('T')[0];
 
-                        expInput.max = maxManualStr; // Bloquea el calendario después de 1 año
-                        expInput.value = '';        // Se deja vacío para obligar al usuario a elegir
+                        expInput.max = maxManualStr;
+                        expInput.value = '';
                     }
                 }
             }
@@ -244,7 +257,6 @@ function attachRowValidationListeners(row) {
 document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
     attachRowValidationListeners(row);
     
-    // Si la primera fila ya tiene un producto cargado por defecto, dispara la lógica de fechas
     const prodId = row.querySelector('.prod-id');
     if (prodId && prodId.value) {
         prodId.dispatchEvent(new Event('change'));
@@ -270,7 +282,7 @@ function addProductRow() {
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" value="10">
+                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty">
                 </div>
             </div>
         </td>
@@ -285,7 +297,7 @@ function addProductRow() {
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
                     <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" value="5.50">
+                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price">
                 </div>
             </div>
         </td>
@@ -309,7 +321,7 @@ function validateFormBeforeSubmit() {
     const exchangeRate = document.getElementById('exchange_rate');
     const invoicePhoto = document.getElementById('invoice_photo');
 
-    if (!supplier.value) { setFieldError(supplier, 'Debes seleccionar un proveedor.'); isValid = false; }
+    if (!supplier.value || supplier.value === 'new') { setFieldError(supplier, 'Debes seleccionar un proveedor.'); isValid = false; }
     if (!user.value) { setFieldError(user, 'Debes seleccionar un usuario comprador.'); isValid = false; }
     if (!currency.value) { setFieldError(currency, 'Debes seleccionar una moneda.'); isValid = false; }
     
@@ -324,7 +336,7 @@ function validateFormBeforeSubmit() {
             icon: 'warning',
             title: 'Evidencia Requerida',
             text: 'Debes adjuntar la foto de la factura.',
-            confirmButtonColor: 'red',
+            confirmButtonColor: '#B31F24',
             confirmButtonText: 'Cerrar'
         });
         isValid = false;
@@ -336,7 +348,7 @@ function validateFormBeforeSubmit() {
             icon: 'warning',
             title: 'Carrito Vacío',
             text: 'Debes registrar al menos un producto en la compra.',
-            confirmButtonColor: 'red',
+            confirmButtonColor: '#B31F24',
             confirmButtonText: 'Cerrar'
         });
         isValid = false;
@@ -446,7 +458,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                     icon: 'error',
                     title: 'Error de consistencia',
                     text: 'Se encontraron errores de consistencia en el Servidor.',
-                    confirmButtonColor: 'red',
+                    confirmButtonColor: '#B31F24',
                     confirmButtonText: 'Cerrar'
                 });
             } else {
@@ -454,7 +466,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                     icon: 'error',
                     title: 'Oops...',
                     text: result.message || 'Ocurrió un error al procesar la compra.',
-                    confirmButtonColor: 'red',
+                    confirmButtonColor: '#B31F24',
                     confirmButtonText: 'Cerrar'
                 });
             }
@@ -464,7 +476,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
             icon: 'error',
             title: 'Fallo de Conexión',
             text: 'No se pudo conectar con el servidor backend.',
-            confirmButtonColor: 'red',
+            confirmButtonColor: '#B31F24',
             confirmButtonText: 'Cerrar'
         });
     }

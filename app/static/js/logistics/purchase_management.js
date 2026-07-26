@@ -131,7 +131,7 @@ function loadCollapseDetails(purchaseId) {
         return;
     }
 
-    fetch(`/logistics/purchases/history/${purchaseId}/details`)
+    fetch(`/logistics/purchases/management/${purchaseId}/details`)
         .then(response => {
             if (!response.ok) throw new Error('No se pudo procesar el desglose.');
             return response.json();
@@ -237,7 +237,7 @@ const handleActionClick = function(e) {
         editTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
         modalEdit.show();
 
-        fetch(`/logistics/purchases/history/${purchaseId}/details`)
+        fetch(`/logistics/purchases/management/${purchaseId}/details`)
             .then(res => {
                 if (!res.ok) throw new Error('Error en la red');
                 return res.json();
@@ -386,7 +386,7 @@ if (btnSaveEdit) {
         btnSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
         btnSaveEdit.disabled = true;
 
-        fetch(`/logistics/purchases/history/${currentEditPurchaseId}/edit`, {
+        fetch(`/logistics/purchases/management/${currentEditPurchaseId}/edit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: items, reason: reasonVal })

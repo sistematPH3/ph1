@@ -2,7 +2,7 @@ from app.models import Purchase, PurchaseDetail, Supplier, Inventory, PurchaseAu
 from decimal import Decimal
 from datetime import datetime, timedelta
 
-class PurchaseHistoryRepository:
+class PurchaseManagementRepository:
     def __init__(self, db_connection):
         self.db = db_connection
 

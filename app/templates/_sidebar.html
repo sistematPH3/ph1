@@ -18,13 +18,12 @@
     <ul class="nav flex-column sidebar-menu">
         
         {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
-<li class="nav-item">
-    <a class="nav-link sidebar-toggler" href="{{ url_for('dashboard.index') }}">
-        <i class="bi bi-house-door main-icon"></i>
-        <span class="link-text">PANEL</span>
-    </a>
-</li>
-
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="{{ url_for('dashboard.index') }}">
+                <i class="bi bi-house-door main-icon"></i>
+                <span class="link-text">PANEL</span>
+            </a>
+        </li>
         {% endif %}
 
         {% if current_user.is_admin %}
@@ -79,7 +78,7 @@
             </a>
             <div class="menu-desplegable">
                 <a class="nav-link sub-link" href="{{ url_for('purchase_routes.new_purchase_form') }}">Nueva Compra</a>
-                <a class="nav-link sub-link" href="{{ url_for('purchase_history.index') }}">Gestión de Compras</a>
+                <a class="nav-link sub-link" href="{{ url_for('purchase_management.index') }}">Gestión de Compras</a>
                 <a class="nav-link sub-link" href="{{ url_for('supplier_list.register_supplier_view') }}">Nuevo Proveedor</a>
                 <a class="nav-link sub-link" href="{{ url_for('supplier_list.index') }}">Proveedores</a>
             </div>
@@ -110,6 +109,7 @@
             <div class="menu-desplegable">
                 <a class="nav-link sub-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
+                <a class="nav-link sub-link" href="{{ url_for('audit_purchase.list_purchase_audits') }}">Auditoría de Compras</a>
             </div>
         </li>
         {% endif %}

@@ -33,6 +33,13 @@ def create_app():
         from .security.routes.audit_user_routes import audit_user_bp
         app.register_blueprint(audit_user_bp)
         # ==========================================================
+
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA DE COMPRAS
+        # ==========================================================
+        from .security.routes.audit_purchase_routes import audit_purchase_bp
+        app.register_blueprint(audit_purchase_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)
@@ -64,10 +71,10 @@ def create_app():
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
 
         # ==========================================================\
-        # HISTORIAL DE COMPRAS 
+        # GESTIÓN DE COMPRAS 
         # ==========================================================\
-        from .logistics.routes.purchase_history_routes import purchase_history_bp
-        app.register_blueprint(purchase_history_bp, url_prefix='/logistics')
+        from .logistics.routes.purchase_management_routes import purchase_management_bp
+        app.register_blueprint(purchase_management_bp, url_prefix='/logistics')
         # ==========================================================\
 
         # ==========================================================

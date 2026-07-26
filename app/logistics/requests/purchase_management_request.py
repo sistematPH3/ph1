@@ -1,16 +1,10 @@
-# app/logistics/requests/purchase_history_request.py
 from datetime import datetime
 
-class PurchaseHistoryFilterRequest:
+class PurchaseManagementFilterRequest:
     def load(self, params):
-        """
-        Procesa, tipa y valida los parámetros de búsqueda del historial.
-        Lanza un ValueError con un diccionario de errores si algo falla.
-        """
         errors = {}
         validated_data = {}
 
-        # 1. Validación de la Fecha de Inicio
         start_date_str = params.get('start_date')
         if start_date_str and start_date_str.strip():
             try:
@@ -20,7 +14,6 @@ class PurchaseHistoryFilterRequest:
         else:
             validated_data['start_date'] = None
 
-        # 2. 	Validación de la Fecha Fin
         end_date_str = params.get('end_date')
         if end_date_str and end_date_str.strip():
             try:
@@ -30,7 +23,6 @@ class PurchaseHistoryFilterRequest:
         else:
             validated_data['end_date'] = None
 
-        # 3. Validación del ID del Proveedor
         supplier_id_str = params.get('supplier_id')
         if supplier_id_str and supplier_id_str.strip():
             try:
@@ -40,7 +32,6 @@ class PurchaseHistoryFilterRequest:
         else:
             validated_data['supplier_id'] = None
 
-        # 4. Validación del Estado de la Compra
         status = params.get('status')
         if status and status.strip():
             status_clean = status.strip().upper()
@@ -51,11 +42,9 @@ class PurchaseHistoryFilterRequest:
         else:
             validated_data['status'] = None
 
-        # Si hay errores de casteo/formato individuales, frenamos aquí para no causar un crash en las fechas
         if errors:
             raise ValueError(errors)
 
-        # 5. Validación Lógica Cruzada (Fechas)
         if validated_data['start_date'] and validated_data['end_date']:
             if validated_data['start_date'] > validated_data['end_date']:
                 errors['start_date'] = ["La fecha de inicio no puede ser posterior a la fecha fin."]
