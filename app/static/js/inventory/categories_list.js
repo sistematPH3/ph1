@@ -1,40 +1,21 @@
 document.addEventListener("DOMContentLoaded", function() {
     
-    // --- FIX RESPONSIVO PARA CONTENEDORES NATIVOS DE BASE_LIST ---
+    // --- FIX RESPONSIVO PARA ENCABEZADO Y BUSCADOR ---
     const iconBox = document.querySelector('.brand-icon-box');
     if (iconBox) {
         const headerContainer = iconBox.closest('.d-flex.justify-content-between');
         if (headerContainer) {
             headerContainer.classList.remove('align-items-center');
             headerContainer.classList.add('flex-column', 'flex-md-row', 'align-items-md-center', 'align-items-start', 'gap-3');
-            Array.from(headerContainer.children).forEach(child => {
-                child.classList.add('w-100', 'w-md-auto');
-            });
         }
     }
 
     const searchInput = document.getElementById('categorySearchInput');
-    const filterGroup = document.querySelector('.mariuska-select-group');
-
     if (searchInput) {
         const searchWrapper = searchInput.closest('.d-flex.justify-content-between') || searchInput.closest('.d-flex');
         if (searchWrapper) {
             searchWrapper.classList.remove('align-items-center');
-            searchWrapper.classList.add('flex-column', 'flex-md-row', 'gap-3', 'w-100'); 
-            
-            Array.from(searchWrapper.children).forEach(child => {
-                child.classList.add('w-100', 'w-md-auto');
-            });
-        }
-    }
-
-    if (filterGroup) {
-        filterGroup.classList.remove('w-100');
-        
-        const filterWrapper = filterGroup.parentElement;
-        if (filterWrapper && filterWrapper !== document.body) {
-            filterWrapper.classList.add('ms-md-auto', 'w-md-auto');
-            filterWrapper.classList.remove('w-100'); 
+            searchWrapper.classList.add('flex-column', 'flex-md-row', 'align-items-md-center', 'gap-2', 'w-100');
         }
     }
 
@@ -54,24 +35,32 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     const controlFilter = document.getElementById('controlTypeFilter');
+    const statusFilter = document.getElementById('statusFilter');
     const noResultsRow = document.getElementById('noResultsRow');
     
     const desktopRows = document.querySelectorAll('.category-row.d-none.d-md-table-row');
     const mobileCards = document.querySelectorAll('.category-row.d-md-none');
 
-    // --- FILTRADO CORREGIDO SIN INTERFERIR CON BREAKPOINTS MÓVIL/DESKTOP ---
+    // --- FILTRADO COMBINADO ---
     function executeCombinedFilter() {
         const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-        const selectedFilter = controlFilter ? controlFilter.value : 'all';
+        const selectedControl = controlFilter ? controlFilter.value : 'all';
+        const selectedStatus = statusFilter ? statusFilter.value : 'all';
+
         let totalVisibleDesktop = 0;
         let totalVisibleMobile = 0;
 
         desktopRows.forEach(row => {
             const categoryName = row.cells[0].textContent.toLowerCase();
             const rowControlType = row.getAttribute('data-control-type');
-            
-            if (categoryName.includes(query) && (selectedFilter === 'all' || rowControlType === selectedFilter)) {
-                row.style.removeProperty('display'); // Permite que la clase responsiva tome el control
+            const rowStatus = row.getAttribute('data-status');
+
+            const matchesSearch = categoryName.includes(query);
+            const matchesControl = (selectedControl === 'all' || rowControlType === selectedControl);
+            const matchesStatus = (selectedStatus === 'all' || rowStatus === selectedStatus);
+
+            if (matchesSearch && matchesControl && matchesStatus) {
+                row.style.removeProperty('display');
                 totalVisibleDesktop++;
             } else {
                 row.style.setProperty('display', 'none', 'important');
@@ -82,9 +71,14 @@ document.addEventListener("DOMContentLoaded", function() {
             const categoryNameElement = card.querySelector('h5');
             const categoryName = categoryNameElement ? categoryNameElement.textContent.toLowerCase() : '';
             const rowControlType = card.getAttribute('data-control-type');
+            const rowStatus = card.getAttribute('data-status');
 
-            if (categoryName.includes(query) && (selectedFilter === 'all' || rowControlType === selectedFilter)) {
-                card.style.removeProperty('display'); // Permite que d-md-none oculte en tablet/PC
+            const matchesSearch = categoryName.includes(query);
+            const matchesControl = (selectedControl === 'all' || rowControlType === selectedControl);
+            const matchesStatus = (selectedStatus === 'all' || rowStatus === selectedStatus);
+
+            if (matchesSearch && matchesControl && matchesStatus) {
+                card.style.removeProperty('display');
                 totalVisibleMobile++;
             } else {
                 card.style.setProperty('display', 'none', 'important');
@@ -103,8 +97,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if (searchInput) searchInput.addEventListener('input', executeCombinedFilter);
     if (controlFilter) controlFilter.addEventListener('change', executeCombinedFilter);
+    if (statusFilter) statusFilter.addEventListener('change', executeCombinedFilter);
 
-    // --- DELEGACIÓN GLOBAL DE EVENTOS AJAX ---
+    // --- DELEGACIÓN GLOBAL AJAX ---
     document.addEventListener('change', async function(e) {
         const switchInput = e.target.closest('.toggle-category-status-switch');
         if (!switchInput) return;
@@ -145,6 +140,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         const badgeCell = rowContainer.querySelector('.status-badge-cell, .status-badge-cell-mobile');
                         const mobileCardItem = rowContainer.querySelector('.mobile-card-item');
 
+                        rowContainer.setAttribute('data-status', isActive ? 'active' : 'inactive');
+
                         if (isActive) {
                             rowContainer.classList.remove('row-inhabilitada');
                             if (mobileCardItem) mobileCardItem.classList.remove('row-inhabilitada');
@@ -162,6 +159,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         }
                     }
                 });
+
+                executeCombinedFilter();
 
             } else {
                 switchInput.checked = !switchInput.checked;

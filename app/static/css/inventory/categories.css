@@ -296,6 +296,7 @@
         margin-bottom: 0.5rem !important;
     }
     
+    /* En teléfonos se apilan abarcando todo el ancho */
     .mariuska-select-group {
         min-width: 100% !important;
         width: 100% !important;
@@ -322,15 +323,16 @@
         padding: 1.25rem !important;
     }
 
+    /* Ancho compacto para pantallas medianas / tablets */
     .mariuska-select-group {
-        width: 220px !important;
+        width: 180px !important;
         flex-shrink: 0 !important;
-        margin-right: 7rem !important;
+        margin-right: 0 !important;
     }
 
     .mariuska-select-group .form-select {
-        font-size: 0.82rem !important;
-        padding-right: 2rem !important;
+        font-size: 0.80rem !important;
+        padding-right: 1.8rem !important;
     }
 
     .btn-mariuska-red {
@@ -357,11 +359,20 @@
 }
 
 @media (min-width: 768px) {
+    /* Subimos a 210px y ajustamos el padding para que no se corte el texto */
     .mariuska-select-group {
-        width: 240px !important;
+        width: 210px !important;
         flex-shrink: 0 !important;
-        margin-left: auto !important;
-        margin-right: 5rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* Reducimos el padding derecho sobrante de la flecha del select */
+    .mariuska-select-group .form-select {
+        font-size: 0.83rem !important;
+        padding-left: 0.25rem !important;
+        padding-right: 1.4rem !important;
+        background-position: right 0.2rem center !important;
     }
 
     .btn-mariuska-red {
@@ -369,33 +380,4 @@
         padding: 0.55rem 1.7rem !important;
         width: auto !important;
     }
-}
-
-#genericTable .generic-pagination-row td {
-    padding: 0 !important;
-    background-color: transparent !important;
-    border: none !important;
-}
-
-#genericTable .generic-pagination-row:hover td {
-    background-color: transparent !important;
-}
-/* ==========================================================================
-   ELIMINACIÓN DE HOVER EN FILAS Y TARJETAS
-   ========================================================================== */
-#genericTable tbody tr:hover,
-#genericTable tbody tr:hover td,
-.category-row:hover,
-.category-row:hover td,
-.mobile-card-item:hover {
-    background-color: #FFFFFF !important;
-    box-shadow: none !important;
-    transform: none !important;
-}
-
-/* Preservar fondo atenuado para registros inhabilitados en Hover */
-#genericTable tbody tr.row-inhabilitada:hover td,
-.category-row.row-inhabilitada:hover td,
-.mobile-card-item.row-inhabilitada:hover {
-    background-color: #FAFAFA !important;
 }

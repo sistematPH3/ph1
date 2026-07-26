@@ -57,13 +57,26 @@
 {% endblock %}
 
 {% block actions_filter %}
-    <div class="mariuska-select-group d-flex align-items-center px-3">
-        <i class="bi bi-filter text-muted me-2"></i>
-        <select id="controlTypeFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important; font-size: 0.88rem;">
-            <option value="all">Todos los controles</option>
-            <option value="automatic">Automático (Días Hábiles)</option>
-            <option value="manual">Manual (Lote / Compras)</option>
-        </select>
+    <div class="d-flex flex-column flex-sm-row gap-2 ms-md-auto align-items-center">
+        <!-- Filtro 1: Tipo de Control -->
+        <div class="mariuska-select-group d-flex align-items-center ps-3 pe-2">
+            <i class="bi bi-sliders text-muted me-2"></i>
+            <select id="controlTypeFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important;">
+                <option value="all">Todos los controles</option>
+                <option value="automatic">Automático (Días Hábiles)</option>
+                <option value="manual">Manual (Lote / Compras)</option>
+            </select>
+        </div>
+
+        <!-- Filtro 2: Estatus Operativo -->
+        <div class="mariuska-select-group d-flex align-items-center ps-3 pe-2">
+            <i class="bi bi-funnel text-muted me-2"></i>
+            <select id="statusFilter" class="form-select border-0 bg-transparent ps-1 py-2 mariuska-custom-select" style="box-shadow: none !important;">
+                <option value="all">Todos los estatus</option>
+                <option value="active">Operativas</option>
+                <option value="inactive">Inactivas</option>
+            </select>
+        </div>
     </div>
 {% endblock %}
 
@@ -73,7 +86,9 @@
             <!-- ==========================================================================
                  VISTA ESCRITORIO (>= 768px)
                  ========================================================================== -->
-            <tr class="category-row d-none d-md-table-row {% if type.is_active == False %}row-inhabilitada{% endif %}" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
+            <tr class="category-row d-none d-md-table-row {% if type.is_active == False %}row-inhabilitada{% endif %}" 
+                    data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}"
+                    data-status="{{ 'inactive' if type.is_active == False else 'active' }}">
                 <td class="text-center fw-bold text-dark fs-6">
                     {{ type.name }}
                 </td>
@@ -128,7 +143,9 @@
             <!-- ==========================================================================
                  VISTA MÓVIL (< 768px)
                  ========================================================================== -->
-            <tr class="category-row d-md-none p-0 border-0 bg-transparent {% if type.is_active == False %}row-inhabilitada{% endif %}" data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}">
+            <tr class="category-row d-md-none p-0 border-0 bg-transparent {% if type.is_active == False %}row-inhabilitada{% endif %}" 
+    data-control-type="{{ 'manual' if type.requires_manual_date else 'automatic' }}"
+    data-status="{{ 'inactive' if type.is_active == False else 'active' }}">
                 <td colspan="5" class="p-0 border-0 bg-transparent">
                     <div class="mobile-card-item {% if type.is_active == False %}row-inhabilitada{% endif %}">
                         
