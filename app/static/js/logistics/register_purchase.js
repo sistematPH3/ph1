@@ -185,10 +185,12 @@ function attachRowValidationListeners(row) {
     const prodPrice = row.querySelector('.prod-price');
     const expInput = row.querySelector('.prod-exp');
 
-    const today = new Date().toISOString().split('T')[0];
+    const minDateObj = new Date();
+    minDateObj.setDate(minDateObj.getDate() + 3);
+    const minDateStr = minDateObj.toISOString().split('T')[0];
 
     if (expInput) {
-        expInput.min = today;
+        expInput.min = minDateStr;
     }
 
     if (prodId) {
@@ -202,11 +204,16 @@ function attachRowValidationListeners(row) {
                 const days = parseInt(selectedOpt.getAttribute('data-days')) || 0;
                 
                 if (expInput) {
-                    expInput.min = today;
+                    expInput.min = minDateStr;
 
                     if (days > 0) {
                         const autoDateObj = new Date();
                         autoDateObj.setDate(autoDateObj.getDate() + days);
+                        
+                        if (autoDateObj < minDateObj) {
+                            autoDateObj.setTime(minDateObj.getTime());
+                        }
+
                         const autoDateStr = autoDateObj.toISOString().split('T')[0];
 
                         expInput.max = autoDateStr;
