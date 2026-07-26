@@ -1,8 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 from app.extensions import db
-from app.models.logistics_model import Purchase, PurchaseDetail, Location
-from app.models.inventory_model import Inventory, Product
+from app.models.logistics_model import Purchase, PurchaseDetail
+from app.models.inventory_model import Product
 from app.models import PurchaseAuditLog
 
 class PurchaseService:
@@ -52,24 +52,10 @@ class PurchaseService:
                     "expiration_date": str(item.get('expiration_date')) if item.get('expiration_date') else None
                 })
 
+                # Actualización exclusiva del Stock General (Almacén Nacional)
                 product = Product.query.get(item['product_id'])
                 if product:
                     product.quantity += quantity
-
-                inventory_item = Inventory.query.filter_by(product_id=item['product_id']).first()
-                
-                if inventory_item:
-                    inventory_item.current_quantity += Decimal(str(quantity))
-                else:
-                    default_location = Location.query.first()
-                    loc_id = default_location.id if default_location else 1
-                    
-                    new_inventory = Inventory(
-                        product_id=item['product_id'],
-                        location_id=loc_id,   
-                        current_quantity=Decimal(str(quantity)) 
-                    )
-                    db.session.add(new_inventory)
 
             new_purchase.total_amount = calculated_total
             
@@ -96,7 +82,7 @@ class PurchaseService:
             
             return {
                 "success": True, 
-                "message": "Compra registrada. Inventario por sede y stock general actualizados con éxito.",
+                "message": "Compra registrada y stock general actualizado con éxito.",
                 "purchase_id": new_purchase.id
             }
 

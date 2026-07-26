@@ -130,10 +130,14 @@
                                             <h6 class="fw-bold text-dark m-0"><i class="bi bi-box-seam me-2"></i>Especificación Técnica y Desglose de Insumos</h6>
                                         </div>
                                         <div class="col-md-6 text-md-end">
-                                            {% if purchase.invoice_url %}
+                                            {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
                                             <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
                                                 <i class="bi bi-image me-1"></i> Ver Factura Original (Evidencia)
                                             </a>
+                                            {% elif purchase.invoice_url == 'En proceso...' %}
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
+                                                <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
+                                            </button>
                                             {% else %}
                                             <span class="text-muted small"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
                                             {% endif %}
@@ -237,10 +241,16 @@
                             <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam me-2"></i>Insumos Adquiridos</h6>
                             
                             <div class="d-flex flex-column gap-2 mb-3">
-                                {% if purchase.invoice_url %}
+                                {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
                                 <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
                                     <i class="bi bi-image me-1"></i> Ver Factura Original
                                 </a>
+                                {% elif purchase.invoice_url == 'En proceso...' %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
+                                    <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
+                                </button>
+                                {% else %}
+                                <span class="text-muted small w-100 text-center d-block mb-2"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
                                 {% endif %}
                                 <a href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=purchase.id) }}" class="btn btn-sm btn-danger fw-bold shadow-sm w-100">
                                     <i class="bi bi-file-earmark-bar-graph me-1"></i> Auditoría Completa
