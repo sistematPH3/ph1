@@ -1,15 +1,13 @@
-
 :root {
-    --ph-red: #b01212;        /* Rojo corporativo */
-    --ph-red-hover: #8c0e0e;  /* Variación hover */
-    --ph-red-light: #fdf2f2;  /* Fondo suave / Alertas */
-    --ph-text-main: #1F2937;  /* Texto principal */
-    --ph-text-soft: #4B5563;  /* Texto secundario */
-    --ph-text-muted: #8892A0; /* Subtextos */
-    --ph-border-soft: #E2E8F0;/* Borde gris sutil */
+    --ph-red: #b01212;
+    --ph-red-hover: #8c0e0e;
+    --ph-red-light: #fdf2f2;
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-border-soft: #E2E8F0;
 }
 
-/* 1. Contenedor Principal (Centrado de la tarjeta) */
 .register-wrapper {
     display: flex;
     justify-content: center;
@@ -18,7 +16,6 @@
     width: 100%;
 }
 
-/* 2. Tarjeta Blanca Redondeada (Form Card Premium) */
 .form-card-premium {
     background-color: #ffffff !important;
     border-radius: 24px !important;
@@ -30,7 +27,6 @@
     position: relative;
 }
 
-/* 3. Título del Formulario (Rojo, Itálico y Negrita) */
 .form-card-premium h2 {
     margin-bottom: 2rem !important;
     color: var(--ph-red) !important;
@@ -41,14 +37,12 @@
     letter-spacing: -0.5px !important;
 }
 
-/* 4. Contenedor de Campos */
 .form-group-premium {
     margin-bottom: 1.35rem;
     display: flex;
     flex-direction: column;
 }
 
-/* Etiquetas */
 .form-group-premium label {
     margin-bottom: 0.45rem !important;
     font-weight: 800 !important;
@@ -57,7 +51,6 @@
     margin-left: 10px !important;
 }
 
-/* Inputs y Selects Estilo Píldora (Rounded 50px) */
 .form-group-premium input,
 .form-group-premium select,
 .form-group-premium .form-control {
@@ -71,7 +64,6 @@
     height: auto !important;
 }
 
-/* Textarea con esquinas suavizadas de 20px */
 .form-group-premium textarea {
     padding: 0.85rem 1.25rem !important;
     border: 2px solid var(--ph-border-soft) !important;
@@ -83,7 +75,6 @@
     resize: none !important;
 }
 
-/* Focus Interactivo (Glow rojo sutil al escribir) */
 .form-group-premium input:focus,
 .form-group-premium select:focus,
 .form-group-premium textarea:focus,
@@ -94,7 +85,6 @@
     box-shadow: 0 0 10px rgba(176, 18, 18, 0.12) !important;
 }
 
-/* 5. Mensajes y Errores del Validador JS */
 .form-group-premium .invalid-feedback,
 .error-feedback-premium {
     color: var(--ph-red) !important;
@@ -106,7 +96,6 @@
     min-height: 18px;
 }
 
-/* Estados de Validación Dinámica */
 .form-group-premium input.is-invalid,
 .form-group-premium textarea.is-invalid {
     border-color: var(--ph-red) !important;
@@ -118,7 +107,6 @@
     border-color: #28a745 !important;
 }
 
-/* 6. Botones de Acción Horizontales */
 .form-actions-premium {
     display: flex !important;
     justify-content: space-between !important;
@@ -142,7 +130,6 @@
     justify-content: center !important;
 }
 
-/* Botón Guardar (Rojo Corporativo con Aura) */
 .btn-premium-primary {
     background-color: var(--ph-red) !important;
     color: #ffffff !important;
@@ -154,7 +141,6 @@
     box-shadow: 0 6px 18px rgba(176, 18, 18, 0.4) !important;
 }
 
-/* Botón Cancelar (Negro Elegante con Aura) */
 .btn-premium-secondary {
     background-color: #000000 !important;
     color: #ffffff !important;
@@ -166,7 +152,6 @@
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
 }
 
-/* 7. Alertas de Flask Flash */
 .flash-messages {
     width: 100%;
 }
@@ -191,7 +176,6 @@
     border: 1px solid #a5d6a7;
 }
 
-/* 8. Adaptabilidad Responsive (Vista Móvil) */
 @media (max-width: 768px) {
     .register-wrapper {
         padding: 0.5rem 0.25rem 2rem 0.25rem !important;

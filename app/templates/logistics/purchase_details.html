@@ -23,9 +23,14 @@
             </div>
         </div>
         
-        <button type="button" id="btn-back-history" class="btn btn-danger btn-sm fw-bold rounded-pill px-4 py-2 shadow-sm align-self-start align-self-md-center">
-            <i class="bi bi-arrow-left me-1"></i> Volver al Historial
-        </button>
+        <div class="d-flex gap-2 align-self-start align-self-md-center">
+            <a href="/logistics/purchases/management" class="btn btn-danger btn-sm fw-bold rounded-pill px-3 py-2 shadow-sm">
+                <i class="bi bi-card-list me-1"></i> Ir a Gestión
+            </a>
+            <a href="/auditoria/compras" class="btn btn-danger btn-sm fw-bold rounded-pill px-3 py-2 shadow-sm">
+                <i class="bi bi-shield-check me-1"></i> Ir a Auditoría
+            </a>
+        </div>
     </div>
 
     {% if purchase.status == 'ANNULLED' and audit_log %}
@@ -112,8 +117,9 @@
                                     </tr>
                                 {% endfor %}
                                 <tr class="table-light">
-                                    <td colspan="4" class="text-end fw-bold p-3">Monto Total Facturado:</td>
-                                    <td class="text-center text-danger fw-bold fs-5 p-3 pe-4">Bs. {{ "{:,.2f}".format(total_bs.value) }}</td>
+                                    <td colspan="3" class="text-end fw-bold p-3 align-middle">Monto Total Facturado:</td>
+                                    <td class="text-center text-primary fw-bold fs-5 p-3 align-middle">{{ "{:,.2f}".format(purchase.total_amount) }} <span class="fs-6">{{ purchase.currency }}</span></td>
+                                    <td class="text-center text-danger fw-bold fs-5 p-3 pe-4 align-middle">Bs. {{ "{:,.2f}".format(total_bs.value) }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -155,8 +161,11 @@
                     {% endfor %}
                     
                     <div class="mt-4 p-3 rounded-3" style="background-color: #fef2f2; border: 1px solid #fca5a5;">
-                        <span class="d-block text-danger fw-bold text-uppercase small mb-1">Monto Total Facturado</span>
-                        <span class="d-block text-danger fw-bold fs-4">Bs. {{ "{:,.2f}".format(total_bs_mobile.value) }}</span>
+                        <span class="d-block text-danger fw-bold text-uppercase small mb-2">Monto Total Facturado</span>
+                        <div class="d-flex flex-column gap-1">
+                            <span class="d-block text-primary fw-bold fs-5">{{ "{:,.2f}".format(purchase.total_amount) }} {{ purchase.currency }}</span>
+                            <span class="d-block text-danger fw-bold fs-4">Bs. {{ "{:,.2f}".format(total_bs_mobile.value) }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -169,14 +178,39 @@
                 </div>
                 <div class="card-body p-4 bg-white">
                     {% for log in edit_logs %}
-                    <div class="mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                    <div class="mb-4 pb-4 {% if not loop.last %}border-bottom{% endif %}">
                         <div class="d-flex flex-column flex-sm-row justify-content-between mb-2">
                             <span class="fw-bold text-dark"><i class="bi bi-person-fill text-danger me-1"></i> {{ log.editor_name }}</span>
                             <span class="text-muted small mt-1 mt-sm-0"><i class="bi bi-calendar3 me-1"></i> {{ log.timestamp.strftime('%d/%m/%Y %I:%M %p') if log.timestamp else 'N/A' }}</span>
                         </div>
-                        <p class="m-0 p-3 rounded-3 small" style="background-color: #fff5f5; border: 1px solid #f8d7da; color: #212529;">
-                            <strong class="text-danger d-block mb-1">Motivo:</strong> {{ log.reason }}
+                        <p class="m-0 p-3 rounded-3 small mb-3" style="background-color: #fff5f5; border: 1px solid #f8d7da; color: #212529;">
+                            <strong class="text-danger d-block mb-1">Motivo de Edición:</strong> {{ log.reason }}
                         </p>
+                        
+                        {% if log.changes %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered m-0 align-middle">
+                                <thead class="table-light text-muted small text-uppercase">
+                                    <tr>
+                                        <th>Campo Modificado</th>
+                                        <th>Valor Anterior (Antes)</th>
+                                        <th>Valor Nuevo (Después)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for change in log.changes %}
+                                    <tr>
+                                        <td class="fw-semibold text-dark small">{{ change.field }}</td>
+                                        <td class="text-danger small"><del>{{ change.from }}</del></td>
+                                        <td class="text-success small fw-bold">{{ change.to }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <span class="text-muted small fst-italic">No se detectaron cambios en cantidades, fechas o precios en esta edición.</span>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>

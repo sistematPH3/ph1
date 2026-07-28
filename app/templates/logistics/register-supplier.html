@@ -17,7 +17,8 @@
             {% if messages %}
                 <div class="flash-messages mb-3">
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
+                        {% set alert_class = 'success' if category == 'success' or 'exitosamente' in message.lower() or 'éxito' in message.lower() else ('danger' if category == 'error' or category == 'danger' else 'info') %}
+                        <div class="alert alert-{{ alert_class }}">
                             {{ message }}
                         </div>
                     {% endfor %}
@@ -25,7 +26,6 @@
             {% endif %}
         {% endwith %}
 
-        <!-- FORMULARIO CON ATRIBUTOS DATA INTAC TOS PARA LAS VALIDACIONES REAL-TIME -->
         <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" 
               method="POST" 
               class="needs-validation" 
@@ -40,7 +40,6 @@
                 <input type="hidden" name="supplier_id" id="supplier_id" value="{{ supplier.id }}">
             {% endif %}
 
-            <!-- Razón Social / Nombre -->
             <div class="form-group-premium">
                 <label for="name">Razón Social / Nombre</label>
                 <input type="text" class="form-control" id="name" name="name" maxlength="150" 
@@ -49,7 +48,6 @@
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
 
-            <!-- RIF / Tax ID -->
             <div class="form-group-premium">
                 <label for="tax_id">RIF / Identificación Fiscal</label>
                 <input type="text" class="form-control" id="tax_id" name="tax_id" maxlength="20" 
@@ -58,7 +56,6 @@
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
 
-            <!-- Persona de Contacto -->
             <div class="form-group-premium">
                 <label for="contact_name">Persona de Contacto</label>
                 <input type="text" class="form-control" id="contact_name" name="contact_name" maxlength="100" 
@@ -67,7 +64,6 @@
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
 
-            <!-- Teléfono -->
             <div class="form-group-premium">
                 <label for="phone">Teléfono de Contacto</label>
                 <input type="tel" class="form-control" id="phone" name="phone" maxlength="20" 
@@ -76,7 +72,6 @@
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
 
-            <!-- Correo Electrónico -->
             <div class="form-group-premium">
                 <label for="email">Correo Electrónico</label>
                 <input type="email" class="form-control" id="email" name="email" maxlength="100" 
@@ -85,10 +80,8 @@
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
 
-            <!-- Botones de Acción -->
             <div class="form-actions-premium">
-                <!-- Redirige exactamente al listado de proveedores -->
-                <a href="{{ url_for('supplier_list.index') }}" class="btn-premium btn-premium-secondary">
+                <a href="{{ url_for('purchase_routes.new_purchase_form') }}" class="btn-premium btn-premium-secondary">
                     Cancelar
                 </a>
                 <button type="submit" class="btn-premium btn-premium-primary" id="submitBtn">

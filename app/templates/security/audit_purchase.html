@@ -65,12 +65,16 @@
                 <ul class="list-unstyled mb-0 small text-muted">
                 {% for field, values in audit.changed_data.items() %}
                     <li class="mb-1">
-                        <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                        <strong class="text-dark">{{ field }}:</strong> 
                         {% if values.old %}
-                        <span class="text-decoration-line-through">{{ values.old }}</span> 
-                        <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                            {% if values.old == '-' %}
+                                <span class="text-muted">{{ values.old }}</span>
+                            {% else %}
+                                <span class="text-decoration-line-through text-danger">{{ values.old }}</span> 
+                            {% endif %}
+                            <i class="bi bi-arrow-right text-primary mx-1"></i> 
                         {% endif %}
-                        <span class="fw-bold text-dark">{{ values.new }}</span>
+                        <span class="fw-bold {% if values.new == '-' %}text-muted{% else %}text-success{% endif %}">{{ values.new }}</span>
                     </li>
                 {% endfor %}
                 </ul>
@@ -128,12 +132,16 @@
                             <ul class="list-unstyled mb-0 text-muted" style="font-size: 0.8rem;">
                             {% for field, values in audit.changed_data.items() %}
                                 <li class="mb-1">
-                                    <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                                    <strong class="text-dark">{{ field }}:</strong> 
                                     {% if values.old %}
-                                    <span class="text-decoration-line-through">{{ values.old }}</span> 
-                                    <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                                        {% if values.old == '-' %}
+                                            <span class="text-muted">{{ values.old }}</span>
+                                        {% else %}
+                                            <span class="text-decoration-line-through text-danger">{{ values.old }}</span> 
+                                        {% endif %}
+                                        <i class="bi bi-arrow-right text-primary mx-1"></i> 
                                     {% endif %}
-                                    <span class="fw-bold text-dark">{{ values.new }}</span>
+                                    <span class="fw-bold {% if values.new == '-' %}text-muted{% else %}text-success{% endif %}">{{ values.new }}</span>
                                 </li>
                             {% endfor %}
                             </ul>

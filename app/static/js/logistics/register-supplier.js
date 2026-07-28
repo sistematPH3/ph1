@@ -2,14 +2,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('supplierForm');
     if (!form) return;
 
-    // 1. Extraer URLs y datos del formulario
     const checkNameUrl = form.getAttribute('data-check-name-url');
     const checkPhoneUrl = form.getAttribute('data-check-phone-url');
     const checkTaxIdUrl = form.getAttribute('data-check-tax-id-url');
     const checkEmailUrl = form.getAttribute('data-check-email-url');
     const supId = form.getAttribute('data-supplier-id') || 0;
 
-    // 2. Captura de inputs
     const nameInput = document.getElementById('name');
     const taxIdInput = document.getElementById('tax_id');
     const phoneInput = document.getElementById('phone');
@@ -20,7 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let phoneTimeout = null;
     let emailTimeout = null;
 
-    // --- VALIDACIÓN EN TIEMPO REAL: NOMBRE / RAZÓN SOCIAL ---
     if (nameInput) {
         nameInput.addEventListener('input', function() {
             clearTimeout(nameTimeout);
@@ -45,14 +42,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         marcarExito(nameInput);
                     }
-                } catch (e) {
-                    console.error("Error verificando nombre:", e);
-                }
+                } catch (e) {}
             }, 500);
         });
     }
 
-    // --- VALIDACIÓN EN TIEMPO REAL: RIF / TAX ID ---
     if (taxIdInput) {
         taxIdInput.addEventListener('input', function() {
             clearTimeout(taxIdTimeout);
@@ -76,14 +70,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         marcarExito(taxIdInput);
                     }
-                } catch (e) {
-                    console.error("Error verificando Tax ID:", e);
-                }
+                } catch (e) {}
             }, 500);
         });
     }
 
-    // --- VALIDACIÓN EN TIEMPO REAL: TELÉFONO ---
     if (phoneInput) {
         phoneInput.addEventListener('input', function() {
             clearTimeout(phoneTimeout);
@@ -109,14 +100,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         marcarExito(phoneInput);
                     }
-                } catch (e) {
-                    console.error("Error verificando teléfono:", e);
-                }
+                } catch (e) {}
             }, 500);
         });
     }
 
-    // --- VALIDACIÓN EN TIEMPO REAL: CORREO ELECTRÓNICO ---
     if (emailInput) {
         const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
         emailInput.addEventListener('input', function() {
@@ -142,14 +130,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         marcarExito(emailInput);
                     }
-                } catch (e) {
-                    console.error("Error verificando correo:", e);
-                }
+                } catch (e) {}
             }, 500);
         });
     }
 
-    // --- CONTROL DE ENVÍO (PREVENT DEFAULT SI HAY ERRORES) ---
     form.addEventListener('submit', function(e) {
         let isFormValid = true;
 
@@ -182,7 +167,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- FUNCIONES AUXILIARES DE ESTILO Y MENSAJES ROJOS ---
     function marcarError(el, msg) {
         el.classList.add('is-invalid');
         el.classList.remove('is-valid');

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template
 from app.extensions import db
 from app.models import PurchaseAuditLog, User, Role
+from app.models.inventory_model import Product
 from app.decorators.roles import require_roles
 from datetime import timedelta
 
@@ -22,27 +23,54 @@ def list_purchase_audits():
         
         if audit.action_type == 'CREATE':
             if audit.new_data:
-                changed_data = {
-                    'monto total': {
-                        'old': '', 
-                        'new': f"{audit.new_data.get('total_amount', 0)} {audit.new_data.get('currency', '')}"
-                    }
-                }
-        elif audit.action_type == 'EDIT':
-            if audit.new_data:
-                changed_data = {
-                    'motivo de edición': {
-                        'old': '', 
-                        'new': audit.new_data.get('edit_reason', 'Modificación de insumos')
-                    }
+                changed_data['Costo Total de la Factura'] = {
+                    'old': '', 
+                    'new': f"{audit.new_data.get('total_amount', 0)} {audit.new_data.get('currency', '')}"
                 }
         elif audit.action_type == 'ANNULLED':
-            changed_data = {
-                'estado de factura': {
-                    'old': 'COMPLETED',
-                    'new': 'ANULADA (Stock Revertido)'
-                }
+            changed_data['Estado de Factura'] = {
+                'old': 'COMPLETED',
+                'new': 'ANULADA (Stock Revertido)'
             }
+        elif audit.action_type == 'EDIT':
+            prev = audit.previous_data or {}
+            curr = audit.new_data or {}
+            
+            changed_data['Motivo de Edición'] = {
+                'old': '', 
+                'new': curr.get('edit_reason', 'No especificado')
+            }
+
+            if str(float(prev.get('total_amount', 0))) != str(float(curr.get('total_amount', 0))):
+                changed_data['Costo Total de la Factura'] = {'old': prev.get('total_amount'), 'new': curr.get('total_amount')}
+            if str(float(prev.get('exchange_rate', 0))) != str(float(curr.get('exchange_rate', 0))):
+                changed_data['Tasa de Cambio Aplicada'] = {'old': prev.get('exchange_rate'), 'new': curr.get('exchange_rate')}
+            
+            prev_details = {str(d.get('id', d.get('product_id'))): d for d in prev.get('details', [])}
+            curr_details = {str(d.get('id', d.get('product_id'))): d for d in curr.get('details', [])}
+            all_keys = set(list(prev_details.keys()) + list(curr_details.keys()))
+            
+            for key in all_keys:
+                p_item = prev_details.get(key)
+                c_item = curr_details.get(key)
+                prod_id = p_item['product_id'] if p_item else c_item['product_id']
+                
+                product_obj = db.session.query(Product).get(prod_id)
+                prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
+                
+                if not p_item and c_item:
+                    changed_data[f'Insumo Añadido: {prod_name}'] = {'old': '-', 'new': f"Cant. Comprada: {c_item.get('quantity')} | Precio Unitario: {c_item.get('foreign_price')}"}
+                elif p_item and not c_item:
+                    changed_data[f'Insumo Eliminado: {prod_name}'] = {'old': f"Cant. Comprada: {p_item.get('quantity')} | Precio Unitario: {p_item.get('foreign_price')}", 'new': '-'}
+                else:
+                    if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
+                        changed_data[f'Cantidad Comprada de {prod_name}'] = {'old': p_item.get('quantity'), 'new': c_item.get('quantity')}
+                    if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
+                        changed_data[f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})'] = {'old': p_item.get('foreign_price'), 'new': c_item.get('foreign_price')}
+                    p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
+                    c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
+                    if p_date != c_date:
+                        changed_data[f'Fecha de Vencimiento de {prod_name}'] = {'old': p_date, 'new': c_date}
 
         local_time = audit.timestamp - timedelta(hours=4) if audit.timestamp else None
 

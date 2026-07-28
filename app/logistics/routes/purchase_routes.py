@@ -90,14 +90,55 @@ def view_purchase_details(purchase_id):
                 
     edit_logs_raw = PurchaseAuditLog.query.filter_by(purchase_id=purchase_id, action_type='EDIT').order_by(PurchaseAuditLog.timestamp.asc()).all()
     edit_logs = []
+    
     for log in edit_logs_raw:
         editor = User.query.get(log.user_id)
         local_time = log.timestamp - timedelta(hours=4) if log.timestamp else None
         reason = log.new_data.get('edit_reason', 'Edición sin motivo especificado') if log.new_data else 'Edición sin motivo especificado'
+        
+        changes = []
+        prev = log.previous_data or {}
+        curr = log.new_data or {}
+
+        if prev.get('total_amount') != curr.get('total_amount'):
+            changes.append({'field': 'Costo Total de la Factura', 'from': prev.get('total_amount'), 'to': curr.get('total_amount')})
+        if prev.get('exchange_rate') != curr.get('exchange_rate'):
+            changes.append({'field': 'Tasa de Cambio Aplicada', 'from': prev.get('exchange_rate'), 'to': curr.get('exchange_rate')})
+
+        prev_details = {str(d.get('id', d.get('product_id'))): d for d in prev.get('details', [])}
+        curr_details = {str(d.get('id', d.get('product_id'))): d for d in curr.get('details', [])}
+
+        all_item_keys = set(list(prev_details.keys()) + list(curr_details.keys()))
+
+        for key in all_item_keys:
+            p_item = prev_details.get(key)
+            c_item = curr_details.get(key)
+
+            prod_id = p_item['product_id'] if p_item else c_item['product_id']
+            product_obj = Product.query.get(prod_id)
+            prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
+
+            if not p_item and c_item:
+                changes.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-', 'to': f"Cant. Comprada: {c_item.get('quantity')} | Precio Unitario: {c_item.get('foreign_price')}"})
+            elif p_item and not c_item:
+                changes.append({'field': f'Insumo Eliminado: {prod_name}', 'from': f"Cant. Comprada: {p_item.get('quantity')} | Precio Unitario: {p_item.get('foreign_price')}", 'to': '-'})
+            else:
+                if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
+                    changes.append({'field': f'Cantidad Comprada de {prod_name}', 'from': p_item.get('quantity'), 'to': c_item.get('quantity')})
+                
+                if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
+                    changes.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})', 'from': p_item.get('foreign_price'), 'to': c_item.get('foreign_price')})
+                
+                p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
+                c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
+                if p_date != c_date:
+                    changes.append({'field': f'Fecha de Vencimiento de {prod_name}', 'from': p_date, 'to': c_date})
+
         edit_logs.append({
             'editor_name': editor.name if editor else 'Usuario Desconocido',
             'timestamp': local_time,
-            'reason': reason
+            'reason': reason,
+            'changes': changes
         })
     
     return render_template(
