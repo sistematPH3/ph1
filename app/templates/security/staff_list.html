@@ -165,13 +165,16 @@
                                     {{ 'Activo' if user.is_active else 'Inactivo' }}
                                 </span>
                             </td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="form-check form-switch me-3">
-                                        <input class="form-check-input status-toggle" type="checkbox" role="switch" 
-                                               id="switch-{{ user.id }}" data-id="{{ user.id }}" 
-                                               {% if user.is_active %}checked{% endif %}>
-                                    </div>
+ <td>
+    <div class="d-flex align-items-center">
+        <div class="form-check form-switch me-3">
+            <!-- SE AGREGÓ LA CONDICIÓN PARA EL DISABLED AQUÍ ABAJO -->
+            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                   id="switch-{{ user.id }}" data-id="{{ user.id }}" 
+                   {% if user.is_active %}checked{% endif %}
+                   {% if user.id == current_user.id %}disabled{% endif %}>
+        </div>
+        <!-- Botón editar... -->
                                     <button class="btn btn-ph-edit edit-btn" 
                                             data-id="{{ user.id }}" 
                                             data-name="{{ user.name }}" 
