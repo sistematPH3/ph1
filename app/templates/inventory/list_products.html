@@ -18,11 +18,10 @@
         <div class="bg-mariuska-red text-white p-2 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 45px; height: 45px; border-radius: 10px;">
             <i class="bi bi-boxes fs-4"></i>
         </div>
-        <span class="module-title-text" style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px;">Gestión de Insumos</span>
+        <span class="module-title-text" style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px;">Menú de Insumos</span>
     </div>
 {% endblock %}
 
-{% block subtitle_list %}Control, stock y descripciones técnicas de insumos a nivel nacional{% endblock %}
 
 {% block actions_top %}
     <div class="d-flex flex-column flex-md-row justify-content-md-end gap-2 w-100 w-md-auto">
@@ -52,7 +51,6 @@
     <th class="text-center text-uppercase tracking-wider">SKU</th>
     <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
     <th class="text-center text-uppercase tracking-wider">Categoría</th>
-    <th class="text-center text-uppercase tracking-wider">Cantidad Actual</th>
     <th class="text-center text-uppercase tracking-wider">U. Medida</th>
     <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
     <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
@@ -64,7 +62,7 @@
         {% if messages %}
             {% for category, message in messages %}
                 <tr class="border-0 alert-row d-md-table-row">
-                    <td colspan="7" class="border-0 p-2 d-block d-md-table-cell">
+                    <td colspan="6" class="border-0 p-2 d-block d-md-table-cell">
                         <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-2 py-2" role="alert">
                             <small class="fw-semibold">{{ message }}</small>
                             <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -76,7 +74,7 @@
     {% endwith %}
 
     <tr id="noResultsRow" style="display: none;">
-        <td colspan="7" class="text-center text-muted py-5 bg-white border-0">
+        <td colspan="6" class="text-center text-muted py-5 bg-white border-0">
             <div class="py-4">
                 <div class="mb-3">
                     <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
@@ -105,9 +103,6 @@
                     <span class="text-secondary fs-6">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
                 </td>
                 <td class="text-center product-clickable-cell">
-                    <span class="fw-semibold fs-6 text-dark">{{ product.quantity }}</span>
-                </td>
-                <td class="text-center product-clickable-cell">
                     <span class="badge bg-light text-secondary border px-2 py-1 fs-7">{{ product.unit_of_measure }}</span>
                 </td>
                 <td class="text-center status-badge-cell product-clickable-cell">
@@ -134,7 +129,7 @@
             </tr>
 
             <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details d-none d-md-table-row bg-light-subtle">
-                <td colspan="7" class="p-0">
+                <td colspan="6" class="p-0">
                     <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
                         <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
                             <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica y Preservación:
@@ -148,7 +143,7 @@
         {% endfor %}
 
         <tr class="d-md-none p-0 border-0 bg-transparent">
-            <td colspan="7" class="p-0 border-0 bg-transparent">
+            <td colspan="6" class="p-0 border-0 bg-transparent">
                 <div id="mobileProductsContainer">
                     {% for product in products %}
                     <div class="mobile-card-item main-product-row-mobile {% if not product.is_active %}row-inhabilitada{% endif %}" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
@@ -166,12 +161,6 @@
                                 {% endif %}
                             </div>
                         </div>
-
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted small fw-bold">Cantidad Actual:</span>
-                            <span class="fw-bold text-dark">{{ product.quantity }} <span class="text-muted fw-normal">{{ product.unit_of_measure }}</span></span>
-                        </div>
-
                         <div class="d-flex gap-2 mt-3 pt-2 border-top">
                             <button class="btn btn-sm btn-light border flex-grow-1 text-muted fw-bold" data-bs-toggle="collapse" data-bs-target="#tech-desc-mobile-{{ product.id }}">
                                 <i class="bi bi-info-circle"></i> Info
@@ -206,7 +195,7 @@
     {% endif %}
 
     <tr class="border-0 generic-pagination-row d-md-table-row d-block">
-        <td colspan="7" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
+        <td colspan="6" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
             <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-3 gap-2" style="display: none !important;">
                 <nav aria-label="Paginación de insumos">
                     <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>

@@ -29,7 +29,6 @@ class ProductService:
             name=data.get('name', '').strip(),
             sku=cleaned_sku,
             product_type_id=data.get('product_type_id'),
-            quantity=data.get('quantity', 0),
             unit_of_measure=data.get('unit_of_measure', '').strip(),
             technical_description=data.get('technical_description', '').strip(),
             is_active=True
@@ -59,7 +58,6 @@ class ProductService:
         # CAMBIO AQUÍ: Se actualiza product_type_id
         product.product_type_id = data.get('product_type_id')
         product.unit_of_measure = unit_of_measure
-        product.quantity = data.get('quantity', 0)
         product.sku = cleaned_sku
         product.technical_description = tech_desc
         

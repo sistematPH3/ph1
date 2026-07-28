@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const productTypeSelect = document.getElementById('product_type_id');
     const unitSelect = document.getElementById('unit_of_measure_select');
     const unitCustomInput = document.getElementById('unit_of_measure_custom');
-    const quantityInput = document.getElementById('quantity');
     const skuInput = document.getElementById('sku');
 
     // Fechas y avisos
@@ -118,17 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return true;
     }
-
-    function validateQuantity() {
-        const val = parseFloat(quantityInput.value);
-        if (isNaN(val) || val < 0 || quantityInput.value.trim() === '') {
-            showFieldError(quantityInput, 'Ingrese una cantidad válida mayor o igual a 0.');
-            return false;
-        }
-        clearFieldError(quantityInput);
-        return true;
-    }
-
     function validateSKU() {
         if (!skuInput.value.trim()) {
             showFieldError(skuInput, 'El SKU es obligatorio.');
@@ -160,10 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (productTypeSelect) productTypeSelect.addEventListener('change', validateProductType);
     if (unitSelect) unitSelect.addEventListener('change', validateUnit);
     if (unitCustomInput) unitCustomInput.addEventListener('input', () => { if (unitCustomInput.value.trim()) clearFieldError(unitCustomInput); });
-    if (quantityInput) {
-        quantityInput.addEventListener('blur', validateQuantity);
-        quantityInput.addEventListener('input', validateQuantity);
-    }
     if (skuInput) {
         skuInput.addEventListener('blur', validateSKU);
         skuInput.addEventListener('input', () => { if (skuInput.value.trim()) clearFieldError(skuInput); });
@@ -178,11 +162,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const isNameValid = validateName();
             const isTypeValid = validateProductType();
             const isUnitValid = validateUnit();
-            const isQuantityValid = validateQuantity();
             const isSkuValid = validateSKU();
             const isDateValid = validatePrimaryExpirationDate();
 
-            if (!isNameValid || !isTypeValid || !isUnitValid || !isQuantityValid || !isSkuValid || !isDateValid) {
+            if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid || !isDateValid) {
                 e.preventDefault();
                 const firstError = document.querySelector('.js-validation-error');
                 if (firstError) {

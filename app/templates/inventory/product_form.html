@@ -27,7 +27,7 @@
         
         <div class="form-group">
             <label for="name">Nombre del Producto</label>
-            <input type="text" id="name" name="name" value="{{ data.get('name', '') }}" maxlength="100" required>
+            <input type="text" id="name" name="name" value="{{ data.get('name', '') }}" maxlength="100" placeholder="Ingrese el nombre" required>
             {% if errors and errors.get('name') %}<span class="error-text">{{ errors.name }}</span>{% endif %}
         </div>
 
@@ -85,12 +85,6 @@
                    style="display: none; margin-top: 0.5rem;">
                    
             {% if errors and errors.get('unit_of_measure') %}<span class="error-text">{{ errors.unit_of_measure }}</span>{% endif %}
-        </div>
-
-        <div class="form-group">
-            <label for="quantity">Cantidad</label>
-            <input type="number" step="any" id="quantity" name="quantity" value="{{ data.get('quantity', '') }}" required>
-            {% if errors and errors.get('quantity') %}<span class="error-text">{{ errors.quantity }}</span>{% endif %}
         </div>
 
         <div class="form-group">
