@@ -8,7 +8,7 @@ import pytz
 from app.logistics.requests.purchase_request import PurchaseRequest
 from app.logistics.services.purchase_service import PurchaseService
 from app import db 
-from app.models import ProductType
+from app.models import ProductType, Inventory
 from app.models.inventory_model import Product
 from app.models.security_model import User  
 from app.models.logistics_model import Supplier, Purchase, PurchaseDetail, ExchangeRateHistory, PurchaseAuditLog
@@ -228,6 +228,23 @@ def create_purchase():
                     ).first()
                     if detail:
                         detail.expiration_date = item['expiration_date']
+                
+                if item['product_id']:
+                    inventory_record = db.session.query(Inventory).filter_by(
+                        location_id=1, 
+                        product_id=item['product_id']
+                    ).first()
+                    
+                    if inventory_record:
+                        inventory_record.current_quantity += float(item['quantity'])
+                    else:
+                        new_inventory = Inventory(
+                            location_id=1,
+                            product_id=item['product_id'],
+                            current_quantity=float(item['quantity'])
+                        )
+                        db.session.add(new_inventory)
+                        
             db.session.commit()
         except Exception as e:
             db.session.rollback()

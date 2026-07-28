@@ -1,8 +1,6 @@
 from datetime import datetime
-from decimal import Decimal
 from app.extensions import db
 from app.models.logistics_model import Purchase, PurchaseDetail
-from app.models.inventory_model import Product
 from app.models import PurchaseAuditLog
 
 class PurchaseService:
@@ -28,7 +26,7 @@ class PurchaseService:
             details_for_audit = []
 
             for item in data['items']:
-                quantity = int(float(item.get('quantity', 0)))
+                quantity = float(item.get('quantity', 0.0))
                 foreign_price = float(item['foreign_price'])
                 
                 price_bs = foreign_price * exchange_rate
@@ -37,7 +35,7 @@ class PurchaseService:
                 new_detail = PurchaseDetail(
                     purchase_id=new_purchase.id,
                     product_id=item['product_id'],
-                    quantity=float(quantity),
+                    quantity=quantity,
                     foreign_price=foreign_price,
                     price_bs=price_bs,
                     expiration_date=item.get('expiration_date')
@@ -46,16 +44,11 @@ class PurchaseService:
 
                 details_for_audit.append({
                     "product_id": item['product_id'],
-                    "quantity": float(quantity),
+                    "quantity": quantity,
                     "foreign_price": foreign_price,
                     "price_bs": price_bs,
                     "expiration_date": str(item.get('expiration_date')) if item.get('expiration_date') else None
                 })
-
-                # Actualización exclusiva del Stock General (Almacén Nacional)
-                product = Product.query.get(item['product_id'])
-                if product:
-                    product.quantity += quantity
 
             new_purchase.total_amount = calculated_total
             
