@@ -9,8 +9,8 @@ class StaffRepository:
 
     @staticmethod
     def get_active_locations():
-        return Location.query.filter_by(is_active=True).all()
-        
+        return Location.query.filter(Location.is_active == True, Location.id != 1).all()
+
     @staticmethod
     def get_all_roles():
         return Role.query.filter(Role.id != 0).all()

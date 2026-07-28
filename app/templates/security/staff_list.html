@@ -175,14 +175,15 @@
                    {% if user.id == current_user.id %}disabled{% endif %}>
         </div>
         <!-- Botón editar... -->
-                                    <button class="btn btn-ph-edit edit-btn" 
-                                            data-id="{{ user.id }}" 
-                                            data-name="{{ user.name }}" 
-                                            data-email="{{ user.email }}" 
-                                            data-role="{{ user.role_id or '' }}"
-                                            data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
-                                        <i class="bi bi-pencil-square"></i> Editar
-                                    </button>
+<button class="btn btn-ph-edit edit-btn" 
+        data-id="{{ user.id }}" 
+        data-user-id="{{ user.id }}"
+        data-name="{{ user.name }}" 
+        data-email="{{ user.email }}" 
+        data-role="{{ user.role_id or '' }}"
+        data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
+    <i class="bi bi-pencil-square"></i> Editar
+</button>
                                 </div>
                             </td>
                         </tr>
