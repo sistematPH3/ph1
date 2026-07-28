@@ -15,8 +15,9 @@ def admin_pending_requests():
     order = request.args.get('sort', 'desc')
     
     # Obtenemos los usuarios en espera y las sedes habilitadas
+# Obtenemos los usuarios en espera y las sedes habilitadas
     usuarios = UserManagementRepository.get_pending_users(sort_order=order)
-    sedes = Location.query.filter_by(is_active=True).all()
+    sedes = Location.query.filter(Location.is_active == True, Location.id != 1).all()  # <--- ASÍ DEBE QUEDAR
     
     return render_template('security/pending_requests.html', usuarios_espera=usuarios, sedes=sedes)
 

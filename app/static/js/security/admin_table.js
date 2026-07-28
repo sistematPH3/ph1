@@ -1,25 +1,68 @@
+// Control Unificado de Búsqueda para Gestión de Permisos y Utilidades de Formularios
+
 function filterTable() {
-    let input = document.getElementById("userInput");
-    let table = document.getElementById("userTable");
-    if (!input || !table) return;
+    const searchInput = document.getElementById("userInput");
+    if (!searchInput) return;
 
-    let filter = input.value.toLowerCase();
-    let tr = table.getElementsByTagName("tr");
+    const query = searchInput.value.toLowerCase().trim();
+    
+    // 1. FILTRADO PARA ESCRITORIO (Filas de la tabla)
+    const tableRows = document.querySelectorAll("#userTableBody tr");
+    let visibleRowsCount = 0;
 
-    for (let i = 1; i < tr.length; i++) {
-        let tdName = tr[i].getElementsByTagName("td")[0];
-        let tdEmail = tr[i].getElementsByTagName("td")[1];
-        if (tdName || tdEmail) {
-            let txtValueName = tdName.textContent || tdName.innerText;
-            let txtValueEmail = tdEmail.textContent || tdEmail.innerText;
-            if (txtValueName.toLowerCase().indexOf(filter) > -1 || txtValueEmail.toLowerCase().indexOf(filter) > -1) {
-                tr[i].style.display = "";
+    tableRows.forEach(row => {
+        // Obtenemos el texto del nombre y correo del colaborador
+        const nameText = row.querySelector(".user-name-text") ? row.querySelector(".user-name-text").textContent.toLowerCase() : "";
+        const emailText = row.querySelector(".user-email-text") ? row.querySelector(".user-email-text").textContent.toLowerCase() : "";
+        
+        if (nameText.includes(query) || emailText.includes(query)) {
+            row.style.setProperty("display", "", "important");
+            visibleRowsCount++;
+        } else {
+            row.style.setProperty("display", "none", "important");
+        }
+    });
+
+    // 2. FILTRADO PARA MÓVIL (Tarjetas móviles)
+    const mobileCards = document.querySelectorAll("#userCardsContainer .mobile-user-card");
+    let visibleCardsCount = 0;
+
+    mobileCards.forEach(card => {
+        // Obtenemos el nombre y correo de la tarjeta móvil
+        const nameText = card.querySelector(".target-name-mobile") ? card.querySelector(".target-name-mobile").textContent.toLowerCase() : "";
+        const emailText = card.querySelector(".target-email-mobile") ? card.querySelector(".target-email-mobile").textContent.toLowerCase() : "";
+
+        if (nameText.includes(query) || emailText.includes(query)) {
+            card.style.setProperty("display", "block", "important");
+            visibleCardsCount++;
+        } else {
+            card.style.setProperty("display", "none", "important");
+        }
+    });
+
+    // 3. CONTROL DE MENSAJE "SIN RESULTADOS"
+    const noSearchResults = document.getElementById("noSearchResults");
+    if (noSearchResults) {
+        const isMobile = window.innerWidth < 768;
+        
+        if (isMobile) {
+            if (mobileCards.length > 0 && visibleCardsCount === 0) {
+                noSearchResults.classList.remove("d-none");
             } else {
-                tr[i].style.display = "none";
+                noSearchResults.classList.add("d-none");
+            }
+        } else {
+            if (tableRows.length > 0 && visibleRowsCount === 0) {
+                noSearchResults.classList.remove("d-none");
+            } else {
+                noSearchResults.classList.add("d-none");
             }
         }
     }
 }
+
+// Aseguramos que si cambia el tamaño de pantalla se reevalúe el aviso de resultados
+window.addEventListener("resize", filterTable);
 
 function toggleSort() {
     let currentUrl = new URL(window.location.href);
@@ -42,25 +85,25 @@ function toggleSedesContainer(rolSelect) {
     }
 }
 
- function confirmReject(userId) {
-            Swal.fire({
-                title: '¿Denegar acceso?',
-                text: "El usuario será eliminado de la lista de forma permanente.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#e31937',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sí, rechazar',
-                cancelButtonText: 'Cancelar',
-                customClass: {
-                    popup: 'rounded-4'
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('rejectForm_' + userId).submit();
-                }
-            });
+function confirmReject(userId) {
+    Swal.fire({
+        title: '¿Denegar acceso?',
+        text: "El usuario será eliminado de la lista de forma permanente.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e31937',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, rechazar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            popup: 'rounded-4'
         }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('rejectForm_' + userId).submit();
+        }
+    });
+}
 
 function validarFormularioAprobacion(event, formulario) {
     event.preventDefault();

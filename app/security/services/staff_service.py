@@ -67,10 +67,18 @@ class StaffService:
             'sedes': ', '.join([loc.name for loc in usuario.locations if loc.is_active]) or 'Ninguna'
         }
 
-        location_ids = data.get('locations', [])
-        nuevas_sedes = StaffRepository.get_locations_by_ids(location_ids)
-        nuevo_rol_id = int(data.get('role_id'))
         nuevo_email = data.get('email')
+
+        # REGLA: Si el administrador se está editando a sí mismo, 
+        # conservamos su rol y sedes actuales (ignoramos lo que venga del formulario).
+        if usuario.id == current_user.id:
+            nuevo_rol_id = usuario.role_id
+            nuevas_sedes = usuario.locations
+        else:
+            # Si está editando a OTRA persona, procesamos los roles y sedes normalmente
+            location_ids = data.get('locations', [])
+            nuevas_sedes = StaffRepository.get_locations_by_ids(location_ids)
+            nuevo_rol_id = int(data.get('role_id'))
 
         exito, mensaje = StaffRepository.update_user(
             user=usuario,

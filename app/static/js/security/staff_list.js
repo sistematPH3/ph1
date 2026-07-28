@@ -228,6 +228,37 @@ function openEditModal(id, name, email, roleId, locationsStr) {
     document.getElementById('editEmail').value = email;
     document.getElementById('editRole').value = roleId;
 
+    // ----- REGLA: BLOQUEAR ROL Y SEDES SI EL ADMIN SE EDITA A SÍ MISMO -----
+    const rowInTable = document.querySelector(`.status-toggle[data-id="${id}"]`);
+    const esUnoMismo = rowInTable ? rowInTable.hasAttribute('disabled') : false;
+
+    const roleSelect = document.getElementById('editRole');
+    const allLocationsPills = document.getElementById('allLocationsPills');
+
+    if (esUnoMismo) {
+        // Bloquear rol
+        roleSelect.disabled = true;
+        roleSelect.style.backgroundColor = "#e9ecef";
+        roleSelect.style.cursor = "not-allowed";
+
+        // Bloquear visualmente las píldoras de sedes para que no se puedan hacer clic
+        if (allLocationsPills) {
+            allLocationsPills.style.pointerEvents = "none";
+            allLocationsPills.style.opacity = "0.6";
+        }
+    } else {
+        // Habilitar normalmente para otros usuarios
+        roleSelect.disabled = false;
+        roleSelect.style.backgroundColor = "";
+        roleSelect.style.cursor = "";
+
+        if (allLocationsPills) {
+            allLocationsPills.style.pointerEvents = "auto";
+            allLocationsPills.style.opacity = "1";
+        }
+    }
+    // ----------------------------------------------------------------------
+
     const hiddenSelect = document.getElementById('editLocations');
     if (hiddenSelect) {
         Array.from(hiddenSelect.options).forEach(opt => opt.selected = false);
