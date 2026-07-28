@@ -58,7 +58,6 @@ def edit_product(product_id):
         'name': product.name,
         'product_type_id': product.product_type_id,
         'unit_of_measure': product.unit_of_measure,
-        'quantity': product.quantity,
         'sku': product.sku,
         'technical_description': product.technical_description
     }
