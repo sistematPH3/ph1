@@ -22,6 +22,10 @@ class StaffService:
         
         if not usuario:
             return False, "Usuario no encontrado."
+            
+        # REGLA AÑADIDA: Evitar que el usuario en sesión se desactive a sí mismo
+        if usuario.id == current_user.id and nuevo_estado is False:
+            return False, "Acción denegada: No puedes desactivar tu propia cuenta."
         
         estado_anterior = usuario.is_active
         

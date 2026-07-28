@@ -330,9 +330,12 @@ function executeToggleStatus(userId, isChecked) {
         if (d.success) {
             location.reload();
         } else {
+            // AJUSTE: Título dinámico para mostrar "Acción Denegada" o el título adecuado
+            const modalTitle = isChecked ? "Error al Activar" : "Acción Denegada";
+            
             showAlertModal(
-                "Sede Obligatoria", 
-                d.message || "Recuerda que debes asignar al menos una sede operativa para este rol.",
+                modalTitle, 
+                d.message || "No se pudo cambiar el estado del usuario.",
                 function() {
                     const switchEl = document.querySelector(`.status-toggle[data-id="${userId}"]`);
                     if (switchEl) switchEl.checked = !isChecked;
