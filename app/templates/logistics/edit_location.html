@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 
-{# Importamos la macro de los estados de Venezuela #}
 {% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
 
 {% block extra_css %}
@@ -18,6 +17,13 @@
         <div class="form-card-premium">
             
             <h2>Editar Sede Registrada</h2>
+
+            {% if location_id == 1 %}
+            <div class="alert alert-info small py-2 mb-4 text-center d-flex align-items-center justify-content-center" style="background-color: #e2f0fb; border-color: #b6d4fe; color: #052c65; border-radius: 12px;">
+                <i class="bi bi-shield-lock-fill me-2 fs-5"></i>
+                <span class="fw-medium">Por ser el <strong>Almacén Central</strong>, únicamente puedes actualizar su dirección y número de contacto.</span>
+            </div>
+            {% endif %}
             
             <form method="POST" action="" id="editLocationForm" 
                   data-check-name-url="{{ url_for('locations.check_name') }}"
@@ -39,7 +45,6 @@
 
                 <div class="form-group-premium">
                     <label>{{ form.state.label }}</label>
-                    {# Pasamos el estado actual para que permanezca seleccionado por defecto #}
                     {{ render_venezuela_states(form.state.data) }}
                     {% for error in form.state.errors %}
                         <small class="error-feedback-premium d-block">{{ error }}</small>
@@ -90,4 +95,20 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/logistics/edit_location.js') }}" defer></script>
+
+{% if location_id == 1 %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const nameInput = document.getElementById('name');
+        
+        if (nameInput) {
+            nameInput.setAttribute('readonly', 'true');
+            nameInput.style.backgroundColor = '#f8f9fa';
+            nameInput.style.color = '#6c757d';
+            nameInput.style.pointerEvents = 'none';
+        }
+    });
+</script>
+{% endif %}
+
 {% endblock %}
