@@ -214,40 +214,11 @@ def create_purchase():
     if not is_valid:
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
 
+    # Llama al servicio, que ahora se encarga de TODO de forma atómica y segura
     result = PurchaseService.register_purchase(data)
 
     if result.get("success"):
         purchase_id = result.get("purchase_id")
-        
-        try:
-            for item in data['items']:
-                if item['expiration_date'] and item['product_id']:
-                    detail = db.session.query(PurchaseDetail).filter_by(
-                        purchase_id=purchase_id, 
-                        product_id=item['product_id']
-                    ).first()
-                    if detail:
-                        detail.expiration_date = item['expiration_date']
-                
-                if item['product_id']:
-                    inventory_record = db.session.query(Inventory).filter_by(
-                        location_id=1, 
-                        product_id=item['product_id']
-                    ).first()
-                    
-                    if inventory_record:
-                        inventory_record.current_quantity += float(item['quantity'])
-                    else:
-                        new_inventory = Inventory(
-                            location_id=1,
-                            product_id=item['product_id'],
-                            current_quantity=float(item['quantity'])
-                        )
-                        db.session.add(new_inventory)
-                        
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
 
         try:
             historial_tasa = ExchangeRateHistory(

@@ -3,6 +3,7 @@ from app.extensions import db
 from app.models.security_model import User, Role
 from app.models import Location
 from werkzeug.security import generate_password_hash
+from sqlalchemy import text
 
 app = create_app()
 
@@ -42,6 +43,14 @@ def seed_database():
         else:
             print("El Almacén Central ya existe en el sistema.")
 
+        try:
+            db.session.execute(text("SELECT setval('locations_id_seq', (SELECT MAX(id) FROM locations));"))
+            db.session.execute(text("SELECT setval('roles_id_seq', (SELECT MAX(id) FROM roles));"))
+            db.session.commit()
+            print("Contadores de base de datos sincronizados.")
+        except Exception:
+            db.session.rollback()
+
         email_admin = 'sistemat3.ph@gmail.com'
         user_exists = User.query.filter_by(email=email_admin).first()
         
@@ -56,6 +65,12 @@ def seed_database():
             db.session.add(admin)
             db.session.commit()
             print(f"Usuario {email_admin} creado con éxito.")
+            
+            try:
+                db.session.execute(text("SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         else:
             print(f"El usuario {email_admin} ya existe en el sistema.")
 

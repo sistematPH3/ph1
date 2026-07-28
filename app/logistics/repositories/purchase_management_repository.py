@@ -1,4 +1,4 @@
-from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType
+from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType, Inventory
 from decimal import Decimal
 from datetime import datetime, timedelta
 
@@ -64,13 +64,16 @@ class PurchaseManagementRepository:
 
             purchase.status = 'ANNULLED'
 
-            # Reversión exclusiva del Stock General (Almacén Nacional)
             for detail in details:
-                product = self.db.session.query(Product).filter_by(id=detail.product_id).first()
-                if product:
-                    product.quantity -= detail.quantity
-                    if product.quantity < 0:
-                        product.quantity = Decimal('0.00')
+                inventory_record = self.db.session.query(Inventory).filter_by(
+                    location_id=1, 
+                    product_id=detail.product_id
+                ).first()
+                
+                if inventory_record:
+                    inventory_record.current_quantity -= Decimal(str(detail.quantity))
+                    if inventory_record.current_quantity < Decimal('0.00'):
+                        inventory_record.current_quantity = Decimal('0.00')
 
             audit_log = PurchaseAuditLog(
                 purchase_id=purchase.id,
@@ -114,6 +117,7 @@ class PurchaseManagementRepository:
             }
 
             new_total_amount = Decimal('0.00')
+            purchase_exchange_rate = Decimal(str(purchase.exchange_rate))
 
             for detail in details:
                 matching_new = next((item for item in new_items if str(item['id']) == str(detail.id)), None)
@@ -121,20 +125,31 @@ class PurchaseManagementRepository:
                 if matching_new:
                     new_qty = Decimal(str(matching_new['quantity']))
                     new_price = Decimal(str(matching_new['foreign_price']))
+                    old_qty = Decimal(str(detail.quantity))
                     
-                    qty_diff = new_qty - detail.quantity
+                    qty_diff = new_qty - old_qty
                     
                     if qty_diff != Decimal('0.00'):
-                        # Actualización exclusiva del Stock General por diferencia de edición
-                        product = self.db.session.query(Product).filter_by(id=detail.product_id).first()
-                        if product:
-                            product.quantity += qty_diff
-                            if product.quantity < 0:
-                                product.quantity = Decimal('0.00')
+                        inventory_record = self.db.session.query(Inventory).filter_by(
+                            location_id=1, 
+                            product_id=detail.product_id
+                        ).first()
+                        
+                        if inventory_record:
+                            inventory_record.current_quantity += qty_diff
+                            if inventory_record.current_quantity < Decimal('0.00'):
+                                inventory_record.current_quantity = Decimal('0.00')
+                        elif qty_diff > Decimal('0.00'):
+                            new_inv = Inventory(
+                                location_id=1, 
+                                product_id=detail.product_id, 
+                                current_quantity=qty_diff
+                            )
+                            self.db.session.add(new_inv)
                     
                     detail.quantity = new_qty
                     detail.foreign_price = new_price
-                    detail.price_bs = new_price * purchase.exchange_rate
+                    detail.price_bs = new_price * purchase_exchange_rate
                     
                     if 'expiration_date' in matching_new and matching_new['expiration_date']:
                         detail.expiration_date = datetime.strptime(matching_new['expiration_date'], '%Y-%m-%d').date()
@@ -143,7 +158,7 @@ class PurchaseManagementRepository:
 
                     new_total_amount += (new_qty * new_price)
                 else:
-                    new_total_amount += (detail.quantity * detail.foreign_price)
+                    new_total_amount += (Decimal(str(detail.quantity)) * Decimal(str(detail.foreign_price)))
 
             for item in new_items:
                 if str(item['id']).startswith('new_'):
@@ -169,15 +184,25 @@ class PurchaseManagementRepository:
                         product_id=product_id,
                         quantity=new_qty,
                         foreign_price=new_price,
-                        price_bs=new_price * purchase.exchange_rate,
+                        price_bs=new_price * purchase_exchange_rate,
                         expiration_date=exp_date_obj
                     )
                     self.db.session.add(new_detail)
                     
-                    # Actualización exclusiva del Stock General por nuevo insumo añadido en edición
-                    product = self.db.session.query(Product).filter_by(id=product_id).first()
-                    if product:
-                        product.quantity += new_qty
+                    inventory_record = self.db.session.query(Inventory).filter_by(
+                        location_id=1, 
+                        product_id=product_id
+                    ).first()
+                    
+                    if inventory_record:
+                        inventory_record.current_quantity += new_qty
+                    else:
+                        new_inv = Inventory(
+                            location_id=1, 
+                            product_id=product_id, 
+                            current_quantity=new_qty
+                        )
+                        self.db.session.add(new_inv)
 
                     new_total_amount += (new_qty * new_price)
 

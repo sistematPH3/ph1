@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from app.extensions import db
 from app.models.logistics_model import Purchase, PurchaseDetail
-from app.models import PurchaseAuditLog
+from app.models import PurchaseAuditLog, Inventory
 
 class PurchaseService:
     @staticmethod
@@ -20,21 +21,22 @@ class PurchaseService:
             db.session.add(new_purchase)
             db.session.flush()
 
-            calculated_total = 0.0
-            exchange_rate = float(data['exchange_rate'])
+            calculated_total = Decimal('0.00')
+            exchange_rate = Decimal(str(data['exchange_rate']))
             
             details_for_audit = []
 
             for item in data['items']:
-                quantity = float(item.get('quantity', 0.0))
-                foreign_price = float(item['foreign_price'])
+                product_id = int(item['product_id'])
+                quantity = Decimal(str(item.get('quantity', 0.0)))
+                foreign_price = Decimal(str(item['foreign_price']))
                 
                 price_bs = foreign_price * exchange_rate
                 calculated_total += (foreign_price * quantity)
 
                 new_detail = PurchaseDetail(
                     purchase_id=new_purchase.id,
-                    product_id=item['product_id'],
+                    product_id=product_id,
                     quantity=quantity,
                     foreign_price=foreign_price,
                     price_bs=price_bs,
@@ -43,12 +45,28 @@ class PurchaseService:
                 db.session.add(new_detail)
 
                 details_for_audit.append({
-                    "product_id": item['product_id'],
-                    "quantity": quantity,
-                    "foreign_price": foreign_price,
-                    "price_bs": price_bs,
+                    "product_id": product_id,
+                    "quantity": float(quantity),
+                    "foreign_price": float(foreign_price),
+                    "price_bs": float(price_bs),
                     "expiration_date": str(item.get('expiration_date')) if item.get('expiration_date') else None
                 })
+
+                # --- MAGIA DEL INVENTARIO: Suma o crea el producto en el Almacén Central ---
+                inventory_record = db.session.query(Inventory).filter_by(
+                    location_id=1, 
+                    product_id=product_id
+                ).first()
+                
+                if inventory_record:
+                    inventory_record.current_quantity = Decimal(str(inventory_record.current_quantity)) + quantity
+                else:
+                    new_inv = Inventory(
+                        location_id=1, 
+                        product_id=product_id, 
+                        current_quantity=quantity
+                    )
+                    db.session.add(new_inv)
 
             new_purchase.total_amount = calculated_total
             
@@ -57,7 +75,7 @@ class PurchaseService:
                 "supplier_id": new_purchase.supplier_id,
                 "total_amount": float(calculated_total),
                 "currency": new_purchase.currency,
-                "exchange_rate": exchange_rate,
+                "exchange_rate": float(exchange_rate),
                 "status": new_purchase.status,
                 "details": details_for_audit
             }
