@@ -34,6 +34,7 @@ def index():
         products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
         
         purchases = service.get_formatted_history(
+            current_user=current_user,
             start_date=validated_data['start_date'],
             end_date=validated_data['end_date'],
             supplier_id=validated_data['supplier_id'],
@@ -68,7 +69,11 @@ def get_details(purchase_id):
         details = data['details']
         
         details_list = []
-        for d, product_sku, requires_manual_date in details:
+        for row in details:
+            d = row[0]
+            product_sku = row[1]
+            requires_manual_date = row[-1] 
+            
             details_list.append({
                 "id": d.id,
                 "product_sku": product_sku if product_sku else "(Sin SKU)",
@@ -97,14 +102,15 @@ def get_details(purchase_id):
 def annul(purchase_id):
     try:
         service = get_management_service()
-        user_id = current_user.id
-        success = service.process_annulment(purchase_id, user_id)
+        success = service.process_annulment(purchase_id, current_user)
         
         if success:
             flash(f"La compra Nro. {purchase_id} ha sido anulada con éxito.", "success")
         else:
             flash("No se pudo realizar la anulación. Verifique que la compra exista.", "error")
             
+    except ValueError as ve:
+        flash(str(ve), "error")
     except Exception as e:
         flash(f"Ocurrió un error crítico durante la anulación: {str(e)}", "error")
         
@@ -115,7 +121,6 @@ def annul(purchase_id):
 def edit_purchase(purchase_id):
     try:
         service = get_management_service()
-        user_id = current_user.id
         
         data = request.get_json()
         if not data or 'items' not in data:
@@ -125,7 +130,7 @@ def edit_purchase(purchase_id):
         if not reason or len(reason.strip()) < 5:
             return jsonify({"success": False, "error": "Debe proporcionar un motivo válido para justificar la edición."}), 400
             
-        success = service.process_edit(purchase_id, user_id, data['items'], reason.strip())
+        success = service.process_edit(purchase_id, current_user, data['items'], reason.strip())
         
         if success:
             flash(f"La compra Nro. {purchase_id} ha sido modificada con éxito.", "success")
@@ -133,5 +138,7 @@ def edit_purchase(purchase_id):
         else:
             return jsonify({"success": False, "error": "No se pudo editar la compra."}), 400
             
+    except ValueError as ve:
+        return jsonify({"success": False, "error": str(ve)}), 400
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

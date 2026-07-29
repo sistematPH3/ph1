@@ -105,18 +105,24 @@
                                     </button>
                                     
                                     {% if purchase.status == 'COMPLETED' %}
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
-                                            data-id="{{ purchase.id }}">
-                                        <i class="bi bi-pencil-square"></i> Editar
-                                    </button>
-                                    
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
-                                            data-id="{{ purchase.id }}" 
-                                            data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
-                                        <i class="bi bi-trash3"></i> Anular
-                                    </button>
+                                        {% if purchase.can_modify %}
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
+                                                data-id="{{ purchase.id }}">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </button>
+                                        
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
+                                                data-id="{{ purchase.id }}" 
+                                                data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
+                                            <i class="bi bi-trash3"></i> Anular
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-sm btn-light text-muted border" style="cursor: not-allowed;" title="Tiempo de modificación expirado" disabled>
+                                            <i class="bi bi-lock-fill"></i> Bloqueada
+                                        </button>
+                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </td>
@@ -221,18 +227,24 @@
                         </button>
                         
                         {% if purchase.status == 'COMPLETED' %}
-                        <button type="button" 
-                                class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger flex-grow-1" 
-                                data-id="{{ purchase.id }}">
-                            <i class="bi bi-pencil-square"></i> Editar
-                        </button>
-                        
-                        <button type="button" 
-                                class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger flex-grow-1" 
-                                data-id="{{ purchase.id }}" 
-                                data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
-                            <i class="bi bi-trash3"></i> Anular
-                        </button>
+                            {% if purchase.can_modify %}
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger flex-grow-1" 
+                                    data-id="{{ purchase.id }}">
+                                <i class="bi bi-pencil-square"></i> Editar
+                            </button>
+                            
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger flex-grow-1" 
+                                    data-id="{{ purchase.id }}" 
+                                    data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
+                                <i class="bi bi-trash3"></i> Anular
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-light text-muted border flex-grow-1" style="cursor: not-allowed;" disabled>
+                                <i class="bi bi-lock-fill"></i> Bloqueada por Tiempo
+                            </button>
+                            {% endif %}
                         {% endif %}
                     </div>
 
