@@ -44,6 +44,19 @@ class PurchaseManagementRepository:
 
             details = self.db.session.query(PurchaseDetail).filter_by(purchase_id=purchase_id).all()
 
+            for detail in details:
+                inventory_record = self.db.session.query(Inventory).filter_by(
+                    location_id=1, 
+                    product_id=detail.product_id
+                ).first()
+                
+                qty_to_remove = Decimal(str(detail.quantity))
+                
+                if not inventory_record or inventory_record.current_quantity < qty_to_remove:
+                    product = self.db.session.query(Product).get(detail.product_id)
+                    prod_name = product.name if product else f"ID {detail.product_id}"
+                    raise ValueError(f"No se puede anular. Stock insuficiente de '{prod_name}' en el Almacén Central para revertir {qty_to_remove} unidades.")
+
             previous_data = {
                 "id": purchase.id,
                 "supplier_id": purchase.supplier_id,
@@ -70,10 +83,7 @@ class PurchaseManagementRepository:
                     product_id=detail.product_id
                 ).first()
                 
-                if inventory_record:
-                    inventory_record.current_quantity -= Decimal(str(detail.quantity))
-                    if inventory_record.current_quantity < Decimal('0.00'):
-                        inventory_record.current_quantity = Decimal('0.00')
+                inventory_record.current_quantity -= Decimal(str(detail.quantity))
 
             audit_log = PurchaseAuditLog(
                 purchase_id=purchase.id,
@@ -85,9 +95,12 @@ class PurchaseManagementRepository:
             self.db.session.add(audit_log)
             self.db.session.commit()
             return True
+        except ValueError as ve:
+            self.db.session.rollback()
+            raise ve
         except Exception as e:
             self.db.session.rollback()
-            raise e
+            raise Exception(f"Error interno: {str(e)}")
 
     def logical_edit(self, purchase_id, user_id, new_items, reason):
         try:
@@ -96,6 +109,25 @@ class PurchaseManagementRepository:
                 return False
 
             details = self.db.session.query(PurchaseDetail).filter_by(purchase_id=purchase_id).all()
+
+            for detail in details:
+                matching_new = next((item for item in new_items if str(item['id']) == str(detail.id)), None)
+                if matching_new:
+                    new_qty = Decimal(str(matching_new['quantity']))
+                    old_qty = Decimal(str(detail.quantity))
+                    qty_diff = new_qty - old_qty
+                    
+                    if qty_diff < Decimal('0.00'): 
+                        abs_diff = abs(qty_diff)
+                        inventory_record = self.db.session.query(Inventory).filter_by(
+                            location_id=1, 
+                            product_id=detail.product_id
+                        ).first()
+                        
+                        if not inventory_record or inventory_record.current_quantity < abs_diff:
+                            product = self.db.session.query(Product).get(detail.product_id)
+                            prod_name = product.name if product else f"ID {detail.product_id}"
+                            raise ValueError(f"No se puede reducir la cantidad de '{prod_name}'. Se intentan restar {abs_diff} unidades, pero el stock actual es insuficiente.")
 
             previous_data = {
                 "id": purchase.id,
@@ -137,8 +169,6 @@ class PurchaseManagementRepository:
                         
                         if inventory_record:
                             inventory_record.current_quantity += qty_diff
-                            if inventory_record.current_quantity < Decimal('0.00'):
-                                inventory_record.current_quantity = Decimal('0.00')
                         elif qty_diff > Decimal('0.00'):
                             new_inv = Inventory(
                                 location_id=1, 
@@ -242,6 +272,9 @@ class PurchaseManagementRepository:
             self.db.session.add(audit_log)
             self.db.session.commit()
             return True
+        except ValueError as ve:
+            self.db.session.rollback()
+            raise ve
         except Exception as e:
             self.db.session.rollback()
-            raise e
+            raise Exception(f"Error interno: {str(e)}")
