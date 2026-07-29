@@ -35,4 +35,11 @@ class StaffRepository:
             return True, "Usuario actualizado correctamente"
         except Exception as e:
             db.session.rollback()
-            return False, str(e)
+            error_msg = str(e)
+            
+            # Detectamos si el error de la base de datos es por correo duplicado
+            if 'UniqueViolation' in error_msg or 'users_email_key' in error_msg:
+                return False, "El correo electrónico ingresado ya pertenece a otro usuario registrado."
+            
+            # Si es cualquier otro error raro, evitamos mostrar código al usuario
+            return False, "No se pudo actualizar el usuario debido a un error interno del sistema."
