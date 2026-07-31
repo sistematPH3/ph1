@@ -1,12 +1,9 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from app.extensions import db
 from app.models import Supplier
-
 from app.logistics.repositories.supplier_list_repository import SupplierListRepository
 from app.logistics.services.supplier_list_service import SupplierListService
 from app.logistics.requests.supplier_list_request import SupplierListFilterRequest
-
-# Importamos el decorador dinámico unificado
 from app.decorators.roles import require_roles
 
 supplier_list_bp = Blueprint('supplier_list', __name__)
@@ -16,8 +13,6 @@ def get_supplier_list_service():
     repository = SupplierListRepository(db)
     return SupplierListService(repository)
 
-
-# 1. VISTA PRINCIPAL DEL LISTADO
 @supplier_list_bp.route('/suppliers/list', methods=['GET'], strict_slashes=False)
 @require_roles('admin', 'management', 'manager')
 def index():
@@ -44,8 +39,6 @@ def index():
         flash(f"Error interno en el sistema: {str(e)}", "danger")
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
 
-
-# 2. VISTA PARA MOSTRAR EL FORMULARIO DE REGISTRO
 @supplier_list_bp.route('/suppliers/register', methods=['GET'])
 @require_roles('admin', 'management', 'manager')
 def register_supplier_view():
@@ -55,8 +48,6 @@ def register_supplier_view():
         flash(f"Error al abrir el formulario de registro: {str(e)}", "danger")
         return redirect(url_for('supplier_list.index'))
 
-
-# 3. PROCESAR EL REGISTRO DE UN NUEVO PROVEEDOR (POST)
 @supplier_list_bp.route('/suppliers/register', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def handle_register_supplier():
@@ -80,14 +71,12 @@ def handle_register_supplier():
         db.session.commit()
         
         flash("Proveedor registrado exitosamente.", "success")
-        return redirect(url_for('supplier_list.index'))
+        return redirect(url_for('purchase_routes.new_purchase_form'))
     except Exception as e:
         db.session.rollback()
         flash(f"Error al registrar el proveedor: {str(e)}", "danger")
         return render_template('logistics/register-supplier.html', supplier=None)
 
-
-# 4. VISTA PARA MOSTRAR EL FORMULARIO DE EDICIÓN
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['GET'])
 @require_roles('admin', 'management', 'manager')
 def edit_supplier_view(supplier_id):
@@ -104,8 +93,6 @@ def edit_supplier_view(supplier_id):
         flash(f"Error al cargar los datos del proveedor para edición: {str(e)}", "danger")
         return redirect(url_for('supplier_list.index'))
 
-
-# 5. PROCESAR LA ACTUALIZACIÓN DE UN PROVEEDOR EXISTENTE (POST)
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def handle_edit_supplier(supplier_id):
@@ -133,8 +120,6 @@ def handle_edit_supplier(supplier_id):
         flash(f"Error al actualizar el proveedor: {str(e)}", "danger")
         return redirect(url_for('supplier_list.index'))
 
-
-# 6. FUNCIONALIDAD DEL TOGGLE DE ESTADO
 @supplier_list_bp.route('/suppliers/list/<int:supplier_id>/toggle', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def toggle_status(supplier_id):

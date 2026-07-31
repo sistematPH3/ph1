@@ -71,6 +71,13 @@ def create_app():
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
 
         # ==========================================================\
+        # REGISTRO DE CONSUMO DE COCINA (MÓDULO 5)
+        # ==========================================================\
+        from .inventory.routes.register_consumption_routes import register_consumption_bp
+        app.register_blueprint(register_consumption_bp)
+        # ==========================================================\
+
+        # ==========================================================\
         # GESTIÓN DE COMPRAS 
         # ==========================================================\
         from .logistics.routes.purchase_management_routes import purchase_management_bp
