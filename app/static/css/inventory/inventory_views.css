@@ -1,0 +1,310 @@
+/* ==========================================================================
+   ESTILOS CORPORATIVOS Y RESPONSIVOS - CONTROL DE INVENTARIO
+   ========================================================================== */
+
+body { 
+    background-color: #f8f9fa; 
+}
+
+/* 1. Tarjetas Corporativas */
+.card-custom { 
+    border: 1px solid rgba(0, 0, 0, 0.05) !important; 
+    border-radius: 20px !important; 
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important; 
+    transition: box-shadow 0.3s ease; 
+}
+
+/* 2. Cuadro de Ícono Principal */
+.brand-icon-box {
+    width: 48px;
+    height: 48px;
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    border-radius: 12px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 12px rgba(179, 31, 36, 0.25) !important;
+    flex-shrink: 0;
+}
+
+/* 3. Títulos y Subtítulos Rediseñados */
+.section-subtitle {
+    color: #212529 !important;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.section-title-icon {
+    color: #B31F24 !important;
+    font-size: 1.25rem;
+    margin-right: 0.5rem;
+}
+
+/* 4. Buscadores Ovalados (Estilo Pill) */
+.pill-input-group {
+    border-radius: 50px !important;
+    border: 1px solid #dee2e6 !important;
+    overflow: hidden;
+    background-color: #ffffff;
+    transition: all 0.25s ease-in-out;
+}
+
+.pill-input-group .form-control,
+.pill-input-group .input-group-text {
+    border: none !important;
+    background-color: transparent !important;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.pill-input-group .form-control:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.pill-input-group:focus-within {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+}
+
+/* Select Ovalado */
+.pill-select {
+    border-radius: 50px !important;
+    border: 1px solid #dee2e6 !important;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 16px;
+    font-weight: 500;
+    color: #495057;
+    background-color: #ffffff;
+    transition: all 0.25s ease-in-out;
+    cursor: pointer;
+}
+
+.pill-select:focus {
+    border-color: #B31F24 !important;
+    box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
+    outline: none !important;
+}
+
+/* 5. Tabla de Insumos (Escritorio) */
+.custom-insumos-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    border: 1px solid #dee2e6 !important;
+}
+
+.custom-insumos-table thead th {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem !important;
+    border: none !important;
+    vertical-align: middle;
+}
+
+.custom-insumos-table td {
+    padding: 0.85rem 1rem !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    background-color: #ffffff !important;
+}
+
+/* 6. Listado de Sedes */
+.location-item {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 12px !important;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.location-item.active {
+    background-color: #fff0f0 !important;
+    border-color: #B31F24 !important;
+    color: #B31F24 !important;
+    font-weight: 700;
+    box-shadow: 0 0 0 0.2rem rgba(179, 31, 36, 0.15) !important;
+}
+
+.card-header-red {
+    background-color: #B31F24 !important;
+    color: #ffffff !important;
+    border-radius: 12px !important;
+    padding: 0.6rem 1rem !important;
+    font-weight: 700;
+    font-size: 1.25rem !important;
+    display: flex;
+    align-items: center;
+}
+
+.card-header-red i {
+    color: #ffffff !important;
+    margin-right: 0.5rem;
+}
+
+/* Botones Corporativos */
+.btn-pill {
+    border-radius: 50px !important;
+    font-weight: 600;
+}
+
+.btn-mariuska-yellow {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-weight: 700;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.25) !important;
+}
+
+.btn-mariuska-yellow:hover {
+    background-color: #e0a800 !important;
+    color: #000000 !important;
+    transform: translateY(-1.5px);
+}
+
+/* Paginación */
+.custom-pagination .page-link {
+    color: #495057;
+    border-radius: 6px;
+    margin: 0 2px;
+    border: 1px solid #dee2e6;
+}
+
+.custom-pagination .page-item.active .page-link {
+    background-color: #B31F24;
+    border-color: #B31F24;
+    color: #ffffff;
+}
+
+/* Overlay */
+.inventory-card-container { position: relative; min-height: 350px; }
+.loading-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.85);
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    border-radius: 20px; z-index: 10;
+}
+
+/* ==========================================================================
+   VISTA TABLET (768px a 1024px)
+   ========================================================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .section-subtitle {
+        font-size: 1.35rem !important;
+    }
+
+    .custom-insumos-table th, 
+    .custom-insumos-table td {
+        padding: 0.65rem 0.6rem !important;
+        font-size: 0.82rem !important;
+    }
+
+    .brand-icon-box {
+        width: 42px !important;
+        height: 42px !important;
+    }
+
+    #locationListGroup {
+        max-height: 300px !important;
+    }
+}
+
+/* ==========================================================================
+   VISTA TELÉFONO / MÓVIL (< 768px)
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    /* 1. Header Apilado */
+    .inventory-header-container {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1rem !important;
+    }
+
+    .header-actions-group {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    .header-actions-group button {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    /* 2. Reducción de la lista de sedes para no ocupar toda la pantalla */
+    #locationListGroup {
+        max-height: 200px !important;
+    }
+
+    /* 3. Transformación de Tabla a Tarjetas Móviles (Mobile-Cards) */
+    .custom-insumos-table, 
+    .custom-insumos-table thead, 
+    .custom-insumos-table tbody, 
+    .custom-insumos-table th, 
+    .custom-insumos-table td, 
+    .custom-insumos-table tr {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .custom-insumos-table thead {
+        display: none !important; /* Ocultar cabeceras de tabla */
+    }
+
+    .custom-insumos-table tbody tr {
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 16px !important;
+        margin-bottom: 1rem !important;
+        padding: 0.85rem 1.1rem !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .custom-insumos-table td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 0.55rem 0 !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        background-color: transparent !important;
+        text-align: right !important;
+        font-size: 0.88rem !important;
+    }
+
+    .custom-insumos-table tbody tr td:last-child {
+        border-bottom: none !important;
+    }
+
+    /* Generación automática de etiquetas sacadas del atributo data-label */
+    .custom-insumos-table td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        color: #64748b;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        text-align: left;
+        margin-right: 1rem;
+    }
+
+    /* 4. Paginador Adaptado */
+    #paginationContainer {
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+        text-align: center !important;
+    }
+}

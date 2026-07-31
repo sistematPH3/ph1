@@ -14,3 +14,4 @@ inventory_bp = Blueprint(
 from app.inventory.routes import list_product_routes
 from app.inventory.routes import products_routes #DE leminyer
 from app.inventory.routes import categories_routes
+from app.inventory.routes import inventory_views_routes
