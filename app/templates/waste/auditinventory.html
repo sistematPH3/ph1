@@ -1,0 +1,121 @@
+{% extends 'layout.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="main-container py-3 py-md-4 px-2 px-md-4">
+    <!-- Contenedor Blanco Principal Único -->
+    <div class="main-card-wrapper p-3 p-md-4 shadow-sm bg-white">
+        
+        <!-- Header con Ícono y Título -->
+        <div class="d-flex align-items-center mb-3 mb-md-4">
+            <div class="icon-header-red me-3 flex-shrink-0">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <div>
+                <h2 class="header-title m-0 fw-bold">Auditoría de Inventario</h2>
+                <p class="text-muted m-0 small">Control inalterable y trazabilidad de movimientos e insumos dañados</p>
+            </div>
+        </div>
+
+        <!-- Barra de Filtros Integrada -->
+        <div class="filters-bar-container p-2 mb-4">
+            <div class="row g-2 align-items-center">
+                <!-- Buscador -->
+                <div class="col-12 col-md-3">
+                    <div class="input-group input-pill">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" id="filter_search" class="form-control border-start-0 ps-0" placeholder="Buscar por usuario, insumo o acción...">
+                    </div>
+                </div>
+
+                <!-- Sedes -->
+                <div class="col-12 col-md-3">
+                    <div class="input-group input-pill">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-geo-alt"></i></span>
+                        {% if is_admin %}
+                            <select class="form-select border-start-0 ps-0" id="filter_location">
+                                <option value="" selected>Todas las sedes</option>
+                                {% if locations %}
+                                    {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        {% else %}
+                            <select class="form-select border-start-0 ps-0" id="filter_location">
+                                <option value="" selected>Sedes permitidas</option>
+                                {% if locations %}
+                                    {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Severidad -->
+                <div class="col-12 col-md-3">
+                    <div class="input-group input-pill">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-exclamation-triangle"></i></span>
+                        <select class="form-select border-start-0 ps-0" id="filter_severity">
+                            <option value="">Todas las severidades</option>
+                            <option value="NORMAL">NORMAL</option>
+                            <option value="ALERTA">ALERTA</option>
+                            <option value="CRITICO">CRÍTICO</option>
+                            <option value="REABASTECIDO">REABASTECIDO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Fecha -->
+                <div class="col-12 col-md-2">
+                    <div class="input-group input-pill">
+                        <input type="date" id="filter_date" class="form-control text-muted">
+                    </div>
+                </div>
+
+                <!-- Botón Reset -->
+                <div class="col-12 col-md-1 text-end">
+                    <button id="btnReset" class="btn btn-outline-secondary rounded-circle btn-icon-reset w-100-mobile" title="Limpiar Filtros">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA ESCRITORIO / TABLET: Tabla con Encabezado Rojo Vino -->
+        <div class="table-responsive table-wrapper d-none d-md-block">
+            <table class="table align-middle mb-0" id="auditTable">
+                <thead>
+                    <tr class="table-header-red">
+                        <th class="ps-3">RESPONSABLE</th>
+                        <th>ACCIÓN</th>
+                        <th>INSUMO Y SEDE</th>
+                        <th class="text-center">VARIACIÓN</th>
+                        <th>SEVERIDAD</th>
+                        <th>FECHA Y HORA</th>
+                        <th class="text-end pe-3">DETALLES</th>
+                    </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                    <!-- JS inyectará las filas de la tabla aquí -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- VISTA MÓVIL: Tarjetas independientes por registro -->
+        <div class="mobile-audit-cards d-block d-md-none" id="auditMobileContainer">
+            <!-- JS inyectará las cards móviles aquí -->
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}"></script>
+{% endblock %}

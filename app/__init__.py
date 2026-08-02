@@ -40,6 +40,13 @@ def create_app():
         from .security.routes.audit_purchase_routes import audit_purchase_bp
         app.register_blueprint(audit_purchase_bp)
         # ==========================================================
+
+        # ==========================================================
+        # MÓDULO WASTE: AUDITORÍA DE INVENTARIO 
+        # ==========================================================
+        from .waste.routes.auditinventory_routes import auditinventory_bp
+        app.register_blueprint(auditinventory_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)

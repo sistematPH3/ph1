@@ -1,3 +1,6 @@
+import json
+from datetime import datetime
+from sqlalchemy import text
 from app.models.inventory_model import db, Inventory, Product
 from app.models.logistics_model import Location
 from app.models.security_model import User, user_locations
@@ -39,7 +42,53 @@ class RegisterConsumptionRepository:
         ).first()
 
     @staticmethod
-    def update_stock(inventory_item, quantity):
-        inventory_item.current_quantity -= quantity
+    def update_stock(inventory_item, quantity, user_id=None, notes=None):
+        # 1. Guardar estado previo y actualizar stock
+        stock_anterior = float(inventory_item.current_quantity)
+        nuevo_stock = stock_anterior - float(quantity)
+        inventory_item.current_quantity = nuevo_stock
+
+        # 2. Determinar severidad
+        min_stock = float(getattr(inventory_item, 'min_stock', 20))
+        if nuevo_stock <= 0:
+            severidad = 'CRITICO'
+        elif nuevo_stock <= min_stock:
+            severidad = 'ALERTA'
+        else:
+            severidad = 'NORMAL'
+
+        # 3. Obtener nombre del producto
+        product_name = inventory_item.product.name if hasattr(inventory_item, 'product') and inventory_item.product else f"Insumo #{inventory_item.product_id}"
+
+        # 4. Construir objeto JSONB para la auditoría
+        changed_data = json.dumps({
+            'product_name': product_name,
+            'previous_quantity': stock_anterior,
+            'new_quantity': nuevo_stock,
+            'quantity_changed': -abs(float(quantity)),
+            'notes': notes or "Registro de consumo de cocina"
+        })
+
+        # 5. Blindaje del user_id por seguridad (evita que pase NULL)
+        try:
+            user_id_final = int(user_id) if user_id is not None else 1
+        except (ValueError, TypeError):
+            user_id_final = 1
+
+        # 6. Insertar directamente en la tabla audit_logs
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, location_id, action, severity, timestamp, changed_data)
+            VALUES (:user_id, :location_id, :action, :severity, :timestamp, :changed_data)
+        """)
+
+        db.session.execute(audit_query, {
+            'user_id': user_id_final,
+            'location_id': inventory_item.location_id,
+            'action': 'GASTO_COCINA',
+            'severity': severidad,
+            'timestamp': datetime.now(),
+            'changed_data': changed_data
+        })
+
         db.session.commit()
         return inventory_item

@@ -1,0 +1,248 @@
+/* ==========================================
+   ESTILOS GENERALES Y ESCRITORIO (ORIGINALES)
+   ========================================== */
+
+.main-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Tarjeta Blanca Principal Contenedora */
+.main-card-wrapper {
+    background-color: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #f1f5f9;
+}
+
+/* Título e Ícono */
+.header-title {
+    color: #0f172a;
+    font-size: 1.4rem;
+}
+
+.icon-header-red {
+    background-color: #b0121a;
+    color: #ffffff;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+/* Barra de Filtros Recubierta */
+.filters-bar-container {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+}
+
+.input-pill .form-control,
+.input-pill .form-select,
+.input-pill .input-group-text {
+    border-radius: 20px;
+    border-color: #e2e8f0;
+    font-size: 0.85rem;
+    background-color: #f8fafc;
+}
+
+.input-pill .input-group-text {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.input-pill .form-control,
+.input-pill .form-select {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.btn-icon-reset {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-color: #cbd5e1;
+    color: #64748b;
+}
+
+.btn-icon-reset:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+/* Tabla y Encabezado Rojo Vino */
+.table-wrapper {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.table-header-red {
+    background-color: #b0121a !important;
+}
+
+.table-header-red th {
+    background-color: #b0121a !important;
+    color: #ffffff !important;
+    font-size: 0.725rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding-top: 13px;
+    padding-bottom: 13px;
+    border: none;
+}
+
+/* Celdas de Usuario */
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background-color: #b0121a;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Cápsulas de Acción */
+.badge-action-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.725rem;
+    font-weight: 600;
+    display: inline-block;
+    border: 1px solid transparent;
+}
+
+.action-blue {
+    border-color: #bfdbfe;
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
+.action-red-light {
+    border-color: #fecaca;
+    color: #dc2626;
+    background-color: #fef2f2;
+}
+
+/* Badges de Severidad */
+.badge-severity {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.severity-normal {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
+.severity-alerta {
+    background-color: #ffedd5;
+    color: #c2410c;
+}
+
+.severity-critico {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Estilos de Variación */
+.variation-positive { color: #15803d; font-weight: 700; }
+.variation-negative { color: #dc2626; font-weight: 700; }
+
+/* Botón Detalle */
+.btn-detail {
+    border: 1px solid #cbd5e1;
+    background-color: #ffffff;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 4px 12px;
+}
+
+.btn-detail:hover {
+    background-color: #f8fafc;
+}
+
+/* Estado Vacío con Lupa Gris */
+.empty-state-container {
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.empty-search-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.4;
+}
+
+/* ==========================================
+   ESTILOS EXCLUSIVOS PARA VISTA MÓVIL (TELÉFONO)
+   ========================================== */
+
+@media (max-width: 767.98px) {
+    /* Ajuste del botón Reset en móviles para abarcar todo el ancho de su fila */
+    .btn-icon-reset.w-100-mobile {
+        width: 100% !important;
+        border-radius: 20px !important;
+        height: 38px;
+    }
+
+    .header-title {
+        font-size: 1.15rem;
+    }
+}
+
+/* Tarjeta Individual de Movimiento en Móvil */
+.mobile-audit-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.mobile-audit-card .card-header-mobile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.mobile-audit-card .user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mobile-audit-card .mobile-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    margin-bottom: 2px;
+}
+
+.mobile-audit-card .mobile-value {
+    font-size: 0.85rem;
+    color: #0f172a;
+}
