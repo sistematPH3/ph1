@@ -1,4 +1,8 @@
 from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
+from datetime import datetime, timezone
+from decimal import Decimal
+import json
+import re
 
 def get_audit_view_data(user_id):
     user = AuditInventoryRepository.get_user_by_id(user_id)
@@ -41,14 +45,40 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
         severity_filter=severity_filter
     )
     
+    # 🔍 Detectar qué IDs de logs están anulados actualmente (secuencia cronológica)
+    annulled_target_ids = set()
+    sorted_logs = sorted(raw_logs, key=lambda x: x.id)  # Ordenar de más antiguo a más reciente
+    
+    for log in sorted_logs:
+        act_upper = (log.action or '').upper()
+        c_data = log.changed_data or {}
+        if isinstance(c_data, str):
+            try: 
+                c_data = json.loads(c_data)
+            except json.JSONDecodeError: 
+                c_data = {}
+        
+        notes = c_data.get('notes', '')
+        match = re.search(r'log\s*#\s*(\d+)', notes, re.IGNORECASE)
+        
+        if match:
+            target_id = int(match.group(1))
+            if 'REVERSION' in act_upper:
+                annulled_target_ids.add(target_id)
+            elif 'ACTIVACION' in act_upper or 'REACTIVACION' in act_upper:
+                annulled_target_ids.discard(target_id)
+
     formatted_logs = []
     for log in raw_logs:
         changed_data = log.changed_data or {}
+        if isinstance(changed_data, str):
+            try:
+                changed_data = json.loads(changed_data)
+            except json.JSONDecodeError:
+                changed_data = {}
         
-        # Extraemos la variación
         qty_changed = float(changed_data.get('quantity_changed', 0))
         
-        # Función auxiliar para limpiar y convertir a float seguro
         def safe_float(val):
             if val in (None, ''):
                 return None
@@ -60,24 +90,18 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
         prev_qty = safe_float(changed_data.get('previous_quantity'))
         new_qty = safe_float(changed_data.get('new_quantity'))
 
-        # --- LÓGICA MATEMÁTICA AGRESIVA PARA CORREGIR DATOS ---
         if qty_changed != 0:
-            # CASO A: Consumo (Gasto, Merma, Cocina, etc) -> Negativo (Ej: -20.0)
             if qty_changed < 0:
-                # Si el stock anterior dice 0 (imposible consumir de 0) o no existe,
-                # inferimos que había suficiente stock antes y tras el gasto llegó a new_qty (o 0 si no se especificó)
                 if prev_qty in (0, 0.0, None):
                     if new_qty is not None and new_qty > 0:
-                        prev_qty = new_qty - qty_changed  # new_qty + abs(qty_changed)
+                        prev_qty = new_qty - qty_changed
                     else:
                         prev_qty = abs(qty_changed)
                         new_qty = 0.0
                 elif new_qty is None:
                     new_qty = prev_qty + qty_changed
 
-            # CASO B: Reabastecimiento -> Positivo (Ej: +20.0)
             elif qty_changed > 0:
-                # Si ambos dicen 0 o no existen, inferimos que partió de cero
                 if prev_qty in (0, 0.0, None) and new_qty in (0, 0.0, None):
                     prev_qty = 0.0
                     new_qty = qty_changed
@@ -86,13 +110,15 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
                 elif prev_qty is None and new_qty is not None:
                     prev_qty = new_qty - qty_changed
 
-        # Protección final: si por alguna razón siguen siendo None, los pasamos a 0.0
         if prev_qty is None: prev_qty = 0.0
         if new_qty is None: new_qty = 0.0
 
-        # Evitar mostrar stocks negativos irreales en el historial
         if prev_qty < 0: prev_qty = 0.0
         if new_qty < 0: new_qty = 0.0
+
+        act_upper = (log.action or '').upper()
+        is_adjustment_type = any(kw in act_upper for kw in ['REVERSION', 'AJUSTE', 'ACTIVACION'])
+        is_annulled = (log.id in annulled_target_ids)
 
         formatted_logs.append({
             'id': log.id,
@@ -101,11 +127,167 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
             'user_name': log.user_name,
             'location_name': log.location_name or changed_data.get('location_name', 'Almacén Principal'),
             'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A',
-            'product_name': changed_data.get('product_name', 'N/A'),
+            'product_name': changed_data.get('product_name') or changed_data.get('producto') or changed_data.get('nombre') or 'N/A',
             'previous_quantity': prev_qty,
             'new_quantity': new_qty,
             'quantity_changed': qty_changed,
-            'notes': changed_data.get('notes', '')
+            'notes': changed_data.get('notes', ''),
+            'is_annulled': is_annulled,
+            'is_adjustment_type': is_adjustment_type
         })
         
     return formatted_logs
+
+
+def process_inventory_action(log_id, current_user, action_type, new_quantity_requested=None, justification_notes=""):
+    """
+    Gestiona la lógica de inmutabilidad generando asientos de AJUSTE, REVERSION o ACTIVACION.
+    """
+    original_log = AuditInventoryRepository.get_audit_log_by_id(log_id)
+    if not original_log:
+        return {'success': False, 'message': 'El registro de auditoría solicitado no existe.'}
+
+    location_id = original_log.location_id
+    action_name_upper = original_log.action.upper()
+
+    # Bloqueo estricto: En Almacén General (location_id == 1) o Compras/Ingresos
+    if location_id == 1 or "COMPRA" in action_name_upper or "INGRESO" in action_name_upper:
+        return {'success': False, 'message': 'Operación denegada. Las compras o registros en el Almacén General no admiten modificaciones.'}
+
+    # Bloqueo de escritura para Finanzas (rol 3)
+    is_admin = (current_user.role_id == 1)
+    is_finance = (current_user.role_id == 3)
+
+    if is_finance:
+        return {'success': False, 'message': 'Operación denegada. El perfil de finanzas posee atributos de solo lectura.'}
+
+    # Ventana temporal de permisos
+    log_timestamp = original_log.timestamp
+    if log_timestamp.tzinfo is None:
+        log_timestamp = log_timestamp.replace(tzinfo=timezone.utc)
+    
+    now = datetime.now(timezone.utc)
+    diff_hours = (now - log_timestamp).total_seconds() / 3600
+
+    if not is_admin:
+        if diff_hours > 24:
+            return {'success': False, 'message': 'El tiempo límite de 24 horas ha expirado. Solicite la acción al Administrador.'}
+    else:
+        if diff_hours > (30 * 24):
+            return {'success': False, 'message': 'El límite máximo de 30 días permitido para administradores ha expirado.'}
+
+    changed_data = original_log.changed_data
+    if isinstance(changed_data, str):
+        try:
+            changed_data = json.loads(changed_data)
+        except json.JSONDecodeError:
+            changed_data = {}
+    elif not changed_data:
+        changed_data = {}
+
+    product_id = (
+        changed_data.get('product_id') or 
+        changed_data.get('insumo_id') or 
+        changed_data.get('id_producto') or 
+        changed_data.get('id_insumo') or 
+        changed_data.get('item_id') or 
+        changed_data.get('id')
+    )
+    product_name = changed_data.get('product_name') or changed_data.get('producto') or changed_data.get('nombre') or 'Insumo no especificado'
+
+    if not product_id and product_name != 'Insumo no especificado':
+        try:
+            from app.models.inventory_model import db
+            from sqlalchemy import text
+            res = db.session.execute(text("SELECT id FROM products WHERE LOWER(name) = LOWER(:pname) LIMIT 1"), {'pname': str(product_name).strip()}).fetchone()
+            if res:
+                product_id = res[0]
+            else:
+                res_ins = db.session.execute(text("SELECT id FROM insumos WHERE LOWER(nombre) = LOWER(:pname) LIMIT 1"), {'pname': str(product_name).strip()}).fetchone()
+                if res_ins:
+                    product_id = res_ins[0]
+        except Exception:
+            pass
+
+    if not product_id:
+        return {'success': False, 'message': 'El registro carece del identificador de insumo necesario para procesar la acción.'}
+
+    original_qty_changed = Decimal(str(
+        changed_data.get('quantity_changed') or 
+        changed_data.get('new_quantity') or 
+        changed_data.get('cantidad') or 0
+    ))
+    
+    if original_qty_changed == 0:
+        p_qty = changed_data.get('previous_quantity')
+        n_qty = changed_data.get('new_quantity')
+        if p_qty is not None and n_qty is not None:
+            original_qty_changed = Decimal(str(n_qty)) - Decimal(str(p_qty))
+
+    current_stock = AuditInventoryRepository.get_current_stock(location_id, product_id)
+    current_stock = Decimal('0.00') if current_stock is None else Decimal(str(current_stock))
+
+    # Definir el ajuste según la acción solicitada
+    if action_type == 'ANULAR':
+        required_adjustment = -original_qty_changed
+        final_action = f"REVERSION_{original_log.action}"
+        final_notes = f"Anulación del log #{log_id}. Motivo: {justification_notes}"
+
+    elif action_type == 'ACTIVAR':
+        # Reactivar vuelve a aplicar la variación original
+        required_adjustment = original_qty_changed
+        final_action = f"ACTIVACION_{original_log.action}"
+        final_notes = f"Reactivación del log #{log_id}. Motivo: {justification_notes}"
+
+    elif action_type == 'EDITAR':
+        if new_quantity_requested is None:
+            return {'success': False, 'message': 'Debe especificar la nueva cantidad para procesar la edición.'}
+        
+        new_requested_dec = Decimal(str(new_quantity_requested))
+        abs_original = abs(original_qty_changed)
+
+        is_consumption = (
+            "GASTO" in action_name_upper or 
+            "CONSUMO" in action_name_upper or 
+            "MERMA" in action_name_upper or 
+            original_qty_changed < 0
+        )
+
+        if is_consumption:
+            abs_new = abs(new_requested_dec)
+            required_adjustment = abs_original - abs_new
+        else:
+            required_adjustment = new_requested_dec - original_qty_changed
+
+        final_action = f"AJUSTE_{original_log.action}"
+        final_notes = f"Edición del log #{log_id} (Gasto original: {abs_original}, Nuevo gasto: {abs(new_requested_dec)}). Motivo: {justification_notes}"
+    else:
+        return {'success': False, 'message': 'Acción no reconocida.'}
+
+    # Validación de stock suficiente si el ajuste descuenta insumos
+    if required_adjustment < Decimal('0') and current_stock < abs(required_adjustment):
+        return {
+            'success': False, 
+            'message': f'Imposible procesar. Stock insuficiente (Disponible: {current_stock}, Requerido: {abs(required_adjustment)}).'
+        }
+
+    new_qty = current_stock + required_adjustment
+    severity = "NORMAL"
+
+    try:
+        AuditInventoryRepository.register_audit_adjustment(
+            user_id=current_user.id,
+            location_id=location_id,
+            action_type=final_action,
+            severity=severity,
+            product_id=product_id,
+            product_name=product_name,
+            prev_qty=float(current_stock),
+            new_qty=float(new_qty),
+            qty_changed=float(required_adjustment),
+            notes=final_notes
+        )
+    except Exception as e:
+        return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}
+
+    return {'success': True, 'message': 'Acción procesada con éxito.'}

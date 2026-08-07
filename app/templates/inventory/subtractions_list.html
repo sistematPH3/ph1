@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Vinculamos el archivo CSS separado -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/subtractions_list.css') }}">
+
+<div class="container mt-4">
+    <h2>Historial de Gastos de Cocina</h2>
+    
+    <!-- Mostrar mensajes de flash (éxito o error de validación) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Fecha y Hora</th>
+                <th>Sede</th>
+                <th>Insumo</th>
+                <th>Cantidad Gastada</th>
+                <th>Registrado por</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in movimientos %}
+            <tr>
+                <td>{{ mov.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ mov.changed_data.location_name }}</td>
+                <td>{{ mov.changed_data.product_name }}</td>
+                <td>{{ mov.changed_data.quantity_subtracted }}</td>
+                <td>{{ mov.user.name if mov.user else 'Sistema' }}</td>
+                <td>
+                    <!-- Botón que ejecuta la función del archivo JS -->
+                    <button type="button" class="btn btn-warning btn-sm" 
+                            onclick="abrirModalEdicion('{{ mov.id }}', '{{ mov.changed_data.quantity_subtracted }}', '{{ mov.changed_data.product_name }}')">
+                        Editar
+                    </button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center">No hay registros de salidas de inventario.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal de Edición (Limpio de estilos en línea) -->
+<div id="modalEdicion" class="modal-custom">
+    <h3 id="modalTitulo">Editar Gasto</h3>
+    
+    <form id="formEdicion" method="POST" action="">
+        <div class="form-group mb-2">
+            <label>Nueva Cantidad Real:</label>
+            <input type="number" step="0.01" name="nueva_cantidad" id="inputNuevaCantidad" class="form-control" required>
+        </div>
+        
+        <div class="form-group mb-3">
+            <label>Motivo de la Edición:</label>
+            <textarea name="motivo_edicion" class="form-control" rows="3" required placeholder="Ej: Error de tipeo, se gastó más de lo reportado..."></textarea>
+        </div>
+        
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios.</button>
+        </div>
+    </form>
+</div>
+
+<!-- Vinculamos el archivo JS separado -->
+<script src="{{ url_for('static', filename='js/inventory/subtractions_list.js') }}"></script>
+{% endblock %}

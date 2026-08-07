@@ -2,6 +2,7 @@ from app.models.inventory_model import db
 from app.models.logistics_model import Location
 from app.models.security_model import User, user_locations
 from sqlalchemy import text
+import json
 
 class AuditInventoryRepository:
     
@@ -30,13 +31,10 @@ class AuditInventoryRepository:
             User, db.Model.metadata.tables['audit_logs'].c.user_id == User.id
         )
 
-        # Filtro de sedes permitidas (para gerentes)
         if allowed_locations is not None:
             if not allowed_locations:
                 return [] 
             
-            # NUEVA LÓGICA: Si el usuario tiene acceso al Almacén Central (1), 
-            # también le permitimos ver los registros huérfanos (None) que dejaron otros módulos.
             if 1 in allowed_locations:
                 query = query.filter(
                     (db.Model.metadata.tables['audit_logs'].c.location_id.in_(allowed_locations)) |
@@ -45,9 +43,7 @@ class AuditInventoryRepository:
             else:
                 query = query.filter(db.Model.metadata.tables['audit_logs'].c.location_id.in_(allowed_locations))
             
-        # FILTRO DE SEDE (Manejo inteligente para Almacén Central)
         if location_id_filter is not None and location_id_filter != '':
-            # Si el ID filtrado es 1 (Almacén Central), traemos también los NULL por si hay registros huérfanos manuales
             if location_id_filter == 1:
                 query = query.filter(
                     (db.Model.metadata.tables['audit_logs'].c.location_id == 1) | 
@@ -62,3 +58,61 @@ class AuditInventoryRepository:
         query = query.order_by(db.Model.metadata.tables['audit_logs'].c.timestamp.desc())
         
         return query.all()
+
+    # --- NUEVOS MÉTODOS PARA GESTIÓN DE ANULACIONES Y EDICIONES ---
+
+    @staticmethod
+    def get_audit_log_by_id(log_id):
+        """Obtiene un registro específico de auditoría para su revisión."""
+        table = db.Model.metadata.tables['audit_logs']
+        return db.session.query(table).filter(table.c.id == log_id).first()
+
+    @staticmethod
+    def get_current_stock(location_id, product_id):
+        query = text("""
+            SELECT current_quantity FROM inventory 
+            WHERE location_id = :loc_id AND product_id = :prod_id
+        """)
+        result = db.session.execute(query, {'loc_id': location_id, 'prod_id': product_id}).fetchone()
+        return result[0] if result else 0.00
+
+    @staticmethod
+    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes):
+        """Genera el movimiento de contra-asiento en auditoría e impacta el inventario real de la sede."""
+        insert_log_query = text("""
+            INSERT INTO audit_logs (user_id, location_id, action, severity, timestamp, changed_data)
+            VALUES (:user_id, :location_id, :action, :severity, NOW(), :changed_data)
+        """)
+        
+        changed_data_json = json.dumps({
+            'product_id': product_id,
+            'product_name': product_name,
+            'previous_quantity': prev_qty,
+            'new_quantity': new_qty,
+            'quantity_changed': qty_changed,
+            'notes': notes
+        })
+
+        # 1. Registrar inalterable en auditoría
+        db.session.execute(insert_log_query, {
+            'user_id': user_id,
+            'location_id': location_id,
+            'action': action_type,
+            'severity': severity,
+            'changed_data': changed_data_json
+        })
+
+        # 2. Actualizar stock real usando la tabla 'inventory' y el campo 'current_quantity'
+        update_stock_query = text("""
+            UPDATE inventory
+            SET current_quantity = :new_qty
+            WHERE location_id = :loc_id AND product_id = :prod_id
+        """)
+        
+        db.session.execute(update_stock_query, {
+            'new_qty': new_qty,
+            'loc_id': location_id,
+            'prod_id': product_id
+        })
+        
+        db.session.commit()

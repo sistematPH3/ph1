@@ -5,9 +5,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="main-container py-3 py-md-4 px-2 px-md-4">
-    <!-- Contenedor Blanco Principal Único -->
-    <div class="main-card-wrapper p-3 p-md-4 shadow-sm bg-white">
+<!-- Contenedor Principal con rol de usuario para control de UI en JS -->
+<div class="main-container py-3 py-md-4 px-2 px-md-4" id="auditMainContainer" data-role-id="{{ current_user.role_id }}">
+    <!-- Card Principal Único -->
+    <div class="main-card-wrapper p-3 p-md-4 shadow-sm bg-white rounded-3">
         
         <!-- Header con Ícono y Título -->
         <div class="d-flex align-items-center mb-3 mb-md-4">
@@ -21,7 +22,7 @@
         </div>
 
         <!-- Barra de Filtros Integrada -->
-        <div class="filters-bar-container p-2 mb-4">
+        <div class="filters-bar-container p-2 mb-4 bg-light rounded-3">
             <div class="row g-2 align-items-center">
                 <!-- Buscador -->
                 <div class="col-12 col-md-3">
@@ -35,25 +36,19 @@
                 <div class="col-12 col-md-3">
                     <div class="input-group input-pill">
                         <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-geo-alt"></i></span>
-                        {% if is_admin %}
-                            <select class="form-select border-start-0 ps-0" id="filter_location">
+                        <select class="form-select border-start-0 ps-0" id="filter_location">
+                            {% if is_admin %}
                                 <option value="" selected>Todas las sedes</option>
-                                {% if locations %}
-                                    {% for loc in locations %}
-                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                    {% endfor %}
-                                {% endif %}
-                            </select>
-                        {% else %}
-                            <select class="form-select border-start-0 ps-0" id="filter_location">
+                            {% else %}
                                 <option value="" selected>Sedes permitidas</option>
-                                {% if locations %}
-                                    {% for loc in locations %}
-                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                    {% endfor %}
-                                {% endif %}
-                            </select>
-                        {% endif %}
+                            {% endif %}
+                            
+                            {% if locations %}
+                                {% for loc in locations %}
+                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
                     </div>
                 </div>
 
@@ -102,16 +97,54 @@
                     </tr>
                 </thead>
                 <tbody id="auditTableBody">
-                    <!-- JS inyectará las filas de la tabla aquí -->
+                    <!-- Inyección dinámica vía JS (auditinventory.js) -->
                 </tbody>
             </table>
         </div>
 
         <!-- VISTA MÓVIL: Tarjetas independientes por registro -->
         <div class="mobile-audit-cards d-block d-md-none" id="auditMobileContainer">
-            <!-- JS inyectará las cards móviles aquí -->
+            <!-- Inyección dinámica vía JS (auditinventory.js) -->
         </div>
 
+    </div>
+</div>
+
+<!-- Modal Unificado para Acciones (Editar/Anular) -->
+<div class="modal fade" id="actionAuditModal" tabindex="-1" aria-labelledby="actionAuditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="actionAuditModalLabel">Confirmar Acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="actionAuditForm">
+                    <input type="hidden" id="actionLogId">
+                    <input type="hidden" id="actionType">
+                    
+                    <div class="alert alert-warning small d-flex align-items-center mb-3">
+                        <i class="bi bi-info-circle-fill me-2 fs-5 flex-shrink-0"></i>
+                        <div>Esta acción generará un nuevo movimiento compensatorio en la auditoría. El registro original permanecerá inalterable.</div>
+                    </div>
+
+                    <!-- Input condicional mostrado solo en tipo EDITAR -->
+                    <div class="mb-3" id="editQuantityContainer" style="display: none;">
+                        <label for="newQuantityInput" class="form-label fw-bold small text-muted">Nueva Cantidad Real Gastada</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="actionNotes" class="form-label fw-bold small text-muted">Motivo de la modificación (Obligatorio)</label>
+                        <textarea class="form-control" id="actionNotes" rows="3" placeholder="Explique por qué se está realizando este ajuste o anulación..." required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger px-4" id="btnConfirmAction">Procesar Acción</button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

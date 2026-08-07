@@ -5,11 +5,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterDate = document.getElementById('filter_date');
     const btnReset = document.getElementById('btnReset');
     const tableBody = document.querySelector('#auditTable tbody');
-    const mobileContainer = document.getElementById('auditMobileContainer'); // Nuevo contenedor móvil
+    const mobileContainer = document.getElementById('auditMobileContainer');
+    
+    // Obtener el rol del contenedor principal
+    const mainContainer = document.getElementById('auditMainContainer');
+    const userRole = mainContainer ? mainContainer.getAttribute('data-role-id') : null;
+
+    // Elementos del Modal
+    const actionModalElement = document.getElementById('actionAuditModal');
+    let actionModal = null;
+    if (actionModalElement) {
+        actionModal = new bootstrap.Modal(actionModalElement);
+    }
+    const editQuantityContainer = document.getElementById('editQuantityContainer');
+    const btnConfirmAction = document.getElementById('btnConfirmAction');
+    const actionLogId = document.getElementById('actionLogId');
+    const actionType = document.getElementById('actionType');
+    const newQuantityInput = document.getElementById('newQuantityInput');
+    const actionNotes = document.getElementById('actionNotes');
 
     let allLogs = [];
 
-    // Mensaje para estado vacío (Escritorio)
     const emptyStateHtml = `
         <tr>
             <td colspan="7">
@@ -21,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </tr>
     `;
 
-    // Mensaje para estado vacío (Móvil)
     const emptyStateMobileHtml = `
         <div class="empty-state-container text-center py-4 bg-white rounded-3 border">
             <h5 class="fw-bold text-secondary mb-1">No se encontraron resultados</h5>
@@ -97,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBody.innerHTML = '';
         if (mobileContainer) mobileContainer.innerHTML = '';
 
+        const now = new Date(); // Fecha actual para calcular límite de 24 horas
+
         filtered.forEach((log, index) => {
             let details = {};
             if (typeof log.changed_data === 'string') {
@@ -109,11 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const initial = userName.charAt(0).toUpperCase();
             const productName = log.product_name || details.product_name || log.producto || 'Insumo';
             const locationName = log.location_name || log.sede || log.location || 'Almacén Principal';
-
-            // Variación del movimiento
             const qty = parseFloat(log.quantity_changed !== undefined ? log.quantity_changed : (details.quantity_changed || 0));
-
-            // Lectura directa y calculada
+            
             let prevQty = parseFloat(log.previous_quantity !== undefined ? log.previous_quantity : (details.previous_quantity || 0));
             let newQty = parseFloat(log.new_quantity !== undefined ? log.new_quantity : (details.new_quantity || 0));
 
@@ -141,7 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 variationPrefix = '+';
             }
 
-            // Severidad
             let severityHtml = '';
             const sev = (log.severity || log.severidad || 'NORMAL').toUpperCase();
             if (sev === 'ALERTA') {
@@ -154,11 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 severityHtml = `<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>NORMAL</span>`;
             }
 
-            // Acción
             const actionText = (log.action || log.accion || log.acción || 'MOVIMIENTO').replace(/_/g, ' ');
-            
-            const isRest = actionText.toLowerCase().includes('gasto') || actionText.toLowerCase().includes('merma') || actionText.toLowerCase().includes('salida');
-            const isAdd = actionText.toLowerCase().includes('ingreso') || actionText.toLowerCase().includes('compra') || actionText.toLowerCase().includes('reabastecimiento');
+            const isRest = actionText.toLowerCase().includes('gasto') || actionText.toLowerCase().includes('merma') || actionText.toLowerCase().includes('salida') || actionText.toLowerCase().includes('anular');
+            const isAdd = actionText.toLowerCase().includes('ingreso') || actionText.toLowerCase().includes('compra') || actionText.toLowerCase().includes('reabastecimiento') || actionText.toLowerCase().includes('ajuste');
 
             let actionBadgeStyle = 'background-color: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;';
             if (isRest) {
@@ -167,9 +178,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionBadgeStyle = 'background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;';
             }
 
-            // Formato de Fecha / Hora
             let dateStr = log.timestamp || '';
             let timeStr = '';
+            // Parseando fecha para validación de tiempo
+            let logDateObj = null;
+            if (dateStr) {
+                const isoFormat = dateStr.replace(' ', 'T') + 'Z'; 
+                logDateObj = new Date(isoFormat);
+            }
+
             if (dateStr.includes('T')) {
                 const parts = dateStr.split('T');
                 dateStr = parts[0];
@@ -178,6 +195,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parts = dateStr.split(' ');
                 dateStr = parts[0];
                 timeStr = parts[1].substring(0, 5);
+            }
+
+            // Calcular diferencia en horas
+            let diffHours = 0;
+            if (logDateObj) {
+                diffHours = Math.abs(now - logDateObj) / 36e5;
+            }
+
+            // LÓGICA DE BOTONES Y ROLES
+            let actionButtonsHtml = '';
+            const actionIsReversionOrAdjust = actionText.includes('AJUSTE') || actionText.includes('REVERSION');
+            
+            if (userRole !== '3' && !actionIsReversionOrAdjust) {
+                if (userRole !== '1' && diffHours > 24) {
+                    actionButtonsHtml = `<div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>Tiempo expirado (24h). Solicite corrección al Administrador.</div>`;
+                } else {
+                    actionButtonsHtml = `
+                        <div class="mt-3 border-top pt-2">
+                            <button class="btn btn-sm btn-outline-primary me-2 btn-action-log" data-action="EDITAR" data-id="${logId}">
+                                <i class="bi bi-pencil-square me-1"></i>Editar
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="${logId}">
+                                <i class="bi bi-x-circle me-1"></i>Anular
+                            </button>
+                        </div>
+                    `;
+                }
             }
 
             if (dateStr.includes('-')) {
@@ -190,9 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const detailRowId = `detail_row_${logId}_${index}`;
             const mobileDetailId = `mobile_detail_${logId}_${index}`;
 
-            // ==========================================
-            // 1. RENDERIZADO ESCRITORIO (TABLA)
-            // ==========================================
+            // 1. RENDERIZADO ESCRITORIO
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="ps-3">
@@ -205,16 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                 </td>
-                <td>
-                    <span class="badge rounded-pill px-3 py-2 text-uppercase" style="${actionBadgeStyle} font-size: 0.725rem;">${actionText}</span>
-                </td>
+                <td><span class="badge rounded-pill px-3 py-2 text-uppercase" style="${actionBadgeStyle} font-size: 0.725rem;">${actionText}</span></td>
                 <td>
                     <div class="fw-bold text-dark small mb-0">${productName}</div>
                     <small class="text-muted" style="font-size: 0.725rem;"><i class="bi bi-geo-alt"></i> ${locationName}</small>
                 </td>
-                <td class="text-center">
-                    <span class="${variationClass}">${variationPrefix}${qty.toFixed(1)}</span>
-                </td>
+                <td class="text-center"><span class="${variationClass}">${variationPrefix}${qty.toFixed(1)}</span></td>
                 <td>${severityHtml}</td>
                 <td>
                     <div class="fw-bold text-dark small mb-0">${dateStr}</div>
@@ -233,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
             trDetail.innerHTML = `
                 <td colspan="7" class="p-0 border-0">
                     <div class="p-3 bg-light border-start border-3 border-secondary my-2 mx-3 rounded-2 shadow-sm">
-                        <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                        <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
                             <div class="col-md-3">Stock Anterior</div>
                             <div class="col-md-3">Nuevo Stock</div>
                             <div class="col-md-3">Variación Stock</div>
@@ -246,10 +284,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="col-md-3 text-muted">#${logId}</div>
                         </div>
                         <div class="pt-2 border-top">
-                            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
                                 <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
                             </div>
                             <div class="text-secondary small mb-0">${notes}</div>
+                            ${actionButtonsHtml}
                         </div>
                     </div>
                 </td>
@@ -258,9 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tableBody.appendChild(tr);
             tableBody.appendChild(trDetail);
 
-            // ==========================================
-            // 2. RENDERIZADO MÓVIL (TARJETAS)
-            // ==========================================
+            // 2. RENDERIZADO MÓVIL
             if (mobileContainer) {
                 const card = document.createElement('div');
                 card.className = 'mobile-audit-card';
@@ -268,16 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-header-mobile">
                         <div class="user-info">
                             <div class="user-avatar">${initial}</div>
-                            <div>
-                                <div class="fw-bold text-dark small">${userName}</div>
-                            </div>
+                            <div><div class="fw-bold text-dark small">${userName}</div></div>
                         </div>
                         <div class="text-end">
                             <div class="fw-semibold text-dark" style="font-size: 0.75rem;">${dateStr}</div>
                             <div class="text-muted" style="font-size: 0.7rem;">${timeStr}</div>
                         </div>
                     </div>
-
                     <div class="row g-2 my-1">
                         <div class="col-8">
                             <div class="mobile-label">Insumo / Sede</div>
@@ -289,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="mobile-value fs-6 ${variationClass}">${variationPrefix}${qty.toFixed(1)}</div>
                         </div>
                     </div>
-
                     <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
                         <div class="d-flex align-items-center gap-1 flex-wrap">
                             <span class="badge rounded-pill px-2 py-1 text-uppercase" style="${actionBadgeStyle} font-size: 0.65rem;">${actionText}</span>
@@ -299,8 +332,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <i class="bi bi-chevron-down me-1 icon-chevron"></i>Detalle
                         </button>
                     </div>
-
-                    <!-- Detalle Desplegable Móvil -->
                     <div id="${mobileDetailId}" class="d-none mt-3 pt-2 border-top bg-light p-2 rounded">
                         <div class="row text-center g-2 mb-2">
                             <div class="col-4">
@@ -319,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="pt-2 border-top">
                             <div class="mobile-label"><i class="bi bi-chat-left-text me-1"></i>Observaciones</div>
                             <div class="text-secondary small">${notes}</div>
+                            ${actionButtonsHtml}
                         </div>
                     </div>
                 `;
@@ -326,16 +358,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Listeners para desplegar detalle en Escritorio
+        // Listeners Desplegables Escritorio
         document.querySelectorAll('.toggle-detail-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-target');
                 const detailRow = document.getElementById(targetId);
                 const chevron = btn.querySelector('.icon-chevron');
-
                 if (detailRow) {
-                    const isHidden = detailRow.classList.contains('d-none');
-                    if (isHidden) {
+                    if (detailRow.classList.contains('d-none')) {
                         detailRow.classList.remove('d-none');
                         chevron.classList.replace('bi-chevron-down', 'bi-chevron-up');
                     } else {
@@ -346,16 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners para desplegar detalle en Móvil
+        // Listeners Desplegables Móvil
         document.querySelectorAll('.toggle-mobile-detail-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-target');
                 const detailBox = document.getElementById(targetId);
                 const chevron = btn.querySelector('.icon-chevron');
-
                 if (detailBox) {
-                    const isHidden = detailBox.classList.contains('d-none');
-                    if (isHidden) {
+                    if (detailBox.classList.contains('d-none')) {
                         detailBox.classList.remove('d-none');
                         chevron.classList.replace('bi-chevron-down', 'bi-chevron-up');
                     } else {
@@ -365,9 +393,83 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        // Listeners Modal (Editar / Anular)
+        document.querySelectorAll('.btn-action-log').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const lId = btn.getAttribute('data-id');
+                const type = btn.getAttribute('data-action');
+                
+                actionLogId.value = lId;
+                actionType.value = type;
+                actionNotes.value = '';
+                newQuantityInput.value = '';
+
+                document.getElementById('actionAuditModalLabel').innerText = `Confirmar Acción: ${type}`;
+                
+                if (type === 'EDITAR') {
+                    editQuantityContainer.style.display = 'block';
+                } else {
+                    editQuantityContainer.style.display = 'none';
+                }
+
+                if (actionModal) actionModal.show();
+            });
+        });
     };
 
-    // Listeners de los filtros
+    // Procesar acción de formulario
+    if (btnConfirmAction) {
+        btnConfirmAction.addEventListener('click', async () => {
+            const lId = actionLogId.value;
+            const type = actionType.value;
+            const notes = actionNotes.value.trim();
+            const newQty = newQuantityInput.value;
+
+            if (!notes) {
+                alert('Debe justificar obligatoriamente el motivo de la acción.');
+                return;
+            }
+
+            if (type === 'EDITAR' && newQty === '') {
+                alert('Debe ingresar la nueva variación para editar el registro.');
+                return;
+            }
+
+            btnConfirmAction.disabled = true;
+            btnConfirmAction.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+
+            try {
+                const response = await fetch('/api/waste/audit/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        log_id: lId,
+                        action_type: type,
+                        notes: notes,
+                        new_quantity: newQty ? parseFloat(newQty) : null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    if (actionModal) actionModal.hide();
+                    fetchAuditLogs(); // Recargar tabla
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error enviando la acción:', error);
+                alert('Error en la comunicación con el servidor.');
+            } finally {
+                btnConfirmAction.disabled = false;
+                btnConfirmAction.innerText = 'Procesar Acción';
+            }
+        });
+    }
+
     if (filterLocation) filterLocation.addEventListener('change', fetchAuditLogs);
     filterSeverity.addEventListener('change', fetchAuditLogs);
     filterSearch.addEventListener('input', () => renderTable(allLogs));

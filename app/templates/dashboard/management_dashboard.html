@@ -8,6 +8,24 @@
     <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
 </header>
 
+<!-- Alertas de Inventario Bajo -->
+{% if alarmas %}
+<div class="alert-banner-container" style="background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px; margin-bottom: 25px; color: #721c24;">
+    <h3><i class="fas fa-exclamation-triangle"></i> Alertas de Stock Crítico</h3>
+    <p>Los siguientes insumos se encuentran por debajo del mínimo permitido en tu sede:</p>
+    <ul style="margin-top: 10px; padding-left: 20px;">
+        {% for alerta in alarmas %}
+            <li>
+                <strong>Sede:</strong> {{ alerta.changed_data.location_name }} | 
+                <strong>Insumo:</strong> {{ alerta.changed_data.product_name }} | 
+                <strong>Stock Actual:</strong> {{ alerta.changed_data.new_quantity }} 
+                <em>(Mínimo requerido: {{ alerta.changed_data.min_stock }})</em>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="dashboard-grid">
     <a href="{{ url_for('inventory.list_products') }}" class="card-link">
         <div class="card-dash">

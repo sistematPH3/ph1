@@ -1,7 +1,6 @@
 def validate_audit_filters(args):
     errors = {}
     
-    # Validar location_id si se provee
     if 'location_id' in args and args['location_id']:
         try:
             location_id = int(args['location_id'])
@@ -10,11 +9,54 @@ def validate_audit_filters(args):
         except ValueError:
             errors['location_id'] = 'Formato de sede inválido'
             
-    # Validar severity si se provee
     valid_severities = ['NORMAL', 'ALERTA', 'CRITICO', 'REABASTECIDO']
     if 'severity' in args and args['severity']:
         if args['severity'].upper() not in valid_severities:
             errors['severity'] = 'Nivel de severidad inválido'
+
+    return {
+        'is_valid': len(errors) == 0,
+        'errors': errors
+    }
+
+# --- NUEVA FUNCIÓN PARA VALIDAR PETICIÓN DE EDICIÓN O ANULACIÓN ---
+
+def validate_audit_action(data):
+    errors = {}
+    
+    if not data:
+        return {'is_valid': False, 'errors': {'payload': 'No se enviaron datos.'}}
+
+    # 1. Validar log_id
+    log_id = data.get('log_id')
+    if not log_id:
+        errors['log_id'] = 'El ID del registro es obligatorio.'
+    else:
+        try:
+            int(log_id)
+        except ValueError:
+            errors['log_id'] = 'Formato de ID inválido.'
+
+    # 2. Validar action_type
+    action_type = data.get('action_type')
+    if action_type not in ['EDITAR', 'ANULAR']:
+        errors['action_type'] = 'Acción no permitida. Solo puede ser EDITAR o ANULAR.'
+
+    # 3. Validar notas (Obligatorio por regla de trazabilidad)
+    notes = data.get('notes')
+    if not notes or not str(notes).strip():
+        errors['notes'] = 'Debe proporcionar un motivo obligatorio para realizar esta acción.'
+        
+    # 4. Validar cantidad si es EDITAR
+    if action_type == 'EDITAR':
+        new_qty = data.get('new_quantity')
+        if new_qty is None or new_qty == '':
+            errors['new_quantity'] = 'Debe especificar una nueva variación para procesar la edición.'
+        else:
+            try:
+                float(new_qty)
+            except (ValueError, TypeError):
+                errors['new_quantity'] = 'La cantidad debe ser un valor numérico.'
 
     return {
         'is_valid': len(errors) == 0,
