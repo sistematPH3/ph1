@@ -45,9 +45,8 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
         severity_filter=severity_filter
     )
     
-    # 🔍 Detectar qué IDs de logs están anulados actualmente (secuencia cronológica)
     annulled_target_ids = set()
-    sorted_logs = sorted(raw_logs, key=lambda x: x.id)  # Ordenar de más antiguo a más reciente
+    sorted_logs = sorted(raw_logs, key=lambda x: x.id) 
     
     for log in sorted_logs:
         act_upper = (log.action or '').upper()
@@ -138,31 +137,24 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
         
     return formatted_logs
 
-
 def process_inventory_action(log_id, current_user, action_type, new_quantity_requested=None, justification_notes=""):
-    """
-    Gestiona la lógica de inmutabilidad generando asientos de AJUSTE, REVERSION o ACTIVACION.
-    """
-    original_log = AuditInventoryRepository.get_audit_log_by_id(log_id)
-    if not original_log:
+    original_log_tuple = AuditInventoryRepository.get_audit_log_by_id(log_id)
+    if not original_log_tuple:
         return {'success': False, 'message': 'El registro de auditoría solicitado no existe.'}
+    
+    location_id = original_log_tuple.location_id
+    action_name_upper = original_log_tuple.action.upper()
 
-    location_id = original_log.location_id
-    action_name_upper = original_log.action.upper()
-
-    # Bloqueo estricto: En Almacén General (location_id == 1) o Compras/Ingresos
     if location_id == 1 or "COMPRA" in action_name_upper or "INGRESO" in action_name_upper:
         return {'success': False, 'message': 'Operación denegada. Las compras o registros en el Almacén General no admiten modificaciones.'}
 
-    # Bloqueo de escritura para Finanzas (rol 3)
     is_admin = (current_user.role_id == 1)
-    is_finance = (current_user.role_id == 3)
+    is_finance = (current_user.role_id == 6)
 
     if is_finance:
         return {'success': False, 'message': 'Operación denegada. El perfil de finanzas posee atributos de solo lectura.'}
 
-    # Ventana temporal de permisos
-    log_timestamp = original_log.timestamp
+    log_timestamp = original_log_tuple.timestamp
     if log_timestamp.tzinfo is None:
         log_timestamp = log_timestamp.replace(tzinfo=timezone.utc)
     
@@ -176,7 +168,7 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
         if diff_hours > (30 * 24):
             return {'success': False, 'message': 'El límite máximo de 30 días permitido para administradores ha expirado.'}
 
-    changed_data = original_log.changed_data
+    changed_data = original_log_tuple.changed_data
     if isinstance(changed_data, str):
         try:
             changed_data = json.loads(changed_data)
@@ -227,17 +219,19 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
     current_stock = AuditInventoryRepository.get_current_stock(location_id, product_id)
     current_stock = Decimal('0.00') if current_stock is None else Decimal(str(current_stock))
 
-    # Definir el ajuste según la acción solicitada
+    new_severity_status = None
+
     if action_type == 'ANULAR':
         required_adjustment = -original_qty_changed
-        final_action = f"REVERSION_{original_log.action}"
+        final_action = f"REVERSION_{original_log_tuple.action}"
         final_notes = f"Anulación del log #{log_id}. Motivo: {justification_notes}"
+        new_severity_status = 'ANULADO'
 
     elif action_type == 'ACTIVAR':
-        # Reactivar vuelve a aplicar la variación original
         required_adjustment = original_qty_changed
-        final_action = f"ACTIVACION_{original_log.action}"
+        final_action = f"ACTIVACION_{original_log_tuple.action}"
         final_notes = f"Reactivación del log #{log_id}. Motivo: {justification_notes}"
+        new_severity_status = 'NORMAL'
 
     elif action_type == 'EDITAR':
         if new_quantity_requested is None:
@@ -259,12 +253,12 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
         else:
             required_adjustment = new_requested_dec - original_qty_changed
 
-        final_action = f"AJUSTE_{original_log.action}"
+        final_action = f"AJUSTE_{original_log_tuple.action}"
         final_notes = f"Edición del log #{log_id} (Gasto original: {abs_original}, Nuevo gasto: {abs(new_requested_dec)}). Motivo: {justification_notes}"
+        new_severity_status = 'EDITADO'
     else:
         return {'success': False, 'message': 'Acción no reconocida.'}
 
-    # Validación de stock suficiente si el ajuste descuenta insumos
     if required_adjustment < Decimal('0') and current_stock < abs(required_adjustment):
         return {
             'success': False, 
@@ -285,7 +279,9 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
             prev_qty=float(current_stock),
             new_qty=float(new_qty),
             qty_changed=float(required_adjustment),
-            notes=final_notes
+            notes=final_notes,
+            original_log_id=log_id,
+            new_original_severity=new_severity_status
         )
     except Exception as e:
         return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}

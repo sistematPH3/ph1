@@ -63,7 +63,7 @@
                             <label for="product_id" class="form-label small fw-bold text-muted">Producto en Inventario <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-secondary"><i class="bi bi-box-seam"></i></span>
-                                <select class="form-select border-secondary" id="product_id" name="product_id" required disabled>
+                                <select class="form-select border-secondary" id="product_id" name="product_id" disabled>
                                     <option value="" selected disabled>Esperando sede...</option>
                                 </select>
                             </div>
@@ -73,22 +73,45 @@
                             <label for="quantity" class="form-label small fw-bold text-muted">Cantidad Gastada (Kg / Lts / Und) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-secondary"><i class="bi bi-speedometer2"></i></span>
-                                <input type="number" step="0.01" min="0.01" class="form-control border-secondary fw-bold text-danger" id="quantity" name="quantity" placeholder="0.00" required>
+                                <input type="number" step="0.01" min="0.01" class="form-control border-secondary fw-bold text-danger" id="quantity" name="quantity" placeholder="0.00">
                             </div>
                         </div>
 
                         <div class="col-12">
                             <label for="notes" class="form-label small fw-bold text-muted">Notas Adicionales (Opcional)</label>
-                            <textarea class="form-control border-secondary" id="notes" name="notes" rows="2" maxlength="255" placeholder="Ej. Consumo del turno de la mañana para masa de pizza..."></textarea>
+                            <textarea class="form-control border-secondary" id="notes" name="notes" rows="2" maxlength="255" placeholder="Ej. Consumo del turno de la mañana..."></textarea>
+                        </div>
+                        
+                        <div class="col-12 mt-3">
+                            <button type="button" class="btn btn-secondary text-white fw-bold py-2 w-100" id="btnAddToList">
+                                <i class="bi bi-plus-circle me-1"></i> Agregar a la Lista
+                            </button>
                         </div>
                     </div>
+                </form>
 
+                <div id="cartSection" class="mt-5 d-none">
+                    <h5 class="fw-bold text-muted border-bottom pb-2">Lote de Insumos a Descontar</h5>
+                    <div class="table-responsive mt-3">
+                        <table class="table table-bordered table-sm align-middle" id="cartTable">
+                            <thead class="table-light text-muted small">
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th class="text-center">Cant.</th>
+                                    <th>Notas</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartBody"></tbody>
+                        </table>
+                    </div>
                     <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-submit-custom text-white fw-bold py-2" id="btnSubmitConsumption">
-                            <i class="bi bi-check-circle me-1"></i> Confirmar Consumo
+                        <button type="button" class="btn btn-submit-custom text-white fw-bold py-2" id="btnSubmitBatch">
+                            <i class="bi bi-check-all me-1"></i> Confirmar Consumo Total
                         </button>
                     </div>
-                </form>
+                </div>
+
             </div>
         </div>
     </div>

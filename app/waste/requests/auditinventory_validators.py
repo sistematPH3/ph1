@@ -9,7 +9,7 @@ def validate_audit_filters(args):
         except ValueError:
             errors['location_id'] = 'Formato de sede inválido'
             
-    valid_severities = ['NORMAL', 'ALERTA', 'CRITICO', 'REABASTECIDO']
+    valid_severities = ['NORMAL', 'ALERTA', 'CRITICO', 'REABASTECIDO', 'EDITADO', 'ANULADO']
     if 'severity' in args and args['severity']:
         if args['severity'].upper() not in valid_severities:
             errors['severity'] = 'Nivel de severidad inválido'
@@ -19,15 +19,12 @@ def validate_audit_filters(args):
         'errors': errors
     }
 
-# --- NUEVA FUNCIÓN PARA VALIDAR PETICIÓN DE EDICIÓN O ANULACIÓN ---
-
 def validate_audit_action(data):
     errors = {}
     
     if not data:
         return {'is_valid': False, 'errors': {'payload': 'No se enviaron datos.'}}
 
-    # 1. Validar log_id
     log_id = data.get('log_id')
     if not log_id:
         errors['log_id'] = 'El ID del registro es obligatorio.'
@@ -37,17 +34,14 @@ def validate_audit_action(data):
         except ValueError:
             errors['log_id'] = 'Formato de ID inválido.'
 
-    # 2. Validar action_type
     action_type = data.get('action_type')
-    if action_type not in ['EDITAR', 'ANULAR']:
-        errors['action_type'] = 'Acción no permitida. Solo puede ser EDITAR o ANULAR.'
+    if action_type not in ['EDITAR', 'ANULAR', 'ACTIVAR']:
+        errors['action_type'] = 'Acción no permitida. Solo puede ser EDITAR, ANULAR o ACTIVAR.'
 
-    # 3. Validar notas (Obligatorio por regla de trazabilidad)
     notes = data.get('notes')
     if not notes or not str(notes).strip():
         errors['notes'] = 'Debe proporcionar un motivo obligatorio para realizar esta acción.'
         
-    # 4. Validar cantidad si es EDITAR
     if action_type == 'EDITAR':
         new_qty = data.get('new_quantity')
         if new_qty is None or new_qty == '':

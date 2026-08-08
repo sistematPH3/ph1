@@ -2,39 +2,36 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('registerLocationForm');
     if (!form) return;
 
-    // 1. Extraer URLs y estados desde los atributos data-* del HTML
     const checkNameUrl = form.getAttribute('data-check-name-url');
     const checkPhoneUrl = form.getAttribute('data-check-phone-url');
     const redirectUrl = form.getAttribute('data-redirect-url');
     const isSuccess = form.getAttribute('data-success') === 'true';
 
-    // 2. Redirección automática si el registro fue exitoso
-    // 2. Mostrar Modal de Éxito y Redirección automática
-if (isSuccess && redirectUrl) {
-    const successModal = document.getElementById('successModal');
-    if (successModal) {
-        // Mostramos el modal de forma inmediata
-        successModal.classList.add('show');
+    if (isSuccess && redirectUrl) {
+        const successModal = document.getElementById('successModal');
+        const btnAceptar = document.getElementById('btnAceptarSuccess');
+        
+        if (successModal) {
+            successModal.classList.add('show');
+        }
+
+        if (btnAceptar) {
+            btnAceptar.addEventListener('click', function() {
+                window.location.href = redirectUrl;
+            });
+        }
     }
 
-    // Ejecutamos la redirección justo cuando la barra termine de cargarse (3.5 segundos)
-    setTimeout(function() {
-        window.location.href = redirectUrl;
-    }, 3500);
-}
-
-    // 3. Captura de todos los campos del formulario
     const nameInput = document.querySelector('input[name="name"]');
     const phoneInput = document.querySelector('input[name="phone"]');
-    const stateInput = document.querySelector('select[name="state"]'); // <-- NUEVO
-    const addressInput = document.querySelector('textarea[name="address"]'); // <-- NUEVO
+    const stateInput = document.querySelector('select[name="state"]'); 
+    const addressInput = document.querySelector('textarea[name="address"]'); 
     const locationIdField = document.querySelector('input[name="location_id"]');
     const locId = locationIdField ? locationIdField.value : 0;
 
     let nameTimeout = null;
     let phoneTimeout = null;
 
-    // --- VALIDACIÓN DE NOMBRE (Tiempo real + Duplicados con Debounce) ---
     if (nameInput) {
         nameInput.addEventListener('input', function() {
             clearTimeout(nameTimeout);
@@ -61,13 +58,11 @@ if (isSuccess && redirectUrl) {
                         marcarExito(nameInput);
                     }
                 } catch (e) {
-                    console.error("Error validando nombre:", e);
                 }
             }, 500);
         });
     }
 
-    // --- VALIDACIÓN DE TELÉFONO (Formato + Duplicados con Debounce) ---
     if (phoneInput) {
         phoneInput.addEventListener('input', function() {
             clearTimeout(phoneTimeout);
@@ -94,17 +89,14 @@ if (isSuccess && redirectUrl) {
                         marcarExito(phoneInput);
                     }
                 } catch (e) {
-                    console.error("Error validando teléfono:", e);
                 }
             }, 500);
         });
     }
 
-    // --- VALIDACIÓN INTERACTIVA AL ESCRIBIR/SELECCIONAR (NUEVO) ---
     if (stateInput) {
         stateInput.addEventListener('change', function() {
             const val = this.value;
-            // Se asume que el valor de la opción por defecto contiene "Seleccione"
             if (val && !val.includes("Seleccione") && val !== "") {
                 marcarExito(this);
             } else {
@@ -123,11 +115,9 @@ if (isSuccess && redirectUrl) {
         });
     }
 
-    // --- DETECTOR GLOBAL DE ENVÍO (NUEVO) ---
     form.addEventListener('submit', function(e) {
         let isFormValid = true;
 
-        // 1. Validar Nombre Sede
         if (nameInput) {
             const nameVal = nameInput.value.trim();
             if (!nameVal) {
@@ -138,7 +128,6 @@ if (isSuccess && redirectUrl) {
             }
         }
 
-        // 2. Validar Estado
         if (stateInput) {
             const stateVal = stateInput.value;
             if (!stateVal || stateVal === "" || stateVal.includes("Seleccione")) {
@@ -147,7 +136,6 @@ if (isSuccess && redirectUrl) {
             }
         }
 
-        // 3. Validar Dirección Detallada
         if (addressInput) {
             const addressVal = addressInput.value.trim();
             if (!addressVal) {
@@ -156,7 +144,6 @@ if (isSuccess && redirectUrl) {
             }
         }
 
-        // 4. Validar Teléfono
         if (phoneInput) {
             const phoneVal = phoneInput.value.trim();
             if (!phoneVal) {
@@ -167,11 +154,9 @@ if (isSuccess && redirectUrl) {
             }
         }
 
-        // Si algún campo no es válido, cancelamos el envío del formulario
         if (!isFormValid) {
             e.preventDefault();
             
-            // Hacemos scroll suave hasta el primer elemento que tenga error
             const firstInvalidElement = form.querySelector('.is-invalid');
             if (firstInvalidElement) {
                 firstInvalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -180,7 +165,6 @@ if (isSuccess && redirectUrl) {
         }
     });
 
-    // --- FUNCIONES DE UTILIDAD (Clases Premium) ---
     function marcarError(el, msg) {
         el.classList.add('is-invalid');
         el.classList.remove('is-valid');

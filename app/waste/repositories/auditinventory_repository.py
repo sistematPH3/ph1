@@ -59,11 +59,8 @@ class AuditInventoryRepository:
         
         return query.all()
 
-    # --- NUEVOS MÉTODOS PARA GESTIÓN DE ANULACIONES Y EDICIONES ---
-
     @staticmethod
     def get_audit_log_by_id(log_id):
-        """Obtiene un registro específico de auditoría para su revisión."""
         table = db.Model.metadata.tables['audit_logs']
         return db.session.query(table).filter(table.c.id == log_id).first()
 
@@ -77,8 +74,7 @@ class AuditInventoryRepository:
         return result[0] if result else 0.00
 
     @staticmethod
-    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes):
-        """Genera el movimiento de contra-asiento en auditoría e impacta el inventario real de la sede."""
+    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes, original_log_id=None, new_original_severity=None):
         insert_log_query = text("""
             INSERT INTO audit_logs (user_id, location_id, action, severity, timestamp, changed_data)
             VALUES (:user_id, :location_id, :action, :severity, NOW(), :changed_data)
@@ -93,7 +89,6 @@ class AuditInventoryRepository:
             'notes': notes
         })
 
-        # 1. Registrar inalterable en auditoría
         db.session.execute(insert_log_query, {
             'user_id': user_id,
             'location_id': location_id,
@@ -102,7 +97,6 @@ class AuditInventoryRepository:
             'changed_data': changed_data_json
         })
 
-        # 2. Actualizar stock real usando la tabla 'inventory' y el campo 'current_quantity'
         update_stock_query = text("""
             UPDATE inventory
             SET current_quantity = :new_qty
@@ -114,5 +108,16 @@ class AuditInventoryRepository:
             'loc_id': location_id,
             'prod_id': product_id
         })
+
+        if original_log_id and new_original_severity:
+            update_severity_query = text("""
+                UPDATE audit_logs 
+                SET severity = :sev 
+                WHERE id = :log_id
+            """)
+            db.session.execute(update_severity_query, {
+                'sev': new_original_severity, 
+                'log_id': original_log_id
+            })
         
         db.session.commit()

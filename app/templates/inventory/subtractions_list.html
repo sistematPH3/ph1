@@ -1,13 +1,11 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<!-- Vinculamos el archivo CSS separado -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/subtractions_list.css') }}">
 
 <div class="container mt-4">
     <h2>Historial de Gastos de Cocina</h2>
     
-    <!-- Mostrar mensajes de flash (éxito o error de validación) -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -24,6 +22,7 @@
                 <th>Insumo</th>
                 <th>Cantidad Gastada</th>
                 <th>Registrado por</th>
+                <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -36,23 +35,36 @@
                 <td>{{ mov.changed_data.quantity_subtracted }}</td>
                 <td>{{ mov.user.name if mov.user else 'Sistema' }}</td>
                 <td>
-                    <!-- Botón que ejecuta la función del archivo JS -->
-                    <button type="button" class="btn btn-warning btn-sm" 
-                            onclick="abrirModalEdicion('{{ mov.id }}', '{{ mov.changed_data.quantity_subtracted }}', '{{ mov.changed_data.product_name }}')">
-                        Editar
-                    </button>
+                    {% if mov.severity == 'ANULADO' %}
+                        <span class="badge bg-danger">Anulado</span>
+                    {% elif mov.severity == 'EDITADO' %}
+                        <span class="badge bg-warning text-dark">Editado</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ mov.severity }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not current_user.is_finance and current_user.role_id != 6 and mov.action != 'INGRESO_COMPRA' and mov.severity not in ['ANULADO', 'EDITADO'] %}
+                        <button type="button" class="btn btn-warning btn-sm" 
+                                onclick="abrirModalEdicion('{{ mov.id }}', '{{ mov.changed_data.quantity_subtracted }}', '{{ mov.changed_data.product_name }}')">
+                            Editar
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" 
+                                onclick="abrirModalAnulacion('{{ mov.id }}')">
+                            Anular
+                        </button>
+                    {% endif %}
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="text-center">No hay registros de salidas de inventario.</td>
+                <td colspan="7" class="text-center">No hay registros de salidas de inventario.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-<!-- Modal de Edición (Limpio de estilos en línea) -->
 <div id="modalEdicion" class="modal-custom">
     <h3 id="modalTitulo">Editar Gasto</h3>
     
@@ -69,11 +81,10 @@
         
         <div class="modal-actions">
             <button type="button" class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar Cambios.</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
         </div>
     </form>
 </div>
 
-<!-- Vinculamos el archivo JS separado -->
 <script src="{{ url_for('static', filename='js/inventory/subtractions_list.js') }}"></script>
 {% endblock %}

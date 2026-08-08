@@ -38,11 +38,9 @@ def process_consumption():
     user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
 
     result = register_consumption(
-        data['product_id'],
-        data['location_id'],
-        data['quantity'],
-        user_id,
-        data.get('notes', '')
+        location_id=data['location_id'],
+        items=data['items'],
+        user_id=user_id
     )
 
     if result['success']:

@@ -5,12 +5,9 @@
 {% endblock %}
 
 {% block content %}
-<!-- Contenedor Principal con rol de usuario para control de UI en JS -->
 <div class="main-container py-3 py-md-4 px-2 px-md-4" id="auditMainContainer" data-role-id="{{ current_user.role_id }}">
-    <!-- Card Principal Único -->
     <div class="main-card-wrapper p-3 p-md-4 shadow-sm bg-white rounded-3">
         
-        <!-- Header con Ícono y Título -->
         <div class="d-flex align-items-center mb-3 mb-md-4">
             <div class="icon-header-red me-3 flex-shrink-0">
                 <i class="bi bi-clock-history"></i>
@@ -21,10 +18,8 @@
             </div>
         </div>
 
-        <!-- Barra de Filtros Integrada -->
         <div class="filters-bar-container p-2 mb-4 bg-light rounded-3">
             <div class="row g-2 align-items-center">
-                <!-- Buscador -->
                 <div class="col-12 col-md-3">
                     <div class="input-group input-pill">
                         <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-search"></i></span>
@@ -32,7 +27,6 @@
                     </div>
                 </div>
 
-                <!-- Sedes -->
                 <div class="col-12 col-md-3">
                     <div class="input-group input-pill">
                         <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-geo-alt"></i></span>
@@ -52,13 +46,14 @@
                     </div>
                 </div>
 
-                <!-- Severidad -->
                 <div class="col-12 col-md-3">
                     <div class="input-group input-pill">
                         <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-exclamation-triangle"></i></span>
                         <select class="form-select border-start-0 ps-0" id="filter_severity">
                             <option value="">Todas las severidades</option>
                             <option value="NORMAL">NORMAL</option>
+                            <option value="EDITADO">EDITADO</option>
+                            <option value="ANULADO">ANULADO</option>
                             <option value="ALERTA">ALERTA</option>
                             <option value="CRITICO">CRÍTICO</option>
                             <option value="REABASTECIDO">REABASTECIDO</option>
@@ -66,14 +61,12 @@
                     </div>
                 </div>
 
-                <!-- Fecha -->
                 <div class="col-12 col-md-2">
                     <div class="input-group input-pill">
                         <input type="date" id="filter_date" class="form-control text-muted">
                     </div>
                 </div>
 
-                <!-- Botón Reset -->
                 <div class="col-12 col-md-1 text-end">
                     <button id="btnReset" class="btn btn-outline-secondary rounded-circle btn-icon-reset w-100-mobile" title="Limpiar Filtros">
                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -82,7 +75,6 @@
             </div>
         </div>
 
-        <!-- VISTA ESCRITORIO / TABLET: Tabla con Encabezado Rojo Vino -->
         <div class="table-responsive table-wrapper d-none d-md-block">
             <table class="table align-middle mb-0" id="auditTable">
                 <thead>
@@ -97,20 +89,16 @@
                     </tr>
                 </thead>
                 <tbody id="auditTableBody">
-                    <!-- Inyección dinámica vía JS (auditinventory.js) -->
                 </tbody>
             </table>
         </div>
 
-        <!-- VISTA MÓVIL: Tarjetas independientes por registro -->
         <div class="mobile-audit-cards d-block d-md-none" id="auditMobileContainer">
-            <!-- Inyección dinámica vía JS (auditinventory.js) -->
         </div>
 
     </div>
 </div>
 
-<!-- Modal Unificado para Acciones (Editar/Anular) -->
 <div class="modal fade" id="actionAuditModal" tabindex="-1" aria-labelledby="actionAuditModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -128,7 +116,6 @@
                         <div>Esta acción generará un nuevo movimiento compensatorio en la auditoría. El registro original permanecerá inalterable.</div>
                     </div>
 
-                    <!-- Input condicional mostrado solo en tipo EDITAR -->
                     <div class="mb-3" id="editQuantityContainer" style="display: none;">
                         <label for="newQuantityInput" class="form-label fw-bold small text-muted">Nueva Cantidad Real Gastada</label>
                         <input type="number" step="0.01" min="0" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">

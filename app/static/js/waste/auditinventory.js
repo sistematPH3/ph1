@@ -7,11 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableBody = document.querySelector('#auditTable tbody');
     const mobileContainer = document.getElementById('auditMobileContainer');
     
-    // Obtener el rol del contenedor principal
     const mainContainer = document.getElementById('auditMainContainer');
     const userRole = mainContainer ? mainContainer.getAttribute('data-role-id') : null;
 
-    // Elementos del Modal
     const actionModalElement = document.getElementById('actionAuditModal');
     let actionModal = null;
     if (actionModalElement) {
@@ -66,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (mobileContainer) mobileContainer.innerHTML = emptyStateMobileHtml;
             }
         } catch (error) {
-            console.error("Error al obtener auditoría:", error);
             tableBody.innerHTML = emptyStateHtml;
             if (mobileContainer) mobileContainer.innerHTML = emptyStateMobileHtml;
         }
@@ -112,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBody.innerHTML = '';
         if (mobileContainer) mobileContainer.innerHTML = '';
 
-        const now = new Date(); // Fecha actual para calcular límite de 24 horas
+        const now = new Date(); 
 
         filtered.forEach((log, index) => {
             let details = {};
@@ -163,13 +160,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 severityHtml = `<span class="badge bg-danger"><i class="bi bi-exclamation-circle-fill me-1"></i>CRÍTICO</span>`;
             } else if (sev === 'REABASTECIDO' || sev === 'REABASTECIMIENTO') {
                 severityHtml = `<span class="badge bg-info text-white"><i class="bi bi-arrow-up-circle-fill me-1"></i>REABASTECIDO</span>`;
+            } else if (sev === 'EDITADO') {
+                severityHtml = `<span class="badge bg-warning text-dark"><i class="bi bi-pencil-fill me-1"></i>EDITADO</span>`;
+            } else if (sev === 'ANULADO') {
+                severityHtml = `<span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>ANULADO</span>`;
             } else {
                 severityHtml = `<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>NORMAL</span>`;
             }
 
             const actionText = (log.action || log.accion || log.acción || 'MOVIMIENTO').replace(/_/g, ' ');
             const isRest = actionText.toLowerCase().includes('gasto') || actionText.toLowerCase().includes('merma') || actionText.toLowerCase().includes('salida') || actionText.toLowerCase().includes('anular');
-            const isAdd = actionText.toLowerCase().includes('ingreso') || actionText.toLowerCase().includes('compra') || actionText.toLowerCase().includes('reabastecimiento') || actionText.toLowerCase().includes('ajuste');
+            const isAdd = actionText.toLowerCase().includes('ingreso') || actionText.toLowerCase().includes('compra') || actionText.toLowerCase().includes('reabastecimiento') || actionText.toLowerCase().includes('ajuste') || actionText.toLowerCase().includes('activacion');
 
             let actionBadgeStyle = 'background-color: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;';
             if (isRest) {
@@ -180,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let dateStr = log.timestamp || '';
             let timeStr = '';
-            // Parseando fecha para validación de tiempo
+            
             let logDateObj = null;
             if (dateStr) {
                 const isoFormat = dateStr.replace(' ', 'T') + 'Z'; 
@@ -197,30 +198,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeStr = parts[1].substring(0, 5);
             }
 
-            // Calcular diferencia en horas
             let diffHours = 0;
             if (logDateObj) {
                 diffHours = Math.abs(now - logDateObj) / 36e5;
             }
 
-            // LÓGICA DE BOTONES Y ROLES
             let actionButtonsHtml = '';
-            const actionIsReversionOrAdjust = actionText.includes('AJUSTE') || actionText.includes('REVERSION');
+            const actionIsReversionOrAdjust = actionText.includes('AJUSTE') || actionText.includes('REVERSION') || actionText.includes('ACTIVACION');
+            const actionIsPurchase = actionText.includes('COMPRA') || actionText.includes('INGRESO');
             
-            if (userRole !== '3' && !actionIsReversionOrAdjust) {
+            if (userRole !== '6' && !actionIsReversionOrAdjust && !actionIsPurchase) {
                 if (userRole !== '1' && diffHours > 24) {
                     actionButtonsHtml = `<div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>Tiempo expirado (24h). Solicite corrección al Administrador.</div>`;
+                } else if (userRole === '1' && diffHours > 720) {
+                    actionButtonsHtml = `<div class="badge bg-danger p-2 mt-2"><i class="bi bi-clock-history me-1"></i>Plazo máximo administrativo expirado (30 días).</div>`;
                 } else {
-                    actionButtonsHtml = `
-                        <div class="mt-3 border-top pt-2">
-                            <button class="btn btn-sm btn-outline-primary me-2 btn-action-log" data-action="EDITAR" data-id="${logId}">
-                                <i class="bi bi-pencil-square me-1"></i>Editar
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="${logId}">
-                                <i class="bi bi-x-circle me-1"></i>Anular
-                            </button>
-                        </div>
-                    `;
+                    if (sev === 'ANULADO') {
+                        actionButtonsHtml = `
+                            <div class="mt-3 border-top pt-2">
+                                <button class="btn btn-sm btn-outline-success me-2 btn-action-log" data-action="ACTIVAR" data-id="${logId}">
+                                    <i class="bi bi-check-circle me-1"></i>Activar
+                                </button>
+                            </div>
+                        `;
+                    } else if (sev !== 'EDITADO') {
+                        actionButtonsHtml = `
+                            <div class="mt-3 border-top pt-2">
+                                <button class="btn btn-sm btn-outline-primary me-2 btn-action-log" data-action="EDITAR" data-id="${logId}">
+                                    <i class="bi bi-pencil-square me-1"></i>Editar
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="${logId}">
+                                    <i class="bi bi-x-circle me-1"></i>Anular
+                                </button>
+                            </div>
+                        `;
+                    }
                 }
             }
 
@@ -234,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const detailRowId = `detail_row_${logId}_${index}`;
             const mobileDetailId = `mobile_detail_${logId}_${index}`;
 
-            // 1. RENDERIZADO ESCRITORIO
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="ps-3">
@@ -297,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
             tableBody.appendChild(tr);
             tableBody.appendChild(trDetail);
 
-            // 2. RENDERIZADO MÓVIL
             if (mobileContainer) {
                 const card = document.createElement('div');
                 card.className = 'mobile-audit-card';
@@ -358,7 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Listeners Desplegables Escritorio
         document.querySelectorAll('.toggle-detail-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-target');
@@ -376,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners Desplegables Móvil
         document.querySelectorAll('.toggle-mobile-detail-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-target');
@@ -394,7 +402,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners Modal (Editar / Anular)
         document.querySelectorAll('.btn-action-log').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const lId = btn.getAttribute('data-id');
@@ -418,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Procesar acción de formulario
     if (btnConfirmAction) {
         btnConfirmAction.addEventListener('click', async () => {
             const lId = actionLogId.value;
@@ -454,14 +460,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(result.message);
                     if (actionModal) actionModal.hide();
-                    fetchAuditLogs(); // Recargar tabla
+                    fetchAuditLogs(); 
                 } else {
                     alert('Error: ' + result.message);
                 }
             } catch (error) {
-                console.error('Error enviando la acción:', error);
                 alert('Error en la comunicación con el servidor.');
             } finally {
                 btnConfirmAction.disabled = false;
