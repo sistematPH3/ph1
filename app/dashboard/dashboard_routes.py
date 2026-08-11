@@ -29,10 +29,7 @@ def index():
 @login_required
 @management_required
 def director_dashboard():
-    # Obtiene las alarmas filtradas automáticamente por la sede del director
     alarmas = obtener_alarmas_para_dashboard()
-    
-    # Se las pasa a la plantilla HTML
     return render_template('dashboard/management_dashboard.html', alarmas=alarmas)
 
 
@@ -40,18 +37,21 @@ def director_dashboard():
 @login_required
 @manager_required
 def manager_dashboard():
-    return render_template('dashboard/manager_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/manager_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/admin')
 @login_required
 @admin_required
 def admin_dashboard():
-    return render_template('dashboard/admin_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/admin_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/finance')
 @login_required
 @finance_required
 def finance_dashboard():
-    return render_template('dashboard/finance_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas)

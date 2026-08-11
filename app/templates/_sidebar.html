@@ -67,7 +67,9 @@
                 <a class="nav-link sub-link" href="{{ url_for('inventory.list_products') }}">Menú de Insumos</a>
                 <a class="nav-link sub-link" href="{{ url_for('register_consumption.show_consumption_form') }}">Registro de Consumo</a>
                 <a class="nav-link sub-link" href="{{ url_for('inventory.render_inventory_views') }}">Inventario Dual</a>
-
+                
+                <!-- Solo Admin, Directores, Gerentes, Asistentes y Operaciones ven la gestión de auditoría en INVENTARIO -->
+                <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Gestión y Auditoría de Inventario</a>
             </div>
         </li>
         {% endif %}
@@ -113,7 +115,11 @@
                 <a class="nav-link sub-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_purchase.list_purchase_audits') }}">Auditoría de Compras</a>
+                
+                <!-- Finanzas vera la vista de auditoría de inventario únicamente en este bloque -->
+                {% if current_user.is_finance %}
                 <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Auditoría de Inventario</a>
+                {% endif %}
             </div>
         </li>
         {% endif %}

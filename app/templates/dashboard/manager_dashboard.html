@@ -8,6 +8,9 @@
     <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
 </header>
 
+<!-- Componente Reusable de Alertas de Stock -->
+{% include 'alerts/_alerts_stock.html' %}
+
 <div class="dashboard-grid">
     <a href="{{ url_for('inventory.list_products') }}" class="card-link">
         <div class="card-dash">

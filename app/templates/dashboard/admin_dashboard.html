@@ -1,7 +1,6 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<!-- Vinculación del archivo CSS local usando la estructura estática de Flask -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}">
 
 <header class="dashboard-header">
@@ -9,7 +8,9 @@
     <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
 </header>
 
-<!-- Grid de Botones/KPIs superiores vacíos -->
+<!-- Componente Reusable de Alertas de Stock -->
+{% include 'alerts/_alerts_stock.html' %}
+
 <div class="metrics-grid">
     <button class="metric-card" onclick="location.href='/sedes'">
         <div class="metric-info">
@@ -43,8 +44,6 @@
 </div>
 
 <div class="dashboard-content">
-    
-    <!-- Sección de Gráficas (Vacía de momento) -->
     <div class="panel">
         <div class="panel-header">
             <h2 id="chartTitle">Reportes Estadísticos</h2>
@@ -67,10 +66,8 @@
             <!-- Los elementos <li> se generarán dinámicamente -->
         </ul>
     </div>
-
 </div>
 
-<!-- Si ya incluyes Chart.js en tu layout.html base, puedes remover este script externo -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('globalChart').getContext('2d');
