@@ -10,8 +10,8 @@ auditinventory_bp = Blueprint('auditinventory_bp', __name__)
 def view_audit_page():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
 
-    if role_id == 4:
-        abort(403, description="No tienes permisos para acceder al módulo de auditoría.")
+    # Si tuvieras algún rol completamente restringido (ej. Guest=0), se validaría aquí.
+    # Operaciones (4), Finanzas (6), Gerente (2), Sub Gerente (3) y Directores (5) pueden acceder.
 
     is_admin = (role_id == 1)
     user_location_id = getattr(current_user, 'location_id', None) or session.get('location_id')
@@ -29,13 +29,17 @@ def view_audit_page():
 @login_required
 def get_audit_api():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
-
-    if role_id == 4:
-        return jsonify({'success': False, 'message': 'Acceso no autorizado'}), 403
+    user_location_id = getattr(current_user, 'location_id', None) or session.get('location_id')
 
     is_admin = (role_id == 1)
     
-    location_id = request.args.get('location_id')
+    # Si es Administrador puede filtrar la sede que desee.
+    # Para los demás roles (Operaciones, Finanzas, Gerente, Sub Gerente, Directores) se fuerza su sede asignada.
+    if is_admin:
+        location_id = request.args.get('location_id')
+    else:
+        location_id = user_location_id
+
     severity = request.args.get('severity')
 
     filters = {
@@ -52,7 +56,8 @@ def get_audit_api():
 def execute_audit_action():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
     
-    if role_id in [6, 4]:
+    # Bloqueo explícito de escritura para Operaciones (4) y Finanzas (6)
+    if role_id in [4, 6]:
         return jsonify({'success': False, 'message': 'Operación denegada. Su perfil no tiene permisos de escritura en este módulo.'}), 403
 
     data = request.get_json()
