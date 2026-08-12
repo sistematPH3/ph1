@@ -1,20 +1,44 @@
 from flask import Blueprint, render_template
+from flask_login import current_user
 from app.extensions import db
-from app.models import PurchaseAuditLog, User, Role
+from app.models import PurchaseAuditLog, User, Role, Purchase, Location
 from app.models.inventory_model import Product
 from app.decorators.roles import require_roles
 from datetime import timedelta
+from sqlalchemy.orm import aliased
 
 audit_purchase_bp = Blueprint('audit_purchase', __name__)
 
 @audit_purchase_bp.route('/auditoria/compras', methods=['GET'])
 @require_roles('admin', 'finance')
 def list_purchase_audits():
-    results = db.session.query(PurchaseAuditLog, User, Role)\
+    # Alias para distinguir al usuario Creador de la Compra del usuario Auditor
+    PurchaseCreator = aliased(User)
+
+    query = db.session.query(PurchaseAuditLog, User, Role)\
         .outerjoin(User, PurchaseAuditLog.user_id == User.id)\
         .outerjoin(Role, User.role_id == Role.id)\
-        .order_by(PurchaseAuditLog.timestamp.desc())\
-        .all()
+        .outerjoin(Purchase, PurchaseAuditLog.purchase_id == Purchase.id)\
+        .outerjoin(PurchaseCreator, Purchase.user_id == PurchaseCreator.id)
+
+    # 1. Obtener y normalizar el rol del usuario actual
+    user_role_name = current_user.role.name.lower().strip() if (hasattr(current_user, 'role') and current_user.role) else ''
+
+    # 2. Obtener lista de IDs de las sedes asignadas al usuario actual (relación muchos a muchos)
+    user_location_ids = [loc.id for loc in current_user.locations] if hasattr(current_user, 'locations') else []
+    print(f"ROL: {user_role_name}, SEDES ASIGNADAS: {user_location_ids}")
+
+    # 3. Filtrar si el rol es Finanzas
+    if user_role_name in ['finance', 'finanzas']:
+        if user_location_ids:
+            # Filtra compras creadas por usuarios cuya lista de sedes contenga alguna de las sedes de Finanzas
+            query = query.filter(PurchaseCreator.locations.any(Location.id.in_(user_location_ids)))
+        else:
+            # Si el usuario de Finanzas no tiene sedes asociadas, no retorna registros
+            query = query.filter(db.false())
+
+    # 4. Consulta ordenada por fecha descendente
+    results = query.order_by(PurchaseAuditLog.timestamp.desc()).all()
     
     audits_list = []
     

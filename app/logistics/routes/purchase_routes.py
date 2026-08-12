@@ -1,6 +1,6 @@
 import threading
 import io
-from flask import Blueprint, request, jsonify, render_template, current_app
+from flask import Blueprint, request, jsonify, render_template, current_app, flash, redirect, url_for
 from flask_login import current_user
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -59,11 +59,20 @@ def new_purchase_form():
     )
 
 @purchase_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin', 'management', 'manager', 'finance')
 def view_purchase_details(purchase_id):
     purchase = Purchase.query.get_or_404(purchase_id)
     supplier = Supplier.query.get(purchase.supplier_id)
-    user = User.query.get(purchase.user_id)
+    user = User.query.get(purchase.user_id) # Usuario que registró la compra
+    
+    if current_user.role and current_user.role.name.lower() == 'finance':
+        user_location_id = getattr(current_user, 'location_id', None)
+        purchase_location_id = getattr(user, 'location_id', None) if user else None
+        
+        # Si la compra fue hecha en otra sede, bloqueamos el acceso
+        if purchase_location_id and user_location_id and purchase_location_id != user_location_id:
+            flash('No tienes autorización para consultar compras de otra sede.', 'danger')
+            return redirect(url_for('audit_purchase.list_purchase_audits'))
     
     details = db.session.query(PurchaseDetail, Product.name)\
         .join(Product, PurchaseDetail.product_id == Product.id)\
