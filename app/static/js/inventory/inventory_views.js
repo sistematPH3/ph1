@@ -136,7 +136,6 @@ async function fetchInventoryData(apiUrl, locationId) {
         updateInventoryView();
     }
 }
-
 /**
  * Procesa filtros dinámicos, calcula la paginación y actualiza la vista
  */
@@ -173,22 +172,41 @@ function updateInventoryView() {
         return matchesSearch && matchesStatus;
     });
 
-    // 4. Evaluar el motivo si la búsqueda no devuelve resultados
-    let emptySearchReason = null; // 'out_of_stock' | 'not_in_location' | 'generic'
+    // 4. Evaluar el motivo si el resultado filtrado está vacío
+    let emptySearchReason = null; // 'low_stock_out_of_stock' | 'out_of_stock' | 'not_in_location' | 'generic'
 
-    if (filteredData.length === 0 && searchTerm !== '') {
-        // Verificar si el producto existe en esta sede pero con Stock = 0
-        const existsWithZeroStock = rawInventoryData.some(item => {
-            const sku = (item.sku || item.product?.sku || '').toLowerCase();
-            const name = (item.product_name || item.product?.name || '').toLowerCase();
-            const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
-            return (sku.includes(searchTerm) || name.includes(searchTerm)) && qty <= 0;
-        });
+    if (filteredData.length === 0) {
+        if (selectedStatus === 'low') {
+            // Verificar si existen insumos en stock bajo pero con existencia 0
+            const zeroStockLowItems = rawInventoryData.filter(item => {
+                const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+                const minStock = item.min_stock != null ? Number(item.min_stock) : 0;
+                const isLow = item.is_low_stock !== undefined ? item.is_low_stock : (qty <= minStock);
+                
+                const sku = (item.sku || item.product?.sku || '').toLowerCase();
+                const name = (item.product_name || item.product?.name || '').toLowerCase();
+                const matchesSearch = (searchTerm === '' || sku.includes(searchTerm) || name.includes(searchTerm));
 
-        if (existsWithZeroStock) {
-            emptySearchReason = 'out_of_stock';
-        } else {
-            emptySearchReason = 'not_in_location';
+                return isLow && qty <= 0 && matchesSearch;
+            });
+
+            if (zeroStockLowItems.length > 0) {
+                emptySearchReason = 'low_stock_out_of_stock';
+            }
+        } else if (searchTerm !== '') {
+            // Verificar si el producto buscado existe en esta sede pero con Stock = 0
+            const existsWithZeroStock = rawInventoryData.some(item => {
+                const sku = (item.sku || item.product?.sku || '').toLowerCase();
+                const name = (item.product_name || item.product?.name || '').toLowerCase();
+                const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+                return (sku.includes(searchTerm) || name.includes(searchTerm)) && qty <= 0;
+            });
+
+            if (existsWithZeroStock) {
+                emptySearchReason = 'out_of_stock';
+            } else {
+                emptySearchReason = 'not_in_location';
+            }
         }
     }
 
@@ -208,14 +226,14 @@ function updateInventoryView() {
     const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
     const paginatedItems = filteredData.slice(startIndex, endIndex);
 
-    // 7. Renderizar Filas pasándole el motivo de búsqueda vacía
+    // 7. Renderizar Filas pasándole el motivo de estado vacío
     renderTableRows(paginatedItems, emptySearchReason);
 
     // 8. Paginación
     renderPaginationControls(totalPages, totalItems, startIndex + 1, endIndex);
 }
 /**
- * Renderiza las filas o los estados vacíos personalizados según la búsqueda
+ * Renderiza las filas o los estados vacíos personalizados según el contexto
  */
 function renderTableRows(items, emptySearchReason = null) {
     const tbody = document.getElementById('inventoryTableBody');
@@ -224,7 +242,16 @@ function renderTableRows(items, emptySearchReason = null) {
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-        if (emptySearchReason === 'out_of_stock') {
+        if (emptySearchReason === 'low_stock_out_of_stock') {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="bi bi-exclamation-octagon-fill fs-1 d-block mb-2 text-danger"></i>
+                        <span class="fw-bold fs-6 text-dark">Los insumos en alerta se encuentran completamente agotados</span><br>
+                        <small class="text-muted">Hay insumos bajo el stock mínimo en esta sede, pero su existencia actual es de 0.00 unidades.</small>
+                    </td>
+                </tr>`;
+        } else if (emptySearchReason === 'out_of_stock') {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" class="text-center py-5">
