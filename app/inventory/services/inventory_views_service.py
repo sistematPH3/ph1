@@ -22,12 +22,18 @@ class InventoryViewService:
                 inventory_data = InventoryViewRepository.get_inventory_by_location(selected_location_id, search_term)
             else:
                 inventory_data = InventoryViewRepository.get_all_inventory(search_term)
+
+            # --- NUEVA LÓGICA DE ALERTAS GLOBALES ---
+            alerts_summary = InventoryViewRepository.get_low_stock_counts_by_location()
+            total_global_alerts = sum(item['count'] for item in alerts_summary)
                 
             return {
                 'is_admin': True,
                 'inventory': inventory_data,
                 'available_locations': locations_list,
-                'selected_location_id': selected_location_id
+                'selected_location_id': selected_location_id,
+                'alerts_summary': alerts_summary,          
+                'total_global_alerts': total_global_alerts
             }
         
         else:

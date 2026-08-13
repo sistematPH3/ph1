@@ -87,6 +87,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (baseApiUrl && currentSelectedLocationId) {
         fetchInventoryData(baseApiUrl, currentSelectedLocationId);
     }
+    // Dentro del event listener DOMContentLoaded:
+const alertsCollapse = document.getElementById('alertsDetailCollapse');
+const toggleBtnText = document.getElementById('btnToggleAlertsText');
+const toggleBtnIcon = document.getElementById('btnToggleAlertsIcon');
+
+if (alertsCollapse && toggleBtnText && toggleBtnIcon) {
+    alertsCollapse.addEventListener('show.bs.collapse', () => {
+        toggleBtnText.textContent = 'Ocultar Alertas';
+        toggleBtnIcon.classList.remove('bi-chevron-down');
+        toggleBtnIcon.classList.add('bi-chevron-up');
+    });
+
+    alertsCollapse.addEventListener('hide.bs.collapse', () => {
+        toggleBtnText.textContent = 'Ver Alertas';
+        toggleBtnIcon.classList.remove('bi-chevron-up');
+        toggleBtnIcon.classList.add('bi-chevron-down');
+    });
+}
 });
 
 /**
@@ -129,11 +147,17 @@ function updateInventoryView() {
     const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const selectedStatus = statusSelect ? statusSelect.value : 'all';
 
-    // 1. Actualizar métricas generales de las tarjetas operativas
+    // 1. Actualizar métricas generales
     updateDashboardCards(rawInventoryData);
 
-    // 2. Filtrado de datos en memoria (Array JS)
-    const filteredData = rawInventoryData.filter(item => {
+    // 2. Filtrar solo insumos con Stock > 0 para el listado activo
+    const activeInventory = rawInventoryData.filter(item => {
+        const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+        return qty > 0;
+    });
+
+    // 3. Aplicar búsqueda y filtro de estado sobre los productos activos
+    const filteredData = activeInventory.filter(item => {
         const sku = (item.sku || item.product?.sku || '').toLowerCase();
         const name = (item.product_name || item.product?.name || '').toLowerCase();
         const matchesSearch = (searchTerm === '' || sku.includes(searchTerm) || name.includes(searchTerm));
@@ -149,59 +173,82 @@ function updateInventoryView() {
         return matchesSearch && matchesStatus;
     });
 
-    // 3. Actualizar contador superior de la tabla
+    // 4. Evaluar el motivo si la búsqueda no devuelve resultados
+    let emptySearchReason = null; // 'out_of_stock' | 'not_in_location' | 'generic'
+
+    if (filteredData.length === 0 && searchTerm !== '') {
+        // Verificar si el producto existe en esta sede pero con Stock = 0
+        const existsWithZeroStock = rawInventoryData.some(item => {
+            const sku = (item.sku || item.product?.sku || '').toLowerCase();
+            const name = (item.product_name || item.product?.name || '').toLowerCase();
+            const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+            return (sku.includes(searchTerm) || name.includes(searchTerm)) && qty <= 0;
+        });
+
+        if (existsWithZeroStock) {
+            emptySearchReason = 'out_of_stock';
+        } else {
+            emptySearchReason = 'not_in_location';
+        }
+    }
+
+    // 5. Actualizar contador superior
     const counter = document.getElementById('itemCounter');
     if (counter) {
         counter.textContent = `${filteredData.length} Insumos`;
     }
 
-    // 4. Cálculo de Paginación
+    // 6. Cálculo de Paginación
     const totalItems = filteredData.length;
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
     if (currentPage > totalPages) currentPage = totalPages || 1;
 
-    // Recorte de datos para la página actual
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
     const paginatedItems = filteredData.slice(startIndex, endIndex);
 
-    // 5. Renderizar Filas recortadas
-    renderTableRows(paginatedItems, filteredData.length === 0 && rawInventoryData.length > 0);
+    // 7. Renderizar Filas pasándole el motivo de búsqueda vacía
+    renderTableRows(paginatedItems, emptySearchReason);
 
-    // 6. Renderizar u Ocultar Paginador
+    // 8. Paginación
     renderPaginationControls(totalPages, totalItems, startIndex + 1, endIndex);
 }
-
 /**
- * Renderiza exclusivamente las filas correspondientes a la página activa
+ * Renderiza las filas o los estados vacíos personalizados según la búsqueda
  */
-/**
- * Renderiza exclusivamente las filas correspondientes a la página activa
- * Incluye atributos data-label para transformación responsive en pantallas móviles
- */
-function renderTableRows(items, isFilteredEmpty = false) {
+function renderTableRows(items, emptySearchReason = null) {
     const tbody = document.getElementById('inventoryTableBody');
     if (!tbody) return;
 
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-        if (isFilteredEmpty) {
+        if (emptySearchReason === 'out_of_stock') {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-5">
-                        <i class="bi bi-funnel fs-1 d-block mb-2 text-secondary"></i>
-                        <span class="fw-semibold fs-6 text-dark">No se encontraron insumos para los filtros aplicados.</span><br>
-                        <small class="text-muted">Intenta ajustando el texto de búsqueda o el estado de stock.</small>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="bi bi-exclamation-octagon fs-1 d-block mb-2 text-danger"></i>
+                        <span class="fw-bold fs-6 text-dark">El producto en stock se ha agotado</span><br>
+                        <small class="text-muted">Este producto pertenece a esta sede, pero su existencia actual es 0.00.</small>
+                    </td>
+                </tr>`;
+        } else if (emptySearchReason === 'not_in_location') {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="bi bi-box-seam-fill fs-1 d-block mb-2 text-warning"></i>
+                        <span class="fw-bold fs-6 text-dark">Este producto no se encuentra en esta sede</span><br>
+                        <small class="text-muted">Verifique la factura de envío o confirme si el insumo fue asignado a otra ubicación.</small>
                     </td>
                 </tr>`;
         } else {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" class="text-center text-muted py-5">
-                        <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-                        No se encontraron insumos registrados en esta sede.
+                        <i class="bi bi-funnel fs-1 d-block mb-2 text-secondary"></i>
+                        <span class="fw-semibold fs-6 text-dark">No se encontraron insumos para los filtros aplicados.</span><br>
+                        <small class="text-muted">Intenta ajustando el texto de búsqueda o el estado de stock.</small>
                     </td>
                 </tr>`;
         }
@@ -300,10 +347,17 @@ function renderPaginationControls(totalPages, totalItems, startItem, endItem) {
     paginationList.appendChild(nextLi);
 }
 
-/**
+/*
  * Actualiza la cifra de insumos bajo stock mínimo en la tarjeta superior de métricas
+ * (Solo aplica para vistas no administradoras, para evitar pisar el conteo global del Admin)
  */
 function updateDashboardCards(inventoryData) {
+    const appContainer = document.getElementById('inventoryViewApp');
+    const isAdmin = appContainer && appContainer.dataset.isAdmin === 'true';
+
+    // ⛔ Si es Administrador, mantenemos el total global traído por Jinja2 desde la BD
+    if (isAdmin) return;
+
     if (!Array.isArray(inventoryData)) return;
 
     const lowStockCount = inventoryData.filter(item => {
