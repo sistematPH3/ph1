@@ -58,6 +58,7 @@ class PurchaseDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
+    lot_number = db.Column(db.String(50), nullable=True)
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
     foreign_price = db.Column(db.Numeric(15, 2)) 
     price_bs = db.Column(db.Numeric(15, 2))
@@ -73,7 +74,6 @@ class Movement(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.String(30), default='EN_TRANSITO', nullable=False)
     received_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    # CAMPOS AÑADIDOS: Para arbitrajes y decisiones administrativas
     resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     resolution_notes = db.Column(db.Text, nullable=True)
     
@@ -84,10 +84,11 @@ class MovementDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movement_id = db.Column(db.Integer, db.ForeignKey('movements.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
+    lot_number = db.Column(db.String(50), nullable=True)
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
-    # CAMPOS AÑADIDOS: Cantidad efectivamente recibida y faltante reportado
     received_quantity = db.Column(db.Numeric(10, 2), nullable=True, default=None)
     missing_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    expiration_date = db.Column(db.Date, nullable=True)
 
 class PurchaseAuditLog(db.Model):
     __tablename__ = 'purchase_audit_log'
