@@ -71,9 +71,11 @@ class Movement(db.Model):
     destination_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
     date = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    status = db.Column(db.String(20), default='PENDIENTE')
+    status = db.Column(db.String(30), default='EN_TRANSITO', nullable=False)
     received_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    guide_url = db.Column(db.Text, nullable=True)
+    # CAMPOS AÑADIDOS: Para arbitrajes y decisiones administrativas
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    resolution_notes = db.Column(db.Text, nullable=True)
     
     details = db.relationship('MovementDetail', backref='movement', lazy=True)
 
@@ -83,6 +85,9 @@ class MovementDetail(db.Model):
     movement_id = db.Column(db.Integer, db.ForeignKey('movements.id'))
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
+    # CAMPOS AÑADIDOS: Cantidad efectivamente recibida y faltante reportado
+    received_quantity = db.Column(db.Numeric(10, 2), nullable=True, default=None)
+    missing_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
 
 class PurchaseAuditLog(db.Model):
     __tablename__ = 'purchase_audit_log'
