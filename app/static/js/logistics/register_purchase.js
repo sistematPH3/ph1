@@ -16,12 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setupHeaderValidation();
+    restoreDraft();
 
     const supplierSelect = document.getElementById('supplier_id');
     if (supplierSelect) {
         supplierSelect.addEventListener('change', function() {
             if (this.value === 'new') {
+                saveDraft();
                 window.location.href = this.getAttribute('data-new-url');
+            } else {
+                saveDraft();
             }
         });
     }
@@ -61,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rateInput.setAttribute('readonly', true);
                     rateInput.removeAttribute('placeholder');
                     rateInput.classList.replace('text-dark', 'text-muted');
+                    saveDraft();
                 } else {
                     throw new Error("Formato de respuesta desconocido");
                 }
@@ -86,10 +91,104 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    fetchExchangeRate();
-    currencySelect.addEventListener('change', fetchExchangeRate);
+    if (!rateInput.value) {
+        fetchExchangeRate();
+    }
+
+    currencySelect.addEventListener('change', () => {
+        saveDraft();
+        fetchExchangeRate();
+    });
+
     refreshRateBtn.addEventListener('click', fetchExchangeRate);
+
+    rateInput.addEventListener('input', saveDraft);
+
+    document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
+        attachRowValidationListeners(row);
+    });
 });
+
+function saveDraft() {
+    const draft = {
+        supplier_id: document.getElementById('supplier_id') ? document.getElementById('supplier_id').value : '',
+        currency: document.getElementById('currency') ? document.getElementById('currency').value : 'USD',
+        exchange_rate: document.getElementById('exchange_rate') ? document.getElementById('exchange_rate').value : '',
+        items: []
+    };
+
+    const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
+    rows.forEach(row => {
+        const prodId = row.querySelector('.prod-id') ? row.querySelector('.prod-id').value : '';
+        const prodQty = row.querySelector('.prod-qty') ? row.querySelector('.prod-qty').value : '';
+        const prodLot = row.querySelector('.prod-lot') ? row.querySelector('.prod-lot').value : '';
+        const prodExp = row.querySelector('.prod-exp') ? row.querySelector('.prod-exp').value : '';
+        const prodPrice = row.querySelector('.prod-price') ? row.querySelector('.prod-price').value : '';
+
+        draft.items.push({
+            product_id: prodId,
+            quantity: prodQty,
+            lot_number: prodLot,
+            expiration_date: prodExp,
+            foreign_price: prodPrice
+        });
+    });
+
+    sessionStorage.setItem('purchase_draft_form', JSON.stringify(draft));
+}
+
+function restoreDraft() {
+    const rawDraft = sessionStorage.getItem('purchase_draft_form');
+    if (!rawDraft) return;
+
+    try {
+        const draft = JSON.parse(rawDraft);
+
+        if (draft.supplier_id && draft.supplier_id !== 'new') {
+            const supplierSelect = document.getElementById('supplier_id');
+            if (supplierSelect) supplierSelect.value = draft.supplier_id;
+        }
+
+        if (draft.currency) {
+            const currencySelect = document.getElementById('currency');
+            if (currencySelect) currencySelect.value = draft.currency;
+        }
+
+        if (draft.exchange_rate) {
+            const rateInput = document.getElementById('exchange_rate');
+            if (rateInput) rateInput.value = draft.exchange_rate;
+        }
+
+        if (draft.items && draft.items.length > 0) {
+            const tbody = document.getElementById('itemsContainer');
+            tbody.innerHTML = '';
+
+            draft.items.forEach(item => {
+                const row = createProductRowElement();
+                tbody.appendChild(row);
+                attachRowValidationListeners(row);
+
+                const prodId = row.querySelector('.prod-id');
+                const prodQty = row.querySelector('.prod-qty');
+                const prodLot = row.querySelector('.prod-lot');
+                const prodExp = row.querySelector('.prod-exp');
+                const prodPrice = row.querySelector('.prod-price');
+
+                if (prodId && item.product_id) prodId.value = item.product_id;
+                if (prodQty && item.quantity) prodQty.value = item.quantity;
+                if (prodLot && item.lot_number) prodLot.value = item.lot_number;
+                if (prodExp && item.expiration_date) prodExp.value = item.expiration_date;
+                if (prodPrice && item.foreign_price) prodPrice.value = item.foreign_price;
+            });
+        }
+    } catch (e) {
+        sessionStorage.removeItem('purchase_draft_form');
+    }
+}
+
+function clearDraft() {
+    sessionStorage.removeItem('purchase_draft_form');
+}
 
 document.getElementById('invoice_photo').addEventListener('change', function(e) {
     const fileNameDisplay = document.getElementById('photoFileName');
@@ -179,19 +278,26 @@ function setupHeaderValidation() {
     });
 }
 
+function configureDatePickerLimits(expInput) {
+    if (!expInput) return;
+
+    const minDateObj = new Date();
+    minDateObj.setDate(minDateObj.getDate() + 1);
+    expInput.min = minDateObj.toISOString().split('T')[0];
+
+    const maxDateObj = new Date();
+    maxDateObj.setFullYear(maxDateObj.getFullYear() + 10);
+    expInput.max = maxDateObj.toISOString().split('T')[0];
+}
+
 function attachRowValidationListeners(row) {
     const prodId = row.querySelector('.prod-id');
     const prodQty = row.querySelector('.prod-qty');
+    const prodLot = row.querySelector('.prod-lot');
     const prodPrice = row.querySelector('.prod-price');
     const expInput = row.querySelector('.prod-exp');
 
-    const minDateObj = new Date();
-    minDateObj.setDate(minDateObj.getDate() + 3);
-    const minDateStr = minDateObj.toISOString().split('T')[0];
-
-    if (expInput) {
-        expInput.min = minDateStr;
-    }
+    configureDatePickerLimits(expInput);
 
     if (prodId) {
         prodId.addEventListener('change', () => {
@@ -204,33 +310,16 @@ function attachRowValidationListeners(row) {
                 const days = parseInt(selectedOpt.getAttribute('data-days')) || 0;
                 
                 if (expInput) {
-                    expInput.min = minDateStr;
+                    configureDatePickerLimits(expInput);
 
-                    if (days > 0) {
+                    if (days > 0 && !expInput.value) {
                         const autoDateObj = new Date();
                         autoDateObj.setDate(autoDateObj.getDate() + days);
-                        
-                        if (autoDateObj < minDateObj) {
-                            autoDateObj.setTime(minDateObj.getTime());
-                        }
-
-                        const autoDateStr = autoDateObj.toISOString().split('T')[0];
-
-                        expInput.max = autoDateStr;
-                        expInput.value = autoDateStr;
-
-                    } else {
-                        const MAX_LOGICAL_MANUAL_DAYS = 365; 
-
-                        const maxManualObj = new Date();
-                        maxManualObj.setDate(maxManualObj.getDate() + MAX_LOGICAL_MANUAL_DAYS);
-                        const maxManualStr = maxManualObj.toISOString().split('T')[0];
-
-                        expInput.max = maxManualStr;
-                        expInput.value = '';
+                        expInput.value = autoDateObj.toISOString().split('T')[0];
                     }
                 }
             }
+            saveDraft();
         });
     }
 
@@ -244,7 +333,17 @@ function attachRowValidationListeners(row) {
             } else {
                 clearFieldError(prodQty);
             }
+            saveDraft();
         });
+    }
+
+    if (prodLot) {
+        prodLot.addEventListener('input', saveDraft);
+    }
+
+    if (expInput) {
+        expInput.addEventListener('change', saveDraft);
+        expInput.addEventListener('input', saveDraft);
     }
 
     if (prodPrice) {
@@ -257,30 +356,20 @@ function attachRowValidationListeners(row) {
             } else {
                 clearFieldError(prodPrice);
             }
+            saveDraft();
         });
     }
 }
 
-document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
-    attachRowValidationListeners(row);
-    
-    const prodId = row.querySelector('.prod-id');
-    if (prodId && prodId.value) {
-        prodId.dispatchEvent(new Event('change'));
-    }
-});
-
-function addProductRow() {
-    const tbody = document.getElementById('itemsContainer');
+function createProductRowElement() {
     const optionsHtml = productOptionsHtml || '<option value="">-- Elige un producto --</option>';
-
     const row = document.createElement('tr');
     row.className = 'main-product-row';
     row.innerHTML = `
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group mariuska-select-group">
-                    <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id">
+                    <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
                         ${optionsHtml}
                     </select>
                 </div>
@@ -289,7 +378,14 @@ function addProductRow() {
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty">
+                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" required>
+                </div>
+            </div>
+        </td>
+        <td>
+            <div class="table-field-wrapper">
+                <div class="input-group search-input-group">
+                    <input type="text" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-lot" placeholder="Opcional / Auto">
                 </div>
             </div>
         </td>
@@ -304,19 +400,25 @@ function addProductRow() {
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
                     <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price">
+                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
                 </div>
             </div>
         </td>
         <td class="text-center">
-            <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove()" title="Eliminar">
+            <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove(); saveDraft();" title="Eliminar">
                 <i class="bi bi-trash text-white fs-6"></i>
             </button>
         </td>
     `;
-    tbody.appendChild(row);
+    return row;
+}
 
+function addProductRow() {
+    const tbody = document.getElementById('itemsContainer');
+    const row = createProductRowElement();
+    tbody.appendChild(row);
     attachRowValidationListeners(row);
+    saveDraft();
 }
 
 function validateFormBeforeSubmit() {
@@ -414,12 +516,14 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     rows.forEach(row => {
         const prodIdVal = row.querySelector('.prod-id').value;
         const qtyVal = row.querySelector('.prod-qty').value;
+        const lotVal = row.querySelector('.prod-lot') ? row.querySelector('.prod-lot').value : '';
         const expVal = row.querySelector('.prod-exp').value;
         const priceVal = row.querySelector('.prod-price').value;
 
-        if(prodIdVal) {
+        if (prodIdVal) {
             formData.append('product_id[]', prodIdVal);
             formData.append('quantity[]', qtyVal);
+            formData.append('lot_number[]', lotVal);
             formData.append('expiration_date[]', expVal);
             formData.append('foreign_price[]', priceVal);
         }
@@ -434,6 +538,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
         const result = await response.json();
 
         if (response.ok) {
+            clearDraft();
             Swal.fire({
                 icon: 'success',
                 title: '¡Compra registrada!',
@@ -456,7 +561,6 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                 addProductRow();
                 
                 document.getElementById('invoice_photo').dispatchEvent(new Event('change'));
-                
                 document.getElementById('currency').dispatchEvent(new Event('change'));
             });
         } else {

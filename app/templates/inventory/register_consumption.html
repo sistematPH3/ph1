@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/register_consumption.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/register_consumption.css') }}?v=1.1">
 {% endblock %}
 
 {% block content %}
@@ -69,7 +69,20 @@
                             </div>
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-12 col-md-6">
+                            <label for="lot_number" class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                <span>Partida / Lote</span>
+                                <small class="text-danger fw-semibold">Sugerido FEFO</small>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
+                                <select class="form-select border-secondary font-monospace" id="lot_number" name="lot_number" disabled>
+                                    <option value="" selected disabled>Esperando producto...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
                             <label for="quantity" class="form-label small fw-bold text-muted">Cantidad Gastada (Kg / Lts / Und) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-secondary"><i class="bi bi-speedometer2"></i></span>
@@ -98,6 +111,7 @@
                                 <tr>
                                     <th>Insumo</th>
                                     <th class="text-center">Cant.</th>
+                                    <th class="text-center">N° Lote</th>
                                     <th>Notas</th>
                                     <th class="text-center">Acción</th>
                                 </tr>
@@ -119,5 +133,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/inventory/register_consumption.js') }}"></script>
+<script src="{{ url_for('static', filename='js/inventory/register_consumption.js') }}?v=1.1"></script>
 {% endblock %}

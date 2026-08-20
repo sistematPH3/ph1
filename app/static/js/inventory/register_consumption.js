@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const locationElement = document.getElementById('location_id');
     const productSelect = document.getElementById('product_id');
+    const lotSelect = document.getElementById('lot_number');
     const inputQuantity = document.getElementById('quantity');
     const inputNotes = document.getElementById('notes');
     const alertContainer = document.getElementById('alertContainer');
@@ -11,9 +12,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let cartItems = [];
 
+    const loadLots = async (locationId, productId) => {
+        if (!lotSelect) return;
+
+        lotSelect.innerHTML = '<option value="" selected disabled>Cargando lotes...</option>';
+        lotSelect.disabled = true;
+
+        try {
+            const response = await fetch(`/api/inventory/locations/${locationId}/products/${productId}/lots`);
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                lotSelect.innerHTML = '';
+
+                if (!result.lots || result.lots.length === 0) {
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Sin lote específico (General)';
+                    defaultOption.selected = true;
+                    lotSelect.appendChild(defaultOption);
+                } else {
+                    result.lots.forEach((lot, index) => {
+                        const option = document.createElement('option');
+                        option.value = lot.lot_number;
+                        option.textContent = `${lot.lot_number} (Vence: ${lot.expiration_date})`;
+                        if (index === 0) option.selected = true;
+                        lotSelect.appendChild(option);
+                    });
+                }
+                lotSelect.disabled = false;
+            }
+        } catch (error) {
+            lotSelect.innerHTML = '<option value="" selected disabled>Error al cargar lotes</option>';
+        }
+    };
+
     const loadProducts = async (locationId) => {
         productSelect.innerHTML = '<option value="" selected disabled>Buscando inventario...</option>';
         productSelect.disabled = true;
+        if (lotSelect) {
+            lotSelect.innerHTML = '<option value="" selected disabled>Esperando producto...</option>';
+            lotSelect.disabled = true;
+        }
         btnAddToList.disabled = true;
         alertContainer.innerHTML = '';
 
@@ -69,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td class="fw-bold text-dark small">${item.product_name}</td>
                 <td class="text-center text-danger fw-bold small">${item.quantity.toFixed(2)}</td>
+                <td class="text-center small"><span class="badge bg-light text-dark border font-monospace">${item.lot_number || 'N/A'}</span></td>
                 <td class="small text-muted">${item.notes || '-'}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeItem(${index})">
@@ -97,11 +138,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    productSelect.addEventListener('change', (e) => {
+        const prodId = parseInt(e.target.value);
+        const locId = parseInt(locationElement.value);
+        if (!isNaN(prodId) && !isNaN(locId)) {
+            loadLots(locId, prodId);
+        }
+    });
+
     btnAddToList.addEventListener('click', () => {
         alertContainer.innerHTML = '';
         
         const productId = parseInt(productSelect.value);
         const productName = productSelect.options[productSelect.selectedIndex]?.text;
+        const lotVal = lotSelect ? lotSelect.value : '';
         const qty = parseFloat(inputQuantity.value);
         const notes = inputNotes.value.trim();
 
@@ -115,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const existingIndex = cartItems.findIndex(i => i.product_id === productId);
+        const existingIndex = cartItems.findIndex(i => i.product_id === productId && i.lot_number === lotVal);
         if (existingIndex > -1) {
             cartItems[existingIndex].quantity += qty;
             if (notes) cartItems[existingIndex].notes = cartItems[existingIndex].notes + " | " + notes;
@@ -123,12 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
             cartItems.push({
                 product_id: productId,
                 product_name: productName,
+                lot_number: lotVal,
                 quantity: qty,
                 notes: notes
             });
         }
 
         productSelect.value = '';
+        if (lotSelect) {
+            lotSelect.innerHTML = '<option value="" selected disabled>Esperando producto...</option>';
+            lotSelect.disabled = true;
+        }
         inputQuantity.value = '';
         inputNotes.value = '';
         renderCart();
@@ -146,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             location_id: parseInt(locationElement.value),
             items: cartItems.map(item => ({
                 product_id: item.product_id,
+                lot_number: item.lot_number,
                 quantity: item.quantity,
                 notes: item.notes
             }))

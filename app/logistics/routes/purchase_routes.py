@@ -44,6 +44,7 @@ def new_purchase_form():
         products.append({
             'id': prod.id,
             'name': prod.name,
+            'sku': prod.sku,
             'unit_of_measure': prod.unit_of_measure,
             'shelf_life_days': ptype.shelf_life_days if ptype else 0
         })
@@ -63,18 +64,17 @@ def new_purchase_form():
 def view_purchase_details(purchase_id):
     purchase = Purchase.query.get_or_404(purchase_id)
     supplier = Supplier.query.get(purchase.supplier_id)
-    user = User.query.get(purchase.user_id) # Usuario que registró la compra
+    user = User.query.get(purchase.user_id)
     
     if current_user.role and current_user.role.name.lower() == 'finance':
         user_location_id = getattr(current_user, 'location_id', None)
         purchase_location_id = getattr(user, 'location_id', None) if user else None
         
-        # Si la compra fue hecha en otra sede, bloqueamos el acceso
         if purchase_location_id and user_location_id and purchase_location_id != user_location_id:
             flash('No tienes autorización para consultar compras de otra sede.', 'danger')
             return redirect(url_for('audit_purchase.list_purchase_audits'))
     
-    details = db.session.query(PurchaseDetail, Product.name)\
+    details = db.session.query(PurchaseDetail, Product.name, Product.sku)\
         .join(Product, PurchaseDetail.product_id == Product.id)\
         .filter(PurchaseDetail.purchase_id == purchase_id).all()
     
@@ -128,9 +128,9 @@ def view_purchase_details(purchase_id):
             prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
 
             if not p_item and c_item:
-                changes.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-', 'to': f"Cant. Comprada: {c_item.get('quantity')} | Precio Unitario: {c_item.get('foreign_price')}"})
+                changes.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-', 'to': f"Cant. Comprada: {c_item.get('quantity')} | Lote: {c_item.get('lot_number')} | Precio Unitario: {c_item.get('foreign_price')}"})
             elif p_item and not c_item:
-                changes.append({'field': f'Insumo Eliminado: {prod_name}', 'from': f"Cant. Comprada: {p_item.get('quantity')} | Precio Unitario: {p_item.get('foreign_price')}", 'to': '-'})
+                changes.append({'field': f'Insumo Eliminado: {prod_name}', 'from': f"Cant. Comprada: {p_item.get('quantity')} | Lote: {p_item.get('lot_number')} | Precio Unitario: {p_item.get('foreign_price')}", 'to': '-'})
             else:
                 if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
                     changes.append({'field': f'Cantidad Comprada de {prod_name}', 'from': p_item.get('quantity'), 'to': c_item.get('quantity')})
@@ -142,6 +142,11 @@ def view_purchase_details(purchase_id):
                 c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
                 if p_date != c_date:
                     changes.append({'field': f'Fecha de Vencimiento de {prod_name}', 'from': p_date, 'to': c_date})
+                
+                p_lot = str(p_item.get('lot_number')) if p_item.get('lot_number') else 'N/A'
+                c_lot = str(c_item.get('lot_number')) if c_item.get('lot_number') else 'N/A'
+                if p_lot != c_lot:
+                    changes.append({'field': f'Número de Lote de {prod_name}', 'from': p_lot, 'to': c_lot})
 
         edit_logs.append({
             'editor_name': editor.name if editor else 'Usuario Desconocido',
@@ -177,6 +182,7 @@ def create_purchase():
 
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('quantity[]')
+        lot_numbers = request.form.getlist('lot_number[]')
         foreign_prices = request.form.getlist('foreign_price[]')
         expiration_dates = request.form.getlist('expiration_date[]')
         
@@ -198,11 +204,14 @@ def create_purchase():
                     if p_type and getattr(p_type, 'shelf_life_days', None):
                         exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
 
+            lot_val = lot_numbers[i].strip() if i < len(lot_numbers) and lot_numbers[i] else None
+
             items.append({
                 'product_id': product_id_val,
                 'quantity': float(quantities[i]) if quantities[i] else 0.0,
                 'foreign_price': float(foreign_prices[i]) if foreign_prices[i] else 0.0,
-                'expiration_date': exp_date_obj
+                'expiration_date': exp_date_obj,
+                'lot_number': lot_val
             })
         
         data = {
@@ -223,7 +232,6 @@ def create_purchase():
     if not is_valid:
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
 
-    # Llama al servicio, que ahora se encarga de TODO de forma atómica y segura
     result = PurchaseService.register_purchase(data)
 
     if result.get("success"):

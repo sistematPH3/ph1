@@ -1,7 +1,7 @@
 {% extends 'layout.html' %} 
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}?v=2.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}?v=2.1">
 {% endblock %}
 
 {% block content %}
@@ -38,11 +38,12 @@
                         <table class="table align-middle m-0 custom-insumos-table" id="itemsTable">
                             <thead>
                                 <tr>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 35%;">Producto / Insumo</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 15%;">Cantidad</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Vencimiento</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Precio Extranjero</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 10%;">Acción</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 28%;">Producto / Insumo</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 14%;">Cantidad</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 18%;">N° de Lote</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 16%;">Vencimiento</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 16%;">Precio Ext.</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 8%;">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="itemsContainer">
@@ -51,9 +52,9 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group mariuska-select-group">
                                                 <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
-                                                    <option value="" disabled selected data-days="0">Seleccione un producto</option>
+                                                    <option value="" disabled selected data-days="0" data-sku="">Seleccione un producto</option>
                                                     {% for p in products %}
-                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}" data-sku="{{ p.sku }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
@@ -69,6 +70,13 @@
                                     <td>
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
+                                                <input type="text" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-lot" placeholder="Opcional / Auto">
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group search-input-group">
                                                 <input type="date" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-exp">
                                             </div>
                                         </div>
@@ -76,7 +84,7 @@
                                     <td>
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
-                                                <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-currency-exchange"></i></span>
+                                                <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
                                                 <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
                                             </div>
                                         </div>

@@ -3,7 +3,8 @@ from app.inventory.requests.register_consumption_validators import validate_cons
 from app.inventory.services.register_consumption_service import (
     register_consumption, 
     get_consumption_form_data, 
-    get_location_products
+    get_location_products,
+    get_product_lots
 )
 
 register_consumption_bp = Blueprint('register_consumption', __name__)
@@ -26,6 +27,11 @@ def show_consumption_form():
 def fetch_location_products(location_id):
     products = get_location_products(location_id)
     return jsonify({'success': True, 'products': products}), 200
+
+@register_consumption_bp.route('/api/inventory/locations/<int:location_id>/products/<int:product_id>/lots', methods=['GET'])
+def fetch_product_lots(location_id, product_id):
+    lots = get_product_lots(location_id, product_id)
+    return jsonify({'success': True, 'lots': lots}), 200
 
 @register_consumption_bp.route('/api/inventory/register-consumption', methods=['POST'])
 def process_consumption():

@@ -70,7 +70,8 @@ class PurchaseManagementRepository:
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price) if d.foreign_price else 0.0,
                         "price_bs": float(d.price_bs) if d.price_bs else 0.0,
-                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None,
+                        "lot_number": d.lot_number if getattr(d, 'lot_number', None) else None
                     } for d in details
                 ]
             }
@@ -143,7 +144,8 @@ class PurchaseManagementRepository:
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price) if d.foreign_price else 0.0,
                         "price_bs": float(d.price_bs) if d.price_bs else 0.0,
-                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None,
+                        "lot_number": d.lot_number if getattr(d, 'lot_number', None) else None
                     } for d in details
                 ]
             }
@@ -186,6 +188,9 @@ class PurchaseManagementRepository:
                     else:
                         detail.expiration_date = None
 
+                    if 'lot_number' in matching_new and matching_new['lot_number']:
+                        detail.lot_number = str(matching_new['lot_number']).strip()
+
                     new_total_amount += (new_qty * new_price)
                 else:
                     new_total_amount += (Decimal(str(detail.quantity)) * Decimal(str(detail.foreign_price)))
@@ -200,14 +205,34 @@ class PurchaseManagementRepository:
                     product_id = int(item['product_id'])
                     
                     exp_date_obj = None
+                    product = self.db.session.query(Product).filter_by(id=product_id).first()
+                    
                     if item.get('expiration_date'):
                         exp_date_obj = datetime.strptime(item['expiration_date'], '%Y-%m-%d').date()
                     else:
-                        product = self.db.session.query(Product).filter_by(id=product_id).first()
                         if product and getattr(product, 'product_type_id', None):
                             p_type = self.db.session.query(ProductType).filter_by(id=product.product_type_id).first()
                             if p_type and getattr(p_type, 'shelf_life_days', None):
                                 exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
+
+                    lot_val = str(item.get('lot_number', '')).strip() if item.get('lot_number') else None
+                    if not lot_val:
+                        prod_sku = product.sku if product and product.sku else f"PROD{product_id}"
+                        date_str = purchase.purchase_date.strftime('%Y%m%d') if purchase.purchase_date else datetime.utcnow().strftime('%Y%m%d')
+                        existing_lots = self.db.session.query(PurchaseDetail.lot_number).filter(
+                            PurchaseDetail.lot_number.like(f"{prod_sku}-{date_str}-%")
+                        ).all()
+                        max_seq = 0
+                        for (l_num,) in existing_lots:
+                            if l_num:
+                                try:
+                                    parts = l_num.split('-')
+                                    seq = int(parts[-1])
+                                    if seq > max_seq:
+                                        max_seq = seq
+                                except (ValueError, IndexError):
+                                    pass
+                        lot_val = f"{prod_sku}-{date_str}-{max_seq + 1:02d}"
 
                     new_detail = PurchaseDetail(
                         purchase_id=purchase.id,
@@ -215,7 +240,8 @@ class PurchaseManagementRepository:
                         quantity=new_qty,
                         foreign_price=new_price,
                         price_bs=new_price * purchase_exchange_rate,
-                        expiration_date=exp_date_obj
+                        expiration_date=exp_date_obj,
+                        lot_number=lot_val
                     )
                     self.db.session.add(new_detail)
                     
@@ -257,7 +283,8 @@ class PurchaseManagementRepository:
                         "quantity": float(d.quantity),
                         "foreign_price": float(d.foreign_price),
                         "price_bs": float(d.price_bs),
-                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None
+                        "expiration_date": str(d.expiration_date) if getattr(d, 'expiration_date', None) else None,
+                        "lot_number": d.lot_number if getattr(d, 'lot_number', None) else None
                     } for d in final_details
                 ]
             }

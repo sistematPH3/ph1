@@ -20,12 +20,16 @@ def get_location_products(location_id):
     products = RegisterConsumptionRepository.get_products_in_inventory(location_id)
     return [{'id': p.id, 'name': p.name} for p in products]
 
+def get_product_lots(location_id, product_id):
+    return RegisterConsumptionRepository.get_product_lots(product_id, location_id)
+
 def register_consumption(location_id, items, user_id):
     try:
         for item in items:
             product_id = item['product_id']
             quantity = item['quantity']
             notes = item.get('notes', '')
+            lot_number = item.get('lot_number')
 
             inventory_item = RegisterConsumptionRepository.get_inventory_item(product_id, location_id)
 
@@ -38,7 +42,7 @@ def register_consumption(location_id, items, user_id):
                 name = inventory_item.product.name if hasattr(inventory_item, 'product') else f"ID {product_id}"
                 return {'success': False, 'message': f'Stock insuficiente para {name}. Lote abortado para proteger el inventario.'}
 
-            RegisterConsumptionRepository.update_stock(inventory_item, quantity, user_id, notes)
+            RegisterConsumptionRepository.update_stock(inventory_item, quantity, user_id, notes, lot_number)
 
         db.session.commit()
         return {'success': True, 'message': 'Lote de consumo registrado exitosamente.'}
