@@ -113,6 +113,9 @@ def create_app():
         from app.inventory.routes.inventory_movement_routes import inventory_movements_bp
         app.register_blueprint(inventory_movements_bp)
 
+        from app.logistics.routes.movement_list_routes import logistics_list_bp
+        app.register_blueprint(logistics_list_bp)
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model

@@ -1,0 +1,208 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-4">
+    <div class="custom-card-list shadow-sm p-4 bg-white rounded">
+        
+        <div class="mb-4">
+            <h3 class="fw-bold mb-1 text-dark">Listado Operativo de Traslados</h3>
+            <p class="text-muted small mb-0">Gestión de despachos en curso e histórico de recepciones (últimas 24h).</p>
+        </div>
+        
+        <!-- Pestañas de filtrado rápido -->
+        <ul class="nav nav-tabs mb-4" id="movementTabs" role="tablist">
+            {% if current_user.is_admin %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-semibold" id="en-camino-tab" data-bs-toggle="tab" data-bs-target="#en-camino" type="button" role="tab">
+                    <i class="bi bi-truck me-2"></i>En Camino
+                </button>
+            </li>
+            {% endif %}
+            
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if not current_user.is_admin %}active{% endif %} fw-semibold" id="por-recibir-tab" data-bs-toggle="tab" data-bs-target="#por-recibir" type="button" role="tab">
+                    <i class="bi bi-box-seam me-2"></i>Por Recibir
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="historico-tab" data-bs-toggle="tab" data-bs-target="#historico" type="button" role="tab">
+                    <i class="bi bi-clock-history me-2"></i>Histórico
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="movementTabsContent">
+            
+            <!-- Pestaña: En Camino (Exclusivo Administrador) -->
+            {% if current_user.is_admin %}
+            <div class="tab-pane fade show active" id="en-camino" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead class="text-uppercase text-muted content-table-header">
+                            <tr>
+                                <th>ID</th>
+                                <th>Sede Destino</th>
+                                <th>Fecha</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-0">
+                            {% for mov in en_camino %}
+                            <!-- Fila Principal -->
+                            <tr>
+                                <td class="fw-bold">#{{ mov.id }}</td>
+                                <td>{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</td>
+                                <td>{{ mov.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 me-1" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
+                                        <i class="bi bi-eye"></i> Ver Detalles
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="cancelarSalida({{ mov.id }})">Cancelar Salida</button>
+                                </td>
+                            </tr>
+                            <!-- Fila Desplegable de Detalles -->
+                            <tr class="collapse bg-light" id="detalle-{{ mov.id }}">
+                                <td colspan="4" class="p-3">
+                                    <div class="card card-body border-0 shadow-sm">
+                                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-box-seam me-2"></i>Productos en este traslado (#{{ mov.id }})</h6>
+                                        <ul class="list-group list-group-flush small">
+                                            {% for item in mov.details %}
+                                            <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong> (Cantidad: {{ item.quantity }})</span>
+                                                <span class="text-muted">Vencimiento: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                            </li>
+                                            {% else %}
+                                            <li class="list-group-item bg-transparent text-muted text-center">No hay productos registrados para este traslado.</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">No hay traslados en camino.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Pestaña: Por Recibir -->
+            <div class="tab-pane fade {% if not current_user.is_admin %}show active{% endif %}" id="por-recibir" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead class="text-uppercase text-muted content-table-header">
+                            <tr>
+                                <th>ID</th>
+                                <th>Sede Destino</th>
+                                <th>Fecha</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-0">
+                            {% for mov in por_recibir %}
+                            <!-- Fila Principal -->
+                            <tr>
+                                <td class="fw-bold">#{{ mov.id }}</td>
+                                <td>{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</td>
+                                <td>{{ mov.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 me-1" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
+                                        <i class="bi bi-eye"></i> Ver Detalles
+                                    </button>
+                                    {% if current_user.is_admin or mov.destination_location_id in user_location_ids %}
+                                        <a href="/logistics/movements/reception/{{ mov.id }}" class="btn btn-primary btn-sm rounded-pill px-3">Procesar Recepción</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <!-- Fila Desplegable de Detalles -->
+                            <tr class="collapse bg-light" id="detalle-{{ mov.id }}">
+                                <td colspan="4" class="p-3">
+                                    <div class="card card-body border-0 shadow-sm">
+                                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-box-seam me-2"></i>Productos en este traslado (#{{ mov.id }})</h6>
+                                        <ul class="list-group list-group-flush small">
+                                            {% for item in mov.details %}
+                                            <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong> (Cantidad: {{ item.quantity }})</span>
+                                                <span class="text-muted">Vencimiento: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                            </li>
+                                            {% else %}
+                                            <li class="list-group-item bg-transparent text-muted text-center">No hay productos registrados para este traslado.</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">No hay despachos por recibir.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pestaña: Histórico -->
+            <div class="tab-pane fade" id="historico" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead class="text-uppercase text-muted content-table-header">
+                            <tr>
+                                <th>ID</th>
+                                <th>Origen</th>
+                                <th>Destino</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-0">
+                            {% for mov in historico %}
+                            <!-- Fila Principal -->
+                            <tr>
+                                <td class="fw-bold">#{{ mov.id }}</td>
+                                <td>{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</td>
+                                <td>{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</td>
+                                <td>{{ mov.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td><span class="badge bg-success rounded-pill px-3">{{ mov.status }}</span></td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
+                                        <i class="bi bi-eye"></i> Ver Detalles
+                                    </button>
+                                </td>
+                            </tr>
+                            <!-- Fila Desplegable de Detalles -->
+                            <tr class="collapse bg-light" id="detalle-{{ mov.id }}">
+                                <td colspan="6" class="p-3">
+                                    <div class="card card-body border-0 shadow-sm">
+                                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-box-seam me-2"></i>Productos en este traslado (#{{ mov.id }})</h6>
+                                        <ul class="list-group list-group-flush small">
+                                            {% for item in mov.details %}
+                                            <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong> (Cantidad: {{ item.quantity }})</span>
+                                                <span class="text-muted">Vencimiento: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                            </li>
+                                            {% else %}
+                                            <li class="list-group-item bg-transparent text-muted text-center">No hay productos registrados para este traslado.</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">No hay histórico de traslados.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
