@@ -1,0 +1,134 @@
+/* ==========================================================================
+   ESTILOS - BANDEJA DE RESOLUCIÓN E INCIDENCIAS (NOTIFICACIONES)
+   ========================================================================== */
+
+.ph-card {
+    background-color: #ffffff;
+    border-radius: 20px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: none;
+}
+
+.ph-icon-box {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.ph-title {
+    color: #1a1a1a;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: -0.5px;
+    text-shadow: 2px 2px 4px rgba(175, 21, 21, 0.15);
+}
+
+.ph-table {
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.ph-table thead th {
+    background-color: #af1515 !important;
+    color: #ffffff;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 1rem 1.5rem;
+    border: none;
+}
+
+.ph-table thead tr th:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.ph-table thead tr th:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.ph-table tbody td {
+    padding: 1.25rem 1.5rem;
+    vertical-align: middle;
+    color: #212529;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.ph-badge-location {
+    background-color: #f1f3f5;
+    color: #495057;
+    font-weight: 500;
+    font-size: 0.85rem;
+    padding: 0.4em 0.8em;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+/* Botones de Acción de Notificación / Inspección */
+.btn-ph-info {
+    border: 1px solid #0d6efd;
+    color: #ffffff;
+    background-color: #0d6efd;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    transition: all 0.2s;
+}
+
+.btn-ph-info:hover {
+    background-color: #0b5ed7;
+    color: #ffffff;
+}
+
+.btn-ph-pill {
+    background-color: #af1515;
+    color: white;
+    border-radius: 50px;
+    font-weight: 600;
+    border: none;
+    padding: 0.4rem 1.2rem;
+    transition: background-color 0.2s;
+}
+
+.btn-ph-pill:hover {
+    background-color: #8f1111;
+    color: white;
+}
+
+/* Caja de detalles con acento de alerta tipo notificación */
+.ph-detail-box {
+    background-color: #fafbfc;
+    border-left: 4px solid #af1515;
+    padding: 1.5rem 2rem;
+    margin: 0;
+    border-radius: 0 8px 8px 0;
+}
+
+/* ==========================================================================
+   ESTILOS DE LA TABLA INTERNA (DETALLES DEL EXPEDIENTE)
+   ========================================================================== */
+
+.ph-inner-table {
+    border-color: #ced4da !important;
+}
+
+.ph-inner-table thead th {
+    background-color: #646464 !important;
+    color: #ffffff !important;
+    border-color: #ced4da !important;
+    font-weight: 700;
+}
+
+.ph-inner-table tbody td {
+    border-color: #ced4da !important;
+}
