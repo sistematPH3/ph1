@@ -101,7 +101,6 @@ class PurchaseService:
                         location_id=1, 
                         product_id=product_id, 
                         current_quantity=quantity,
-                        min_stock=Decimal('0.00'),
                         transit_quantity=Decimal('0.00')
                     )
                     db.session.add(new_inv)
