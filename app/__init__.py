@@ -117,8 +117,14 @@ def create_app():
         app.register_blueprint(logistics_list_bp)
 
         from app.logistics.routes.movement_dispute_routes import movement_dispute_bp
-
         app.register_blueprint(movement_dispute_bp)
+
+        # ==========================================================
+        # MÓDULO 6
+        # ==========================================================
+        from app.logistics.routes.movement_reception_routes import movement_reception_bp
+        app.register_blueprint(movement_reception_bp)
+        # ==========================================================
 
         from . import models 
         from .models.security_model import User
