@@ -1,0 +1,88 @@
+from app import db
+from app.logistics.requests.movement_dispatch_validators import MovementDispatchValidator
+from app.logistics.repositories.movement_dispatch_repository import MovementDispatchRepository
+
+class MovementDispatchService:
+
+    @staticmethod
+    def execute_dispatch(user, payload):
+        """
+        Coordina la validación, autorización por sede/rol y la persistencia del despacho.
+        """
+        # 1. Validar esquema
+        is_valid, errors = MovementDispatchValidator.validate_dispatch_payload(payload)
+        if not is_valid:
+            return {"success": False, "errors": errors}, 400
+
+        origin_id = int(payload['origin_location_id'])
+        destination_id = int(payload['destination_location_id'])
+
+        # 2. Obtener la sede del usuario de forma segura desde el parámetro `user`
+        user_locations = getattr(user, 'locations', None)
+        user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
+
+        if user.role_id not in [1] and user_loc_id != origin_id:
+            return {
+                "success": False,
+                "errors": ["No tiene permisos para emitir despachos desde una sede distinta a la asignada."]
+            }, 403
+
+        # 3. Transacción en Base de Datos
+        try:
+            movement = MovementDispatchRepository.create_dispatch_transaction(
+                origin_id=origin_id,
+                destination_id=destination_id,
+                created_by_id=user.id,
+                items_payload=payload['items']
+            )
+            db.session.commit()
+            return {
+                "success": True,
+                "message": f"Despacho #{movement.id} emitido exitosamente.",
+                "movement_id": movement.id
+            }, 201
+
+        except ValueError as ve:
+            db.session.rollback()
+            return {"success": False, "errors": [str(ve)]}, 422
+        except Exception as e:
+            db.session.rollback()
+            return {"success": False, "errors": [f"Error interno en la transacción: {str(e)}"]}, 500
+
+    @staticmethod
+    def execute_precancellation(user, movement_id: int, reason: str):
+        """
+        Coordina la pre-cancelación de un despacho antes de ser recibido.
+        """
+        if not reason or not reason.strip():
+            return {"success": False, "errors": ["El motivo de cancelación es obligatorio."]}, 400
+
+        try:
+            # Revertir reserva en base de datos
+            movement_check = MovementDispatchRepository.cancel_dispatch_transaction(movement_id)
+            
+            user_locations = getattr(user, 'locations', None)
+            user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
+
+            if user.role_id not in [1] and user_loc_id != movement_check.origin_location_id:
+                db.session.rollback()
+                return {
+                    "success": False,
+                    "errors": ["Solo el Administrador o el personal de la sede de origen pueden cancelar esta pre-salida."]
+                }, 403
+
+            # Guardar la razón de la cancelación
+            movement_check.resolution_notes = reason.strip()
+
+            db.session.commit()
+            return {
+                "success": True,
+                "message": f"Traslado #{movement_id} cancelado correctamente. El stock ha sido revertido."
+            }, 200
+
+        except ValueError as ve:
+            db.session.rollback()
+            return {"success": False, "errors": [str(ve)]}, 422
+        except Exception as e:
+            db.session.rollback()
+            return {"success": False, "errors": [f"Error al cancelar la salida: {str(e)}"]}, 500

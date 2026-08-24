@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+
+{% block title %}Emisión de Despachos e Insumos - PML{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=1">
+
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card shadow-sm">
+        
+        <!-- Cabecera Corporativa con Icono -->
+        <div class="d-flex align-items-center mb-4">
+            <div class="ph-icon-box me-3 shadow-sm">
+                <i class="bi bi-truck"></i>
+            </div>
+            <div>
+                <h2 class="ph-title mb-1">Emisión de Despacho e Insumos</h2>
+                <p class="text-muted mb-0">Gestión y transferencia de inventario entre sedes de la red.</p>
+            </div>
+        </div>
+
+        <form id="dispatchForm" class="needs-validation" novalidate>
+            <!-- Selección de Sedes -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="origin_location_id" class="form-label fw-bold text-dark">
+                        Sede Origen <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select ph-pill-input" id="origin_location_id" name="origin_location_id" required>
+                        <option value="">Seleccione el Origen</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if loc.id == user_location_id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback ps-2">Por favor, seleccione la sede de origen.</div>
+                </div>
+
+                <div class="col-md-6">
+                    <label for="destination_location_id" class="form-label fw-bold text-dark">
+                        Sede Destino <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select ph-pill-input" id="destination_location_id" name="destination_location_id" required>
+                        <option value="">Seleccione el Destino </option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback ps-2">Por favor, seleccione la sede de destino.</div>
+                </div>
+            </div>
+
+            <!-- Título del Detalle -->
+            <div class="d-flex align-items-center mb-3 mt-4">
+                <i class="bi bi-box-seam text-danger fs-4 me-2"></i>
+                <h5 class="fw-bold text-dark mb-0">Productos a Despachar</h5>
+            </div>
+
+            <!-- Tabla de Productos Estilo Registro de Compras -->
+            <div class="table-responsive mb-3">
+                <table class="table ph-table align-middle" id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 30%;">PRODUCTO / INSUMO</th>
+                            <th style="width: 15%;">CANTIDAD</th>
+                            <th style="width: 20%;">N° DE LOTE</th>
+                            <th style="width: 20%;">VENCIMIENTO</th>
+                            <th style="width: 15%; text-align: center;">ACCIÓN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody">
+                        <!-- Filas dinámicas generadas mediante JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Botones de Acción inferior -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-2">
+                <button type="button" class="btn btn-ph-success shadow-sm" id="btnAddRow">
+                    <i class="bi bi-plus-lg me-1"></i> Agregar Producto
+                </button>
+
+                <div class="d-flex gap-2">
+                    <a href="/logistics/movements" class="btn btn-ph-outline-danger">Cancelar</a>
+                    <button type="submit" class="btn btn-ph-danger shadow-sm" id="btnSubmit">
+                        <i class="bi bi-check2-circle me-1"></i> Procesar Despacho
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Template oculto para opciones de productos -->
+<select id="productOptionsTemplate" class="d-none">
+    <option value="">Seleccione un producto...</option>
+    {% for prod in products %}
+    <option value="{{ prod.id }}">{{ prod.name }} ({{ prod.unit_of_measure }})</option>
+    {% endfor %}
+</select>
+
+<!-- Modal de Éxito Personalizado -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+        <div class="modal-content text-center p-4 border-0 rounded-4 shadow-lg">
+            <div class="modal-body p-2">
+                <div class="d-flex justify-content-center mb-3">
+                    <div class="success-icon-circle">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-dark mb-2">¡Despacho Emitido!</h3>
+                <p class="text-muted mb-4 fs-6" id="successModalMessage">
+                    El despacho se ha registrado exitosamente.
+                </p>
+                <button type="button" class="btn btn-ph-danger w-100 fw-bold py-2" id="btnSuccessOk">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="/static/js/logistics/movement_dispatch.js"></script>
+{% endblock %}
