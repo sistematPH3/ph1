@@ -1,5 +1,6 @@
 # app/logistics/__init__.py
 from flask import Blueprint
+from .routes.movement_dispatch_routes import dispatch_bp
 
 # 1. Se crean los Blueprints principales del módulo de logística
 logistics_bp = Blueprint('logistics', __name__)
@@ -17,3 +18,4 @@ from .routes.supplier_routes import suppliers_bp  # <--- Tu nueva ruta en inglé
 # 4. Registro de los sub-blueprints dentro del principal de logística
 logistics_bp.register_blueprint(purchase_management_bp)
 logistics_bp.register_blueprint(suppliers_bp)
+logistics_bp.register_blueprint(dispatch_bp, url_prefix='/logistics/movements')

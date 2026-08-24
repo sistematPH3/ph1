@@ -21,7 +21,7 @@
             
             {% if current_user.is_admin %}
             <!-- Botón rojo redondeado con símbolo de más (+) -->
-            <a href="/logistics/movements/new" class="btn btn-ph-pill shadow-sm">
+            <a href="/logistics/movements/dispatch" class="btn btn-ph-pill shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> Nuevo Traslado
             </a>
             {% endif %}
@@ -90,8 +90,9 @@
                                     <button class="btn btn-ph-info me-2" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
                                         <i class="bi bi-eye"></i> Ver
                                     </button>
-                                    <button class="btn btn-ph-secondary" onclick="cancelarSalida({{ mov.id }})">
-                                        Cancelar
+                                    <!-- Botón para abrir el modal de cancelación -->
+                                    <button type="button" class="btn btn-ph-secondary" onclick="cancelarSalida('{{ mov.id }}')">
+                                        <i class="bi bi-x-circle me-1"></i>Cancelar
                                     </button>
                                 </td>
                             </tr>
@@ -231,7 +232,13 @@
                                     <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
                                 </td>
                                 <td>
-                                    <span class="ph-badge-success">{{ mov.status }}</span>
+                                    {% if mov.status == 'COMPLETADO' %}
+                                        <span class="ph-badge-success">Completado</span>
+                                    {% elif mov.status == 'CANCELADO_EMISOR' %}
+                                        <span class="badge bg-danger">Cancelado en Salida</span>
+                                    {% else %}
+                                        <span class="ph-badge-success">{{ mov.status }}</span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-end">
                                     <button class="btn btn-ph-info" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
@@ -269,4 +276,41 @@
         </div>
     </div>
 </div>
+<!-- Modal para Motivo de Cancelación -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="cancelModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Cancelar Traslado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Al cancelar este traslado, los insumos congelados en tránsito volverán inmediatamente al stock disponible del origen.
+                </p>
+                <input type="hidden" id="cancelMovementId">
+
+                <!-- Mensaje de error interno -->
+                <div id="cancelModalAlert" class="alert py-2 small mb-3 d-none" role="alert"></div>
+
+                <div class="mb-3">
+                    <label for="cancelReason" class="form-label fw-semibold text-dark">
+                        Motivo de Cancelación <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Indique la razón por la cual se cancela este despacho..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-danger fw-semibold" id="btnConfirmCancel">
+                    Confirmar Cancelación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/logistics/movement_dispatch.js') }}"></script>
 {% endblock %}

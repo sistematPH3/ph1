@@ -9,7 +9,7 @@ def get_movement_list_context(current_user):
     user_loc_ids = [loc.id for loc in current_user.locations]
     
     # Base query de traslados operativos ('EN_TRANSITO' y 'COMPLETADO')
-    query = Movement.query.filter(Movement.status.in_(['EN_TRANSITO', 'COMPLETADO']))
+    query = Movement.query.filter(Movement.status.in_(['EN_TRANSITO', 'COMPLETADO', 'CANCELADO_EMISOR']))
 
     # Aplicar filtro de sede SOLO si no es Administrador
     if not current_user.is_admin:
@@ -32,5 +32,5 @@ def get_movement_list_context(current_user):
         "user_location_ids": user_loc_ids,
         "en_camino": en_camino_list,
         "por_recibir": por_recibir_list,
-        "historico": [m for m in all_movements if m.status == 'COMPLETADO']
+        "historico": [m for m in all_movements if m.status in ['COMPLETADO', 'CANCELADO_EMISOR']]
     }
