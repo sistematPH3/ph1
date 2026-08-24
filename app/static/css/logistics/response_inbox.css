@@ -1,0 +1,215 @@
+/* Variables de Color: Logo en rojo y acentos/tabla en naranja */
+:root {
+    --ph-red: #B31F24;                /* Rojo principal solo para el logo */
+    --ph-orange: #B31F24;               /* Naranja vibrante para encabezados, botones y acentos */
+    --ph-orange-hover: #B31F24;         /* Naranja oscuro para hovers */
+    --ph-orange-light: #fff3e0;         /* Fondo tenue para alertas */
+}
+
+/* Ícono / Logo Principal en Rojo */
+.ph-card .ph-icon-red,
+.ph-icon-red {
+    background-color: var(--ph-red) !important;
+    color: #ffffff !important;
+}
+
+/* Encabezado de Tabla en Naranja */
+.ph-card .ph-table thead,
+.ph-card .ph-table thead tr,
+.ph-card .ph-table thead th,
+.ph-table thead tr,
+.ph-table thead th,
+.ph-table-header,
+.ph-table-header th {
+    background-color: var(--ph-orange) !important;
+    color: #ffffff !important;
+}
+
+/* Filas No Leídas: Fondo gris y línea naranja indicadora */
+.dispute-row.row-unread > td {
+    background-color: #e2e8f0 !important;
+    transition: background-color 0.3s ease;
+}
+
+.dispute-row.row-unread > td:first-child {
+    border-left: 4px solid var(--ph-orange) !important;
+}
+
+/* Filas Leídas: Fondo blanco plano */
+.dispute-row.row-read > td {
+    background-color: #ffffff !important;
+    transition: background-color 0.3s ease;
+}
+
+.dispute-row.row-read > td:first-child {
+    border-left: 4px solid transparent !important;
+}
+
+/* Badge de Contador */
+.ph-badge-orange {
+    background-color: var(--ph-orange) !important;
+    color: #ffffff !important;
+}
+
+/* Texto de Acento */
+.ph-text-orange {
+    color: var(--ph-orange) !important;
+}
+
+/* Botón de Acción Naranja */
+.ph-btn-orange {
+    color: var(--ph-orange) !important;
+    border-color: var(--ph-orange) !important;
+    background-color: transparent !important;
+}
+
+.ph-btn-orange:hover,
+.ph-btn-orange:focus,
+.ph-btn-orange:active {
+    color: #ffffff !important;
+    background-color: var(--ph-orange-hover) !important;
+    border-color: var(--ph-orange-hover) !important;
+}
+
+/* Badges de Sucursales */
+.location-pill {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.route-arrow-icon {
+    color: var(--ph-orange);
+    font-size: 1.1rem;
+}
+
+/* Caja de Detalle y Respuesta Desplegable */
+.ph-detail-box {
+    border-left: 5px solid var(--ph-orange);
+    background-color: #ffffff;
+    border-radius: 8px;
+}
+
+.ph-alert-orange {
+    background-color: var(--ph-orange-light);
+    border: 1px solid #ffe0b2;
+    border-radius: 6px;
+}
+
+.ph-notes-text {
+    white-space: pre-wrap;
+    font-style: italic;
+}
+
+/* =========================================================
+   ADAPTACIÓN RESPONSIVA PARA TELÉFONOS (< 768px)
+   ========================================================= */
+@media (max-width: 767.98px) {
+    /* Optimizar el contenedor principal */
+    .container-fluid.px-4 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    .ph-card {
+        padding: 1rem !important;
+    }
+
+    /* Ocultar encabezado tradicional */
+    .ph-table thead {
+        display: none;
+    }
+
+    /* Transformar la tabla en tarjetas verticales */
+    .ph-table, 
+    .ph-table tbody, 
+    .ph-table tr, 
+    .ph-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .dispute-row {
+        margin-bottom: 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: #ffffff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Borde superior para filas no leídas en móviles */
+    .dispute-row.row-unread > td:first-child {
+        border-left: none !important;
+        border-top: 5px solid var(--ph-orange) !important;
+    }
+
+    /* Alinear en vertical (Etiqueta ARRIBA, Contenido ABAJO) */
+    .dispute-row > td {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+        padding: 0.65rem 0.85rem !important;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .dispute-row > td:last-child {
+        border-bottom: none;
+    }
+
+    /* Estilo de la etiqueta */
+    .dispute-row > td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.72rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.35rem;
+    }
+
+    /* Ocultar etiqueta en la celda del botón para evitar redundancia */
+    .dispute-row > td[data-label="Acción"]::before {
+        display: none;
+    }
+
+    .dispute-row > td[data-label="Acción"] {
+        align-items: stretch;
+        padding-top: 0.5rem !important;
+    }
+
+    /* Badges adaptables que NO se cortan */
+    .location-pill {
+        width: 100%;
+        white-space: normal !important;
+        word-break: break-word;
+        padding: 0.45rem 0.65rem;
+    }
+
+    /* Ajuste de la caja de respuesta desplegable */
+    .ph-detail-box {
+        margin: 0.5rem 0 !important;
+        border-left-width: 4px;
+    }
+    
+    .ph-detail-box .p-4 {
+        padding: 0.85rem !important;
+    }
+
+    .ph-alert-orange {
+        padding: 0.75rem !important;
+    }
+
+    .ph-notes-text {
+        font-size: 0.88rem !important;
+        word-break: break-word;
+    }
+}

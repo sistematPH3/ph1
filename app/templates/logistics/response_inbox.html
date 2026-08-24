@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Hojas de estilo -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/response_inbox.css') }}?v=8">
+
+<div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
+    <!-- Contenedor con data-user-id para scoped localStorage -->
+    <div class="ph-card" data-user-id="{{ current_user.id }}">
+        
+        <!-- Encabezado adaptable -->
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box ph-icon-red me-3 shadow-sm flex-shrink-0">
+                    <i class="bi bi-inbox-fill"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1 fs-4 fs-sm-2">Bandeja de Respuestas de Administración</h2>
+                    <p class="text-muted mb-0 small">
+                        {% if current_user.is_admin %}
+                            Bandeja global de respuestas emitidas a las sucursales.
+                        {% else %}
+                            Revisa las respuestas a las novedades reportadas en tus sedes asignadas.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <div>
+                <span class="badge ph-badge-orange rounded-pill px-3 py-2 fs-6 shadow-sm d-inline-block">
+                    <i class="bi bi-envelope-paper-fill me-1"></i> Nuevas Respuestas: <span id="unread-count">{{ responses|length }}</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="table-responsive-md">
+            <table class="table ph-table">
+                <thead>
+                    <tr class="ph-table-header">
+                        <th>Nº DE CASO / FECHA</th>
+                        <th>SUCURSAL DESTINO / ORIGEN</th>
+                        <th>ESTADO DEL CASO</th>
+                        <th class="text-end">ACCIÓN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in responses %}
+                    <tr class="dispute-row row-unread" id="row-mov-{{ mov.id }}">
+                        <td class="fw-bold" data-label="Caso / Fecha">
+                            <div class="d-flex justify-content-between align-items-center w-100 d-md-block">
+                                <span class="text-dark">Traslado #{{ mov.id }}</span>
+                                <span class="text-muted small ms-2">{{ mov.date.strftime('%Y-%m-%d') }}</span>
+                            </div>
+                        </td>
+                        <td data-label="Sucursal">
+                            {% if mov.origin_location_id == 1 %}
+                                <!-- Despacho Normal desde Almacén Central -->
+                                <span class="location-pill" title="Envío a sucursal">
+                                    <i class="bi bi-box-arrow-right ph-text-orange me-1 flex-shrink-0"></i>
+                                    <span>Despacho a: <strong class="text-dark">{{ mov.destination_location.name if mov.destination_location else 'N/A' }}</strong></span>
+                                </span>
+                            {% else %}
+                                <!-- Devolución desde Sucursal hacia Almacén Central -->
+                                <span class="location-pill border-warning bg-warning-subtle" title="Devolución hacia Central">
+                                    <i class="bi bi-arrow-return-left text-warning-emphasis me-1 flex-shrink-0"></i>
+                                    <span>Devolución de: <strong class="text-dark">{{ mov.origin_location.name if mov.origin_location else 'N/A' }}</strong></span>
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Estado">
+                            <span class="badge bg-light text-dark border px-3 py-2 rounded-pill fw-semibold shadow-sm">
+                                <i class="bi bi-shield-check me-1"></i> {{ mov.status | replace('_', ' ') | title }}
+                            </span>
+                        </td>
+                        <td class="text-end" data-label="Acción">
+                            <button class="btn ph-btn-orange btn-sm px-3 py-2 fw-bold btn-read-response w-100 w-md-auto" 
+                                    type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#respuesta-admin-{{ mov.id }}"
+                                    data-mov-id="{{ mov.id }}">
+                                <i class="bi bi-envelope-open me-1"></i> Leer Respuesta
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- Desplegable con la respuesta -->
+                    <tr class="collapse" id="respuesta-admin-{{ mov.id }}">
+                        <td colspan="4" class="p-0 border-0">
+                            <div class="ph-detail-box shadow-inner">
+                                <div class="p-3 p-md-4">
+                                    <h6 class="fw-bold text-dark mb-2">
+                                        <i class="bi bi-person-workspace ph-text-orange me-2"></i>Respuesta de Administración
+                                    </h6>
+                                    
+                                    <div class="ph-alert-orange shadow-sm border-0 mb-0 py-2 px-3">
+                                        <p class="mb-0 fs-6 text-dark ph-notes-text">"{{ mov.resolution_notes or 'El administrador cerró este caso sin incluir un comentario escrito.' }}"</p>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-1 text-secondary d-block mb-2"></i>
+                            Tu bandeja está vacía. No hay respuestas pendientes.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Script JS externo -->
+<script src="{{ url_for('static', filename='js/logistics/response_inbox.js') }}?v=2"></script>
+{% endblock %}
