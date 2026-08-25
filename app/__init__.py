@@ -126,6 +126,10 @@ def create_app():
         app.register_blueprint(movement_reception_bp)
         # ==========================================================
 
+        from app.logistics.routes.response_inbox_routes import inbox_bp
+        app.register_blueprint(inbox_bp)
+
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model
