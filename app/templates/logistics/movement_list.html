@@ -2,6 +2,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=8">
 
 <div class="container-fluid mt-4 mb-5 px-4">
     <!-- Tarjeta Principal Blanca con bordes redondeados 20px -->
@@ -19,7 +20,7 @@
                 </div>
             </div>
             
-            {% if current_user.is_admin %}
+            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
             <!-- Botón rojo redondeado con símbolo de más (+) -->
             <a href="/logistics/movements/dispatch" class="btn btn-ph-pill shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> Nuevo Traslado
@@ -29,7 +30,7 @@
 
         <!-- Pestañas de Navegación con Iconos -->
         <ul class="nav nav-tabs ph-tabs" id="movementTabs" role="tablist">
-            {% if current_user.is_admin %}
+            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="en-camino-tab" data-bs-toggle="tab" data-bs-target="#en-camino" type="button" role="tab">
                     <i class="bi bi-truck me-2"></i>En Camino
@@ -38,7 +39,7 @@
             {% endif %}
             
             <li class="nav-item" role="presentation">
-                <button class="nav-link {% if not current_user.is_admin %}active{% endif %}" id="por-recibir-tab" data-bs-toggle="tab" data-bs-target="#por-recibir" type="button" role="tab">
+                <button class="nav-link {% if not (current_user.is_admin or current_user.role_id in [1, 2, 3]) %}active{% endif %}" id="por-recibir-tab" data-bs-toggle="tab" data-bs-target="#por-recibir" type="button" role="tab">
                     <i class="bi bi-box-seam me-2"></i>Por Recibir
                 </button>
             </li>
@@ -52,7 +53,7 @@
         <div class="tab-content" id="movementTabsContent">
             
             <!-- ================= Pestaña: En Camino ================= -->
-            {% if current_user.is_admin %}
+            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
             <div class="tab-pane fade show active" id="en-camino" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table ph-table">
@@ -126,7 +127,7 @@
             {% endif %}
 
             <!-- ================= Pestaña: Por Recibir ================= -->
-            <div class="tab-pane fade {% if not current_user.is_admin %}show active{% endif %}" id="por-recibir" role="tabpanel">
+            <div class="tab-pane fade {% if not (current_user.is_admin or current_user.role_id in [1, 2, 3]) %}show active{% endif %}" id="por-recibir" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table ph-table">
                         <thead>
@@ -276,37 +277,42 @@
         </div>
     </div>
 </div>
-<!-- Modal para Motivo de Cancelación -->
-<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="cancelModalLabel">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Cancelar Traslado
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small">
-                    Al cancelar este traslado, los insumos congelados en tránsito volverán inmediatamente al stock disponible del origen.
-                </p>
-                <input type="hidden" id="cancelMovementId">
+<!-- Modal para Motivo de Cancelación Personalizado -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+        <div class="modal-content text-center p-4 border-0 rounded-4 shadow-lg">
+            <div class="modal-body p-2">
+                <!-- Círculo de Icono Rojo -->
+                <div class="d-flex justify-content-center mb-3">
+                    <div class="danger-icon-circle">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
 
-                <!-- Mensaje de error interno -->
+                <h3 class="fw-bold text-dark mb-2">¿Cancelar Traslado?</h3>
+                <p class="text-muted small mb-3">
+                    Los insumos congelados en tránsito volverán inmediatamente al stock disponible del origen.
+                </p>
+
+                <input type="hidden" id="cancelMovementId">
                 <div id="cancelModalAlert" class="alert py-2 small mb-3 d-none" role="alert"></div>
 
-                <div class="mb-3">
-                    <label for="cancelReason" class="form-label fw-semibold text-dark">
+                <div class="text-start mb-4">
+                    <label for="cancelReason" class="form-label fw-bold text-dark small">
                         Motivo de Cancelación <span class="text-danger">*</span>
                     </label>
-                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Indique la razón por la cual se cancela este despacho..." required></textarea>
+                    <textarea class="form-control rounded-3" id="cancelReason" rows="3" placeholder="Indique la razón de la cancelación..." style="resize: none;" required></textarea>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-danger fw-semibold" id="btnConfirmCancel">
-                    Confirmar Cancelación
-                </button>
+
+                <!-- Botones Redondeados -->
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-ph-outline-danger w-50" data-bs-dismiss="modal">
+                        Volver
+                    </button>
+                    <button type="button" class="btn btn-ph-danger w-50 fw-bold" id="btnConfirmCancel">
+                        Confirmar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
