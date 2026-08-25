@@ -1,4 +1,4 @@
-from app.models import Movement
+from app.models import Movement, Location
 
 def get_movement_list_context(current_user):
     """
@@ -17,8 +17,15 @@ def get_movement_list_context(current_user):
             (Movement.origin_location_id.in_(user_loc_ids)) | 
             (Movement.destination_location_id.in_(user_loc_ids))
         )
-
+# 3. Asignación fuera de cualquier bloque IF (Alineado con el margen del método)
     all_movements = query.order_by(Movement.date.desc()).all()
+
+    # 4. Mapear sedes dinámicamente en memoria
+    locations_map = {loc.id: loc for loc in Location.query.all()}
+
+    for mov in all_movements:
+        mov.origin_location = locations_map.get(mov.origin_location_id)
+        mov.destination_location = locations_map.get(mov.destination_location_id)
 
     # Si es admin, ve TODO lo que esté en tránsito. Si no, filtra por su sede de origen o destino.
     if current_user.is_admin:
