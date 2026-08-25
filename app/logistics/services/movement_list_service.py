@@ -1,4 +1,4 @@
-from app.models import Movement, Location
+from app.models import Movement, Location, Product
 
 def get_movement_list_context(current_user):
     """
@@ -22,10 +22,14 @@ def get_movement_list_context(current_user):
 
     # 4. Mapear sedes dinámicamente en memoria
     locations_map = {loc.id: loc for loc in Location.query.all()}
+    products_map = {p.id: p for p in Product.query.all()}
 
     for mov in all_movements:
         mov.origin_location = locations_map.get(mov.origin_location_id)
         mov.destination_location = locations_map.get(mov.destination_location_id)
+
+        for item in mov.details:
+            item.product = products_map.get(item.product_id)
 
     # Si es admin, ve TODO lo que esté en tránsito. Si no, filtra por su sede de origen o destino.
     if current_user.is_admin:
