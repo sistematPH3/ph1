@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
-from app.models import Location, Product, User
+from app.models import Location, Product, Inventory
 from app.logistics.services.movement_dispatch_service import MovementDispatchService
 from app.decorators.roles import require_roles  # Decorador del proyecto
 
@@ -22,13 +22,39 @@ def dispatch_form_view():
         user_location_id = current_user.locations[0].id
     elif hasattr(current_user, 'location_id'):
         user_location_id = current_user.location_id
+
+    # Determinar si el usuario tiene rol de Administrador (role_id = 1)
+    is_admin = getattr(current_user, 'role_id', None) == 1
     
     return render_template(
         '/logistics/movement_dispatch.html',
         locations=locations,
         products=products,
-        user_location_id=user_location_id
+        user_location_id=user_location_id,
+        is_admin=is_admin
     )
+
+@dispatch_bp.route('/check-stock', methods=['GET'])
+@login_required
+def check_stock_api():
+    """Consulta en tiempo real el stock operativo de un producto en una sede."""
+    location_id = request.args.get('location_id', type=int)
+    product_id = request.args.get('product_id', type=int)
+
+    if not location_id or not product_id:
+        return jsonify({"success": False, "stock": 0}), 400
+
+    inventory = Inventory.query.filter_by(
+        location_id=location_id, 
+        product_id=product_id
+    ).first()
+
+    stock = float(inventory.current_quantity) if inventory else 0.0
+
+    return jsonify({
+        "success": True,
+        "stock": stock
+    }), 200
 
 @dispatch_bp.route('/dispatch', methods=['POST'])
 @login_required
