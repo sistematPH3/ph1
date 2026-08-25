@@ -178,3 +178,136 @@
 .modal-content {
     border-radius: 24px !important;
 }
+/* Círculo del Icono de Advertencia/Cancelación */
+.danger-icon-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #dc3545;
+    background-color: #fff5f5;
+    color: #dc3545;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.6rem;
+    margin: 0 auto;
+}
+/* =========================================================================
+   1. MODO TARJETAS (TABLETS Y MÓVILES - Hasta 991.98px)
+   ========================================================================= */
+@media (max-width: 991.98px) {
+    /* Contenedor y tarjeta principal */
+    .container-fluid {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    .ph-card {
+        padding: 1.25rem 1rem;
+        border-radius: 16px;
+    }
+
+    /* Reducción de cabecera */
+    .ph-icon-box {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+
+    .ph-title {
+        font-size: 1.25rem;
+    }
+
+    /* TRANSFORMACIÓN DE TABLA A MODO TARJETAS */
+    .ph-table, 
+    .ph-table thead, 
+    .ph-table tbody, 
+    .ph-table th, 
+    .ph-table td, 
+    .ph-table tr {
+        display: block;
+    }
+
+    /* Ocultar encabezado rojo */
+    .ph-table thead {
+        display: none;
+    }
+
+    /* Fila convertida en tarjeta */
+    .ph-table tbody tr {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 16px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        position: relative;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .ph-table tbody td {
+        padding: 0.35rem 0;
+        border: none;
+    }
+
+    /* Espacio reservado para el botón eliminar */
+    .ph-table tbody td:nth-child(1) {
+        padding-right: 2.75rem;
+    }
+
+    /* Etiquetas superiores para cada input */
+    .ph-table tbody td::before {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 0.25rem;
+        letter-spacing: 0.5px;
+    }
+
+    .ph-table tbody td:nth-child(1)::before { content: "Producto / Insumo"; }
+    .ph-table tbody td:nth-child(2)::before { content: "Cantidad"; }
+    .ph-table tbody td:nth-child(3)::before { content: "N° de Lote"; }
+    .ph-table tbody td:nth-child(4)::before { content: "Fecha de Vencimiento"; }
+
+    /* Ubicación exacta del botón eliminar */
+    .ph-table tbody td:last-child {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.75rem;
+        padding: 0;
+    }
+
+    .ph-table tbody td:last-child::before {
+        content: "";
+        display: none;
+    }
+}
+
+/* =========================================================================
+   2. BOTONES APILADOS (EXCLUSIVO MÓVILES - Hasta 767.98px)
+   ========================================================================= */
+@media (max-width: 767.98px) {
+    .d-flex.justify-content-between.align-items-center.mt-4.pt-2 {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch !important;
+    }
+
+    #btnAddRow {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .d-flex.gap-2 {
+        flex-direction: column-reverse;
+        width: 100%;
+        gap: 0.75rem !important;
+    }
+
+    .d-flex.gap-2 .btn,
+    .d-flex.gap-2 a {
+        width: 100%;
+        text-align: center;
+    }
+}
