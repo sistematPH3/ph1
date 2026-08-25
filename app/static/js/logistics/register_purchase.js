@@ -102,7 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshRateBtn.addEventListener('click', fetchExchangeRate);
 
-    rateInput.addEventListener('input', saveDraft);
+    rateInput.addEventListener('input', () => {
+        if (rateInput.value.length > 10) {
+            rateInput.value = rateInput.value.slice(0, 10);
+        }
+        saveDraft();
+    });
 
     document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
         attachRowValidationListeners(row);
@@ -325,11 +330,16 @@ function attachRowValidationListeners(row) {
 
     if (prodQty) {
         prodQty.addEventListener('input', () => {
+            if (prodQty.value.length > 8) {
+                prodQty.value = prodQty.value.slice(0, 8);
+            }
             const val = parseFloat(prodQty.value);
             if (!prodQty.value || isNaN(val)) {
                 setFieldError(prodQty, 'La cantidad es obligatoria.');
             } else if (val <= 0) {
                 setFieldError(prodQty, 'Debe ser mayor a 0.');
+            } else if (val > 999999.99) {
+                setFieldError(prodQty, 'Máximo 999,999.99');
             } else {
                 clearFieldError(prodQty);
             }
@@ -338,7 +348,12 @@ function attachRowValidationListeners(row) {
     }
 
     if (prodLot) {
-        prodLot.addEventListener('input', saveDraft);
+        prodLot.addEventListener('input', () => {
+            if (prodLot.value.length > 30) {
+                prodLot.value = prodLot.value.slice(0, 30);
+            }
+            saveDraft();
+        });
     }
 
     if (expInput) {
@@ -348,11 +363,16 @@ function attachRowValidationListeners(row) {
 
     if (prodPrice) {
         prodPrice.addEventListener('input', () => {
+            if (prodPrice.value.length > 8) {
+                prodPrice.value = prodPrice.value.slice(0, 8);
+            }
             const val = parseFloat(prodPrice.value);
             if (!prodPrice.value || isNaN(val)) {
                 setFieldError(prodPrice, 'El precio es obligatorio.');
             } else if (val <= 0) {
                 setFieldError(prodPrice, 'Debe ser mayor a 0.');
+            } else if (val > 999999.99) {
+                setFieldError(prodPrice, 'Máximo 999,999.99');
             } else {
                 clearFieldError(prodPrice);
             }
@@ -378,14 +398,14 @@ function createProductRowElement() {
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" required>
+                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
                 </div>
             </div>
         </td>
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="text" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-lot" placeholder="Opcional / Auto">
+                    <input type="text" maxlength="30" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-lot font-monospace" placeholder="Auto o Manual">
                 </div>
             </div>
         </td>
@@ -400,7 +420,7 @@ function createProductRowElement() {
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
                     <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                    <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
+                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
                 </div>
             </div>
         </td>
@@ -477,6 +497,9 @@ function validateFormBeforeSubmit() {
         } else if (qtyVal <= 0) { 
             setFieldError(prodQty, 'Debe ser mayor a 0.'); 
             isValid = false; 
+        } else if (qtyVal > 999999.99) {
+            setFieldError(prodQty, 'Máximo 999,999.99');
+            isValid = false;
         }
         
         const priceVal = parseFloat(prodPrice.value);
@@ -486,6 +509,9 @@ function validateFormBeforeSubmit() {
         } else if (priceVal <= 0) { 
             setFieldError(prodPrice, 'Debe ser mayor a 0.'); 
             isValid = false; 
+        } else if (priceVal > 999999.99) {
+            setFieldError(prodPrice, 'Máximo 999,999.99');
+            isValid = false;
         }
     });
 

@@ -1,3 +1,14 @@
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 .bg-mariuska-red {
     background-color: #B31F24 !important;
 }
@@ -150,6 +161,11 @@
     margin-bottom: 0.4rem;
 }
 
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
 .custom-insumos-table {
     border-collapse: separate !important;
     border-spacing: 0 !important;
@@ -163,14 +179,15 @@
     background-color: #B31F24 !important;
     color: #ffffff !important;
     font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.6rem 1rem !important;
+    font-size: 0.82rem;
+    padding: 0.65rem 0.5rem !important;
     border: none !important;
     vertical-align: middle;
+    white-space: nowrap;
 }
 
 .custom-insumos-table td {
-    padding: 0.85rem 0.5rem !important;
+    padding: 0.75rem 0.35rem !important;
     border-bottom: 1px solid #dee2e6 !important;
     background-color: #ffffff !important;
 }
@@ -200,33 +217,52 @@
 
 .table-field-wrapper {
     width: 100%;
-    padding: 0 4px;
+    padding: 0 2px;
 }
 
 .custom-insumos-table .mariuska-select-group, 
-.custom-insumos-table .search-input-group {
+.custom-insumos-table .search-input-group,
+.mariuska-select-group,
+.search-input-group {
     border-radius: 50px !important;
     border: 1px solid #ced4da !important;
     background-color: #f8f9fa !important;
     overflow: hidden;
     transition: all 0.2s ease-in-out;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    width: 100% !important;
 }
 
 .custom-insumos-table .form-control, 
 .custom-insumos-table .form-select, 
-.custom-insumos-table .input-group-text {
+.custom-insumos-table .input-group-text,
+.mariuska-select-group .form-select,
+.search-input-group .form-control,
+.search-input-group .input-group-text {
     border-radius: 0 !important;
+    font-size: 13px;
 }
 
 .custom-insumos-table .mariuska-select-group:focus-within, 
-.custom-insumos-table .search-input-group:focus-within {
+.custom-insumos-table .search-input-group:focus-within,
+.mariuska-select-group:focus-within,
+.search-input-group:focus-within {
     border-color: #B31F24 !important;
     box-shadow: 0 0 0 0.25rem rgba(179, 31, 36, 0.15) !important;
     background-color: #ffffff !important;
 }
 
 .custom-insumos-table .form-select {
-    padding-left: 1.2rem !important;
+    padding-left: 0.9rem !important;
+    padding-right: 1.5rem !important;
+}
+
+.custom-insumos-table .search-input-group input {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
 }
 
 @media (max-width: 767.98px) {
@@ -241,6 +277,7 @@
     .custom-insumos-table tbody {
         display: block !important;
         width: 100% !important;
+        min-width: 100% !important;
     }
 
     .container {

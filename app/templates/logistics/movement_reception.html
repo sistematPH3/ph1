@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=27">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -9,7 +9,7 @@
         <div class="ph-card-header">
             <div class="header-left">
                 <div class="header-icon-box">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
                         <path d="m3.3 7 8.7 5 8.7-5"/>
                         <path d="M12 22V12"/>
@@ -25,23 +25,45 @@
             </div>
         </div>
 
-        <div class="route-banner">
-            <div class="route-box">
-                <span class="route-label">Sede Remitente (Origen)</span>
-                <span class="route-value">{{ movement.origin_name }}</span>
+        <div class="route-hero-card">
+            <div class="route-node">
+                <div class="node-icon-wrapper">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 21h18M3 7v14M21 7v14M6 11h4M6 15h4M14 11h4M14 15h4M9 3h6v4H9z"/>
+                    </svg>
+                </div>
+                <div class="node-content">
+                    <span class="node-label node-label-origin">Sede Remitente (Origen)</span>
+                    <span class="node-name">{{ movement.origin_name }}</span>
+                </div>
             </div>
-            <div class="route-divider">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
+
+            <div class="route-connector">
+                <span class="connector-line"></span>
+                <div class="connector-pill">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <span class="connector-line"></span>
             </div>
-            <div class="route-box">
-                <span class="route-label">Sede Receptora (Destino)</span>
-                <span class="route-value">{{ movement.destination_name }}</span>
+
+            <div class="route-node">
+                <div class="node-icon-wrapper node-dest">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l1.5-6h15L21 9v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/>
+                        <path d="M3 9h18"/>
+                        <path d="M9 22V12h6v10"/>
+                    </svg>
+                </div>
+                <div class="node-content">
+                    <span class="node-label node-label-dest">Sede Receptora (Destino)</span>
+                    <span class="node-name">{{ movement.destination_name }}</span>
+                </div>
             </div>
         </div>
 
-        <form id="receptionForm" data-movement-id="{{ movement.id }}">
+        <form id="receptionForm" data-movement-id="{{ movement.id }}" data-origin-name="{{ movement.origin_name }}" data-destination-name="{{ movement.destination_name }}">
             
             <div class="table-container">
                 <table class="ph-table">
@@ -49,14 +71,23 @@
                         <tr>
                             <th>Insumo / SKU</th>
                             <th>Lote y Vencimiento</th>
-                            <th class="text-right">Cant. Despachada</th>
-                            <th class="text-right">Cant. Recibida</th>
-                            <th class="text-right">Diferencia</th>
+                            <th class="text-right">
+                                <span class="th-main">Despachado</span>
+                                <span class="th-sub">(Guía Digital)</span>
+                            </th>
+                            <th class="text-right">
+                                <span class="th-main">Recibido</span>
+                                <span class="th-sub">(Físico Editable ✎)</span>
+                            </th>
+                            <th class="text-right">
+                                <span class="th-main">Diferencia</span>
+                                <span class="th-sub">(Recibido - Guía)</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row" data-detail-id="{{ item.id }}" data-dispatched="{{ item.quantity }}">
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}">
                             <td>
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
@@ -70,18 +101,24 @@
                                 </div>
                             </td>
                             <td class="text-right font-semibold">
-                                {{ "%.2f"|format(item.quantity) }} <span class="unit-tag">{{ item.unit_of_measure }}</span>
+                                <span class="qty-dispatched-val">{{ "%.2f"|format(item.quantity) }}</span>
+                                <span class="unit-tag">{{ item.unit_of_measure }}</span>
                             </td>
                             <td class="text-right">
                                 <div class="qty-input-wrapper">
-                                    <input 
-                                        type="number" 
-                                        step="0.01" 
-                                        min="0" 
-                                        class="ph-input-number input-received" 
-                                        value="{{ "%.2f"|format(item.quantity) }}"
-                                        required
-                                    >
+                                    <div class="input-editable-box" title="Haga clic para editar la cantidad recibida">
+                                        <svg class="edit-hint-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                        </svg>
+                                        <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0" 
+                                            class="ph-input-number input-received" 
+                                            value="{{ "%.2f"|format(item.quantity) }}"
+                                            required
+                                        >
+                                    </div>
                                     <span class="input-unit">{{ item.unit_of_measure }}</span>
                                 </div>
                             </td>
@@ -94,11 +131,24 @@
                 </table>
             </div>
 
-            <div class="novelty-panel">
-                <h2 class="panel-subtitle">Auditoría de Recepción y Novedades</h2>
+            <div class="novelty-interactive-panel" id="smartNoveltyPanel">
+                <div class="panel-header-row">
+                    <div class="panel-title-with-icon">
+                        <div class="panel-mini-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="panel-subtitle">Auditoría de Recepción y Novedades</h2>
+                            <span class="panel-desc">Clasifique la condición física de descarga y registre cualquier incidencia</span>
+                        </div>
+                    </div>
+                    <span id="noveltyStatusBadge" class="status-pill pill-ok">Conforme (Cuadrado)</span>
+                </div>
                 
-                <div class="form-row">
-                    <div class="form-col-6">
+                <div class="form-grid-2col">
+                    <div class="input-card-box">
                         <label class="ph-label" for="noveltyType">Tipo de Novedad Detectada</label>
                         <select id="noveltyType" class="ph-select">
                             <option value="CONFORME">Recepción Conforme (Sin Discrepancia)</option>
@@ -111,9 +161,10 @@
                             <option value="LOTE_NO_COINCIDE">Lote Físico no coincide con Guía</option>
                             <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Falta de Espacio</option>
                         </select>
+                        <span class="field-help-text" id="noveltyHelpText">Carga completa y en condiciones óptimas. Se acredita en destino.</span>
                     </div>
 
-                    <div class="form-col-12">
+                    <div class="input-card-box">
                         <label class="ph-label" for="receptionNotes">
                             Notas de Muelle / Justificación
                             <span id="notesRequiredFlag" class="flag-required hidden">* (Obligatorio por discrepancia)</span>
@@ -121,14 +172,12 @@
                         <textarea 
                             id="receptionNotes" 
                             class="ph-textarea" 
-                            rows="3" 
-                            placeholder="Detalle los precintos rotos, conteo con transportista o motivo de discrepancia..."
+                            placeholder="Observaciones generales de recepción (opcional)..."
                         ></textarea>
                     </div>
                 </div>
             </div>
 
-            <!-- Contenedor del mensaje de alerta situado justo sobre los botones de acción -->
             <div id="receptionAlertBox" class="alert-box hidden"></div>
 
             <div class="form-actions">
@@ -155,5 +204,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=27"></script>
 {% endblock %}

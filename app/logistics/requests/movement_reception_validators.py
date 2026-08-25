@@ -28,7 +28,8 @@ def validate_reception_payload(payload, movement_details_map):
         
     notes = payload.get("notes", "").strip()
     
-    has_discrepancy = False
+    has_shortage = False
+    has_surplus = False
     processed_items = []
 
     for item in items:
@@ -52,11 +53,11 @@ def validate_reception_payload(payload, movement_details_map):
             
         if received_qty < detail.quantity:
             missing_qty = detail.quantity - received_qty
-            has_discrepancy = True
+            has_shortage = True
         else:
             missing_qty = Decimal("0.00")
             if received_qty > detail.quantity:
-                has_discrepancy = True
+                has_surplus = True
             
         processed_items.append({
             "detail_id": detail_id,
@@ -68,8 +69,19 @@ def validate_reception_payload(payload, movement_details_map):
             "expiration_date": detail.expiration_date
         })
 
-    if (novelty_type != "CONFORME" or has_discrepancy) and len(notes) < 5:
-        errors.append("Debe ingresar una justificación/nota de muelle de al menos 5 caracteres al reportar novedades.")
+    has_numeric_discrepancy = has_shortage or has_surplus
+
+    if has_surplus and novelty_type != "SOBRANTE_EXCEDENTE":
+        errors.append("Existe un excedente físico en la recepción. La clasificación principal debe ser 'Sobrante / Excedente en Muelle'.")
+
+    if has_shortage and novelty_type not in ("FALTANTE_CONTEO", "RECHAZO_POR_ESPACIO"):
+        errors.append("Existe un faltante físico de inventario. La clasificación principal debe ser 'Faltante de Conteo' o 'Rechazo Parcial por Espacio'. Detalle las anomalías secundarias en las notas de muelle.")
+
+    if not has_numeric_discrepancy and novelty_type in ("FALTANTE_CONTEO", "SOBRANTE_EXCEDENTE"):
+        errors.append("Las cantidades están cuadradas al 100%. No puede seleccionar faltantes ni sobrantes numéricos.")
+
+    if (novelty_type != "CONFORME" or has_numeric_discrepancy) and len(notes) < 5:
+        errors.append("Debe ingresar una justificación en las notas de muelle de al menos 5 caracteres.")
 
     if errors:
         return False, errors
@@ -78,5 +90,5 @@ def validate_reception_payload(payload, movement_details_map):
         "novelty_type": novelty_type,
         "notes": notes,
         "items": processed_items,
-        "has_discrepancy": has_discrepancy
+        "has_discrepancy": has_numeric_discrepancy
     }

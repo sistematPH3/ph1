@@ -15,9 +15,9 @@ class PurchaseService:
             new_purchase = Purchase(
                 supplier_id=data['supplier_id'],
                 purchase_date=purchase_date,
-                total_amount=data.get('total_amount', 0.0),
-                currency=data['currency'].upper(),
-                exchange_rate=data['exchange_rate'],
+                total_amount=Decimal('0.00'),
+                currency=str(data['currency']).upper(),
+                exchange_rate=Decimal(str(data['exchange_rate'])),
                 user_id=data['user_id'],
                 invoice_url=data.get('invoice_url'), 
                 status='COMPLETED' 
@@ -87,6 +87,7 @@ class PurchaseService:
                     "lot_number": lot_number
                 })
 
+                # Búsqueda o creación de inventario asegurando min_stock = 20 y transit = 0
                 inventory_record = db.session.query(Inventory).filter_by(
                     location_id=1, 
                     product_id=product_id
@@ -95,12 +96,16 @@ class PurchaseService:
                 if inventory_record:
                     prev_qty = float(inventory_record.current_quantity)
                     inventory_record.current_quantity = Decimal(str(inventory_record.current_quantity)) + quantity
+                    # Aseguramos que no tenga min_stock en 0 si era un registro previo dañado
+                    if inventory_record.min_stock == Decimal('0.00') or inventory_record.min_stock is None:
+                        inventory_record.min_stock = Decimal('20.00')
                 else:
                     prev_qty = 0.0
                     new_inv = Inventory(
                         location_id=1, 
                         product_id=product_id, 
                         current_quantity=quantity,
+                        min_stock=Decimal('20.00'),
                         transit_quantity=Decimal('0.00')
                     )
                     db.session.add(new_inv)

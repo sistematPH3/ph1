@@ -5,7 +5,7 @@ from flask_login import current_user
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import pytz
-from app.logistics.requests.purchase_request import PurchaseRequest
+from app.logistics.requests.purchase_validators import PurchaseValidator
 from app.logistics.services.purchase_service import PurchaseService
 from app import db 
 from app.models import ProductType, Inventory
@@ -228,7 +228,8 @@ def create_purchase():
     if not data:
         return jsonify({"error": "No se recibieron datos en la petición."}), 400
 
-    is_valid, errors = PurchaseRequest.validate_create(data)
+    # Invocación directa a PurchaseValidator
+    is_valid, errors = PurchaseValidator.validate_create(data)
     if not is_valid:
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
 
