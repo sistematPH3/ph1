@@ -132,3 +132,30 @@
 .ph-inner-table tbody td {
     border-color: #ced4da !important;
 }
+
+/* ==========================================================================
+   ADAPTACIONES PARA VISTA MÓVIL Y TARJETAS RESPONSIVAS
+   ========================================================================== */
+
+.dispute-row-mobile {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dispute-row-mobile:active {
+    transform: scale(0.99);
+}
+
+/* Ajustes responsivos para pantallas muy pequeñas */
+@media (max-width: 576px) {
+    .ph-card {
+        padding: 1.25rem;
+    }
+    
+    .ph-title {
+        font-size: 1.3rem;
+    }
+
+    .ph-filter-bar {
+        padding: 1rem !important;
+    }
+}

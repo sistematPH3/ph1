@@ -5,7 +5,7 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/list_locations.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
 {% endblock %}
 
 {% block title_list %}
@@ -49,6 +49,36 @@
 {% block table_id %}phTableCustom{% endblock %}
 
 {% block table_head %}
+    <!-- BANNER DE ALERTAS SUPERIOR PARA ERRORES / RESTRICCIONES DE DESACTIVACIÓN -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          {% if category == 'danger' %}
+            <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4 border-0 rounded-4" role="alert" style="background-color: #f8d7da; color: #842029;">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-danger"></i>
+                    <div>
+                        <strong>No se pudo desactivar la sede:</strong>
+                        <div class="small mt-1">{{ message }}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% elif category == 'warning' %}
+            <div class="alert alert-warning alert-dismissible fade show shadow-sm mb-4 border-0 rounded-4" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% elif category == 'success' %}
+            <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4 border-0 rounded-4" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <th class="ps-4">Código / Nombre</th>
     <th>Dirección Sucursal</th>
     <th>Contacto Directo</th>
