@@ -1,57 +1,151 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('searchDisputeInput');
-    const statusSelect = document.getElementById('statusFilterSelect');
-    const locationSelect = document.getElementById('locationFilterSelect');
-    const tableRows = document.querySelectorAll('.ph-table tbody tr.dispute-row');
-    const noResultsRow = document.getElementById('noResultsRow');
+document.addEventListener("DOMContentLoaded", function () {
+    const itemsPerPage = 10;
+    let currentPage = 1;
 
-    function filterTable() {
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-        const selectedStatus = statusSelect ? statusSelect.value.toLowerCase().trim() : '';
+    const searchInput = document.getElementById("searchDisputeInput");
+    const statusSelect = document.getElementById("statusFilterSelect");
+    const locationSelect = document.getElementById("locationFilterSelect");
+    const noResultsRow = document.getElementById("noResultsRow");
+
+    const btnPrev = document.getElementById("btnPrevPage");
+    const btnNext = document.getElementById("btnNextPage");
+    const pageText = document.getElementById("currentPageText");
+    const pageInfo = document.getElementById("paginationInfo");
+
+    function getFilteredIndices() {
+        const desktopRows = Array.from(document.querySelectorAll(".dispute-row"));
+        const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const selectedStatus = statusSelect ? statusSelect.value.trim() : "";
         
-        // Obtenemos el texto visible de la sede seleccionada (ej. el nombre de la sede)
-        let selectedLocationText = '';
+        let selectedLocationText = "";
         if (locationSelect && locationSelect.selectedIndex > 0) {
             selectedLocationText = locationSelect.options[locationSelect.selectedIndex].text.toLowerCase().trim();
         }
-        
-        let visibleCount = 0;
 
-        tableRows.forEach(row => {
-            const textContent = row.textContent.toLowerCase();
+        let matchingIndices = [];
+
+        desktopRows.forEach((row, index) => {
+            // Buscamos también en su respectiva tarjeta móvil para asegurar el mismo texto evaluado
+            const mobileCard = document.querySelectorAll(".dispute-row-mobile")[index];
+            const combinedText = (row.textContent + " " + (mobileCard ? mobileCard.textContent : "")).toLowerCase();
             
-            // Evaluamos coincidencias generales de texto y estado
-            const matchesSearch = textContent.includes(query);
-            const matchesStatus = selectedStatus === "" || textContent.includes(selectedStatus);
+            const matchesSearch = searchTerm === "" || combinedText.includes(searchTerm);
             
-            // Evaluamos si la fila contiene la sede seleccionada (ya sea como origen o destino)
-            const matchesLocation = selectedLocationText === "" || textContent.includes(selectedLocationText);
+            let matchesStatus = true;
+            if (selectedStatus !== "") {
+                const selectedStatusText = statusSelect.options[statusSelect.selectedIndex].text.toLowerCase();
+                matchesStatus = combinedText.includes(selectedStatusText) || combinedText.includes(selectedStatus.toLowerCase());
+            }
+
+            const matchesLocation = selectedLocationText === "" || combinedText.includes(selectedLocationText);
 
             if (matchesSearch && matchesStatus && matchesLocation) {
-                row.style.display = '';
-                visibleCount++;
+                matchingIndices.push(index);
+            }
+        });
+
+        return matchingIndices;
+    }
+
+    function renderPage() {
+        const desktopRows = document.querySelectorAll(".dispute-row");
+        const detailRows = document.querySelectorAll(".detail-collapse-row");
+        const mobileCards = document.querySelectorAll(".dispute-row-mobile");
+        
+        // 1. Ocultar absolutamente todo primero
+        desktopRows.forEach(r => r.style.setProperty("display", "none", "important"));
+        detailRows.forEach(d => {
+            d.style.setProperty("display", "none", "important");
+            const collapseDiv = d.querySelector('.collapse');
+            if (collapseDiv && collapseDiv.classList.contains('show')) {
+                collapseDiv.classList.remove('show');
+            }
+        });
+        mobileCards.forEach(m => m.style.setProperty("display", "none", "important"));
+
+        const filteredIndices = getFilteredIndices();
+        const totalItems = filteredIndices.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageIndices = filteredIndices.slice(start, end);
+
+        // 2. Mostrar únicamente los elementos correspondientes a la página actual según el dispositivo
+        const isMobile = window.innerWidth < 768;
+
+        pageIndices.forEach(index => {
+            if (isMobile) {
+                if (mobileCards[index]) {
+                    mobileCards[index].style.setProperty("display", "block", "important");
+                }
             } else {
-                row.style.display = 'none';
-                // Si la fila se oculta, cerramos su detalle desplegable si estuviera abierto
-                const nextRow = row.nextElementSibling;
-                if (nextRow && nextRow.classList.contains('collapse')) {
-                    nextRow.classList.remove('show');
+                if (desktopRows[index]) {
+                    desktopRows[index].style.setProperty("display", "table-row", "important");
+                }
+                if (detailRows[index]) {
+                    detailRows[index].style.setProperty("display", "table-row", "important");
                 }
             }
         });
 
-        // Mostrar u ocultar el mensaje de "No se encontraron resultados"
+        // Mensaje cuando no hay datos
         if (noResultsRow) {
-            if (visibleCount === 0 && tableRows.length > 0) {
-                noResultsRow.style.display = '';
-            } else {
-                noResultsRow.style.display = 'none';
-            }
+            noResultsRow.style.display = totalItems === 0 ? "block" : "none";
         }
+
+        // Información de paginación
+        if (pageText) pageText.textContent = `Página ${currentPage} de ${totalPages}`;
+        const displayedStart = totalItems === 0 ? 0 : start + 1;
+        const displayedEnd = Math.min(end, totalItems);
+        if (pageInfo) pageInfo.textContent = `Mostrando ${displayedStart}-${displayedEnd} de ${totalItems} registros`;
+
+        if (btnPrev) btnPrev.disabled = currentPage === 1;
+        if (btnNext) btnNext.disabled = currentPage === totalPages || totalItems === 0;
     }
 
-    // Escuchar eventos en los elementos de filtro
-    if (searchInput) searchInput.addEventListener('input', filterTable);
-    if (statusSelect) statusSelect.addEventListener('change', filterTable);
-    if (locationSelect) locationSelect.addEventListener('change', filterTable);
+    // Escuchadores de Paginación
+    if (btnPrev) {
+        btnPrev.addEventListener("click", () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage();
+            }
+        });
+    }
+
+    if (btnNext) {
+        btnNext.addEventListener("click", () => {
+            const filtered = getFilteredIndices();
+            if (currentPage * itemsPerPage < filtered.length) {
+                currentPage++;
+                renderPage();
+            }
+        });
+    }
+
+    // Escuchadores de Filtros y Búsqueda
+    [searchInput, statusSelect, locationSelect].forEach(el => {
+        if (el) {
+            el.addEventListener("input", () => {
+                currentPage = 1;
+                renderPage();
+            });
+            el.addEventListener("change", () => {
+                currentPage = 1;
+                renderPage();
+            });
+        }
+    });
+
+    // Re-renderizar dinámicamente si se cambia el tamaño de pantalla entre PC y Móvil
+    window.addEventListener("resize", () => {
+        renderPage();
+    });
+
+    // Inicialización
+    renderPage();
 });
