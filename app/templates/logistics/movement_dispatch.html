@@ -20,23 +20,32 @@
         </div>
 
         <form id="dispatchForm" class="needs-validation" novalidate>
-            <!-- Selección de Sedes -->
+            <!-- Selección de Sedes según el Rol -->
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label for="origin_location_id" class="form-label fw-bold text-dark">
                         Sede Origen <span class="text-danger">*</span>
                     </label>
-                    <select class="form-select ph-pill-input" id="origin_location_id" name="origin_location_id" 
-                    required {% if not is_admin %}disabled{% endif %}>
-                        <option value="">Seleccione el Origen</option>
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if loc.id == user_location_id %}selected{% endif %}>
-                            {{ loc.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    {% if not is_admin %}
-                    <input type="hidden" id="origin_location_id_hidden" value="{{ user_location_id }}">
+                    {% if is_admin %}
+                        <!-- ADMIN: Fijo en Almacén Central (ID = 1) -->
+                        <select class="form-select ph-pill-input" id="origin_location_id" disabled>
+                            {% for loc in locations %}
+                                {% if loc.id == 1 %}
+                                <option value="{{ loc.id }}" selected>{{ loc.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <input type="hidden" id="origin_location_id_hidden" value="1">
+                    {% else %}
+                        <!-- GERENTE / SUBGERENTE: Fijo en su sede asignada -->
+                        <select class="form-select ph-pill-input" id="origin_location_id" disabled>
+                            {% for loc in locations %}
+                                {% if loc.id == user_location_id %}
+                                <option value="{{ loc.id }}" selected>{{ loc.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <input type="hidden" id="origin_location_id_hidden" value="{{ user_location_id }}">
                     {% endif %}
                     <div class="invalid-feedback ps-2" id="originFeedback">Por favor, seleccione la sede de origen.</div>
                 </div>
@@ -46,15 +55,17 @@
                         Sede Destino <span class="text-danger">*</span>
                     </label>
                     {% if is_admin %}
-                        <!-- Si es Admin: desplegable con todas las sedes -->
+                        <!-- ADMIN: Seleccionable, excluyendo Almacén Central -->
                         <select class="form-select ph-pill-input" id="destination_location_id" name="destination_location_id" required>
                             <option value="">Seleccione el Destino</option>
                             {% for loc in locations %}
-                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% if loc.id != 1 %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endif %}
                             {% endfor %}
                         </select>
                     {% else %}
-                        <!-- Si no es Admin: campo bloqueado fijo en Almacén Central (ID = 1) -->
+                        <!-- GERENTE / SUBGERENTE: Fijo en Almacén Central (ID = 1) -->
                         <select class="form-select ph-pill-input" id="destination_location_id" disabled>
                             {% for loc in locations %}
                                 {% if loc.id == 1 %}
@@ -64,7 +75,6 @@
                         </select>
                         <input type="hidden" id="destination_location_id_hidden" value="1">
                     {% endif %}
-                    
                     <div class="invalid-feedback ps-2" id="destinationFeedback">Por favor, seleccione la sede de destino.</div>
                 </div>
             </div>

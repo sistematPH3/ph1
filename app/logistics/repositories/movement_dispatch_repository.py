@@ -1,3 +1,4 @@
+from datetime import datetime  #
 from decimal import Decimal
 from app import db
 from app.models import Inventory, Movement, MovementDetail
@@ -16,53 +17,48 @@ class MovementDispatchRepository:
 
     @staticmethod
     def create_dispatch_transaction(origin_id, destination_id, created_by_id, items_payload):
-        """
-        Ejecuta la reserva matemática bajo bloqueo pesimista:
-        Resta de current_quantity y suma a transit_quantity en la sede origen.
-        """
-        # 1. Crear el registro cabecera en la tabla movements
         movement = Movement(
             type='DESPACHO',
             origin_location_id=origin_id,
             destination_location_id=destination_id,
-            status='EN_TRANSITO',  # Estado inicial inmutable
+            status='EN_TRANSITO',
             user_id=created_by_id
         )
         db.session.add(movement)
-        db.session.flush()  # Genera el ID del movimiento sin cerrar la transacción
+        db.session.flush()
 
-        # 2. Procesar cada renglón del detalle
         for item in items_payload:
             product_id = int(item['product_id'])
             quantity = Decimal(str(item['quantity']))
-            lot_number = item.get('lot_number', '').strip()
-            exp_date_str = item.get('expiration_date')
+            lot_number = str(item.get('lot_number', '')).strip()
 
-            # Bloqueo Pesimista
-            inventory = MovementDispatchRepository.get_inventory_for_update(origin_id, product_id)
+            if not lot_number:
+                raise ValueError(f"Debe especificar un lote válido para el producto ID {product_id}.")
 
-            if not inventory:
-                raise ValueError(f"El producto ID {product_id} no está registrado en el inventario de la sede origen.")
+            # Bloqueo pesimista sobre el registro específico del lote en la sede origen
+            inventory = db.session.query(Inventory).filter_by(
+            location_id=origin_id,
+            product_id=product_id
+        ).with_for_update().first()
 
-            if inventory.current_quantity < quantity:
-                raise ValueError(
-                    f"Stock insuficiente para el producto ID {product_id}. "
-                    f"Disponible: {inventory.current_quantity}, Solicitado: {quantity}"
-                )
+        if not inventory or inventory.current_quantity < quantity:
+            raise ValueError(f"Stock insuficiente en la sede origen. Disponible: {inventory.current_quantity if inventory else 0}")
 
-            # Transferencia de saldos de custodia
-            inventory.current_quantity -= quantity
-            inventory.transit_quantity += quantity
+        # Descuenta del inventario general de la sede
+        inventory.current_quantity -= quantity
+        inventory.transit_quantity += quantity
 
-            # Crear renglón en movement_details
-            detail = MovementDetail(
-                movement_id=movement.id,
-                product_id=product_id,
-                quantity=quantity,
-                lot_number=lot_number if lot_number else None,
-                expiration_date=exp_date_str if exp_date_str else None
-            )
-            db.session.add(detail)
+        exp_date_obj = datetime.strptime(item['expiration_date'], '%Y-%m-%d').date() if item.get('expiration_date') else None
+
+        # El lote y su fecha de vencimiento se registran directamente en el detalle del movimiento
+        detail = MovementDetail(
+            movement_id=movement.id,
+            product_id=product_id,
+            quantity=quantity,
+            lot_number=lot_number,
+            expiration_date=exp_date_obj
+        )
+        db.session.add(detail)
 
         return movement
 

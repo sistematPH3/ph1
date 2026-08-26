@@ -7,14 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dispatchForm = document.getElementById('dispatchForm');
     const productOptionsTemplateEl = document.getElementById('productOptionsTemplate');
 
-    // Obtener fecha actual en formato AAAA-MM-DD para bloquear el calendario
     const todayStr = new Date().toISOString().split('T')[0];
 
     if (!dispatchForm || !itemsBody || !productOptionsTemplateEl) return;
 
     const productOptionsTemplate = productOptionsTemplateEl.innerHTML;
 
-    // Helper para leer el ID del origen sin importar si el select está deshabilitado por ROL
     function getOriginLocationId() {
         const originSelect = document.getElementById('origin_location_id');
         if (originSelect && originSelect.disabled) {
@@ -23,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return originSelect ? originSelect.value : '';
     }
 
-    // Helper para leer el ID del destino sin importar si está deshabilitado por ROL
     function getDestinationLocationId() {
         const destSelect = document.getElementById('destination_location_id');
         if (destSelect && destSelect.disabled) {
@@ -32,116 +29,156 @@ document.addEventListener('DOMContentLoaded', () => {
         return destSelect ? destSelect.value : '';
     }
 
-    // Validar en tiempo real que Origen y Destino no sean la misma sede y marcar visualmente
-function validateLocations() {
-    const originSelect = document.getElementById('origin_location_id');
-    const destSelect = document.getElementById('destination_location_id');
-    const destFeedback = document.getElementById('destinationFeedback');
-    const originId = getOriginLocationId();
+    function validateLocations() {
+        const originSelect = document.getElementById('origin_location_id');
+        const destSelect = document.getElementById('destination_location_id');
+        const destFeedback = document.getElementById('destinationFeedback');
+        const originId = getOriginLocationId();
 
-    // Marcar origen como válido si tiene valor y no está deshabilitado
-    if (originSelect && !originSelect.disabled) {
-        if (originId) {
-            originSelect.classList.remove('is-invalid');
-            originSelect.classList.add('is-valid');
-        } else {
-            originSelect.classList.remove('is-valid', 'is-invalid');
+        if (originSelect && !originSelect.disabled) {
+            if (originId) {
+                originSelect.classList.remove('is-invalid');
+                originSelect.classList.add('is-valid');
+            } else {
+                originSelect.classList.remove('is-valid', 'is-invalid');
+            }
         }
-    }
 
-    if (!destSelect) return true;
+        if (!destSelect) return true;
 
-    const destId = destSelect.value;
+        const destId = getDestinationLocationId();
 
-    if (originId && destId && originId === destId) {
-        destSelect.classList.remove('is-valid');
-        destSelect.classList.add('is-invalid');
-        if (destFeedback) {
-            destFeedback.textContent = 'La sede de destino no puede ser igual a la sede de origen.';
+        if (originId && destId && originId === destId) {
+            destSelect.classList.remove('is-valid');
+            destSelect.classList.add('is-invalid');
+            if (destFeedback) {
+                destFeedback.textContent = 'La sede de destino no puede ser igual a la sede de origen.';
+            }
+            return false;
+        } else if (destId) {
+            destSelect.classList.remove('is-invalid');
+            
+            if (!destSelect.disabled) {
+                destSelect.classList.add('is-valid');
+            } else {
+                destSelect.classList.remove('is-valid');
+            }
+
+            if (destFeedback) {
+                destFeedback.textContent = 'Por favor, seleccione la sede de destino.';
+            }
+            return true;
         }
         return false;
-    } else if (destId) {
-        destSelect.classList.remove('is-invalid');
-        
-        // Solo mostrar la tilde verde si el campo está activo/editable
-        if (!destSelect.disabled) {
-            destSelect.classList.add('is-valid');
-        } else {
-            destSelect.classList.remove('is-valid');
-        }
-
-        if (destFeedback) {
-            destFeedback.textContent = 'Por favor, seleccione la sede de destino.';
-        }
-        return true;
     }
-    return false;
-}
 
-    // Escuchar cambios de sedes
-    document.getElementById('origin_location_id')?.addEventListener('change', validateLocations);
+    document.getElementById('origin_location_id')?.addEventListener('change', () => {
+        validateLocations();
+        document.querySelectorAll('#itemsBody tr').forEach(row => checkStockForRow(row));
+    });
     document.getElementById('destination_location_id')?.addEventListener('change', validateLocations);
 
-    // Consultar la base de datos para verificar si el producto está en 0 unidades
     async function checkStockForRow(row) {
         const productSelect = row.querySelector('.product-select');
+        const lotSelect = row.querySelector('.lot-select');
         const qtyInput = row.querySelector('.quantity-input');
+        const expInput = row.querySelector('.exp-input');
+        const totalStockInfo = row.querySelector('.total-stock-info');
         const qtyFeedback = qtyInput ? qtyInput.nextElementSibling : null;
-        
+
         const originId = getOriginLocationId();
         const productId = productSelect.value;
 
-        if (!originId || !productId) return;
+        lotSelect.innerHTML = '<option value="">Cargando lotes...</option>';
+        lotSelect.disabled = true;
+        expInput.value = '';
+        if (totalStockInfo) totalStockInfo.textContent = '';
+        row.dataset.availableStock = 0;
+        row.dataset.totalStock = 0;
+
+        if (!originId || !productId) {
+            lotSelect.innerHTML = '<option value="">Seleccione Lote...</option>';
+            return;
+        }
 
         try {
-            const response = await fetch(`/logistics/movements/check-stock?location_id=${originId}&product_id=${productId}`);
+            const response = await fetch(`/logistics/movements/get-product-lots?location_id=${originId}&product_id=${productId}`);
+            
+            if (!response.ok) {
+                throw new Error(`Respuesta de red fallida con estatus ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.success) {
-                const availableStock = data.stock;
-                row.dataset.availableStock = availableStock;
+                row.dataset.totalStock = data.total_stock;
+                
+                if (totalStockInfo) {
+                    totalStockInfo.textContent = `Stock Total en Sede: ${data.total_stock}`;
+                }
 
-                // El producto fue seleccionado correctamente: se asegura estado válido en el select
                 productSelect.classList.remove('is-invalid');
                 productSelect.classList.add('is-valid');
 
-                if (availableStock <= 0) {
+                lotSelect.innerHTML = '<option value="">Seleccione Lote...</option>';
+
+                if (!data.lots || data.lots.length === 0) {
+                    lotSelect.innerHTML = '<option value="">Sin lotes con stock</option>';
                     qtyInput.classList.remove('is-valid');
                     qtyInput.classList.add('is-invalid');
-                    if (qtyFeedback) {
-                        qtyFeedback.textContent = 'Este producto no existe o se encuentra en 0 unidades.';
-                    }
-                } else {
-                    validateQuantityInput(row);
+                    if (qtyFeedback) qtyFeedback.textContent = 'Este producto no posee lotes con inventario disponible.';
+                    return;
                 }
+
+                data.lots.forEach(lot => {
+                    const option = document.createElement('option');
+                    option.value = lot.lot_number;
+                    option.textContent = `Lote: ${lot.lot_number} (Disp: ${lot.available_quantity})`;
+                    option.dataset.stock = lot.available_quantity;
+                    option.dataset.expiration = lot.expiration_date;
+                    lotSelect.appendChild(option);
+                });
+
+                lotSelect.disabled = false;
+                validateQuantityInput(row);
             }
         } catch (err) {
-            console.error('Error al verificar stock:', err);
+            console.error('Error al consultar lotes:', err);
+            lotSelect.innerHTML = '<option value="">Error al cargar lotes</option>';
+            lotSelect.disabled = true;
         }
     }
 
-    // Validar que la cantidad ingresada sea mayor a 0 y no supere el disponible
     function validateQuantityInput(row) {
         const qtyInput = row.querySelector('.quantity-input');
+        const lotSelect = row.querySelector('.lot-select');
         const qtyFeedback = qtyInput ? qtyInput.nextElementSibling : null;
         const availableStock = parseFloat(row.dataset.availableStock || 0);
         const enteredQty = parseFloat(qtyInput.value) || 0;
+
+        if (!lotSelect.value) {
+            qtyInput.classList.remove('is-valid');
+            if (enteredQty > 0) {
+                qtyInput.classList.add('is-invalid');
+                if (qtyFeedback) qtyFeedback.textContent = 'Debe seleccionar un lote primero.';
+            }
+            return;
+        }
 
         if (enteredQty <= 0) {
             qtyInput.classList.remove('is-valid');
             qtyInput.classList.add('is-invalid');
             if (qtyFeedback) qtyFeedback.textContent = 'La cantidad debe ser mayor a 0.';
-        } else if (row.dataset.availableStock !== undefined && enteredQty > availableStock) {
+        } else if (enteredQty > availableStock) {
             qtyInput.classList.remove('is-valid');
             qtyInput.classList.add('is-invalid');
-            if (qtyFeedback) qtyFeedback.textContent = `Stock insuficiente. Disponible: ${availableStock}`;
+            if (qtyFeedback) qtyFeedback.textContent = `Excede el disponible del lote (${availableStock}).`;
         } else {
             qtyInput.classList.remove('is-invalid');
             qtyInput.classList.add('is-valid');
         }
     }
 
-    // Función para añadir filas con las nuevas restricciones y validaciones en tiempo real
     function addRow() {
         const rowId = Date.now();
         const tr = document.createElement('tr');
@@ -153,18 +190,21 @@ function validateLocations() {
                     ${productOptionsTemplate}
                 </select>
                 <div class="invalid-feedback ps-2">Seleccione un producto.</div>
+                <small class="text-muted ps-2 pt-1 d-block total-stock-info"></small>
             </td>
             <td>
                 <input type="number" step="0.01" min="0.01" class="form-control ph-pill-input quantity-input" placeholder="0.00" required>
                 <div class="invalid-feedback ps-2">La cantidad debe ser mayor a 0.</div>
             </td>
             <td>
-                <input type="text" class="form-control ph-pill-input lot-input" placeholder="N° de Lote" required>
-                <div class="invalid-feedback ps-2">El lote es obligatorio.</div>
+                <select class="form-select ph-pill-input lot-select" required disabled>
+                    <option value="">Seleccione Lote...</option>
+                </select>
+                <div class="invalid-feedback ps-2">Debe seleccionar un lote.</div>
             </td>
             <td>
-                <input type="date" min="${todayStr}" class="form-control ph-pill-input exp-input" required>
-                <div class="invalid-feedback ps-2">La fecha de vencimiento es obligatoria y no puede ser pasada.</div>
+                <input type="date" class="form-control ph-pill-input exp-input" readonly required>
+                <div class="invalid-feedback ps-2">La fecha es obligatoria.</div>
             </td>
             <td class="text-center">
                 <button type="button" class="btn btn-ph-delete btn-sm btn-delete shadow-sm" title="Eliminar fila">
@@ -174,38 +214,36 @@ function validateLocations() {
         `;
 
         const productSelect = tr.querySelector('.product-select');
+        const lotSelect = tr.querySelector('.lot-select');
         const qtyInput = tr.querySelector('.quantity-input');
-        const lotInput = tr.querySelector('.lot-input');
         const expInput = tr.querySelector('.exp-input');
 
         productSelect.addEventListener('change', () => checkStockForRow(tr));
         qtyInput.addEventListener('input', () => validateQuantityInput(tr));
 
-        // Validación en tiempo real para N° de Lote
-        lotInput.addEventListener('input', () => {
-            if (lotInput.value.trim() !== '') {
-                lotInput.classList.remove('is-invalid');
-                lotInput.classList.add('is-valid');
+        lotSelect.addEventListener('change', () => {
+            const selectedOpt = lotSelect.options[lotSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.value) {
+                const stock = parseFloat(selectedOpt.dataset.stock || 0);
+                const expDate = selectedOpt.dataset.expiration || '';
+
+                tr.dataset.availableStock = stock;
+                expInput.value = expDate;
+
+                lotSelect.classList.remove('is-invalid');
+                lotSelect.classList.add('is-valid');
+                if (expDate) {
+                    expInput.classList.remove('is-invalid');
+                    expInput.classList.add('is-valid');
+                }
             } else {
-                lotInput.classList.remove('is-valid');
+                tr.dataset.availableStock = 0;
+                expInput.value = '';
+                lotSelect.classList.remove('is-valid');
+                expInput.classList.remove('is-valid');
             }
+            validateQuantityInput(tr);
         });
-
-        // Validación en tiempo real para Fecha de Vencimiento
-        const validateExp = () => {
-            if (expInput.value && expInput.value >= todayStr) {
-                expInput.classList.remove('is-invalid');
-                expInput.classList.add('is-valid');
-            } else if (expInput.value) {
-                expInput.classList.remove('is-valid');
-                expInput.classList.add('is-invalid');
-            } else {
-                expInput.classList.remove('is-valid');
-            }
-        };
-
-        expInput.addEventListener('change', validateExp);
-        expInput.addEventListener('input', validateExp);
 
         tr.querySelector('.btn-delete').addEventListener('click', () => {
             tr.remove();
@@ -214,17 +252,14 @@ function validateLocations() {
         itemsBody.appendChild(tr);
     }
 
-    // Agregar primera fila por defecto
     addRow();
 
     if (btnAddRow) {
         btnAddRow.addEventListener('click', addRow);
     }
 
-    // Ejecutar validación inicial al cargar las sedes
     validateLocations();
 
-    // Envío del formulario asíncrono
     dispatchForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -245,12 +280,13 @@ function validateLocations() {
         rows.forEach(row => {
             const qtyInput = row.querySelector('.quantity-input');
             const productSelect = row.querySelector('.product-select');
-            const lotInput = row.querySelector('.lot-input');
+            const lotSelect = row.querySelector('.lot-select');
             const expInput = row.querySelector('.exp-input');
 
             if (qtyInput?.classList.contains('is-invalid') || 
                 productSelect?.classList.contains('is-invalid') ||
-                lotInput?.classList.contains('is-invalid') ||
+                lotSelect?.classList.contains('is-invalid') ||
+                !lotSelect?.value ||
                 expInput?.classList.contains('is-invalid')) {
                 formIsValid = false;
             }
@@ -266,7 +302,7 @@ function validateLocations() {
         rows.forEach(row => {
             const productId = row.querySelector('.product-select').value;
             const quantity = row.querySelector('.quantity-input').value;
-            const lotNumber = row.querySelector('.lot-input').value;
+            const lotNumber = row.querySelector('.lot-select').value;
             const expirationDate = row.querySelector('.exp-input').value;
 
             items.push({
