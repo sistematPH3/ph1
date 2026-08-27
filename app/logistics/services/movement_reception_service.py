@@ -13,7 +13,7 @@ class MovementReceptionService:
         if not movement:
             return None, "Traslado no encontrado."
 
-        if movement["status"] != "EN_TRANSITO":
+        if str(movement["status"]).upper() != "EN_TRANSITO":
             return None, f"El traslado #{movement_id} no está en tránsito (Estado actual: {movement['status']})."
 
         if user_role_id != 1 and movement["destination_location_id"] not in user_location_ids:
@@ -28,7 +28,7 @@ class MovementReceptionService:
         if not movement:
             return False, "Traslado no encontrado."
 
-        if movement["status"] != "EN_TRANSITO":
+        if str(movement["status"]).upper() != "EN_TRANSITO":
             return False, f"El traslado no puede ser recibido con estatus '{movement['status']}'."
 
         if user_role_id != 1 and movement["destination_location_id"] not in user_location_ids:
@@ -54,9 +54,9 @@ class MovementReceptionService:
             for item in processed_items:
                 detail_id = item["detail_id"]
                 product_id = item["product_id"]
-                rec_qty = item["received_quantity"]
-                mis_qty = item["missing_quantity"]
-                dispatched_qty = item["quantity"]
+                rec_qty = Decimal(str(item["received_quantity"]))
+                mis_qty = Decimal(str(item["missing_quantity"]))
+                dispatched_qty = Decimal(str(item["quantity"]))
 
                 MovementReceptionRepository.update_detail_quantities(detail_id, rec_qty, mis_qty)
                 MovementReceptionRepository.get_or_create_inventory(movement["origin_location_id"], product_id)

@@ -1,25 +1,23 @@
-from app.extensions import db
-from app.models import Movement, Inventory, AuditLog
 from datetime import datetime
+from decimal import Decimal
 from sqlalchemy import or_
+from app import db
+from app.models import Movement, Inventory, AuditLog, Product
+from app.logistics.requests.movement_dispute_validators import MovementDisputeValidator
 
 class MovementDisputeService:
 
     @staticmethod
     def validate_location_can_be_deactivated(location_id):
-        """
-        Valida que la sede no tenga traslados en tránsito ni disputas pendientes.
-        Lanza ValueError si tiene pendientes para bloquear la desactivación.
-        """
         pending_statuses = [
-            'EN_TRANSITO', 
-            'NOVEDAD_FALTANTE', 
-            'RETORNO_EMERGENCIA', 
-            'RECIBIDO_CON_NOVEDAD', 
+            'EN_TRANSITO',
+            'NOVEDAD_FALTANTE',
+            'RETORNO_EMERGENCIA',
+            'RECIBIDO_CON_NOVEDAD',
             'EN_DISPUTA'
         ]
 
-        pending_count = Movement.query.filter(
+        pending_count = db.session.query(Movement).filter(
             or_(
                 Movement.origin_location_id == location_id,
                 Movement.destination_location_id == location_id
@@ -29,184 +27,200 @@ class MovementDisputeService:
 
         if pending_count > 0:
             raise ValueError(
-                f"No se puede desactivar la sede ID {location_id}. "
-                f"Existen {pending_count} traslados pendientes de liquidación "
-                f"(en tránsito, retorno o con faltantes en disputa)."
+                f"No se puede desactivar la sede ID {location_id}. Existen {pending_count} traslados pendientes de liquidación."
             )
 
     @staticmethod
     def resolve_dispute(movement_id, action_type, resolution_notes, admin_user_id):
-        """
-        Ejecuta la lógica transaccional de arbitraje dictaminada por el Administrador.
-        """
-        movement = Movement.query.get_or_404(movement_id)
-        
-        # Validación de seguridad: evitar resolver movimientos ya arbitrados
+        is_valid, errors = MovementDisputeValidator.validate_dispute_resolution(action_type, resolution_notes)
+        if not is_valid:
+            raise ValueError(errors[0])
+
+        movement = db.session.query(Movement).filter_by(id=movement_id).with_for_update().first()
+        if not movement:
+            raise ValueError(f"El movimiento #{movement_id} no existe.")
+
         if movement.resolved_by_id is not None:
             raise ValueError(f"El movimiento #{movement_id} ya ha sido arbitrado previamente.")
 
         valid_dispute_statuses = [
-            'NOVEDAD_FALTANTE', 'RETORNO_EMERGENCIA', 'RECIBIDO_CON_NOVEDAD', 
-            'EN_DISPUTA', 'FALTANTE_CONTEO', 'COMPLETADO'
+            'NOVEDAD_FALTANTE', 'RETORNO_EMERGENCIA', 'RECIBIDO_CON_NOVEDAD',
+            'EN_DISPUTA', 'FALTANTE_CONTEO', 'SOBRANTE_EXCEDENTE',
+            'PRODUCTO_ERRONEO', 'SKU_CRUZADO', 'VIOLACION_CUSTODIA',
+            'INCIDENCIA_TEMPERATURA', 'VENCIMIENTO_PROXIMO', 'LOTE_NO_COINCIDE',
+            'RECHAZO_POR_ESPACIO', 'COMPLETADO'
         ]
         if movement.status not in valid_dispute_statuses:
             raise ValueError("El movimiento seleccionado no se encuentra en una fase que requiera arbitraje.")
 
-        if not resolution_notes or len(resolution_notes.strip()) < 15:
-            raise ValueError("La justificación legal o acta es obligatoria y debe tener al menos 15 caracteres.")
-
-        # Asignamos los datos del veredicto a la cabecera del movimiento
         movement.resolved_by_id = admin_user_id
         movement.resolution_notes = resolution_notes.strip()
 
-        # =========================================================================
-        # OPCIÓN 1: REINTEGRO AL ORIGEN
-        # =========================================================================
+        audit_items = []
+        stock_impact = {}
+
         if action_type == 'RESOLUCION_REINTEGRO':
             movement.status = 'CERRADO_POR_ADMIN'
-            
+            total_reintegrated = Decimal('0.00')
+
             for detail in movement.details:
-                qty_sent = detail.quantity or 0
-                qty_received = detail.received_quantity or 0
+                missing_qty = Decimal(str(detail.missing_quantity or 0))
+                product = db.session.query(Product).get(detail.product_id)
 
-                inventory_origin = Inventory.query.with_for_update().filter_by(
-                    location_id=movement.origin_location_id,
-                    product_id=detail.product_id
-                ).first()
+                if missing_qty > Decimal('0.00'):
+                    inv_origin = db.session.query(Inventory).filter_by(
+                        location_id=movement.origin_location_id,
+                        product_id=detail.product_id
+                    ).with_for_update().first()
 
-                # CASO A: FALTANTE (Se enviaron 5 kg y llegaron 2 kg -> faltan 3 kg)
-                # Los 3 kg sí fueron restados de Central y están congelados en 'transit_quantity'.
-                # Al reintegar, se liberan del tránsito y regresan al disponible de Central.
-                if getattr(detail, 'missing_quantity', 0) > 0:
-                    missing = detail.missing_quantity
-                    if inventory_origin:
-                        inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - missing)
-                        inventory_origin.current_quantity += missing
+                    if inv_origin:
+                        inv_origin.transit_quantity = max(Decimal('0.00'), inv_origin.transit_quantity - missing_qty)
+                        inv_origin.current_quantity += missing_qty
+                        total_reintegrated += missing_qty
 
-                # CASO B: SOBRANTE (Se enviaron 5 kg y llegaron 20 kg -> sobran 15 kg)
-                # El camión devuelve los 15 kg físicos a Central.
-                # Digitalmente NO se hace ningún cálculo porque Central NUNCA descontó esos 15 kg.
-                # Su base de datos ya marcaba 45 kg disponibles.
-                elif qty_received > qty_sent:
-                    pass  # El stock en BD de Central ya es el correcto (45 kg).
+                audit_items.append({
+                    'product_id': detail.product_id,
+                    'sku': product.sku if product else f"PROD-{detail.product_id}",
+                    'lot_number': detail.lot_number,
+                    'reintegrated_qty': float(missing_qty)
+                })
 
+            stock_impact = {
+                'origin_transit_delta': -float(total_reintegrated),
+                'origin_current_delta': float(total_reintegrated)
+            }
             audit_severity = 'NORMAL'
             event_name = 'RESOLUCION_REINTEGRO'
 
-        # =========================================================================
-        # OPCIÓN 2: LEGALIZAR SOBRANTE EN DESTINO
-        # (Si el administrador autoriza que la sucursal receptora se quede el excedente)
-        # =========================================================================
-        elif action_type in ['RESOLUCION_LEGALIZAR_SOBRANTE', 'RESOLUCION_INGRESO_DESTINO']:
-            movement.status = 'CERRADO_POR_ADMIN'
-            
-            for detail in movement.details:
-                qty_sent = detail.quantity or 0
-                qty_received = detail.received_quantity or 0
-
-                if qty_received > qty_sent:
-                    sobrante = qty_received - qty_sent
-
-                    inventory_dest = Inventory.query.filter_by(
-                        location_id=movement.destination_location_id,
-                        product_id=detail.product_id
-                    ).first()
-
-                    # Se le suma el excedente únicamente a la sucursal que se lo quedó
-                    if inventory_dest:
-                        inventory_dest.current_quantity += sobrante
-
-            audit_severity = 'NORMAL'
-            event_name = 'RESOLUCION_LEGALIZAR_SOBRANTE'
-
-        # =========================================================================
-        # OPCIÓN 3: BAJA POR EXTRAVÍO / ROBO
-        # =========================================================================
         elif action_type == 'RESOLUCION_BAJA_EXTRAVIO':
             movement.status = 'CERRADO_CON_PERDIDA'
-            
+            total_loss = Decimal('0.00')
+
             for detail in movement.details:
-                if getattr(detail, 'missing_quantity', 0) > 0:
-                    missing = detail.missing_quantity
-                    inventory_origin = Inventory.query.filter_by(
+                missing_qty = Decimal(str(detail.missing_quantity or 0))
+                product = db.session.query(Product).get(detail.product_id)
+
+                if missing_qty > Decimal('0.00'):
+                    inv_origin = db.session.query(Inventory).filter_by(
                         location_id=movement.origin_location_id,
                         product_id=detail.product_id
-                    ).first()
-                    
-                    if inventory_origin:
-                        inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - missing)
+                    ).with_for_update().first()
 
+                    if inv_origin:
+                        inv_origin.transit_quantity = max(Decimal('0.00'), inv_origin.transit_quantity - missing_qty)
+                        total_loss += missing_qty
+
+                audit_items.append({
+                    'product_id': detail.product_id,
+                    'sku': product.sku if product else f"PROD-{detail.product_id}",
+                    'lot_number': detail.lot_number,
+                    'written_off_qty': float(missing_qty)
+                })
+
+            stock_impact = {
+                'origin_transit_delta': -float(total_loss),
+                'financial_loss_acknowledged': True
+            }
             audit_severity = 'CRITICO'
             event_name = 'RESOLUCION_BAJA_EXTRAVIO'
 
-        # =========================================================================
-        # OPCIÓN 4: RETORNO DE EMERGENCIA / LIQUIDACIÓN
-        # =========================================================================
         elif action_type == 'RETORNO_EMERGENCIA_LIQUIDACION':
             movement.status = 'CERRADO_POR_ADMIN'
-            CENTRAL_LOCATION_ID = 1  # ID del Almacén Central
+            total_recovered = Decimal('0.00')
+            total_lost = Decimal('0.00')
 
             for detail in movement.details:
-                inventory_origin = Inventory.query.with_for_update().filter_by(
+                dispatched_qty = Decimal(str(detail.quantity or 0))
+                received_dest_qty = Decimal(str(detail.received_quantity or 0)) if detail.received_quantity is not None else Decimal('0.00')
+                damaged_qty = Decimal(str(detail.missing_quantity or 0))
+
+                returning_qty = max(Decimal('0.00'), dispatched_qty - received_dest_qty)
+                healthy_recovered = max(Decimal('0.00'), returning_qty - damaged_qty)
+
+                inv_origin = db.session.query(Inventory).filter_by(
                     location_id=movement.origin_location_id,
                     product_id=detail.product_id
-                ).first()
+                ).with_for_update().first()
 
-                transit_to_clear = (detail.quantity or 0) - (detail.received_quantity or 0)
+                if inv_origin and returning_qty > Decimal('0.00'):
+                    inv_origin.transit_quantity = max(Decimal('0.00'), inv_origin.transit_quantity - returning_qty)
+                    inv_origin.current_quantity += healthy_recovered
+                    total_recovered += healthy_recovered
+                    total_lost += damaged_qty
 
-                if inventory_origin and transit_to_clear > 0:
-                    inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - transit_to_clear)
+                product = db.session.query(Product).get(detail.product_id)
+                audit_items.append({
+                    'product_id': detail.product_id,
+                    'sku': product.sku if product else f"PROD-{detail.product_id}",
+                    'lot_number': detail.lot_number,
+                    'recovered_qty': float(healthy_recovered),
+                    'lost_in_return_qty': float(damaged_qty)
+                })
 
-                inventory_dest = Inventory.query.with_for_update().filter_by(
-                    location_id=movement.destination_location_id,
-                    product_id=detail.product_id
-                ).first()
-
-                qty_received = detail.received_quantity or 0
-                if inventory_dest and qty_received > 0:
-                    inventory_dest.current_quantity = max(0, inventory_dest.current_quantity - qty_received)
-
-                inventory_central = Inventory.query.with_for_update().filter_by(
-                    location_id=CENTRAL_LOCATION_ID,
-                    product_id=detail.product_id
-                ).first()
-
-                if not inventory_central:
-                    inventory_central = Inventory(
-                        location_id=CENTRAL_LOCATION_ID,
-                        product_id=detail.product_id,
-                        current_quantity=0,
-                        transit_quantity=0,
-                        min_stock=0
-                    )
-                    db.session.add(inventory_central)
-
-                damaged_qty = getattr(detail, 'missing_quantity', 0) or 0
-                total_returning = transit_to_clear + qty_received
-                recovered_qty = max(0, total_returning - damaged_qty)
-
-                inventory_central.current_quantity += recovered_qty
-
+            stock_impact = {
+                'origin_transit_delta': -float(total_recovered + total_lost),
+                'origin_current_delta': float(total_recovered),
+                'loss_written_off': float(total_lost)
+            }
             audit_severity = 'CRITICO'
             event_name = 'RETORNO_EMERGENCIA_LIQUIDACION'
-        else:
-            raise ValueError("Tipo de resolución no reconocido por el sistema.")
 
-        # Registro inmutable en la bitácora de auditoría
-        audit_log = AuditLog(
+        elif action_type == 'RESOLUCION_LEGALIZAR_SOBRANTE':
+            movement.status = 'CERRADO_POR_ADMIN'
+            total_surplus = Decimal('0.00')
+
+            for detail in movement.details:
+                qty_sent = Decimal(str(detail.quantity or 0))
+                qty_received = Decimal(str(detail.received_quantity or 0)) if detail.received_quantity is not None else Decimal('0.00')
+
+                surplus_qty = max(Decimal('0.00'), qty_received - qty_sent)
+
+                if surplus_qty > Decimal('0.00'):
+                    inv_dest = db.session.query(Inventory).filter_by(
+                        location_id=movement.destination_location_id,
+                        product_id=detail.product_id
+                    ).with_for_update().first()
+
+                    if inv_dest:
+                        inv_dest.current_quantity += surplus_qty
+                        total_surplus += surplus_qty
+
+                product = db.session.query(Product).get(detail.product_id)
+                audit_items.append({
+                    'product_id': detail.product_id,
+                    'sku': product.sku if product else f"PROD-{detail.product_id}",
+                    'lot_number': detail.lot_number,
+                    'legalized_surplus_qty': float(surplus_qty)
+                })
+
+            stock_impact = {
+                'destination_current_delta': float(total_surplus),
+                'origin_transit_delta': 0.00
+            }
+            audit_severity = 'NORMAL'
+            event_name = 'RESOLUCION_LEGALIZAR_SOBRANTE'
+
+        changed_data = {
+            'movement_id': movement.id,
+            'event': event_name,
+            'action_type': action_type,
+            'origin_location_id': movement.origin_location_id,
+            'destination_location_id': movement.destination_location_id,
+            'items': audit_items,
+            'stock_impact': stock_impact,
+            'justification': movement.resolution_notes,
+            'resolved_by_admin_id': admin_user_id,
+            'timestamp': datetime.now().isoformat()
+        }
+
+        audit_entry = AuditLog(
             affected_table='movements',
             action=event_name,
             severity=audit_severity,
             user_id=admin_user_id,
             location_id=movement.origin_location_id,
-            timestamp=datetime.utcnow(),
-            changed_data={
-                "movement_id": movement.id,
-                "event": event_name,
-                "status_result": movement.status,
-                "resolution_notes": movement.resolution_notes,
-                "resolved_by_admin_id": admin_user_id
-            }
+            timestamp=datetime.now(),
+            changed_data=changed_data
         )
-        db.session.add(audit_log)
+        db.session.add(audit_entry)
         db.session.commit()

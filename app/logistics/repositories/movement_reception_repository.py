@@ -95,7 +95,7 @@ class MovementReceptionRepository:
     def update_origin_transit(location_id, product_id, decrement_transit):
         sql = text("""
             UPDATE inventory
-            SET transit_quantity = transit_quantity - :decrement_transit
+            SET transit_quantity = GREATEST(0.00, transit_quantity - :decrement_transit)
             WHERE location_id = :location_id AND product_id = :product_id
         """)
         db.session.execute(sql, {
@@ -139,7 +139,7 @@ class MovementReceptionRepository:
                 affected_table, action, severity, user_id, timestamp, changed_data, location_id
             )
             VALUES (
-                :affected_table, :action, :severity, :user_id, :timestamp, :changed_data, :location_id
+                :affected_table, :action, :severity, :user_id, :timestamp, CAST(:changed_data AS jsonb), :location_id
             )
         """)
         db.session.execute(sql, audit_data)

@@ -7,7 +7,10 @@ from app.inventory.services.inventory_views_service import InventoryViewService
 @inventory_bp.route('/views', methods=['GET'])
 @login_required
 def render_inventory_views():
-    filter_params = InventoryViewRequest.get_filter_params()
+    filter_params = InventoryViewRequest.get_filter_params() if hasattr(InventoryViewRequest, 'get_filter_params') else {
+        'location_id': request.args.get('location_id'),
+        'search_term': request.args.get('search') or request.args.get('search_term')
+    }
     context = InventoryViewService.get_inventory_for_user(current_user, filter_params)
     return render_template('inventory/inventory_views.html', **context)
 
@@ -15,7 +18,10 @@ def render_inventory_views():
 @login_required
 def get_inventory_api():
     try:
-        filter_params = InventoryViewRequest.get_filter_params()
+        filter_params = InventoryViewRequest.get_filter_params() if hasattr(InventoryViewRequest, 'get_filter_params') else {
+            'location_id': request.args.get('location_id'),
+            'search_term': request.args.get('search') or request.args.get('search_term')
+        }
         context = InventoryViewService.get_inventory_for_user(current_user, filter_params)
         
         inventory_list = context.get('inventory', []) or []
@@ -49,7 +55,7 @@ def get_inventory_api():
             'success': True,
             'selected_location_id': context.get('selected_location_id'),
             'items': items
-        })
+        }), 200
 
     except Exception as e:
         return jsonify({

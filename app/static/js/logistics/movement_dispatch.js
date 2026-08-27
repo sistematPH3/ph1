@@ -1,6 +1,3 @@
-// =========================================================================
-// SECCIÓN 1: FORMULARIO DE DESPACHO E INSUMOS
-// =========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const itemsBody = document.getElementById('itemsBody');
     const btnAddRow = document.getElementById('btnAddRow');
@@ -8,24 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const productOptionsTemplateEl = document.getElementById('productOptionsTemplate');
     const isReadOnly = dispatchForm ? dispatchForm.dataset.isReadOnly === 'true' : false;
 
-    // BLINDAJE DE SEGURIDAD EN CLIENTE
     if (isReadOnly) {
-        // Deshabilitar todos los inputs, selects y botones en el formulario
         if (dispatchForm) {
             dispatchForm.querySelectorAll('input, select, button').forEach(el => {
-                if (el.tagName !== 'A') { // Mantiene activos los enlaces de navegación
+                if (el.tagName !== 'A') {
                     el.disabled = true;
                 }
             });
         }
-
-        // Si se intenta enviar forzando el formulario por consola o JS inusual:
-        dispatchForm?.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Acceso Denegado: Su usuario no posee permisos para emitir despachos.');
-            window.location.href = '/logistics/movements';
-        });
-
         if (itemsBody) {
             itemsBody.innerHTML = `
                 <tr>
@@ -35,10 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                 </tr>`;
         }
-        return; // Detiene la inicialización de lógica interactiva
+        return;
     }
-
-    const todayStr = new Date().toISOString().split('T')[0];
 
     if (!dispatchForm || !itemsBody || !productOptionsTemplateEl) return;
 
@@ -88,13 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         } else if (destId) {
             destSelect.classList.remove('is-invalid');
-            
             if (!destSelect.disabled) {
                 destSelect.classList.add('is-valid');
             } else {
                 destSelect.classList.remove('is-valid');
             }
-
             if (destFeedback) {
                 destFeedback.textContent = 'Por favor, seleccione la sede de destino.';
             }
@@ -115,40 +98,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const qtyInput = row.querySelector('.quantity-input');
         const expInput = row.querySelector('.exp-input');
         const totalStockInfo = row.querySelector('.total-stock-info');
+        const maxHint = row.querySelector('.lot-max-hint');
         const qtyFeedback = qtyInput ? qtyInput.nextElementSibling : null;
 
         const originId = getOriginLocationId();
         const productId = productSelect.value;
 
-        lotSelect.innerHTML = '<option value="">Cargando lotes...</option>';
+        lotSelect.innerHTML = '<option value="" selected disabled>Cargando lotes...</option>';
         lotSelect.disabled = true;
         expInput.value = '';
-        if (totalStockInfo) totalStockInfo.innerHTML = ''; 
+        if (totalStockInfo) totalStockInfo.innerHTML = '';
+        if (maxHint) maxHint.textContent = '';
         row.dataset.availableStock = 0;
         row.dataset.totalStock = 0;
+        qtyInput.value = '';
+        qtyInput.removeAttribute('max');
+        qtyInput.classList.remove('is-invalid', 'is-valid');
 
         if (!originId || !productId) {
-            lotSelect.innerHTML = '<option value="">Seleccione Lote...</option>';
+            lotSelect.innerHTML = '<option value="" selected disabled>Seleccione Lote...</option>';
             return;
         }
 
         try {
             const response = await fetch(`/logistics/movements/get-product-lots?location_id=${originId}&product_id=${productId}`);
-            
-            if (!response.ok) {
-                throw new Error(`Respuesta de red fallida con estatus ${response.status}`);
-            }
-
             const data = await response.json();
 
-            if (data.success) {
+            if (response.ok && data.success) {
                 row.dataset.totalStock = data.total_stock;
-                
+
                 if (totalStockInfo) {
                     if (data.total_stock > 0) {
                         totalStockInfo.innerHTML = `
                             <span class="stock-badge stock-badge-available">
-                                <i class="bi bi-box-seam me-1"></i> Stock Total: ${data.total_stock}
+                                <i class="bi bi-box-seam me-1"></i> Stock Total: ${parseFloat(data.total_stock).toFixed(2)}
                             </span>`;
                     } else {
                         totalStockInfo.innerHTML = `
@@ -161,31 +144,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 productSelect.classList.remove('is-invalid');
                 productSelect.classList.add('is-valid');
 
-                lotSelect.innerHTML = '<option value="">Seleccione Lote...</option>';
+                lotSelect.innerHTML = '<option value="" selected disabled>Seleccione Lote...</option>';
 
                 if (!data.lots || data.lots.length === 0) {
-                    lotSelect.innerHTML = '<option value="">Sin lotes con stock</option>';
+                    lotSelect.innerHTML = '<option value="" selected disabled>Sin lotes registrados</option>';
                     qtyInput.classList.remove('is-valid');
                     qtyInput.classList.add('is-invalid');
-                    if (qtyFeedback) qtyFeedback.textContent = 'Este producto no posee lotes con inventario disponible.';
+                    if (qtyFeedback) qtyFeedback.textContent = 'Este insumo no posee partidas activas para transferir.';
                     return;
                 }
 
                 data.lots.forEach(lot => {
                     const option = document.createElement('option');
                     option.value = lot.lot_number;
-                    option.textContent = `Lote: ${lot.lot_number} (Disp: ${lot.available_quantity})`;
+                    option.textContent = `${lot.lot_number} (Disp: ${parseFloat(lot.available_quantity).toFixed(2)})`;
                     option.dataset.stock = lot.available_quantity;
                     option.dataset.expiration = lot.expiration_date;
                     lotSelect.appendChild(option);
                 });
 
                 lotSelect.disabled = false;
-                validateQuantityInput(row);
+            } else {
+                lotSelect.innerHTML = '<option value="" selected disabled>Error al cargar lotes</option>';
             }
         } catch (err) {
-            console.error('Error al consultar lotes:', err);
-            lotSelect.innerHTML = '<option value="">Error al cargar lotes</option>';
+            lotSelect.innerHTML = '<option value="" selected disabled>Error de conexión</option>';
             lotSelect.disabled = true;
         }
     }
@@ -206,6 +189,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (qtyInput.value.trim() === '') {
+            qtyInput.classList.remove('is-valid', 'is-invalid');
+            return;
+        }
+
         if (enteredQty <= 0) {
             qtyInput.classList.remove('is-valid');
             qtyInput.classList.add('is-invalid');
@@ -213,14 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (enteredQty > availableStock) {
             qtyInput.classList.remove('is-valid');
             qtyInput.classList.add('is-invalid');
-            if (qtyFeedback) qtyFeedback.textContent = `Excede el disponible del lote (${availableStock}).`;
+            if (qtyFeedback) qtyFeedback.textContent = `Excede el disponible del lote (${availableStock.toFixed(2)}).`;
         } else {
             qtyInput.classList.remove('is-invalid');
             qtyInput.classList.add('is-valid');
         }
     }
 
-    // Control visual del estado del botón y el mensaje de aviso (Límite: 25)
     function updateAddButtonState() {
         const currentRowCount = itemsBody.querySelectorAll('tr').length;
         const limitWarning = document.getElementById('limitWarning');
@@ -237,14 +224,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function addRow() {
         const currentRowCount = itemsBody.querySelectorAll('tr').length;
-        if (currentRowCount >= 25) {
-            return; 
-        }
+        if (currentRowCount >= 25) return;
 
         const rowId = Date.now();
         const tr = document.createElement('tr');
         tr.id = `row-${rowId}`;
-        
+
         tr.innerHTML = `
             <td>
                 <select class="form-select ph-pill-input product-select" required>
@@ -254,17 +239,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 <small class="text-muted ps-2 pt-1 d-block total-stock-info"></small>
             </td>
             <td>
-                <input type="number" step="0.01" min="0.01" class="form-control ph-pill-input quantity-input" placeholder="0.00" required>
+                <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control ph-pill-input quantity-input text-center fw-bold" placeholder="0.00" required>
                 <div class="invalid-feedback ps-2">La cantidad debe ser mayor a 0.</div>
+                <div class="lot-max-hint text-center"></div>
             </td>
             <td>
-                <select class="form-select ph-pill-input lot-select" required disabled>
-                    <option value="">Seleccione Lote...</option>
+                <select class="form-select ph-pill-input lot-select font-monospace" required disabled>
+                    <option value="" selected disabled>Seleccione Lote...</option>
                 </select>
                 <div class="invalid-feedback ps-2">Debe seleccionar un lote.</div>
             </td>
             <td>
-                <input type="date" class="form-control ph-pill-input exp-input" readonly required>
+                <input type="date" class="form-control ph-pill-input exp-input bg-light text-center" readonly required>
                 <div class="invalid-feedback ps-2">La fecha es obligatoria.</div>
             </td>
             <td class="text-center">
@@ -278,9 +264,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const lotSelect = tr.querySelector('.lot-select');
         const qtyInput = tr.querySelector('.quantity-input');
         const expInput = tr.querySelector('.exp-input');
+        const maxHint = tr.querySelector('.lot-max-hint');
 
         productSelect.addEventListener('change', () => checkStockForRow(tr));
-        qtyInput.addEventListener('input', () => validateQuantityInput(tr));
+        
+        qtyInput.addEventListener('keydown', (e) => {
+            if (['-', '+', 'e', 'E'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        qtyInput.addEventListener('input', () => {
+            if (parseFloat(qtyInput.value) < 0) {
+                qtyInput.value = '';
+            }
+            validateQuantityInput(tr);
+        });
 
         lotSelect.addEventListener('change', () => {
             const selectedOpt = lotSelect.options[lotSelect.selectedIndex];
@@ -290,6 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 tr.dataset.availableStock = stock;
                 expInput.value = expDate;
+                qtyInput.value = '';
+                qtyInput.setAttribute('max', stock.toFixed(2));
+                qtyInput.classList.remove('is-invalid', 'is-valid');
+                if (maxHint) maxHint.textContent = `Máx: ${stock.toFixed(2)}`;
 
                 lotSelect.classList.remove('is-invalid');
                 lotSelect.classList.add('is-valid');
@@ -300,10 +303,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 tr.dataset.availableStock = 0;
                 expInput.value = '';
+                qtyInput.value = '';
+                qtyInput.removeAttribute('max');
+                if (maxHint) maxHint.textContent = '';
                 lotSelect.classList.remove('is-valid');
                 expInput.classList.remove('is-valid');
+                qtyInput.classList.remove('is-invalid', 'is-valid');
             }
-            validateQuantityInput(tr);
         });
 
         tr.querySelector('.btn-delete').addEventListener('click', () => {
@@ -317,10 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!isReadOnly) {
         addRow();
-    } else {
-        if (itemsBody) {
-            itemsBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Modo de solo lectura: No hay productos interactivos para mostrar.</td></tr>`;
-        }
     }
 
     if (btnAddRow) {
@@ -341,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const rows = itemsBody.querySelectorAll('tr');
         if (rows.length === 0) {
-            alert('Debe agregar al menos un producto a la lista de despacho.');
             return;
         }
 
@@ -356,6 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 productSelect?.classList.contains('is-invalid') ||
                 lotSelect?.classList.contains('is-invalid') ||
                 !lotSelect?.value ||
+                !qtyInput?.value ||
+                parseFloat(qtyInput.value) <= 0 ||
                 expInput?.classList.contains('is-invalid')) {
                 formIsValid = false;
             }
@@ -388,6 +391,11 @@ document.addEventListener('DOMContentLoaded', () => {
             items: items
         };
 
+        const btnSubmit = document.getElementById('btnSubmit');
+        const originalBtnHtml = btnSubmit.innerHTML;
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        btnSubmit.disabled = true;
+
         try {
             const response = await fetch('/logistics/movements/dispatch', {
                 method: 'POST',
@@ -415,24 +423,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             } else {
-                const errorMsg = result.errors ? result.errors.join('\n') : 'Ocurrió un error inesperado.';
+                btnSubmit.innerHTML = originalBtnHtml;
+                btnSubmit.disabled = false;
+                const errorMsg = result.errors ? result.errors.join('\n') : (result.message || 'Error en el despacho.');
                 alert(`Error al procesar despacho:\n${errorMsg}`);
             }
         } catch (error) {
-            console.error('Error en la petición:', error);
+            btnSubmit.innerHTML = originalBtnHtml;
+            btnSubmit.disabled = false;
             alert('Error de conexión con el servidor.');
         }
     });
 });
 
-// =========================================================================
-// SECCIÓN 2: LÓGICA DE CANCELACIÓN DE SALIDA
-// =========================================================================
 window.cancelarSalida = function(movementId) {
     const cancelInput = document.getElementById('cancelMovementId');
     const reasonInput = document.getElementById('cancelReason');
     const modalEl = document.getElementById('cancelModal');
-    
+
     if (cancelInput && reasonInput && modalEl) {
         cancelInput.value = movementId;
         reasonInput.value = '';
@@ -443,7 +451,7 @@ window.cancelarSalida = function(movementId) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const btnConfirmCancel = document.getElementById('btnConfirmCancel');
-    
+
     if (btnConfirmCancel) {
         btnConfirmCancel.addEventListener('click', async () => {
             const movementId = document.getElementById('cancelMovementId').value;
@@ -462,6 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            btnConfirmCancel.disabled = true;
+
             try {
                 const response = await fetch(`/logistics/movements/cancel-dispatch/${movementId}`, {
                     method: 'POST',
@@ -476,9 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         alertDiv.className = 'alert alert-success py-2 small mb-3';
                         alertDiv.textContent = result.message || '¡Traslado cancelado y stock revertido con éxito!';
                     }
-                    btnConfirmCancel.disabled = true;
                     setTimeout(() => { window.location.reload(); }, 1500);
                 } else {
+                    btnConfirmCancel.disabled = false;
                     const errorMsg = result.errors ? result.errors.join('\n') : (result.message || 'Error al cancelar.');
                     if (alertDiv) {
                         alertDiv.className = 'alert alert-danger py-2 small mb-3';
@@ -486,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (error) {
-                console.error('Error al procesar la cancelación:', error);
+                btnConfirmCancel.disabled = false;
                 if (alertDiv) {
                     alertDiv.className = 'alert alert-danger py-2 small mb-3';
                     alertDiv.textContent = 'Error de conexión con el servidor.';

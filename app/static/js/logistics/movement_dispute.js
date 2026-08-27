@@ -1,6 +1,4 @@
-// Función para convertir la fecha/hora UTC del registro a la hora local (-4h) y formato Día/Mes/Año
 function formatRegistrationDates() {
-    // Formatea solo la Fecha a Día/Mes/Año (DD/MM/YYYY)
     document.querySelectorAll('.js-local-date').forEach(el => {
         const utcStr = el.getAttribute('data-utc');
         if (utcStr) {
@@ -15,7 +13,6 @@ function formatRegistrationDates() {
         }
     });
 
-    // Formatea la Hora a 12 horas con AM/PM (resta automáticamente las 4h según zona horaria del usuario)
     document.querySelectorAll('.js-local-time').forEach(el => {
         const utcStr = el.getAttribute('data-utc');
         if (utcStr) {
@@ -30,7 +27,6 @@ function formatRegistrationDates() {
         }
     });
 
-    // Formatea Fecha y Hora juntas para la vista móvil
     document.querySelectorAll('.js-local-full').forEach(el => {
         const utcStr = el.getAttribute('data-utc');
         if (utcStr) {
@@ -53,7 +49,6 @@ function formatRegistrationDates() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    // 1. Formatear automáticamente todas las fechas/horas de la tabla y vista móvil
     formatRegistrationDates();
 
     const itemsPerPage = 10;
@@ -73,7 +68,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const desktopRows = Array.from(document.querySelectorAll(".dispute-row"));
         const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
         const selectedStatus = statusSelect ? statusSelect.value.trim() : "";
-        
+
         let selectedLocationText = "";
         if (locationSelect && locationSelect.selectedIndex > 0) {
             selectedLocationText = locationSelect.options[locationSelect.selectedIndex].text.toLowerCase().trim();
@@ -82,12 +77,11 @@ document.addEventListener("DOMContentLoaded", function () {
         let matchingIndices = [];
 
         desktopRows.forEach((row, index) => {
-            // Buscamos también en su respectiva tarjeta móvil para asegurar el mismo texto evaluado
             const mobileCard = document.querySelectorAll(".dispute-row-mobile")[index];
             const combinedText = (row.textContent + " " + (mobileCard ? mobileCard.textContent : "")).toLowerCase();
-            
+
             const matchesSearch = searchTerm === "" || combinedText.includes(searchTerm);
-            
+
             let matchesStatus = true;
             if (selectedStatus !== "") {
                 const selectedStatusText = statusSelect.options[statusSelect.selectedIndex].text.toLowerCase();
@@ -108,8 +102,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const desktopRows = document.querySelectorAll(".dispute-row");
         const detailRows = document.querySelectorAll(".detail-collapse-row");
         const mobileCards = document.querySelectorAll(".dispute-row-mobile");
-        
-        // 1. Ocultar absolutamente todo primero
+
         desktopRows.forEach(r => r.style.setProperty("display", "none", "important"));
         detailRows.forEach(d => {
             d.style.setProperty("display", "none", "important");
@@ -131,7 +124,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const end = start + itemsPerPage;
         const pageIndices = filteredIndices.slice(start, end);
 
-        // 2. Mostrar únicamente los elementos correspondientes a la página actual según el dispositivo
         const isMobile = window.innerWidth < 768;
 
         pageIndices.forEach(index => {
@@ -149,12 +141,10 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
-        // Mensaje cuando no hay datos
         if (noResultsRow) {
             noResultsRow.style.display = totalItems === 0 ? "block" : "none";
         }
 
-        // Información de paginación
         if (pageText) pageText.textContent = `Página ${currentPage} de ${totalPages}`;
         const displayedStart = totalItems === 0 ? 0 : start + 1;
         const displayedEnd = Math.min(end, totalItems);
@@ -164,7 +154,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (btnNext) btnNext.disabled = currentPage === totalPages || totalItems === 0;
     }
 
-    // Escuchadores de Paginación
     if (btnPrev) {
         btnPrev.addEventListener("click", () => {
             if (currentPage > 1) {
@@ -184,7 +173,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Escuchadores de Filtros y Búsqueda
     [searchInput, statusSelect, locationSelect].forEach(el => {
         if (el) {
             el.addEventListener("input", () => {
@@ -198,11 +186,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // Re-renderizar dinámicamente si se cambia el tamaño de pantalla entre PC y Móvil
     window.addEventListener("resize", () => {
         renderPage();
     });
 
-    // Inicialización
     renderPage();
 });

@@ -1,15 +1,3 @@
-/* Variables Corporativas Pizza Hut */
-/* Fondo general gris claro para resaltar la separación de las tarjetas */
-body {
-    background-color: #f4f6f9;
-}
-
-.ph-card {
-    background-color: #ffffff;
-    border-radius: var(--ph-border-radius);
-    padding: 2rem;
-    border: 1.5px solid #edf2f7;
-}
 :root {
     --ph-red: #a81119;
     --ph-red-hover: #800c12;
@@ -19,15 +7,27 @@ body {
     --ph-border-radius: 20px;
 }
 
-/* Tarjeta Principal Blanca */
+body {
+    background-color: #f4f6f9;
+}
+
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none !important; 
+    margin: 0 !important; 
+}
+
+input[type=number] {
+    -mozappearance: textfield !important;
+}
+
 .ph-card {
     background-color: #ffffff;
     border-radius: var(--ph-border-radius);
     padding: 2rem;
-    border: 1px solid #edf2f7;
+    border: 1.5px solid #edf2f7;
 }
 
-/* Icono Superior de Sección */
 .ph-icon-box {
     width: 50px;
     height: 50px;
@@ -45,7 +45,6 @@ body {
     color: #2b2b2b;
 }
 
-/* Inputs Tipo Píldora */
 .ph-pill-input {
     border-radius: 50px !important;
     padding: 0.6rem 1.2rem;
@@ -59,10 +58,95 @@ body {
     box-shadow: 0 0 0 0.25rem rgba(168, 17, 25, 0.15);
 }
 
-/* Estilo de la Tabla e Encabezado Rojo */
+.location-card {
+    background: #ffffff;
+    border: 1.5px solid #edf2f7;
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    min-height: 96px;
+}
+
+.location-icon-box {
+    width: 52px;
+    height: 52px;
+    background-color: #fff0f1 !important;
+    color: var(--ph-red) !important;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.location-card:has(select):hover {
+    transform: translateY(-3px);
+    border-color: rgba(168, 17, 25, 0.35);
+    box-shadow: 0 10px 22px -4px rgba(168, 17, 25, 0.2), 
+                0 4px 8px -2px rgba(168, 17, 25, 0.08);
+}
+
+.location-card:has(select):hover .location-icon-box {
+    background-color: var(--ph-red) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(168, 17, 25, 0.3);
+}
+
+.transfer-flow-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.flow-icon-pill {
+    width: 44px;
+    height: 44px;
+    background-color: #fff0f1;
+    color: var(--ph-red);
+    border: 1.5px solid rgba(168, 17, 25, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.flow-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+    animation: pulseDot 1.6s infinite ease-in-out;
+}
+
+.flow-dot:nth-child(1) { animation-delay: 0s; }
+.flow-dot:nth-child(2) { animation-delay: 0.3s; }
+.flow-dot:nth-child(4) { animation-delay: 0.6s; }
+.flow-dot:nth-child(5) { animation-delay: 0.9s; }
+
+@keyframes pulseDot {
+    0%, 100% {
+        transform: scale(0.8);
+        background-color: #cbd5e1;
+        box-shadow: 0 0 0 rgba(168, 17, 25, 0);
+    }
+    50% {
+        transform: scale(1.3);
+        background-color: var(--ph-red);
+        box-shadow: 0 0 8px rgba(168, 17, 25, 0.4);
+    }
+}
+
 .ph-table {
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: separate !important;
+    border-spacing: 0 12px !important;
     width: 100%;
 }
 
@@ -72,9 +156,9 @@ body {
     font-weight: 700;
     font-size: 0.82rem;
     letter-spacing: 0.5px;
-    padding: 0.9rem 1rem;
-    border: none;
-    text-align: center !important; /* Centra los títulos de todas las columnas */
+    padding: 0.9rem 1.2rem !important;
+    border: none !important;
+    text-align: center !important;
 }
 
 .ph-table thead th:first-child {
@@ -87,12 +171,31 @@ body {
     border-bottom-right-radius: 12px;
 }
 
-.ph-table tbody td {
-    padding: 0.75rem 0.5rem;
-    border-bottom: 1px solid #f1f1f1;
+.ph-table tbody tr {
+    background-color: #ffffff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
 }
 
-/* Botón Verde (Agregar Producto) */
+.ph-table tbody td {
+    padding: 0.95rem 0.8rem !important;
+    border-top: 1.5px solid #edf2f7 !important;
+    border-bottom: 1.5px solid #edf2f7 !important;
+    vertical-align: middle;
+}
+
+.ph-table tbody td:first-child {
+    border-left: 1.5px solid #edf2f7 !important;
+    border-top-left-radius: 16px !important;
+    border-bottom-left-radius: 16px !important;
+}
+
+.ph-table tbody td:last-child {
+    border-right: 1.5px solid #edf2f7 !important;
+    border-top-right-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    text-align: center;
+}
+
 .btn-ph-success {
     background-color: var(--ph-green);
     color: #ffffff;
@@ -110,7 +213,6 @@ body {
     transform: translateY(-1px);
 }
 
-/* Botón Rojo (Procesar Despacho) */
 .btn-ph-danger {
     background-color: var(--ph-red);
     color: #ffffff;
@@ -128,7 +230,6 @@ body {
     transform: translateY(-1px);
 }
 
-/* Botón Outline Cancelar */
 .btn-ph-outline-danger {
     background-color: #212529;
     color: #ffffff;
@@ -147,7 +248,6 @@ body {
     transform: translateY(-1px);
 }
 
-/* Botón Eliminar Fila */
 .btn-ph-delete {
     background-color: #dc3545;
     color: #ffffff;
@@ -160,6 +260,7 @@ body {
     justify-content: center;
     border: none;
     transition: all 0.2s ease;
+    margin: 0 auto;
 }
 
 .btn-ph-delete:hover {
@@ -167,12 +268,41 @@ body {
     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
 }
 
-/* Ajustes de Mensajes de Validación */
+.stock-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.28rem 0.75rem;
+    border-radius: 50px;
+    margin-top: 0.45rem;
+    letter-spacing: 0.2px;
+}
+
+.stock-badge-available {
+    background-color: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+}
+
+.stock-badge-empty {
+    background-color: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+}
+
+.lot-max-hint {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
 .invalid-feedback {
     font-size: 0.78rem;
     font-weight: 600;
 }
-/* Modal de Éxito */
+
 .success-icon-circle {
     width: 80px;
     height: 80px;
@@ -187,28 +317,7 @@ body {
     margin: 0 auto;
 }
 
-.modal-content {
-    border-radius: 24px !important;
-}
-/* Círculo del Icono de Advertencia/Cancelación */
-.danger-icon-circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 2px solid #dc3545;
-    background-color: #fff5f5;
-    color: #dc3545;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.6rem;
-    margin: 0 auto;
-}
-/* =========================================================================
-   1. MODO TARJETAS (TABLETS Y MÓVILES - Hasta 991.98px)
-   ========================================================================= */
 @media (max-width: 991.98px) {
-    /* Contenedor y tarjeta principal */
     .container-fluid {
         padding-left: 0.75rem !important;
         padding-right: 0.75rem !important;
@@ -219,7 +328,6 @@ body {
         border-radius: 16px;
     }
 
-    /* Reducción de cabecera */
     .ph-icon-box {
         width: 42px;
         height: 42px;
@@ -230,7 +338,6 @@ body {
         font-size: 1.25rem;
     }
 
-    /* TRANSFORMACIÓN DE TABLA A MODO TARJETAS */
     .ph-table, 
     .ph-table thead, 
     .ph-table tbody, 
@@ -240,12 +347,10 @@ body {
         display: block;
     }
 
-    /* Ocultar encabezado rojo */
     .ph-table thead {
         display: none;
     }
 
-    /* Fila convertida en tarjeta */
     .ph-table tbody tr {
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
@@ -257,16 +362,15 @@ body {
     }
 
     .ph-table tbody td {
-        padding: 0.35rem 0;
-        border: none;
+        padding: 0.35rem 0 !important;
+        border: none !important;
+        text-align: left !important;
     }
 
-    /* Espacio reservado para el botón eliminar */
     .ph-table tbody td:nth-child(1) {
         padding-right: 2.75rem;
     }
 
-    /* Etiquetas superiores para cada input */
     .ph-table tbody td::before {
         font-weight: 700;
         font-size: 0.75rem;
@@ -282,23 +386,19 @@ body {
     .ph-table tbody td:nth-child(3)::before { content: "N° de Lote"; }
     .ph-table tbody td:nth-child(4)::before { content: "Fecha de Vencimiento"; }
 
-    /* Ubicación exacta del botón eliminar */
     .ph-table tbody td:last-child {
         position: absolute;
         top: 0.85rem;
         right: 0.75rem;
-        padding: 0;
+        padding: 0 !important;
+        border: none !important;
     }
 
     .ph-table tbody td:last-child::before {
-        content: "";
         display: none;
     }
 }
 
-/* =========================================================================
-   2. BOTONES APILADOS (EXCLUSIVO MÓVILES - Hasta 767.98px)
-   ========================================================================= */
 @media (max-width: 767.98px) {
     .d-flex.justify-content-between.align-items-center.mt-4.pt-2 {
         flex-direction: column;
@@ -322,220 +422,4 @@ body {
         width: 100%;
         text-align: center;
     }
-}
-/* =========================================================================
-   1. TARJETAS DE SEDES (TAMAÑO UNIFORME Y COLOR CORPORATIVO RESTAURADO)
-   ========================================================================= */
-.location-card {
-    background: #ffffff;
-    border: 1.5px solid #edf2f7;
-    border-radius: 18px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    position: relative;
-    overflow: hidden;
-    
-    /* Mantiene ambas tarjetas a la misma altura en la cuadrícula */
-    height: 100%;
-    min-height: 96px;
-}
-
-/* Restauración de la caja del icono con el rojo distintivo de Pizza Hut */
-.location-icon-box {
-    width: 52px;
-    height: 52px;
-    background-color: #fff0f1 !important; /* Fondo rosado/rojo suave */
-    color: var(--ph-red) !important;       /* Icono en rojo institucional */
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: all 0.3s ease;
-}
-
-/* Elevación y Aura Roja: Exclusivo si la tarjeta tiene un <select> activo */
-.location-card:has(select):hover {
-    transform: translateY(-3px);
-    border-color: rgba(168, 17, 25, 0.35);
-    box-shadow: 0 10px 22px -4px rgba(168, 17, 25, 0.2), 
-                0 4px 8px -2px rgba(168, 17, 25, 0.08);
-}
-
-.location-card:has(select):hover .location-icon-box {
-    background-color: var(--ph-red) !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(168, 17, 25, 0.3);
-}
-
-/* =========================================================================
-   2. FILAS FLOTANTES (ESTÁTICAS Y SIN ELEVACIÓN EN HOVER)
-   ========================================================================= */
-.ph-table {
-    border-collapse: separate !important;
-    border-spacing: 0 12px !important;
-    width: 100%;
-}
-
-.ph-table thead th {
-    border: none !important;
-    padding: 0.9rem 1.2rem !important;
-}
-
-/* Tarjeta flotante con sombra fija sutil */
-.ph-table tbody tr {
-    background-color: #ffffff;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04); /* Separación visual limpia del fondo */
-}
-
-/* SE ELIMINA EL EFECTO HOVER DE ELEVACIÓN (translateY) */
-.ph-table tbody tr:hover {
-    transform: none !important;
-}
-
-.ph-table tbody td {
-    padding: 0.95rem 0.8rem !important;
-    border-top: 1.5px solid #edf2f7 !important;
-    border-bottom: 1.5px solid #edf2f7 !important;
-    vertical-align: top;
-}
-
-.ph-table tbody td:first-child {
-    border-left: 1.5px solid #edf2f7 !important;
-    border-top-left-radius: 16px !important;
-    border-bottom-left-radius: 16px !important;
-}
-
-.ph-table tbody td:last-child {
-    border-right: 1.5px solid #edf2f7 !important;
-    border-top-right-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
-}
-
-/* =========================================================================
-   3. BADGE DE STOCK CON ANIMACIÓN SUAVE
-   ========================================================================= */
-@keyframes badgeFadeIn {
-    0% {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.stock-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.76rem;
-    font-weight: 700;
-    padding: 0.28rem 0.75rem;
-    border-radius: 50px;
-    margin-top: 0.45rem;
-    letter-spacing: 0.2px;
-    animation: badgeFadeIn 0.3s ease-out forwards;
-}
-
-.stock-badge-available {
-    background-color: #e6f4ea;
-    color: #137333;
-    border: 1px solid #ceead6;
-}
-
-.stock-badge-empty {
-    background-color: #fce8e6;
-    color: #c5221f;
-    border: 1px solid #fad2cf;
-}
-/* =========================================================================
-   INDICADOR DE VIAJE / FLUJO DE TRANSFERENCIA ENTRE SEDES
-   ========================================================================= */
-.transfer-flow-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-}
-
-/* Puntos secuenciales animados */
-.flow-dot {
-    width: 6px;
-    height: 6px;
-    background-color: #cbd5e1;
-    border-radius: 50%;
-    animation: pulseDot 1.6s infinite ease-in-out;
-}
-
-/* Retraso escalonado para dar el efecto de movimiento/viaje fluido */
-.flow-dot:nth-child(1) { animation-delay: 0s; }
-.flow-dot:nth-child(2) { animation-delay: 0.3s; }
-.flow-dot:nth-child(4) { animation-delay: 0.6s; }
-.flow-dot:nth-child(5) { animation-delay: 0.9s; }
-
-@keyframes pulseDot {
-    0%, 100% {
-        transform: scale(0.8);
-        background-color: #cbd5e1;
-        box-shadow: 0 0 0 rgba(168, 17, 25, 0);
-    }
-    50% {
-        transform: scale(1.3);
-        background-color: var(--ph-red);
-        box-shadow: 0 0 8px rgba(168, 17, 25, 0.4);
-    }
-}
-
-/* Píldora central con icono de dirección */
-/* Píldora central con icono de dirección (Mayor tamaño) */
-.flow-icon-pill {
-    width: 44px;  /* Antes 34px */
-    height: 44px; /* Antes 34px */
-    background-color: #fff0f1;
-    color: var(--ph-red);
-    border: 1.5px solid rgba(168, 17, 25, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem; /* Icono interno más grande */
-    transition: all 0.3s ease;
-}
-
-/* Puntos secuenciales animados (Mayor tamaño) */
-.flow-dot {
-    width: 8px;   /* Antes 6px */
-    height: 8px;  /* Antes 6px */
-    background-color: #cbd5e1;
-    border-radius: 50%;
-    animation: pulseDot 1.6s infinite ease-in-out;
-}
-
-/* Espaciado general del contenedor para acomodar el nuevo tamaño */
-.transfer-flow-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px; /* Espacio ligeramente mayor entre los puntos y la píldora */
-    width: 100%;
-}
-
-.transfer-flow-indicator:hover .flow-icon-pill {
-    background-color: var(--ph-red);
-    color: #ffffff;
-    transform: scale(1.05);
-}
-
-/* =========================================================================
-   ALINEACIÓN DE LA COLUMNA DE ACCIÓN DE LA TABLA
-   ========================================================================= */
-.ph-table tbody td:last-child {
-    text-align: center;
-    vertical-align: middle;
-}
-
-.btn-ph-delete {
-    margin: 0 auto; /* Centra perfectamente el botón de eliminar en su celda */
 }

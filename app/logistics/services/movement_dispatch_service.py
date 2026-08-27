@@ -5,11 +5,19 @@ from app.logistics.repositories.movement_dispatch_repository import MovementDisp
 class MovementDispatchService:
 
     @staticmethod
+    def get_lots_for_dispatch(location_id, product_id):
+        if not location_id or not product_id:
+            return {"success": False, "total_stock": 0, "lots": []}, 400
+
+        total_stock, lots = MovementDispatchRepository.get_product_lots_available(location_id, product_id)
+        return {
+            "success": True,
+            "total_stock": total_stock,
+            "lots": lots
+        }, 200
+
+    @staticmethod
     def execute_dispatch(user, payload):
-        """
-        Coordina la validación, autorización por sede/rol y la persistencia del despacho.
-        """
-        # 1. Validar esquema
         is_valid, errors = MovementDispatchValidator.validate_dispatch_payload(payload)
         if not is_valid:
             return {"success": False, "errors": errors}, 400
@@ -17,17 +25,15 @@ class MovementDispatchService:
         origin_id = int(payload['origin_location_id'])
         destination_id = int(payload['destination_location_id'])
 
-        # 2. Obtener la sede del usuario de forma segura desde el parámetro `user`
         user_locations = getattr(user, 'locations', None)
         user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
 
-        if user.role_id not in [1] and user_loc_id != origin_id:
+        if getattr(user, 'role_id', None) not in [1] and user_loc_id != origin_id:
             return {
                 "success": False,
                 "errors": ["No tiene permisos para emitir despachos desde una sede distinta a la asignada."]
             }, 403
 
-        # 3. Transacción en Base de Datos
         try:
             movement = MovementDispatchRepository.create_dispatch_transaction(
                 origin_id=origin_id,
@@ -51,28 +57,26 @@ class MovementDispatchService:
 
     @staticmethod
     def execute_precancellation(user, movement_id: int, reason: str):
-        """
-        Coordina la pre-cancelación de un despacho antes de ser recibido.
-        """
         if not reason or not reason.strip():
             return {"success": False, "errors": ["El motivo de cancelación es obligatorio."]}, 400
 
         try:
-            # Revertir reserva en base de datos
-            movement_check = MovementDispatchRepository.cancel_dispatch_transaction(movement_id)
+            movement_check = db.session.query(db.models.Movement if hasattr(db, 'models') else MovementDispatchRepository).get(movement_id)
+        except Exception:
+            movement_check = None
+
+        try:
+            movement = MovementDispatchRepository.cancel_dispatch_transaction(movement_id, user.id, reason)
             
             user_locations = getattr(user, 'locations', None)
             user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
 
-            if user.role_id not in [1] and user_loc_id != movement_check.origin_location_id:
+            if getattr(user, 'role_id', None) not in [1] and user_loc_id != movement.origin_location_id:
                 db.session.rollback()
                 return {
                     "success": False,
                     "errors": ["Solo el Administrador o el personal de la sede de origen pueden cancelar esta pre-salida."]
                 }, 403
-
-            # Guardar la razón de la cancelación
-            movement_check.resolution_notes = reason.strip()
 
             db.session.commit()
             return {

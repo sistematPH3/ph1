@@ -1,20 +1,21 @@
 {% extends "layout.html" %}
 
+{% block title %}Bandeja de Arbitraje e Incidencias - PML{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=7.0">
 
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
-    <div class="ph-card">
+    <div class="ph-card shadow-sm">
         
-        <!-- Cabecera -->
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
             <div class="d-flex align-items-center">
-                <div class="ph-icon-box me-3 shadow-sm" style="background-color: #af1515;">
-                    <i class="bi bi-bell-fill"></i>
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-shield-shaded"></i>
                 </div>
                 <div>
-                    <h2 class="ph-title mb-1">Bandeja de Resolución e Incidencias</h2>
-                    <p class="text-muted mb-0">Centro de control y dictamen de alertas en tránsito, cruces de SKU y excepciones logísticas.</p>
+                    <h2 class="ph-title mb-1">Bandeja de Arbitraje e Incidencias</h2>
+                    <p class="text-muted mb-0">Centro de control, dictamen de discrepancias logísticas y regularización contable.</p>
                 </div>
             </div>
             <div>
@@ -24,26 +25,26 @@
             </div>
         </div>
 
-        <!-- Filtros -->
-        <div class="ph-filter-bar mb-4 p-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3" style="background-color: #212529;">
+        <div class="ph-filter-bar mb-4 p-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="input-group" style="max-width: 320px;">
                 <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Tipo, Sede..." id="searchDisputeInput">
+                <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Sede o SKU..." id="searchDisputeInput">
             </div>
 
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <span class="text-light small fw-semibold">Filtrar:</span>
                 
-                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 210px;">
-                    <option value="" selected>Todos los estados</option>
-                    <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
+                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 220px;">
+                    <option value="" selected>Todos los incidentes</option>
                     <option value="NOVEDAD_FALTANTE">Faltante de Conteo</option>
                     <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente</option>
+                    <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU</option>
+                    <option value="RETORNO_EMERGENCIA">Retorno de Emergencia</option>
                     <option value="VIOLACION_CUSTODIA">Violación de Custodia</option>
-                    <option value="INCIDENCIA_TEMPERATURA">Incidencia Temperatura</option>
+                    <option value="INCIDENCIA_TEMPERATURA">Incidencia Térmica</option>
                     <option value="VENCIMIENTO_PROXIMO">Vencimiento Próximo</option>
                     <option value="LOTE_NO_COINCIDE">Lote no Coincide</option>
-                    <option value="RETORNO_EMERGENCIA">Retorno de Emergencia</option>
+                    <option value="RECHAZO_POR_ESPACIO">Rechazo por Espacio</option>
                 </select>
 
                 <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="locationFilterSelect" style="width: 180px;">
@@ -55,180 +56,157 @@
             </div>
         </div>
 
-        <!-- ================= VISTA DE COMPUTADORA (TABLA TRADICIONAL) ================= -->
         <div class="table-responsive d-none d-md-block">
             <table class="table ph-table">
                 <thead>
-                    <tr style="background-color: #af1515 !important;">
-                        <th style="background-color: #af1515 !important;">ID / TIPO DE ALERTA</th>
-                        <th style="background-color: #af1515 !important;">ORIGEN Y DESTINO</th>
-                        <th style="background-color: #af1515 !important;">FECHA DE INCIDENCIA</th>
-                        <th style="background-color: #af1515 !important;">ESTADO ACTUAL</th>
-                        <th style="background-color: #af1515 !important;" class="text-end">ACCIONES DE RESOLUCIÓN</th>
+                    <tr>
+                        <th style="width: 18%;">ID / INCIDENCIA</th>
+                        <th style="width: 26%;">RUTA DE TRASLADO</th>
+                        <th style="width: 18%;">FECHA DE REGISTRO</th>
+                        <th style="width: 20%;">ESTADO / NOVEDAD</th>
+                        <th style="width: 18%;" class="text-center">ACCIONES</th>
                     </tr>
                 </thead>
                 <tbody>
-    {% for mov in disputes %}
-    {% set actual_status = mov.real_status if mov.real_status else (mov.incident_type if mov.incident_type else mov.status) %}
-    <tr class="dispute-row">
-        <!-- Columna 1: ID / Tipo -->
-        <td class="fw-bold">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold;">
-                    #{{ mov.id }}
-                </div>
-                <div>
-                    <span class="text-dark d-block">Incidencia Crítica</span>
-                    <span class="text-muted small">Ref: Traslado Inter-sedes</span>
-                </div>
-            </div>
-        </td>
+                    {% for mov in disputes %}
+                    {% set actual_status = mov.real_status if mov.real_status else mov.status %}
+                    <tr class="dispute-row">
+                        <td class="fw-bold">
+                            <div class="d-flex align-items-center">
+                                <div class="dispute-id-circle me-3 shadow-sm">
+                                    #{{ mov.id }}
+                                </div>
+                                <div>
+                                    <span class="text-dark d-block">Traslado #{{ mov.id }}</span>
+                                    <span class="text-muted small">Inter-sedes</span>
+                                </div>
+                            </div>
+                        </td>
 
-        <!-- Columna 2: Origen y Destino -->
-        <td>
-            <div class="d-flex flex-column gap-1">
-                <div class="d-flex align-items-center">
-                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
-                    <span class="ph-badge-location">{{ mov.origin_name }}</span>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
-                    <span class="ph-badge-location">{{ mov.destination_name }}</span>
-                </div>
-            </div>
-        </td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <div class="d-flex align-items-center">
+                                    <span class="text-muted small fw-semibold me-2" style="width: 32px;">De:</span>
+                                    <span class="ph-badge-location">{{ mov.origin_name }}</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="text-muted small fw-semibold me-2" style="width: 32px;">A:</span>
+                                    <span class="ph-badge-location">{{ mov.destination_name }}</span>
+                                </div>
+                            </div>
+                        </td>
 
-        <!-- Columna 3: Fecha de Incidencia -->
-        <td>
-            <span class="text-dark d-block js-local-date" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}">N/A</span>
-            <span class="text-muted small js-local-time" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}"></span>
-        </td>
+                        <td>
+                            <span class="text-dark d-block js-local-date" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}">N/A</span>
+                            <span class="text-muted small js-local-time" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}"></span>
+                        </td>
 
-        <!-- Columna 4: Estado Actual -->
-        <td>
-            {% if actual_status in ['PRODUCTO_ERRONEO', 'SKU_CRUZADO'] %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">Producto Erróneo / SKU Cruzado</span>
-            {% elif actual_status in ['NOVEDAD_FALTANTE', 'FALTANTE_CONTEO'] %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;">Faltante de Conteo</span>
-            {% elif actual_status == 'SOBRANTE_EXCEDENTE' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;">Sobrante / Excedente</span>
-            {% elif actual_status == 'VIOLACION_CUSTODIA' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db;">Violación de Custodia</span>
-            {% elif actual_status == 'INCIDENCIA_TEMPERATURA' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #cce5ff; color: #004085; border: 1px solid #b8daff;">Incidencia Temperatura</span>
-            {% elif actual_status == 'VENCIMIENTO_PROXIMO' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #e8daef; color: #512e5f; border: 1px solid #d7bde2;">Vencimiento Próximo</span>
-            {% elif actual_status == 'LOTE_NO_COINCIDE' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #fcbf49; color: #433002; border: 1px solid #f7ae16;">Lote no Coincide</span>
-            {% elif actual_status in ['RETORNO_EMERGENCIA', 'RECHAZO_POR_ESPACIO'] %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #fadbd8; color: #78281f; border: 1px solid #f2d7d5;">Retorno de Emergencia</span>
-            {% elif actual_status == 'CONFORME' %}
-                <span class="badge px-3 py-2 rounded-pill fw-semibold" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">Conforme</span>
-            {% else %}
-                <span class="badge bg-light text-dark px-3 py-2 rounded-pill fw-semibold border">{{ actual_status | replace('_', ' ') | title }}</span>
-            {% endif %}
-        </td>
-
-        <!-- Columna 5: Acciones de Resolución -->
-        <td class="text-end">
-            <div class="d-flex justify-content-end gap-2 align-items-center">
-                <button class="btn btn-primary btn-sm px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-disputa-{{ mov.id }}" aria-expanded="false" aria-controls="detalle-disputa-{{ mov.id }}">
-                    <i class="bi bi-eye me-1"></i> Ver
-                </button>
-                <button class="btn btn-danger btn-sm px-3 py-1" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}" style="font-size: 0.85rem;">
-                    <i class="bi bi-gavel me-1"></i> Resolver
-                </button>
-            </div>
-        </td>
-    </tr>
-
-    <!-- Desplegable Escritorio -->
-    <tr class="detail-collapse-row">
-        <td colspan="5" class="p-0 border-0">
-            <div class="collapse" id="detalle-disputa-{{ mov.id }}">
-                <div class="ph-detail-box shadow-sm m-3 p-3 bg-light border rounded">
-                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Tránsito (#{{ mov.id }})</h6>
-                    
-                    {% set ns = namespace(reception_note=mov.notes or mov.reception_notes or mov.observation or mov.comments) %}
-                    {% if not ns.reception_note and mov.details %}
-                        {% for item in mov.details %}
-                            {% if not ns.reception_note and (item.notes or item.observation) %}
-                                {% set ns.reception_note = item.notes or item.observation %}
+                        <td>
+                            {% if actual_status in ['PRODUCTO_ERRONEO', 'SKU_CRUZADO'] %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-danger">Producto Erróneo</span>
+                            {% elif actual_status in ['NOVEDAD_FALTANTE', 'FALTANTE_CONTEO'] %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-warning">Faltante de Conteo</span>
+                            {% elif actual_status == 'SOBRANTE_EXCEDENTE' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-info">Sobrante Físico</span>
+                            {% elif actual_status == 'VIOLACION_CUSTODIA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-secondary">Custodia Violada</span>
+                            {% elif actual_status == 'INCIDENCIA_TEMPERATURA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-primary">Falla Térmica</span>
+                            {% elif actual_status in ['RETORNO_EMERGENCIA', 'RECHAZO_POR_ESPACIO'] %}
+                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-dark">Retorno de Emergencia</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark px-3 py-2 rounded-pill fw-semibold border">{{ actual_status | replace('_', ' ') | title }}</span>
                             {% endif %}
-                        {% endfor %}
-                    {% endif %}
+                        </td>
 
-                    <div class="alert alert-warning mb-3 py-2 px-3 small border-0 shadow-sm">
-                        <strong>Notas de Muelle / Justificación:</strong> 
-                        {% if ns.reception_note %}
-                            <span class="fst-italic text-dark">"{{ ns.reception_note }}"</span>
-                        {% else %}
-                            <span class="text-muted">Sin justificación registrada en muelle.</span>
-                        {% endif %}
-                    </div>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2 align-items-center">
+                                <button class="btn btn-ph-info btn-sm px-3 py-1 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-disputa-{{ mov.id }}" aria-expanded="false">
+                                    <i class="bi bi-eye me-1"></i> Ver
+                                </button>
+                                <button class="btn btn-ph-danger btn-sm px-3 py-1 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}">
+                                    <i class="bi bi-gavel me-1"></i> Resolver
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered bg-white mb-0 shadow-sm ph-inner-table">
-                            <thead>
-                                <tr>
-                                    <th>Producto / SKU</th>
-                                    <th>Lote</th>
-                                    <th>Fecha de Vencimiento</th>
-                                    <th>Cant. Despachada</th>
-                                    <th>Cant. Recibida</th>
-                                    <th>Faltante / Sobrante</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in mov.details %}
-                                <tr>
-                                    <td><strong>{{ item.product_name }}</strong></td>
-                                    <td><code>{{ item.lot_number or 'N/A' }}</code></td>
-                                    <td>
-                                        {% if item.expiration_date %}
-                                            <span class="badge bg-light text-dark border">{{ item.expiration_date.strftime('%Y-%m-%d') }}</span>
+                    <tr class="detail-collapse-row">
+                        <td colspan="5" class="p-0 border-0">
+                            <div class="collapse" id="detalle-disputa-{{ mov.id }}">
+                                <div class="ph-detail-box shadow-sm m-3 p-3 bg-light border rounded-3">
+                                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Muelle (#{{ mov.id }})</h6>
+
+                                    <div class="alert alert-warning mb-3 py-2 px-3 small border-0 shadow-sm">
+                                        <strong>Notas de Muelle / Declaración:</strong> 
+                                        {% if mov.notes %}
+                                            <span class="fst-italic text-dark">"{{ mov.notes }}"</span>
                                         {% else %}
-                                            <span class="text-muted">N/A</span>
+                                            <span class="text-muted">Sin justificación registrada en muelle.</span>
                                         {% endif %}
-                                    </td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>{{ item.received_quantity if item.received_quantity is not none else '0.00' }}</td>
-                                    <td>
-                                        {% if item.received_quantity is not none and item.received_quantity > item.quantity %}
-                                            <span class="text-info fw-bold">+{{ "%.2f"|format(item.received_quantity - item.quantity) }} (Excedente)</span>
-                                        {% elif item.missing_quantity > 0 %}
-                                            <span class="text-danger fw-bold">-{{ item.missing_quantity }} (Faltante)</span>
-                                        {% else %}
-                                            <span class="text-success fw-bold">0.00</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </td>
-    </tr>
-    {% endfor %}
-</tbody>
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm bg-white mb-0 shadow-sm ph-inner-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Producto / Insumo</th>
+                                                    <th>N° Lote</th>
+                                                    <th>Vencimiento</th>
+                                                    <th>Despachado</th>
+                                                    <th>Recibido</th>
+                                                    <th>Discrepancia</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in mov.details %}
+                                                <tr>
+                                                    <td><strong>{{ item.product_name }}</strong></td>
+                                                    <td><span class="badge bg-light text-dark font-monospace border">{{ item.lot_number or 'N/A' }}</span></td>
+                                                    <td>
+                                                        {% if item.expiration_date %}
+                                                            <span>{{ item.expiration_date.strftime('%d/%m/%Y') }}</span>
+                                                        {% else %}
+                                                            <span class="text-muted">N/A</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ "%.2f"|format(item.quantity) }}</td>
+                                                    <td>{{ "%.2f"|format(item.received_quantity) if item.received_quantity is not none else '0.00' }}</td>
+                                                    <td>
+                                                        {% if item.received_quantity is not none and item.received_quantity > item.quantity %}
+                                                            <span class="text-info fw-bold">+{{ "%.2f"|format(item.received_quantity - item.quantity) }} (Excedente)</span>
+                                                        {% elif item.missing_quantity > 0 %}
+                                                            <span class="text-danger fw-bold">-{{ "%.2f"|format(item.missing_quantity) }} (Faltante)</span>
+                                                        {% else %}
+                                                            <span class="text-success fw-bold">0.00</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
 
-        <!-- ================= VISTA MÓVIL (TARJETAS ADAPTADAS) ================= -->
         <div class="d-block d-md-none">
             <div class="d-flex flex-column gap-3">
                 {% for mov in disputes %}
-                {% set actual_status = mov.real_status if mov.real_status else (mov.incident_type if mov.incident_type else mov.status) %}
+                {% set actual_status = mov.real_status if mov.real_status else mov.status %}
                 <div class="card border-0 shadow-sm rounded-4 p-3 dispute-row-mobile" style="background-color: #f8f9fa;">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge bg-danger rounded-pill px-3 py-2">#{{ mov.id }} - Incidencia</span>
-                        <small class="text-muted">{{ mov.date.strftime('%Y-%m-%d %H:%M') if mov.date else 'N/A' }}</small>
+                        <span class="badge bg-danger rounded-pill px-3 py-2">#{{ mov.id }} - Disputa</span>
+                        <small class="text-muted js-local-full" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}"></small>
                     </div>
 
                     <div class="mb-2">
-                        <div class="small text-muted fw-semibold">Ruta de Traslado:</div>
+                        <div class="small text-muted fw-semibold">Ruta:</div>
                         <div class="d-flex align-items-center gap-1 mt-1">
                             <span class="ph-badge-location text-truncate">{{ mov.origin_name }}</span>
                             <i class="bi bi-arrow-right text-muted"></i>
@@ -237,38 +215,26 @@
                     </div>
 
                     <div class="mb-3">
-                        <div class="small text-muted fw-semibold mb-1">Estado:</div>
+                        <div class="small text-muted fw-semibold mb-1">Novedad:</div>
                         <div>
-                            {% if actual_status in ['PRODUCTO_ERRONEO', 'SKU_CRUZADO'] %}
-                                <span class="badge px-2 py-1 fw-semibold" style="background-color: #f8d7da; color: #721c24;">Producto Erróneo / SKU</span>
-                            {% elif actual_status in ['NOVEDAD_FALTANTE', 'FALTANTE_CONTEO'] %}
-                                <span class="badge px-2 py-1 fw-semibold" style="background-color: #fff3cd; color: #856404;">Faltante de Conteo</span>
-                            {% elif actual_status == 'SOBRANTE_EXCEDENTE' %}
-                                <span class="badge px-2 py-1 fw-semibold" style="background-color: #d1ecf1; color: #0c5460;">Sobrante / Excedente</span>
-                            {% else %}
-                                <span class="badge bg-secondary text-white px-2 py-1">{{ actual_status | replace('_', ' ') | title }}</span>
-                            {% endif %}
+                            <span class="badge bg-secondary text-white px-2 py-1">{{ actual_status | replace('_', ' ') | title }}</span>
                         </div>
                     </div>
 
-                    <!-- Botones de Acción Móvil -->
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-primary btn-sm flex-fill" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-mobile-{{ mov.id }}" aria-expanded="false">
                             <i class="bi bi-eye me-1"></i> Detalles
                         </button>
-                        <button class="btn btn-danger btn-sm flex-fill" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}">
+                        <button class="btn btn-ph-danger btn-sm flex-fill" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}">
                             <i class="bi bi-gavel me-1"></i> Resolver
                         </button>
                     </div>
 
-                    <!-- Desplegable de Detalles Adaptado para Móvil -->
                     <div class="collapse mt-3" id="detalle-mobile-{{ mov.id }}">
                         <div class="p-3 bg-white border rounded-3 shadow-sm">
                             <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-shield-exclamation text-danger me-1"></i>Expediente #{{ mov.id }}</h6>
-                            
-                            {% set ns_m = namespace(reception_note=mov.notes or mov.reception_notes or mov.observation or mov.comments) %}
                             <div class="alert alert-warning py-1 px-2 small mb-2">
-                                <strong>Nota:</strong> {{ ns_m.reception_note if ns_m.reception_note else "Sin justificación." }}
+                                <strong>Nota:</strong> {{ mov.notes if mov.notes else "Sin justificación en muelle." }}
                             </div>
 
                             <div class="d-flex flex-column gap-2">
@@ -277,8 +243,8 @@
                                     <div class="fw-bold text-dark">{{ item.product_name }}</div>
                                     <div class="text-muted">Lote: <code>{{ item.lot_number or 'N/A' }}</code></div>
                                     <div class="d-flex justify-content-between mt-1">
-                                        <span>Desp: <strong>{{ item.quantity }}</strong></span>
-                                        <span>Rec: <strong>{{ item.received_quantity if item.received_quantity is not none else '0.00' }}</strong></span>
+                                        <span>Desp: <strong>{{ "%.2f"|format(item.quantity) }}</strong></span>
+                                        <span>Rec: <strong>{{ "%.2f"|format(item.received_quantity if item.received_quantity is not none else 0) }}</strong></span>
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -289,19 +255,17 @@
                 {% else %}
                 <div class="text-center text-muted py-4">
                     <i class="bi bi-check-circle fs-2 text-success d-block mb-2"></i>
-                    No hay incidencias pendientes.
+                    No hay incidencias ni disputas pendientes de arbitraje.
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Fila de Sin Resultados General -->
         <div id="noResultsRow" class="text-center text-muted py-5" style="display: none;">
             <i class="bi bi-search fs-1 text-secondary d-block mb-2"></i>
-            No se encontraron resultados que coincidan con la búsqueda.
+            No se encontraron expedientes que coincidan con la búsqueda.
         </div>
 
-        <!-- ================= PAGINACIÓN INFERIOR (10 en 10 con flechas) ================= -->
         <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top flex-wrap gap-3">
             <div class="text-muted small" id="paginationInfo">
                 Mostrando 0-0 de 0 registros
@@ -317,34 +281,34 @@
             </div>
         </div>
 
-        <!-- Modales de Resolución (Comunes para ambas vistas) -->
         {% for mov in disputes %}
         <div class="modal fade" id="resolveModal-{{ mov.id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                     <form action="{{ url_for('movement_dispute.resolve_dispute', movement_id=mov.id) }}" method="POST">
-                        <div class="modal-header bg-dark text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-gavel text-danger me-2"></i>Dictamen Administrativo — Traslado #{{ mov.id }}</h5>
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-gavel text-danger me-2"></i>Arbitraje Administrativo — Traslado #{{ mov.id }}</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-4">
                             <div class="mb-3">
-                                <label for="action_type" class="form-label fw-bold text-dark">Seleccionar Resolución Contable:</label>
-                                <select name="action_type" class="form-select shadow-sm" required>
-                                    <option value="" selected disabled>-- Elija el dictamen --</option>
-                                    <option value="RESOLUCION_REINTEGRO">Reintegro al Origen (Devolver stock al disponible del origen)</option>
-                                    <option value="RESOLUCION_BAJA_EXTRAVIO">Baja por Extravío / Robo (Pérdida patrimonial formal)</option>
-                                    <option value="RETORNO_EMERGENCIA_LIQUIDACION">Liquidación de Retorno de Emergencia</option>
+                                <label class="form-label fw-bold text-dark">Seleccionar Dictamen Contable <span class="text-danger">*</span></label>
+                                <select name="action_type" class="form-select ph-pill-input" required>
+                                    <option value="" selected disabled>-- Elija la resolución legal --</option>
+                                    <option value="RESOLUCION_REINTEGRO">Reintegro al Origen (Devolver faltante a stock disponible)</option>
+                                    <option value="RESOLUCION_BAJA_EXTRAVIO">Baja por Extravío / Robo (Declarar pérdida patrimonial)</option>
+                                    <option value="RETORNO_EMERGENCIA_LIQUIDACION">Liquidación de Retorno (Reingreso de carga a Central)</option>
+                                    <option value="RESOLUCION_LEGALIZAR_SOBRANTE">Legalizar Sobrante en Destino (Ingresar excedente a sucursal)</option>
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="resolution_notes" class="form-label fw-bold text-dark">Acta y Justificación Legal (Mínimo 15 caracteres):</label>
-                                <textarea name="resolution_notes" class="form-control shadow-sm" rows="4" minlength="15" placeholder="Escriba el motivo técnico..." required></textarea>
+                                <label class="form-label fw-bold text-dark">Acta y Justificación Legal (Mínimo 15 caracteres) <span class="text-danger">*</span></label>
+                                <textarea name="resolution_notes" class="form-control" rows="4" minlength="15" placeholder="Asiente los motivos técnicos, número de acta policial o reporte de muelle..." required></textarea>
                             </div>
                         </div>
-                        <div class="modal-footer bg-light" style="border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-                            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-danger px-4">Emitir Veredicto</button>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-ph-outline-danger px-4" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-ph-danger px-4 shadow-sm">Emitir Dictamen</button>
                         </div>
                     </form>
                 </div>
@@ -352,7 +316,8 @@
         </div>
         {% endfor %}
 
-        <script src="{{ url_for('static', filename='js/logistics/movement_dispute.js') }}?v=6"></script>
     </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/logistics/movement_dispute.js') }}?v=7.0"></script>
 {% endblock %}
