@@ -1,4 +1,61 @@
+// Función para convertir la fecha/hora UTC del registro a la hora local (-4h) y formato Día/Mes/Año
+function formatRegistrationDates() {
+    // Formatea solo la Fecha a Día/Mes/Año (DD/MM/YYYY)
+    document.querySelectorAll('.js-local-date').forEach(el => {
+        const utcStr = el.getAttribute('data-utc');
+        if (utcStr) {
+            const date = new Date(utcStr);
+            if (!isNaN(date)) {
+                el.textContent = date.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            }
+        }
+    });
+
+    // Formatea la Hora a 12 horas con AM/PM (resta automáticamente las 4h según zona horaria del usuario)
+    document.querySelectorAll('.js-local-time').forEach(el => {
+        const utcStr = el.getAttribute('data-utc');
+        if (utcStr) {
+            const date = new Date(utcStr);
+            if (!isNaN(date)) {
+                el.textContent = date.toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+            }
+        }
+    });
+
+    // Formatea Fecha y Hora juntas para la vista móvil
+    document.querySelectorAll('.js-local-full').forEach(el => {
+        const utcStr = el.getAttribute('data-utc');
+        if (utcStr) {
+            const date = new Date(utcStr);
+            if (!isNaN(date)) {
+                const dateStr = date.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+                const timeStr = date.toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                el.textContent = `${dateStr} ${timeStr}`;
+            }
+        }
+    });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+    // 1. Formatear automáticamente todas las fechas/horas de la tabla y vista móvil
+    formatRegistrationDates();
+
     const itemsPerPage = 10;
     let currentPage = 1;
 

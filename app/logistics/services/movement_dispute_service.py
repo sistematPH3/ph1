@@ -1,7 +1,7 @@
 from app.extensions import db
 from app.models import Movement, Inventory, AuditLog
 from datetime import datetime
-from sqlalchemy import or_  # <-- Asegúrate de importar or_
+from sqlalchemy import or_
 
 class MovementDisputeService:
 
@@ -19,7 +19,6 @@ class MovementDisputeService:
             'EN_DISPUTA'
         ]
 
-        # Contar traslados donde la sede sea origen o destino y sigan pendientes
         pending_count = Movement.query.filter(
             or_(
                 Movement.origin_location_id == location_id,
@@ -42,7 +41,7 @@ class MovementDisputeService:
         """
         movement = Movement.query.get_or_404(movement_id)
         
-        # Validación de seguridad: evitar resolver movimientos ya arbitrados o no válidos
+        # Validación de seguridad: evitar resolver movimientos ya arbitrados
         if movement.resolved_by_id is not None:
             raise ValueError(f"El movimiento #{movement_id} ya ha sido arbitrado previamente.")
 
@@ -60,7 +59,9 @@ class MovementDisputeService:
         movement.resolved_by_id = admin_user_id
         movement.resolution_notes = resolution_notes.strip()
 
-        # Procesamos según el tipo de resolución seleccionada
+        # =========================================================================
+        # OPCIÓN 1: REINTEGRO AL ORIGEN
+        # =========================================================================
         if action_type == 'RESOLUCION_REINTEGRO':
             movement.status = 'CERRADO_POR_ADMIN'
             
@@ -68,77 +69,130 @@ class MovementDisputeService:
                 qty_sent = detail.quantity or 0
                 qty_received = detail.received_quantity or 0
 
-                # Inventario de la sede origen (Almacén Central)
-                inventory_origin = Inventory.query.filter_by(
+                inventory_origin = Inventory.query.with_for_update().filter_by(
                     location_id=movement.origin_location_id,
                     product_id=detail.product_id
                 ).first()
 
-                # Inventario de la sede destino (Receptora)
-                inventory_dest = Inventory.query.filter_by(
-                    location_id=movement.destination_location_id,
-                    product_id=detail.product_id
-                ).first()
-
-                # CASO 1: FALTANTE (Se envió más de lo que llegó)
+                # CASO A: FALTANTE (Se enviaron 5 kg y llegaron 2 kg -> faltan 3 kg)
+                # Los 3 kg sí fueron restados de Central y están congelados en 'transit_quantity'.
+                # Al reintegar, se liberan del tránsito y regresan al disponible de Central.
                 if getattr(detail, 'missing_quantity', 0) > 0:
+                    missing = detail.missing_quantity
                     if inventory_origin:
-                        inventory_origin.transit_quantity -= detail.missing_quantity
-                        inventory_origin.current_quantity += detail.missing_quantity
+                        inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - missing)
+                        inventory_origin.current_quantity += missing
 
-                # CASO 2: SOBRANTE (Se recibió más de lo que se envió, ej: 90 recibidos vs 50 enviados)
+                # CASO B: SOBRANTE (Se enviaron 5 kg y llegaron 20 kg -> sobran 15 kg)
+                # El camión devuelve los 15 kg físicos a Central.
+                # Digitalmente NO se hace ningún cálculo porque Central NUNCA descontó esos 15 kg.
+                # Su base de datos ya marcaba 45 kg disponibles.
                 elif qty_received > qty_sent:
-                    sobrante = qty_received - qty_sent
-
-                    # 1. Reintegrar el sobrante al disponible del Almacén Central (Origen)
-                    if inventory_origin:
-                        inventory_origin.current_quantity += sobrante
-
-                    # 2. Descontar el sobrante de la sede receptora si esta se lo había sumado indebidamente
-                    if inventory_dest:
-                        inventory_dest.current_quantity -= sobrante
+                    pass  # El stock en BD de Central ya es el correcto (45 kg).
 
             audit_severity = 'NORMAL'
             event_name = 'RESOLUCION_REINTEGRO'
 
+        # =========================================================================
+        # OPCIÓN 2: LEGALIZAR SOBRANTE EN DESTINO
+        # (Si el administrador autoriza que la sucursal receptora se quede el excedente)
+        # =========================================================================
+        elif action_type in ['RESOLUCION_LEGALIZAR_SOBRANTE', 'RESOLUCION_INGRESO_DESTINO']:
+            movement.status = 'CERRADO_POR_ADMIN'
+            
+            for detail in movement.details:
+                qty_sent = detail.quantity or 0
+                qty_received = detail.received_quantity or 0
+
+                if qty_received > qty_sent:
+                    sobrante = qty_received - qty_sent
+
+                    inventory_dest = Inventory.query.filter_by(
+                        location_id=movement.destination_location_id,
+                        product_id=detail.product_id
+                    ).first()
+
+                    # Se le suma el excedente únicamente a la sucursal que se lo quedó
+                    if inventory_dest:
+                        inventory_dest.current_quantity += sobrante
+
+            audit_severity = 'NORMAL'
+            event_name = 'RESOLUCION_LEGALIZAR_SOBRANTE'
+
+        # =========================================================================
+        # OPCIÓN 3: BAJA POR EXTRAVÍO / ROBO
+        # =========================================================================
         elif action_type == 'RESOLUCION_BAJA_EXTRAVIO':
             movement.status = 'CERRADO_CON_PERDIDA'
             
-            # Se descuenta definitivamente del tránsito del origen sin sumarse a ningún disponible (Pérdida patrimonial)
             for detail in movement.details:
                 if getattr(detail, 'missing_quantity', 0) > 0:
-                    inventory = Inventory.query.filter_by(
+                    missing = detail.missing_quantity
+                    inventory_origin = Inventory.query.filter_by(
                         location_id=movement.origin_location_id,
                         product_id=detail.product_id
                     ).first()
                     
-                    if inventory:
-                        inventory.transit_quantity -= detail.missing_quantity
+                    if inventory_origin:
+                        inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - missing)
 
             audit_severity = 'CRITICO'
             event_name = 'RESOLUCION_BAJA_EXTRAVIO'
 
+        # =========================================================================
+        # OPCIÓN 4: RETORNO DE EMERGENCIA / LIQUIDACIÓN
+        # =========================================================================
         elif action_type == 'RETORNO_EMERGENCIA_LIQUIDACION':
             movement.status = 'CERRADO_POR_ADMIN'
-            
-            # Liquidación del retorno físico a central
+            CENTRAL_LOCATION_ID = 1  # ID del Almacén Central
+
             for detail in movement.details:
-                inventory = Inventory.query.filter_by(
+                inventory_origin = Inventory.query.with_for_update().filter_by(
                     location_id=movement.origin_location_id,
                     product_id=detail.product_id
                 ).first()
-                
-                if inventory:
-                    # Liberamos el tránsito total que venía de regreso
-                    transit_to_clear = detail.quantity - (detail.received_quantity or 0)
-                    inventory.transit_quantity -= transit_to_clear
+
+                transit_to_clear = (detail.quantity or 0) - (detail.received_quantity or 0)
+
+                if inventory_origin and transit_to_clear > 0:
+                    inventory_origin.transit_quantity = max(0, inventory_origin.transit_quantity - transit_to_clear)
+
+                inventory_dest = Inventory.query.with_for_update().filter_by(
+                    location_id=movement.destination_location_id,
+                    product_id=detail.product_id
+                ).first()
+
+                qty_received = detail.received_quantity or 0
+                if inventory_dest and qty_received > 0:
+                    inventory_dest.current_quantity = max(0, inventory_dest.current_quantity - qty_received)
+
+                inventory_central = Inventory.query.with_for_update().filter_by(
+                    location_id=CENTRAL_LOCATION_ID,
+                    product_id=detail.product_id
+                ).first()
+
+                if not inventory_central:
+                    inventory_central = Inventory(
+                        location_id=CENTRAL_LOCATION_ID,
+                        product_id=detail.product_id,
+                        current_quantity=0,
+                        transit_quantity=0,
+                        min_stock=0
+                    )
+                    db.session.add(inventory_central)
+
+                damaged_qty = getattr(detail, 'missing_quantity', 0) or 0
+                total_returning = transit_to_clear + qty_received
+                recovered_qty = max(0, total_returning - damaged_qty)
+
+                inventory_central.current_quantity += recovered_qty
 
             audit_severity = 'CRITICO'
             event_name = 'RETORNO_EMERGENCIA_LIQUIDACION'
         else:
             raise ValueError("Tipo de resolución no reconocido por el sistema.")
 
-        # Registro inmutable en la bitácora de auditoría (AuditLog)
+        # Registro inmutable en la bitácora de auditoría
         audit_log = AuditLog(
             affected_table='movements',
             action=event_name,
