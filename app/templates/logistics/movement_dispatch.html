@@ -6,121 +6,158 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=1">
 
 <div class="container-fluid mt-4 mb-5 px-4">
-    <div class="ph-card shadow-sm">
+    <form id="dispatchForm" data-is-read-only="{{ 'true' if is_read_only else 'false' }}" novalidate>
         
-        <!-- Cabecera Corporativa con Icono -->
-        <div class="d-flex align-items-center mb-4">
-            <div class="ph-icon-box me-3 shadow-sm">
-                <i class="bi bi-truck"></i>
+        <!-- TARJETA 1: SECCIÓN DE SEDES Y CABECERA -->
+        <div class="ph-card shadow-sm mb-4">
+            <div class="d-flex align-items-center mb-4">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-truck"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Emisión de Despacho e Insumos</h2>
+                    <p class="text-muted mb-0">Gestión y transferencia de inventario entre sedes de la red.</p>
+                </div>
             </div>
-            <div>
-                <h2 class="ph-title mb-1">Emisión de Despacho e Insumos</h2>
-                <p class="text-muted mb-0">Gestión y transferencia de inventario entre sedes de la red.</p>
+            {% if is_read_only %}
+            <!-- Banner Alerta Solo Lectura -->
+            <div class="alert alert-warning d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
+                <i class="bi bi-shield-lock-fill fs-4 me-3 text-warning"></i>
+                <div>
+                    <strong>Modo de Solo Lectura:</strong> Tu rol ({{ current_user.role_name | capitalize if current_user.role_name else 'Consulta' }}) te permite visualizar la interfaz de despacho, pero no puedes realizar modificaciones ni emitir transferencias de inventario.
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="row g-3 align-items-center mb-4">
+    <!-- Tarjeta Sede Origen -->
+    <div class="col-lg-5">
+        <div class="location-card location-card-origin p-3 d-flex align-items-center">
+            <div class="location-icon-box me-3">
+                <i class="bi bi-house-door-fill fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <span class="badge bg-danger-subtle text-danger fw-bold mb-1 px-2 py-1">SEDE DE ORIGEN</span>
+                {% if is_admin %}
+                    <h5 class="fw-bold text-dark mb-0">Almacén Central</h5>
+                    <input type="hidden" id="origin_location_id" value="1">
+                    <input type="hidden" id="origin_location_id_hidden" value="1">
+                {% else %}
+                    {% for loc in locations %}
+                        {% if loc.id == user_location_id %}
+                            <h5 class="fw-bold text-dark mb-0">{{ loc.name }}</h5>
+                            <input type="hidden" id="origin_location_id" value="{{ loc.id }}">
+                            <input type="hidden" id="origin_location_id_hidden" value="{{ loc.id }}">
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
             </div>
         </div>
+    </div>
 
-        <form id="dispatchForm" class="needs-validation" novalidate>
-            <!-- Selección de Sedes según el Rol -->
-            <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                    <label for="origin_location_id" class="form-label fw-bold text-dark">
-                        Sede Origen <span class="text-danger">*</span>
-                    </label>
-                    {% if is_admin %}
-                        <!-- ADMIN: Fijo en Almacén Central (ID = 1) -->
-                        <select class="form-select ph-pill-input" id="origin_location_id" disabled>
-                            {% for loc in locations %}
-                                {% if loc.id == 1 %}
-                                <option value="{{ loc.id }}" selected>{{ loc.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                        <input type="hidden" id="origin_location_id_hidden" value="1">
-                    {% else %}
-                        <!-- GERENTE / SUBGERENTE: Fijo en su sede asignada -->
-                        <select class="form-select ph-pill-input" id="origin_location_id" disabled>
-                            {% for loc in locations %}
-                                {% if loc.id == user_location_id %}
-                                <option value="{{ loc.id }}" selected>{{ loc.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                        <input type="hidden" id="origin_location_id_hidden" value="{{ user_location_id }}">
-                    {% endif %}
-                    <div class="invalid-feedback ps-2" id="originFeedback">Por favor, seleccione la sede de origen.</div>
-                </div>
-
-                <div class="col-md-6">
-                    <label for="destination_location_id" class="form-label fw-bold text-dark">
-                        Sede Destino <span class="text-danger">*</span>
-                    </label>
-                    {% if is_admin %}
-                        <!-- ADMIN: Seleccionable, excluyendo Almacén Central -->
-                        <select class="form-select ph-pill-input" id="destination_location_id" name="destination_location_id" required>
-                            <option value="">Seleccione el Destino</option>
-                            {% for loc in locations %}
-                                {% if loc.id != 1 %}
-                                <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    {% else %}
-                        <!-- GERENTE / SUBGERENTE: Fijo en Almacén Central (ID = 1) -->
-                        <select class="form-select ph-pill-input" id="destination_location_id" disabled>
-                            {% for loc in locations %}
-                                {% if loc.id == 1 %}
-                                <option value="{{ loc.id }}" selected>{{ loc.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                        <input type="hidden" id="destination_location_id_hidden" value="1">
-                    {% endif %}
-                    <div class="invalid-feedback ps-2" id="destinationFeedback">Por favor, seleccione la sede de destino.</div>
-                </div>
+    <!-- Indicador Central de Viaje Animado (Flujo de Transferencia) -->
+    <div class="col-lg-2 text-center d-none d-lg-flex flex-column align-items-center justify-content-center py-2">
+        <div class="transfer-flow-indicator">
+            <span class="flow-dot"></span>
+            <span class="flow-dot"></span>
+            <div class="flow-icon-pill shadow-sm">
+                <i class="bi bi-arrow-right"></i>
             </div>
+            <span class="flow-dot"></span>
+            <span class="flow-dot"></span>
+        </div>
+        <span class="text-muted fw-bold" style="font-size: 0.68rem; letter-spacing: 0.5px; margin-top: 4px;">EN TRÁNSITO</span>
+    </div>
 
-            <!-- Título del Detalle -->
-            <div class="d-flex align-items-center mb-3 mt-4">
+    <!-- Tarjeta Sede Destino -->
+    <div class="col-lg-5">
+        <div class="location-card location-card-destination p-3 d-flex align-items-center">
+            <div class="location-icon-box me-3">
+                <i class="bi bi-shop fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <label for="destination_location_id" class="form-label fw-bold small text-muted text-uppercase mb-1">
+                    Sede Destino <span class="text-danger">*</span>
+                </label>
+                {% if is_admin %}
+                    <select class="form-select ph-pill-input border-0 shadow-none bg-light fw-semibold" id="destination_location_id" name="destination_location_id" required>
+                        <option value="">Seleccione el Destino...</option>
+                        {% for loc in locations %}
+                            {% if loc.id != 1 %}
+                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <h5 class="fw-bold text-dark mb-0">Almacén Central</h5>
+                    <input type="hidden" id="destination_location_id" value="1">
+                    <input type="hidden" id="destination_location_id_hidden" value="1">
+                {% endif %}
+                <div class="invalid-feedback ps-2" id="destinationFeedback">Por favor, seleccione la sede de destino.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- TARJETA 2: DETALLE DE PRODUCTOS A DESPACHAR -->
+        <div class="ph-card shadow-sm">
+            <div class="d-flex align-items-center mb-3">
                 <i class="bi bi-box-seam text-danger fs-4 me-2"></i>
                 <h5 class="fw-bold text-dark mb-0">Productos a Despachar</h5>
             </div>
 
-            <!-- Tabla de Productos Estilo Registro de Compras -->
             <div class="table-responsive mb-3">
-                <table class="table ph-table align-top" id="itemsTable">
+                <table class="table ph-table align-top text-center" id="itemsTable">
                     <thead>
                         <tr>
-                            <th style="width: 30%;">PRODUCTO / INSUMO</th>
-                            <th style="width: 15%;">CANTIDAD</th>
+                            <th style="width: 28%;">PRODUCTO / INSUMO</th>
+                            <th style="width: 14%;">CANTIDAD</th>
                             <th style="width: 20%;">N° DE LOTE</th>
-                            <th style="width: 20%;">VENCIMIENTO</th>
-                            <th style="width: 15%; text-align: center;">ACCIÓN</th>
+                            <th style="width: 22%;">VENCIMIENTO</th>
+                            <th style="width: 16%;">ACCIÓN</th>
                         </tr>
                     </thead>
                     <tbody id="itemsBody">
-                        <!-- Filas dinámicas generadas mediante JavaScript -->
+                        <!-- Filas dinámicas -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- Botones de Acción inferior -->
             <div class="d-flex justify-content-between align-items-center mt-4 pt-2">
-                <button type="button" class="btn btn-ph-success shadow-sm" id="btnAddRow">
-                    <i class="bi bi-plus-lg me-1"></i> Agregar Producto
-                </button>
+                    {% if not is_read_only %}
+                    <div class="d-flex align-items-center gap-3">
+                        <button type="button" class="btn btn-ph-success shadow-sm" id="btnAddRow">
+                            <i class="bi bi-plus-lg me-1"></i> Agregar Producto
+                        </button>
+                        <span id="limitWarning" class="text-danger small fw-semibold d-none">
+                            <i class="bi bi-exclamation-circle me-1"></i> Límite máximo de 25 productos alcanzado.
+                        </span>
+                    </div>
 
-                <div class="d-flex gap-2">
-                    <a href="/logistics/movements" class="btn btn-ph-outline-danger">Cancelar</a>
-                    <button type="submit" class="btn btn-ph-danger shadow-sm" id="btnSubmit">
-                        <i class="bi bi-check2-circle me-1"></i> Procesar Despacho
-                    </button>
-                </div>
+                    <div class="d-flex gap-2">
+                        <a href="/logistics/movements" class="btn btn-ph-outline-danger">Cancelar</a>
+                        <button type="submit" class="btn btn-ph-danger shadow-sm" id="btnSubmit">
+                            <i class="bi bi-check2-circle me-1"></i> Procesar Despacho
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <span class="text-muted small">
+                            <i class="bi bi-lock me-1"></i> Los controles de emisión se encuentran deshabilitados para tu usuario.
+                        </span>
+                        <a href="/logistics/movements" class="btn btn-ph-outline-danger">
+                            <i class="bi bi-arrow-left me-1"></i> Volver al Listado
+                        </a>
+                    </div>
+                    {% endif %}
+</div>
             </div>
-        </form>
-    </div>
+        </div>
+
+    </form>
 </div>
 
-<!-- Template oculto para opciones de productos -->
+<!-- Template oculto -->
 <select id="productOptionsTemplate" class="d-none">
     <option value="">Seleccione un producto...</option>
     {% for prod in products %}
@@ -128,7 +165,7 @@
     {% endfor %}
 </select>
 
-<!-- Modal de Éxito Personalizado -->
+<!-- Modal de Éxito -->
 <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
         <div class="modal-content text-center p-4 border-0 rounded-4 shadow-lg">
@@ -149,5 +186,6 @@
         </div>
     </div>
 </div>
+
 <script src="/static/js/logistics/movement_dispatch.js"></script>
 {% endblock %}

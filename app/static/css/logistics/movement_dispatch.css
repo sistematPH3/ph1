@@ -1,4 +1,15 @@
 /* Variables Corporativas Pizza Hut */
+/* Fondo general gris claro para resaltar la separación de las tarjetas */
+body {
+    background-color: #f4f6f9;
+}
+
+.ph-card {
+    background-color: #ffffff;
+    border-radius: var(--ph-border-radius);
+    padding: 2rem;
+    border: 1.5px solid #edf2f7;
+}
 :root {
     --ph-red: #a81119;
     --ph-red-hover: #800c12;
@@ -63,6 +74,7 @@
     letter-spacing: 0.5px;
     padding: 0.9rem 1rem;
     border: none;
+    text-align: center !important; /* Centra los títulos de todas las columnas */
 }
 
 .ph-table thead th:first-child {
@@ -310,4 +322,220 @@
         width: 100%;
         text-align: center;
     }
+}
+/* =========================================================================
+   1. TARJETAS DE SEDES (TAMAÑO UNIFORME Y COLOR CORPORATIVO RESTAURADO)
+   ========================================================================= */
+.location-card {
+    background: #ffffff;
+    border: 1.5px solid #edf2f7;
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+    
+    /* Mantiene ambas tarjetas a la misma altura en la cuadrícula */
+    height: 100%;
+    min-height: 96px;
+}
+
+/* Restauración de la caja del icono con el rojo distintivo de Pizza Hut */
+.location-icon-box {
+    width: 52px;
+    height: 52px;
+    background-color: #fff0f1 !important; /* Fondo rosado/rojo suave */
+    color: var(--ph-red) !important;       /* Icono en rojo institucional */
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+/* Elevación y Aura Roja: Exclusivo si la tarjeta tiene un <select> activo */
+.location-card:has(select):hover {
+    transform: translateY(-3px);
+    border-color: rgba(168, 17, 25, 0.35);
+    box-shadow: 0 10px 22px -4px rgba(168, 17, 25, 0.2), 
+                0 4px 8px -2px rgba(168, 17, 25, 0.08);
+}
+
+.location-card:has(select):hover .location-icon-box {
+    background-color: var(--ph-red) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(168, 17, 25, 0.3);
+}
+
+/* =========================================================================
+   2. FILAS FLOTANTES (ESTÁTICAS Y SIN ELEVACIÓN EN HOVER)
+   ========================================================================= */
+.ph-table {
+    border-collapse: separate !important;
+    border-spacing: 0 12px !important;
+    width: 100%;
+}
+
+.ph-table thead th {
+    border: none !important;
+    padding: 0.9rem 1.2rem !important;
+}
+
+/* Tarjeta flotante con sombra fija sutil */
+.ph-table tbody tr {
+    background-color: #ffffff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04); /* Separación visual limpia del fondo */
+}
+
+/* SE ELIMINA EL EFECTO HOVER DE ELEVACIÓN (translateY) */
+.ph-table tbody tr:hover {
+    transform: none !important;
+}
+
+.ph-table tbody td {
+    padding: 0.95rem 0.8rem !important;
+    border-top: 1.5px solid #edf2f7 !important;
+    border-bottom: 1.5px solid #edf2f7 !important;
+    vertical-align: top;
+}
+
+.ph-table tbody td:first-child {
+    border-left: 1.5px solid #edf2f7 !important;
+    border-top-left-radius: 16px !important;
+    border-bottom-left-radius: 16px !important;
+}
+
+.ph-table tbody td:last-child {
+    border-right: 1.5px solid #edf2f7 !important;
+    border-top-right-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+}
+
+/* =========================================================================
+   3. BADGE DE STOCK CON ANIMACIÓN SUAVE
+   ========================================================================= */
+@keyframes badgeFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stock-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.28rem 0.75rem;
+    border-radius: 50px;
+    margin-top: 0.45rem;
+    letter-spacing: 0.2px;
+    animation: badgeFadeIn 0.3s ease-out forwards;
+}
+
+.stock-badge-available {
+    background-color: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+}
+
+.stock-badge-empty {
+    background-color: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+}
+/* =========================================================================
+   INDICADOR DE VIAJE / FLUJO DE TRANSFERENCIA ENTRE SEDES
+   ========================================================================= */
+.transfer-flow-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* Puntos secuenciales animados */
+.flow-dot {
+    width: 6px;
+    height: 6px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+    animation: pulseDot 1.6s infinite ease-in-out;
+}
+
+/* Retraso escalonado para dar el efecto de movimiento/viaje fluido */
+.flow-dot:nth-child(1) { animation-delay: 0s; }
+.flow-dot:nth-child(2) { animation-delay: 0.3s; }
+.flow-dot:nth-child(4) { animation-delay: 0.6s; }
+.flow-dot:nth-child(5) { animation-delay: 0.9s; }
+
+@keyframes pulseDot {
+    0%, 100% {
+        transform: scale(0.8);
+        background-color: #cbd5e1;
+        box-shadow: 0 0 0 rgba(168, 17, 25, 0);
+    }
+    50% {
+        transform: scale(1.3);
+        background-color: var(--ph-red);
+        box-shadow: 0 0 8px rgba(168, 17, 25, 0.4);
+    }
+}
+
+/* Píldora central con icono de dirección */
+/* Píldora central con icono de dirección (Mayor tamaño) */
+.flow-icon-pill {
+    width: 44px;  /* Antes 34px */
+    height: 44px; /* Antes 34px */
+    background-color: #fff0f1;
+    color: var(--ph-red);
+    border: 1.5px solid rgba(168, 17, 25, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem; /* Icono interno más grande */
+    transition: all 0.3s ease;
+}
+
+/* Puntos secuenciales animados (Mayor tamaño) */
+.flow-dot {
+    width: 8px;   /* Antes 6px */
+    height: 8px;  /* Antes 6px */
+    background-color: #cbd5e1;
+    border-radius: 50%;
+    animation: pulseDot 1.6s infinite ease-in-out;
+}
+
+/* Espaciado general del contenedor para acomodar el nuevo tamaño */
+.transfer-flow-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px; /* Espacio ligeramente mayor entre los puntos y la píldora */
+    width: 100%;
+}
+
+.transfer-flow-indicator:hover .flow-icon-pill {
+    background-color: var(--ph-red);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+/* =========================================================================
+   ALINEACIÓN DE LA COLUMNA DE ACCIÓN DE LA TABLA
+   ========================================================================= */
+.ph-table tbody td:last-child {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.btn-ph-delete {
+    margin: 0 auto; /* Centra perfectamente el botón de eliminar en su celda */
 }

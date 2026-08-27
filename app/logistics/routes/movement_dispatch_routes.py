@@ -10,7 +10,7 @@ dispatch_bp = Blueprint('dispatch_bp', __name__, template_folder='templates')
 
 @dispatch_bp.route('/dispatch', methods=['GET'])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager')  # Solo Admin, Manager y Assistant Manager
+@require_roles('admin', 'manager', 'assistant_manager', 'management', 'finance')  # Solo Admin, Manager y Assistant Manager
 def dispatch_form_view():
     """
     Renderiza la pantalla principal del formulario de emisión de despachos.
@@ -27,9 +27,14 @@ def dispatch_form_view():
 
     # Determinar si el usuario tiene rol de Administrador (role_id = 1)
     is_admin = getattr(current_user, 'role_id', None) == 1
+    # Obtener de forma segura el rol y nombre del usuario actual
+    user_role_id = getattr(current_user, 'role_id', None)
+    user_role_name = getattr(current_user, 'role_name', None)
+    is_read_only = user_role_id in [5, 6] or user_role_name in ['management', 'finance']
     
     return render_template(
         '/logistics/movement_dispatch.html',
+        is_read_only=is_read_only,
         locations=locations,
         products=products,
         user_location_id=user_location_id,
@@ -45,6 +50,7 @@ def get_product_lots_api():
     if not location_id or not product_id:
         return jsonify({"success": False, "total_stock": 0, "lots": []}), 400
 
+    # 1. Saldo oficial en la sede
     inventory_item = Inventory.query.filter_by(
         location_id=location_id,
         product_id=product_id
@@ -55,7 +61,7 @@ def get_product_lots_api():
     if total_stock <= 0:
         return jsonify({"success": True, "total_stock": 0, "lots": []}), 200
 
-    # 1. Obtener total ingresado por lote
+    # 2. Compras del lote en esta sede específica
     purchased_query = db.session.query(
         PurchaseDetail.lot_number,
         PurchaseDetail.expiration_date,
@@ -69,7 +75,8 @@ def get_product_lots_api():
         PurchaseDetail.expiration_date
     ).all()
 
-    # 2. Obtener total despachado/descontado por lote desde la sede de origen
+    # 3. BLINDAJE DE SALIDAS: Contar TODAS las salidas reales originadas en esta sede.
+    # Excluimos ÚNICAMENTE las cancelaciones previas al despacho.
     dispatched_query = db.session.query(
         MovementDetail.lot_number,
         func.sum(MovementDetail.quantity).label('total_dispatched')
@@ -78,27 +85,40 @@ def get_product_lots_api():
     ).filter(
         MovementDetail.product_id == product_id,
         Movement.origin_location_id == location_id,
-        Movement.status.in_(['COMPLETED', 'EN_TRANSITO'])
+        # Se restan todas las salidas EXCEPTO los movimientos anulados/cancelados
+        ~func.upper(Movement.status).in_([
+            'CANCELADO', 'CANCELADO_EMISOR', 'CANCELLED', 'DRAFT', 'BORRADOR'
+        ])
     ).group_by(
         MovementDetail.lot_number
     ).all()
 
-    # Mapear salidas por número de lote
     dispatched_map = {item.lot_number: float(item.total_dispatched or 0) for item in dispatched_query}
 
-    # 3. Calcular disponibilidad neta por lote
+    # 4. Cálculo de disponibilidad real por lote
     lots = []
+    remaining_pool = total_stock
+
     for item in purchased_query:
+        if remaining_pool <= 0:
+            break
+
         purchased_qty = float(item.total_purchased or 0)
         dispatched_qty = dispatched_map.get(item.lot_number, 0.0)
-        available_qty = max(0.0, purchased_qty - dispatched_qty)
+        
+        # Resta directa blindada: Compras menos Salidas efectivas
+        raw_available = max(0.0, purchased_qty - dispatched_qty)
 
-        if available_qty > 0:
+        # Se limita al stock total disponible en la sede para no prometer inventario inexistente
+        capped_available = min(raw_available, remaining_pool)
+
+        if capped_available > 0:
             lots.append({
                 "lot_number": item.lot_number,
-                "available_quantity": available_qty,
+                "available_quantity": capped_available,
                 "expiration_date": item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else ''
             })
+            remaining_pool -= capped_available
 
     return jsonify({
         "success": True,

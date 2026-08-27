@@ -6,6 +6,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAddRow = document.getElementById('btnAddRow');
     const dispatchForm = document.getElementById('dispatchForm');
     const productOptionsTemplateEl = document.getElementById('productOptionsTemplate');
+    const isReadOnly = dispatchForm ? dispatchForm.dataset.isReadOnly === 'true' : false;
+
+    // BLINDAJE DE SEGURIDAD EN CLIENTE
+    if (isReadOnly) {
+        // Deshabilitar todos los inputs, selects y botones en el formulario
+        if (dispatchForm) {
+            dispatchForm.querySelectorAll('input, select, button').forEach(el => {
+                if (el.tagName !== 'A') { // Mantiene activos los enlaces de navegación
+                    el.disabled = true;
+                }
+            });
+        }
+
+        // Si se intenta enviar forzando el formulario por consola o JS inusual:
+        dispatchForm?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Acceso Denegado: Su usuario no posee permisos para emitir despachos.');
+            window.location.href = '/logistics/movements';
+        });
+
+        if (itemsBody) {
+            itemsBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-eye fs-3 d-block mb-2 text-secondary"></i>
+                        <strong>Modo de solo lectura:</strong> No hay formulario activo para completar.
+                    </td>
+                </tr>`;
+        }
+        return; // Detiene la inicialización de lógica interactiva
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -92,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lotSelect.innerHTML = '<option value="">Cargando lotes...</option>';
         lotSelect.disabled = true;
         expInput.value = '';
-        if (totalStockInfo) totalStockInfo.textContent = '';
+        if (totalStockInfo) totalStockInfo.innerHTML = ''; 
         row.dataset.availableStock = 0;
         row.dataset.totalStock = 0;
 
@@ -114,7 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.dataset.totalStock = data.total_stock;
                 
                 if (totalStockInfo) {
-                    totalStockInfo.textContent = `Stock Total en Sede: ${data.total_stock}`;
+                    if (data.total_stock > 0) {
+                        totalStockInfo.innerHTML = `
+                            <span class="stock-badge stock-badge-available">
+                                <i class="bi bi-box-seam me-1"></i> Stock Total: ${data.total_stock}
+                            </span>`;
+                    } else {
+                        totalStockInfo.innerHTML = `
+                            <span class="stock-badge stock-badge-empty">
+                                <i class="bi bi-exclamation-triangle me-1"></i> Sin Stock en Sede
+                            </span>`;
+                    }
                 }
 
                 productSelect.classList.remove('is-invalid');
@@ -179,7 +220,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Control visual del estado del botón y el mensaje de aviso (Límite: 25)
+    function updateAddButtonState() {
+        const currentRowCount = itemsBody.querySelectorAll('tr').length;
+        const limitWarning = document.getElementById('limitWarning');
+        if (!btnAddRow) return;
+
+        if (currentRowCount >= 25) {
+            btnAddRow.style.pointerEvents = 'none';
+            if (limitWarning) limitWarning.classList.remove('d-none');
+        } else {
+            btnAddRow.style.pointerEvents = 'auto';
+            if (limitWarning) limitWarning.classList.add('d-none');
+        }
+    }
+
     function addRow() {
+        const currentRowCount = itemsBody.querySelectorAll('tr').length;
+        if (currentRowCount >= 25) {
+            return; 
+        }
+
         const rowId = Date.now();
         const tr = document.createElement('tr');
         tr.id = `row-${rowId}`;
@@ -247,12 +308,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tr.querySelector('.btn-delete').addEventListener('click', () => {
             tr.remove();
+            updateAddButtonState();
         });
 
         itemsBody.appendChild(tr);
+        updateAddButtonState();
     }
 
-    addRow();
+    if (!isReadOnly) {
+        addRow();
+    } else {
+        if (itemsBody) {
+            itemsBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Modo de solo lectura: No hay productos interactivos para mostrar.</td></tr>`;
+        }
+    }
 
     if (btnAddRow) {
         btnAddRow.addEventListener('click', addRow);
