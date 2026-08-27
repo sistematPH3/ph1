@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.decorators.roles import management_required, manager_required, admin_required, finance_required
+from app.decorators.roles import management_required, manager_required, admin_required, finance_required, assistant_manager_required
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -13,6 +13,8 @@ def index():
         return redirect(url_for('dashboard.director_dashboard'))
     elif current_user.is_manager:
         return redirect(url_for('dashboard.manager_dashboard'))
+    elif current_user.is_assistant_manager:
+            return redirect(url_for('dashboard.assistant_manager_dashboard'))
     elif current_user.is_admin:
         return redirect(url_for('dashboard.admin_dashboard'))
     elif current_user.is_finance:
@@ -31,6 +33,14 @@ def index():
 def director_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
     return render_template('dashboard/management_dashboard.html', alarmas=alarmas)
+
+
+@dashboard_bp.route('/assistant_manager-dashboard')
+@login_required
+@assistant_manager_required
+def assistant_manager_dashboard():
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/assistant_manager_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/manager-dashboard')

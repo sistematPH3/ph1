@@ -40,6 +40,8 @@ def login():
                 return redirect(url_for('dashboard.manager_dashboard'))
             elif getattr(usuario, 'is_finance', False):
                 return redirect(url_for('dashboard.finance_dashboard'))
+            elif getattr(usuario, 'is_assistant_manager', False):
+                return redirect(url_for('dashboard.assistant_manager_dashboard'))
             elif usuario.is_guest:
                 return redirect(url_for('security.waiting_room'))
             else:

@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}">
+
+<header class="dashboard-header">
+    <h1>Panel de Sub-Gerencia</h1>
+    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
+</header>
+
+<!-- Componente Reusable de Alertas de Stock -->
+{% include 'alerts/_alerts_stock.html' %}
+
+<div class="dashboard-grid">
+    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-boxes"></i>
+            <h3>Inventario</h3>
+            <p>Gestionar insumos y stock</p>
+        </div>
+    </a>
+
+    <a href="{{ url_for('purchase_management.index') }}" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-shopping-cart"></i>
+            <h3>Compras</h3>
+            <p>Historial y proveedores</p>
+        </div>
+    </a>
+
+    <a href="#" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-truck"></i>
+            <h3>Traslados</h3>
+            <p>Logística de sucursales</p>
+        </div>
+    </a>
+
+    <a href="#" class="card-link">
+        <div class="card-dash">
+            <i class="fas fa-arrow-down"></i>
+            <h3>Mermas</h3>
+            <p>Control de pérdidas</p>
+        </div>
+    </a>
+</div>
+{% endblock %}
