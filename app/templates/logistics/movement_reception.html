@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=27">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=85">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -17,7 +17,7 @@
                 </div>
                 <div>
                     <h1 class="ph-title">Recepción Física de Traslado</h1>
-                    <p class="ph-subtitle">Inspección de carga en muelle y certificación de ingreso a estantería</p>
+                    <p class="ph-subtitle">Inspección de carga en muelle, evaluación cualitativa por insumo e ingreso a estantería</p>
                 </div>
             </div>
             <div class="header-badge-tag">
@@ -50,7 +50,7 @@
 
             <div class="route-node">
                 <div class="node-icon-wrapper node-dest">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 9l1.5-6h15L21 9v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/>
                         <path d="M3 9h18"/>
                         <path d="M9 22V12h6v10"/>
@@ -70,43 +70,35 @@
                     <thead>
                         <tr>
                             <th>Insumo / SKU</th>
-                            <th>Lote y Vencimiento</th>
-                            <th class="text-right">
-                                <span class="th-main">Despachado</span>
-                                <span class="th-sub">(Guía Digital)</span>
-                            </th>
-                            <th class="text-right">
-                                <span class="th-main">Recibido</span>
-                                <span class="th-sub">(Físico Editable ✎)</span>
-                            </th>
-                            <th class="text-right">
-                                <span class="th-main">Diferencia</span>
-                                <span class="th-sub">(Recibido - Guía)</span>
-                            </th>
+                            <th>Lote y Vencimiento Guía</th>
+                            <th class="text-right">Despachado</th>
+                            <th class="text-right">Recibido Conforme ✎</th>
+                            <th class="text-right">Diferencia</th>
+                            <th>Condición del Insumo</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}">
-                            <td>
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}">
+                            <td data-label="Insumo">
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
                                     <span class="product-sku-code">{{ item.sku }}</span>
                                 </div>
                             </td>
-                            <td>
+                            <td data-label="Lote / Fecha">
                                 <div class="lot-cell">
                                     <span class="lot-pill">{{ item.lot_number or 'S/L' }}</span>
                                     <span class="date-text">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
                                 </div>
                             </td>
-                            <td class="text-right font-semibold">
+                            <td class="text-right font-semibold" data-label="Despachado">
                                 <span class="qty-dispatched-val">{{ "%.2f"|format(item.quantity) }}</span>
                                 <span class="unit-tag">{{ item.unit_of_measure }}</span>
                             </td>
-                            <td class="text-right">
+                            <td class="text-right" data-label="Recibido">
                                 <div class="qty-input-wrapper">
-                                    <div class="input-editable-box" title="Haga clic para editar la cantidad recibida">
+                                    <div class="input-editable-box">
                                         <svg class="edit-hint-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
                                         </svg>
@@ -122,8 +114,26 @@
                                     <span class="input-unit">{{ item.unit_of_measure }}</span>
                                 </div>
                             </td>
-                            <td class="text-right">
+                            <td class="text-right" data-label="Diferencia">
                                 <span class="diff-badge diff-ok">0.00</span>
+                            </td>
+                            <td data-label="Condición">
+                                <div class="item-condition-wrapper">
+                                    <select class="form-select form-select-sm select-item-condition">
+                                        <option value="CONFORME" selected>Conforme (Buen Estado)</option>
+                                        <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre)</option>
+                                        <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
+                                        <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
+                                        <option value="INCIDENCIA_TEMPERATURA">Ruptura Cadena de Frío</option>
+                                        <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
+                                        <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
+                                        <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
+                                        <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Espacio</option>
+                                    </select>
+                                    <div class="row-lot-mismatch hidden mt-1">
+                                        <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real en empaque...">
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -140,26 +150,27 @@
                             </svg>
                         </div>
                         <div>
-                            <h2 class="panel-subtitle">Auditoría de Recepción y Novedades</h2>
-                            <span class="panel-desc">Clasifique la condición física de descarga y registre cualquier incidencia</span>
+                            <h2 class="panel-subtitle">Diagnóstico y Justificación de Muelle</h2>
+                            <span class="panel-desc">Resumen consolidado generado a partir de la inspección por renglón</span>
                         </div>
                     </div>
-                    <span id="noveltyStatusBadge" class="status-pill pill-ok">Conforme (Cuadrado)</span>
+                    <span id="noveltyStatusBadge" class="status-pill pill-ok">Recepción Conforme</span>
                 </div>
                 
                 <div class="form-grid-2col">
                     <div class="input-card-box">
-                        <label class="ph-label" for="noveltyType">Tipo de Novedad Detectada</label>
+                        <label class="ph-label" for="noveltyType">Clasificación General del Despacho</label>
                         <select id="noveltyType" class="ph-select">
                             <option value="CONFORME">Recepción Conforme (Sin Discrepancia)</option>
                             <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre Físico)</option>
                             <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
                             <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
-                            <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precintos Rotos</option>
                             <option value="INCIDENCIA_TEMPERATURA">Ruptura de Cadena de Frío</option>
-                            <option value="VENCIMIENTO_PROXIMO">Vencimiento Próximo</option>
-                            <option value="LOTE_NO_COINCIDE">Lote Físico no coincide con Guía</option>
+                            <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
+                            <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
+                            <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
                             <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Falta de Espacio</option>
+                            <option value="INCIDENCIA_MIXTA">Incidencia Mixta (Múltiples Novedades)</option>
                         </select>
                         <span class="field-help-text" id="noveltyHelpText">Carga completa y en condiciones óptimas. Se acredita en destino.</span>
                     </div>
@@ -167,7 +178,7 @@
                     <div class="input-card-box">
                         <label class="ph-label" for="receptionNotes">
                             Notas de Muelle / Justificación
-                            <span id="notesRequiredFlag" class="flag-required hidden">* (Obligatorio por discrepancia)</span>
+                            <span id="notesRequiredFlag" class="flag-required hidden">* (Obligatorio por novedad detectada)</span>
                         </label>
                         <textarea 
                             id="receptionNotes" 
@@ -176,12 +187,39 @@
                         ></textarea>
                     </div>
                 </div>
+
+                <div id="dynamicProtocolGuideBox" class="protocol-guide-box card-ok-guide mt-3">
+                    <div class="protocol-guide-title" id="protocolGuideTitle">
+                        <i class="bi bi-info-circle-fill"></i> Protocolo Operativo: Recepción Conforme
+                    </div>
+                    <div class="protocol-guide-body" id="protocolGuideBody">
+                        Todos los renglones coinciden exactamente con la orden digital. La totalidad de los insumos ingresará de inmediato al disponible operativo de la sede.
+                    </div>
+                </div>
+
+                <div id="erroneousProductSection" class="erroneous-section-card hidden mt-3 p-3 border rounded-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <h6 class="fw-bold text-danger mb-0">
+                            <i class="bi bi-box-seam me-1"></i> Insumos Físicos No Solicitados (Entregados por Error)
+                        </h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill fw-bold" id="btnAddErroneousItem">
+                            <i class="bi bi-plus-lg me-1"></i> Agregar Insumo Erróneo
+                        </button>
+                    </div>
+
+                    <div id="erroneousItemsList" class="d-flex flex-column gap-2 mb-2">
+                    </div>
+
+                    <small class="text-muted d-block mt-1">
+                        * Nota: Toda mercancía no solicitada permanecerá en resguardo temporal sin ingresar a producción hasta que el Administrador dicte su retorno formal a Central[cite: 4].
+                    </small>
+                </div>
             </div>
 
             <div id="receptionAlertBox" class="alert-box hidden"></div>
 
             <div class="form-actions">
-                <a href="{{ url_for('logistics_list.movement_list') }}" class="btn-ph-secondary">Cancelar</a>
+                <a href="/logistics/movements" class="btn-ph-secondary">Cancelar</a>
                 <button type="submit" id="btnSubmitReception" class="btn-ph-primary">Confirmar y Asentar Stock</button>
             </div>
 
@@ -189,20 +227,28 @@
     </div>
 </div>
 
+<select id="catalogOptionsTemplate" class="d-none">
+    <option value="" selected disabled>-- Seleccione el producto entregado --</option>
+    {% for prod in catalog_products %}
+    <option value="{{ prod.id }}" data-sku="{{ prod.sku }}" data-unit="{{ prod.unit_of_measure }}">{{ prod.name }} ({{ prod.sku }})</option>
+    {% endfor %}
+</select>
+
 <div id="confirmModal" class="modal-backdrop-custom hidden">
     <div class="modal-card-custom">
-        <div class="modal-header-custom">
-            <h3 class="modal-title-custom">Confirmación de Recepción</h3>
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+            <h3 class="modal-title-custom mb-0">
+                <i class="bi bi-shield-check text-danger me-2"></i>Certificación de Descarga en Muelle
+            </h3>
         </div>
-        <div class="modal-body-custom">
-            <p id="confirmModalText"></p>
+        <div class="modal-body-custom" id="confirmModalContent">
         </div>
-        <div class="modal-actions-custom">
-            <button type="button" id="btnCancelModal" class="btn-ph-secondary">Revisar</button>
-            <button type="button" id="btnAcceptModal" class="btn-ph-primary">Sí, Procesar</button>
+        <div class="modal-actions-custom border-top pt-3 mt-3">
+            <button type="button" id="btnCancelModal" class="btn-ph-secondary">Revisar Nuevamente</button>
+            <button type="button" id="btnAcceptModal" class="btn-ph-primary">Certificar y Asentar Stock</button>
         </div>
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=27"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=85"></script>
 {% endblock %}

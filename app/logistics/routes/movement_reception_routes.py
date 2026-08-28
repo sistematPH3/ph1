@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, flash, session
 from flask_login import current_user, login_required
 from app.decorators.roles import require_roles
+from app.models import Product
 from app.logistics.services.movement_reception_service import MovementReceptionService
 
 movement_reception_bp = Blueprint("movement_reception", __name__, url_prefix="/logistics/movements")
@@ -25,10 +26,13 @@ def view_reception(movement_id):
         flash(error, "danger")
         return redirect("/logistics/movements")
 
+    catalog_products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
+
     return render_template(
         "logistics/movement_reception.html",
         movement=data["movement"],
-        details=data["details"]
+        details=data["details"],
+        catalog_products=catalog_products
     )
 
 @movement_reception_bp.route("/reception/<int:movement_id>/process", methods=["POST"])

@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 from datetime import datetime
 from app import db
+from app.models import Product
 from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
 from app.logistics.requests.movement_reception_validators import validate_reception_payload
 
@@ -44,10 +45,11 @@ class MovementReceptionService:
         novelty_type = validation_res["novelty_type"]
         notes = validation_res["notes"]
         processed_items = validation_res["items"]
+        erroneous_products = validation_res.get("erroneous_products", [])
         has_discrepancy = validation_res["has_discrepancy"]
 
         final_status = "COMPLETADO"
-        if has_discrepancy or novelty_type in ['FALTANTE_CONTEO', 'SOBRANTE_EXCEDENTE', 'PRODUCTO_ERRONEO', 'RECHAZO_POR_ESPACIO']:
+        if has_discrepancy or len(erroneous_products) > 0 or novelty_type != "CONFORME":
             final_status = "NOVEDAD_FALTANTE"
 
         try:
@@ -79,22 +81,48 @@ class MovementReceptionService:
             if final_status == "NOVEDAD_FALTANTE":
                 audit_event = "RECEPCION_NOVEDAD"
                 severity = "ALERTA"
-            elif novelty_type in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO', 'LOTE_NO_COINCIDE']:
+            elif any(it.get("item_condition") in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO'] for it in processed_items):
                 audit_event = "RECEPCION_INCIDENCIA_CALIDAD"
                 severity = "ALERTA"
 
             audit_items = []
             for item in processed_items:
                 detail_obj = details_map[item["detail_id"]]
+                item_diff = float(item["received_quantity"]) - float(item["quantity"])
+                item_cond = item.get("item_condition", "CONFORME")
+
+                if item_diff < -0.001:
+                    specific_novelty = "FALTANTE"
+                elif item_diff > 0.001:
+                    specific_novelty = "SOBRANTE"
+                elif item_cond != "CONFORME":
+                    specific_novelty = item_cond
+                else:
+                    specific_novelty = "CONFORME"
+
                 audit_items.append({
+                    "detail_id": item["detail_id"],
                     "product_id": item["product_id"],
                     "sku": detail_obj.sku,
                     "product_name": detail_obj.product_name,
                     "lot_number": item["lot_number"],
+                    "observed_physical_lot": item.get("observed_physical_lot"),
                     "expiration_date": str(item["expiration_date"]) if item["expiration_date"] else None,
                     "dispatched_qty": float(item["quantity"]),
                     "received_qty": float(item["received_quantity"]),
-                    "missing_qty": float(item["missing_quantity"])
+                    "missing_qty": float(item["missing_quantity"]),
+                    "item_condition": item_cond,
+                    "specific_novelty": specific_novelty
+                })
+
+            erroneous_audit_list = []
+            for err_p in erroneous_products:
+                p_obj = db.session.query(Product).get(err_p["product_id"])
+                erroneous_audit_list.append({
+                    "product_id": p_obj.id if p_obj else err_p["product_id"],
+                    "sku": p_obj.sku if p_obj else "N/A",
+                    "product_name": p_obj.name if p_obj else "Insumo Desconocido",
+                    "quantity_delivered": float(err_p["quantity"])
                 })
 
             changed_data = {
@@ -104,6 +132,7 @@ class MovementReceptionService:
                 "origin_location_id": movement["origin_location_id"],
                 "destination_location_id": movement["destination_location_id"],
                 "items": audit_items,
+                "erroneous_products_delivered": erroneous_audit_list,
                 "notes": notes,
                 "received_by_user_id": user_id,
                 "timestamp": datetime.utcnow().isoformat() + "Z"
