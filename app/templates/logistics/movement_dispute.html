@@ -1,21 +1,21 @@
 {% extends "layout.html" %}
 
-{% block title %}Bandeja de Arbitraje e Incidencias - PML{% endblock %}
-
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=7.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=5">
 
+<!-- Agregamos translate="no" y la clase notranslate para blindar la vista contra Google Translate -->
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
-    <div class="ph-card shadow-sm">
+    <div class="ph-card">
         
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <!-- Cabecera de la Bandeja -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
             <div class="d-flex align-items-center">
-                <div class="ph-icon-box me-3 shadow-sm">
-                    <i class="bi bi-shield-shaded"></i>
+                <div class="ph-icon-box me-3 shadow-sm" style="background-color: #af1515;">
+                    <i class="bi bi-bell-fill"></i>
                 </div>
                 <div>
-                    <h2 class="ph-title mb-1">Bandeja de Arbitraje e Incidencias</h2>
-                    <p class="text-muted mb-0">Centro de control, dictamen de discrepancias logísticas y regularización contable.</p>
+                    <h2 class="ph-title mb-1">Bandeja de Resolución e Incidencias</h2>
+                    <p class="text-muted mb-0">Centro de control y dictamen de alertas en tránsito, cruces de SKU y excepciones logísticas.</p>
                 </div>
             </div>
             <div>
@@ -25,299 +25,364 @@
             </div>
         </div>
 
-        <div class="ph-filter-bar mb-4 p-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <!-- Barra de Filtros Superior -->
+        <div class="ph-filter-bar mb-4 p-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3" style="background-color: #212529;">
+            <!-- Buscador -->
             <div class="input-group" style="max-width: 320px;">
                 <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Sede o SKU..." id="searchDisputeInput">
+                <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Tipo, Sede..." id="searchDisputeInput">
             </div>
 
+            <!-- Filtros de Estado y Sede -->
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <span class="text-light small fw-semibold">Filtrar:</span>
                 
-                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 220px;">
-                    <option value="" selected>Todos los incidentes</option>
-                    <option value="NOVEDAD_FALTANTE">Faltante de Conteo</option>
-                    <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente</option>
-                    <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU</option>
-                    <option value="RETORNO_EMERGENCIA">Retorno de Emergencia</option>
-                    <option value="VIOLACION_CUSTODIA">Violación de Custodia</option>
-                    <option value="INCIDENCIA_TEMPERATURA">Incidencia Térmica</option>
-                    <option value="VENCIMIENTO_PROXIMO">Vencimiento Próximo</option>
-                    <option value="LOTE_NO_COINCIDE">Lote no Coincide</option>
-                    <option value="RECHAZO_POR_ESPACIO">Rechazo por Espacio</option>
+                <!-- Selector dinámico de Estados / Novedades -->
+                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 250px;">
+                    <option value="" selected>Todos los estados</option>
+                    <option value="faltante de conteo">Faltante de Conteo</option>
+                    <option value="sobrante / excedente">Sobrante / Excedente</option>
+                    <option value="producto erróneo">Producto Erróneo</option>
+                    <option value="violación de custodia">Violación de Custodia</option>
+                    <option value="incidencia temperatura">Incidencia Temperatura</option>
+                    <option value="vencimiento próximo">Vencimiento Próximo</option>
+                    <option value="lote no coincide">Lote no Coincide</option>
+                    <option value="rechazo por espacio">Rechazo por Espacio</option>
+                    <option value="retorno de emergencia">Retorno de Emergencia</option>
+                    <option value="novedad faltante">Novedad Faltante</option>
+                    <option value="incidencia mixta">Incidencia Mixta</option>
                 </select>
 
+                <!-- Selector de Sede Dinámico basado en la tabla Locations -->
                 <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="locationFilterSelect" style="width: 180px;">
                     <option value="" selected>Todas las sedes</option>
-                    {% for loc in locations %}
+                    {% for loc in locations[1:] %}
                         <option value="{{ loc.name }}">{{ loc.name }}</option>
                     {% endfor %}
                 </select>
             </div>
         </div>
 
-        <div class="table-responsive d-none d-md-block">
-            <table class="table ph-table">
+        <!-- Tabla de Novedades / Disputas -->
+        <div class="table-responsive">
+            <table class="table ph-table align-middle">
                 <thead>
-                    <tr>
-                        <th style="width: 18%;">ID / INCIDENCIA</th>
-                        <th style="width: 26%;">RUTA DE TRASLADO</th>
-                        <th style="width: 18%;">FECHA DE REGISTRO</th>
-                        <th style="width: 20%;">ESTADO / NOVEDAD</th>
-                        <th style="width: 18%;" class="text-center">ACCIONES</th>
+                    <tr style="background-color: #af1515 !important;">
+                        <th style="background-color: #af1515 !important;">ID / TIPO DE ALERTA</th>
+                        <th style="background-color: #af1515 !important;">ORIGEN Y DESTINO</th>
+                        <th style="background-color: #af1515 !important;">FECHA DE INCIDENCIA</th>
+                        <th style="background-color: #af1515 !important;">ESTADO ACTUAL</th>
+                        <th style="background-color: #af1515 !important;" class="text-end">ACCIONES DE RESOLUCIÓN</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for mov in disputes %}
-                    {% set actual_status = mov.real_status if mov.real_status else mov.status %}
                     <tr class="dispute-row">
                         <td class="fw-bold">
                             <div class="d-flex align-items-center">
-                                <div class="dispute-id-circle me-3 shadow-sm">
+                                <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold;">
                                     #{{ mov.id }}
                                 </div>
                                 <div>
-                                    <span class="text-dark d-block">Traslado #{{ mov.id }}</span>
-                                    <span class="text-muted small">Inter-sedes</span>
+                                    <span class="text-dark d-block fw-bold">Incidencia Crítica</span>
+                                    <span class="text-muted small">Ref: Traslado Inter-sedes</span>
                                 </div>
                             </div>
                         </td>
-
                         <td>
                             <div class="d-flex flex-column gap-1">
                                 <div class="d-flex align-items-center">
-                                    <span class="text-muted small fw-semibold me-2" style="width: 32px;">De:</span>
-                                    <span class="ph-badge-location">{{ mov.origin_name }}</span>
+                                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
+                                    <span class="ph-badge-location">{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</span>
                                 </div>
                                 <div class="d-flex align-items-center">
-                                    <span class="text-muted small fw-semibold me-2" style="width: 32px;">A:</span>
-                                    <span class="ph-badge-location">{{ mov.destination_name }}</span>
+                                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
+                                    <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
                                 </div>
                             </div>
                         </td>
-
                         <td>
-                            <span class="text-dark d-block js-local-date" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}">N/A</span>
-                            <span class="text-muted small js-local-time" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}"></span>
+                            <span class="text-dark d-block fw-semibold">{{ mov.date.strftime('%Y-%m-%d') }}</span>
+                            <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
                         </td>
-
                         <td>
-                            {% if actual_status in ['PRODUCTO_ERRONEO', 'SKU_CRUZADO'] %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-danger">Producto Erróneo</span>
-                            {% elif actual_status in ['NOVEDAD_FALTANTE', 'FALTANTE_CONTEO'] %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-warning">Faltante de Conteo</span>
-                            {% elif actual_status == 'SOBRANTE_EXCEDENTE' %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-info">Sobrante Físico</span>
-                            {% elif actual_status == 'VIOLACION_CUSTODIA' %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-secondary">Custodia Violada</span>
-                            {% elif actual_status == 'INCIDENCIA_TEMPERATURA' %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-primary">Falla Térmica</span>
-                            {% elif actual_status in ['RETORNO_EMERGENCIA', 'RECHAZO_POR_ESPACIO'] %}
-                                <span class="badge px-3 py-2 rounded-pill fw-semibold novelty-badge novelty-dark">Retorno de Emergencia</span>
+                            {% if mov.status == 'FALTANTE_CONTEO' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fdf3d1; color: #b18721;">Faltante de Conteo</span>
+                            {% elif mov.status == 'SOBRANTE_EXCEDENTE' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #d8f1f5; color: #2e7a88;">Sobrante / Excedente</span>
+                            {% elif mov.status == 'PRODUCTO_ERRONEO' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fce4e8; color: #af3645;">Producto Erróneo</span>
+                            {% elif mov.status == 'VIOLACION_CUSTODIA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fce4e8; color: #af3645;">Violación de Custodia</span>
+                            {% elif mov.status == 'INCIDENCIA_TEMPERATURA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #d1e7fc; color: #1e5a9c;">Incidencia Temperatura</span>
+                            {% elif mov.status == 'VENCIMIENTO_PROXIMO' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #e8daef; color: #512e5f;">Vencimiento Próximo</span>
+                            {% elif mov.status == 'LOTE_NO_COINCIDE' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fcbf49; color: #433002;">Lote no Coincide</span>
+                            {% elif mov.status == 'RECHAZO_POR_ESPACIO' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fadbd8; color: #78281f;">Rechazo por Espacio</span>
+                            {% elif mov.status == 'RETORNO_EMERGENCIA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #fce4e8; color: #af3645;">Retorno de Emergencia</span>
+                            {% elif mov.status == 'NOVEDAD_FALTANTE' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium" style="background-color: #ff6b6b; color: #fff;">Novedad Faltante</span>
+                            {% elif mov.status == 'INCIDENCIA_MIXTA' %}
+                                <span class="badge px-3 py-2 rounded-pill fw-medium bg-dark text-white">Incidencia Mixta</span>
                             {% else %}
-                                <span class="badge bg-light text-dark px-3 py-2 rounded-pill fw-semibold border">{{ actual_status | replace('_', ' ') | title }}</span>
+                                <span class="badge bg-light text-dark px-3 py-2 rounded-pill fw-medium">{{ mov.status | replace('_', ' ') | title }}</span>
                             {% endif %}
                         </td>
-
-                        <td class="text-center">
-                            <div class="d-flex justify-content-center gap-2 align-items-center">
-                                <button class="btn btn-ph-info btn-sm px-3 py-1 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-disputa-{{ mov.id }}" aria-expanded="false">
-                                    <i class="bi bi-eye me-1"></i> Ver
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2 align-items-center">
+                                <button class="btn btn-ph-info btn-sm px-3 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-disputa-{{ mov.id }}" title="Inspeccionar">
+                                    <i class="bi bi-eye"></i> Ver
                                 </button>
-                                <button class="btn btn-ph-danger btn-sm px-3 py-1 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}">
-                                    <i class="bi bi-gavel me-1"></i> Resolver
+                                <button class="btn btn-ph-pill btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}" style="font-size: 0.85rem;">
+                                    Resolver
                                 </button>
                             </div>
                         </td>
                     </tr>
 
-                    <tr class="detail-collapse-row">
-                        <td colspan="5" class="p-0 border-0">
-                            <div class="collapse" id="detalle-disputa-{{ mov.id }}">
-                                <div class="ph-detail-box shadow-sm m-3 p-3 bg-light border rounded-3">
-                                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Muelle (#{{ mov.id }})</h6>
+                    <!-- Desplegable con los detalles -->
+                    <tr class="collapse" id="detalle-disputa-{{ mov.id }}">
+                        <td colspan="5">
+                            <div class="ph-detail-box shadow-sm">
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Tránsito (#{{ mov.id }})</h6>
+                                
+                                <!-- Observaciones reales de recepción -->
+                                <div class="alert alert-warning mb-3 py-2 px-3 small border-0 shadow-sm">
+                                    <strong><i class="bi bi-chat-left-text-fill me-1"></i> Descripción de la novedad en muelle:</strong> 
+                                    {{ mov.reception_notes or mov.resolution_notes or 'No se registraron observaciones adicionales por parte del receptor al momento de la descarga.' }}
+                                </div>
 
-                                    <div class="alert alert-warning mb-3 py-2 px-3 small border-0 shadow-sm">
-                                        <strong>Notas de Muelle / Declaración:</strong> 
-                                        {% if mov.notes %}
-                                            <span class="fst-italic text-dark">"{{ mov.notes }}"</span>
-                                        {% else %}
-                                            <span class="text-muted">Sin justificación registrada en muelle.</span>
-                                        {% endif %}
+                                <!-- Ítems del Manifestado Original -->
+                                <table class="table table-sm table-bordered bg-white mb-3 shadow-sm ph-inner-table align-middle">
+                                    <thead>
+                                        <tr class="bg-light">
+                                            <th>Producto / SKU</th>
+                                            <th>Lote</th>
+                                            <th>Fecha de Vencimiento</th>
+                                            <th>Cant. Despachada</th>
+                                            <th>Cant. Recibida</th>
+                                            <th>Faltante Retenido (Transit)</th>
+                                            <th>Estado / Condición Auditada</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in mov.details %}
+                                        {% set diff = (item.received_quantity | default(0, true) | float) - (item.quantity | float) %}
+                                        <tr>
+                                            <td class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</td>
+                                            <td><code>{{ item.observed_physical_lot or item.lot_number or 'N/A' }}</code></td>
+                                            <td>
+                                                {% if item.expiration_date %}
+                                                    <span class="badge bg-light text-dark border">{{ item.expiration_date.strftime('%Y-%m-%d') }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">N/A</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ "%.2f"|format(item.quantity) }}</td>
+                                            <td>{{ "%.2f"|format(item.received_quantity | default(0, true)) }}</td>
+                                            <td class="text-danger fw-bold">{{ "%.2f"|format(item.missing_quantity | default(0, true)) }}</td>
+                                            <td>
+                                                {% if diff > 0.001 %}
+                                                    <span class="badge bg-info text-dark">SOBRANTE / EXCEDENTE</span>
+                                                {% elif item.missing_quantity and item.missing_quantity > 0 %}
+                                                    <span class="badge bg-danger">FALTANTE DE CONTEO</span>
+                                                {% elif item.item_condition and item.item_condition != 'CONFORME' %}
+                                                    <span class="badge bg-warning text-dark">{{ item.item_condition }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">CONFORME</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+
+                                <!-- SECCIÓN DETALLADA: PRODUCTOS NO MANIFESTADOS / ENTREGADOS POR ERROR -->
+                                {% if mov.erroneous_products and mov.erroneous_products|length > 0 %}
+                                <div class="card border-danger mb-3 shadow-sm">
+                                    <div class="card-header bg-danger text-white py-2 fw-bold small">
+                                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Productos No Manifestados / Entregados por Error (Fuera de Guía)
                                     </div>
-
-                                    <div class="table-responsive">
-                                        <table class="table table-sm bg-white mb-0 shadow-sm ph-inner-table">
-                                            <thead>
+                                    <div class="card-body p-2">
+                                        <table class="table table-sm table-bordered bg-white mb-0 ph-inner-table align-middle">
+                                            <thead class="table-light">
                                                 <tr>
-                                                    <th>Producto / Insumo</th>
-                                                    <th>N° Lote</th>
-                                                    <th>Vencimiento</th>
-                                                    <th>Despachado</th>
-                                                    <th>Recibido</th>
-                                                    <th>Discrepancia</th>
+                                                    <th>SKU</th>
+                                                    <th>Producto Erróneo / Insumo</th>
+                                                    <th>Cantidad Físicamente Entregada</th>
+                                                    <th>Estado de Incidencia</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {% for item in mov.details %}
+                                                {% for err_p in mov.erroneous_products %}
                                                 <tr>
-                                                    <td><strong>{{ item.product_name }}</strong></td>
-                                                    <td><span class="badge bg-light text-dark font-monospace border">{{ item.lot_number or 'N/A' }}</span></td>
-                                                    <td>
-                                                        {% if item.expiration_date %}
-                                                            <span>{{ item.expiration_date.strftime('%d/%m/%Y') }}</span>
-                                                        {% else %}
-                                                            <span class="text-muted">N/A</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>{{ "%.2f"|format(item.quantity) }}</td>
-                                                    <td>{{ "%.2f"|format(item.received_quantity) if item.received_quantity is not none else '0.00' }}</td>
-                                                    <td>
-                                                        {% if item.received_quantity is not none and item.received_quantity > item.quantity %}
-                                                            <span class="text-info fw-bold">+{{ "%.2f"|format(item.received_quantity - item.quantity) }} (Excedente)</span>
-                                                        {% elif item.missing_quantity > 0 %}
-                                                            <span class="text-danger fw-bold">-{{ "%.2f"|format(item.missing_quantity) }} (Faltante)</span>
-                                                        {% else %}
-                                                            <span class="text-success fw-bold">0.00</span>
-                                                        {% endif %}
-                                                    </td>
+                                                    <td><code>{{ err_p.sku }}</code></td>
+                                                    <td class="fw-bold text-danger">{{ err_p.product_name }}</td>
+                                                    <td class="fw-bold fs-6">{{ "%.2f"|format(err_p.quantity_delivered) }} unidades</td>
+                                                    <td><span class="badge bg-danger text-white">PRODUCTO ERREONEO</span></td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
+
+                    <!-- Modal de Resolución Granular por Ítem -->
+                    <div class="modal fade" id="resolveModal-{{ mov.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                                <form action="{{ url_for('movement_dispute.resolve_dispute', movement_id=mov.id) }}" method="POST">
+                                    <div class="modal-header bg-dark text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                                        <h5 class="modal-title fw-bold"><i class="bi bi-gavel text-danger me-2"></i>Dictamen Administrativo Granular — Traslado #{{ mov.id }}</h5>
+                                        <button type="button" class="btn-close btn-close-white dispute-modal-dismiss" data-movement-id="{{ mov.id }}" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        
+                                        <p class="text-muted small mb-3">Defina la acción administrativa de arbitraje de forma independiente para cada producto involucrado en esta incidencia:</p>
+
+                                        <!-- Ítems del manifestado original -->
+                                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-box-seam me-1 text-danger"></i> Ítems del Manifestado Original:</h6>
+                                        {% for item in mov.details %}
+                                        <div class="card bg-light border-0 p-3 mb-3 shadow-sm">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="fw-bold text-dark"><i class="bi bi-box-seam me-1 text-danger"></i> {{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span>
+                                                {% if item.missing_quantity and item.missing_quantity > 0 %}
+                                                    <span class="badge bg-danger text-white">Discrepancia / Faltante: {{ item.missing_quantity }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary text-white">En Guía</span>
+                                                {% endif %}
+                                            </div>
+                                            
+                                            <div class="row g-2 align-items-center">
+                                                <!-- Opciones dinámicas segun catálogo -->
+                                                <div class="col-md-{% if mov.status == 'LOTE_NO_COINCIDE' %}7{% else %}12{% endif %}">
+                                                    <label class="form-label small fw-semibold text-secondary">Acción permitida:</label>
+                                                    <select name="item_{{ item.id }}_action" class="form-select form-select-sm shadow-sm" required>
+                                                        <option value="" selected disabled>-- Seleccione resolución --</option>
+                                                        
+                                                        {% if mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
+                                                            <option value="ACEPTAR_RECEPCION">Aceptar recepción física real (Confirmar lo que llegó)</option>
+                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (Pérdida en ruta)</option>
+                                                        {% elif mov.status in ['SOBRANTE_EXCEDENTE'] %}
+                                                            <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar en destino (Ingresar excedente al stock local)</option>
+                                                            <option value="RESOLUCION_REINTEGRO">Devolver al origen (Reintegro en Transporte)</option>
+                                                        {% elif mov.status == 'VIOLACION_CUSTODIA' %}
+                                                            <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar recepción en destino con acta de auditoría</option>
+                                                            <option value="INCIDENCIA_INTERNA">Procesar como incidencia interna local (caja dañada/abierta, el contenido queda en sede)</option>
+                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física local</option>
+                                                        {% elif mov.status == 'INCIDENCIA_TEMPERATURA' %}
+                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física (Cerrar tránsito y notificar a auditoría)</option>
+                                                        {% elif mov.status == 'VENCIMIENTO_PROXIMO' %}
+                                                            <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
+                                                        {% elif mov.status == 'LOTE_NO_COINCIDE' %}
+                                                            <option value="CORREGIR_LOTE">Actualizar y corregir número de lote en sistema</option>
+                                                        {% elif mov.status in ['RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA'] %}
+                                                            <option value="RETORNO_EMERGENCIA">Ordenar Retorno de Emergencia a central</option>
+                                                        {% else %}
+                                                            <option value="ACEPTAR_RECEPCION">Aceptar recepción física real</option>
+                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial</option>
+                                                        {% endif %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Campo de Lote condicional solo para LOTE_NO_COINCIDE -->
+                                                {% if mov.status == 'LOTE_NO_COINCIDE' %}
+                                                <div class="col-md-5">
+                                                    <label class="form-label small fw-semibold text-secondary">Nuevo Lote Real:</label>
+                                                    <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm shadow-sm" placeholder="Ej. LOTE-REAL-2026" required>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+
+                                        <!-- SECCIÓN DE PRODUCTOS ERRÓNEOS: ÚNICAMENTE QUEDÁRSELO O DEVOLVERLO -->
+                                        {% if mov.erroneous_products and mov.erroneous_products|length > 0 %}
+                                        <h6 class="fw-bold text-danger mt-4 mb-2"><i class="bi bi-exclamation-octagon-fill me-1"></i> Decisión sobre Producto Erróneo / Inesperado:</h6>
+                                        {% for err_p in mov.erroneous_products %}
+                                        <div class="card border-danger bg-light p-3 mb-3 shadow-sm">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="fw-bold text-dark"><i class="bi bi-x-circle-fill text-danger me-1"></i> {{ err_p.product_name }} (SKU: {{ err_p.sku }})</span>
+                                                <span class="badge bg-danger text-white">Cantidad recibida: {{ "%.2f"|format(err_p.quantity_delivered) }}</span>
+                                            </div>
+                                            <div>
+                                                <label class="form-label small fw-semibold text-secondary">Acción para este producto erróneo:</label>
+                                                <select name="erroneous_{{ err_p.product_id }}_action" class="form-select form-select-sm shadow-sm" required>
+                                                    <option value="" selected disabled>-- Seleccione qué hacer con este producto --</option>
+                                                    <option value="RESOLUCION_ACREDITAR_DESTINO">Quedárselo / Acreditar en Destino (Ingresar al stock local)</option>
+                                                    <option value="RESOLUCION_REINTEGRO">Devolverlo al Origen (Reintegro en Transporte)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                        {% endif %}
+
+                                        <!-- BOTÓN Y ALERTA DE ACCESO DIRECTO A REPOSICIÓN DENTRO DEL MODAL (RESTABLECIDO) -->
+                                        {% set ns_modal = namespace(total=0) %}
+                                        {% for item in mov.details %}
+                                            {% set missing = (item.missing_quantity | default(0, true) | float) %}
+                                            {% if missing > 0 %}
+                                                {% set ns_modal.total = ns_modal.total + missing %}
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        {% if ns_modal.total > 0 %}
+                                        <div class="alert alert-info border-0 shadow-sm d-flex justify-content-between align-items-center mt-3 mb-3 p-3" style="background-color: #e2f0fb;">
+                                            <div>
+                                                <span class="fw-bold text-dark d-block"><i class="bi bi-info-circle-fill text-primary me-1"></i> Faltante detectado ({{ ns_modal.total }} unidades)</span>
+                                                <span class="text-muted small">Puedes realizar un despacho complementario de reposición para cubrir este faltante.</span>
+                                            </div>
+                                            <div>
+                                                <a href="/logistics/movements/dispatch?destination_id={{ mov.destination_location_id }}&dispute_id={{ mov.id }}" class="btn btn-primary btn-sm px-3 fw-semibold shadow-sm">
+                                                    <i class="bi bi-truck me-1"></i> Ir a Reposición
+                                                </a>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+
+                                        <div class="mb-3 mt-3">
+                                            <label for="general_notes" class="form-label fw-bold text-dark">Acta y Justificación General Legal (Mínimo 15 caracteres):</label>
+                                            <textarea name="general_notes" class="form-control shadow-sm" rows="3" minlength="15" placeholder="Escriba el motivo técnico, número de acta o revisión de auditoría que fundamenta las decisiones..." required></textarea>
+                                            <div class="form-text">Esta justificación quedará registrada en la bitácora general de auditoría para todos los ítems.</div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer bg-light" style="border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+                                        <button type="button" class="btn btn-secondary px-4 dispute-modal-dismiss" data-movement-id="{{ mov.id }}">Cancelar</button>
+                                        <button type="submit" class="btn btn-ph-pill px-4">Emitir Veredicto Granular</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-5">
+                            <i class="bi bi-check-circle fs-1 text-success d-block mb-2"></i>
+                            No hay novedades ni incidencias pendientes de resolución en este momento.
+                        </td>
+                    </tr>
                     {% endfor %}
+
+                    <!-- Fila oculta para el mensaje de que no hay coincidencias con el filtro -->
+                    <tr id="noResultsRow" style="display: none;">
+                        <td colspan="5" class="text-center text-muted py-5">
+                            <i class="bi bi-search fs-1 text-secondary d-block mb-2"></i>
+                            No se encontraron resultados que coincidan con la búsqueda.
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
 
-        <div class="d-block d-md-none">
-            <div class="d-flex flex-column gap-3">
-                {% for mov in disputes %}
-                {% set actual_status = mov.real_status if mov.real_status else mov.status %}
-                <div class="card border-0 shadow-sm rounded-4 p-3 dispute-row-mobile" style="background-color: #f8f9fa;">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge bg-danger rounded-pill px-3 py-2">#{{ mov.id }} - Disputa</span>
-                        <small class="text-muted js-local-full" data-utc="{{ mov.date.strftime('%Y-%m-%dT%H:%M:%SZ') if mov.date else '' }}"></small>
-                    </div>
-
-                    <div class="mb-2">
-                        <div class="small text-muted fw-semibold">Ruta:</div>
-                        <div class="d-flex align-items-center gap-1 mt-1">
-                            <span class="ph-badge-location text-truncate">{{ mov.origin_name }}</span>
-                            <i class="bi bi-arrow-right text-muted"></i>
-                            <span class="ph-badge-location text-truncate">{{ mov.destination_name }}</span>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="small text-muted fw-semibold mb-1">Novedad:</div>
-                        <div>
-                            <span class="badge bg-secondary text-white px-2 py-1">{{ actual_status | replace('_', ' ') | title }}</span>
-                        </div>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-primary btn-sm flex-fill" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-mobile-{{ mov.id }}" aria-expanded="false">
-                            <i class="bi bi-eye me-1"></i> Detalles
-                        </button>
-                        <button class="btn btn-ph-danger btn-sm flex-fill" type="button" data-bs-toggle="modal" data-bs-target="#resolveModal-{{ mov.id }}">
-                            <i class="bi bi-gavel me-1"></i> Resolver
-                        </button>
-                    </div>
-
-                    <div class="collapse mt-3" id="detalle-mobile-{{ mov.id }}">
-                        <div class="p-3 bg-white border rounded-3 shadow-sm">
-                            <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-shield-exclamation text-danger me-1"></i>Expediente #{{ mov.id }}</h6>
-                            <div class="alert alert-warning py-1 px-2 small mb-2">
-                                <strong>Nota:</strong> {{ mov.notes if mov.notes else "Sin justificación en muelle." }}
-                            </div>
-
-                            <div class="d-flex flex-column gap-2">
-                                {% for item in mov.details %}
-                                <div class="p-2 border rounded bg-light small">
-                                    <div class="fw-bold text-dark">{{ item.product_name }}</div>
-                                    <div class="text-muted">Lote: <code>{{ item.lot_number or 'N/A' }}</code></div>
-                                    <div class="d-flex justify-content-between mt-1">
-                                        <span>Desp: <strong>{{ "%.2f"|format(item.quantity) }}</strong></span>
-                                        <span>Rec: <strong>{{ "%.2f"|format(item.received_quantity if item.received_quantity is not none else 0) }}</strong></span>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-check-circle fs-2 text-success d-block mb-2"></i>
-                    No hay incidencias ni disputas pendientes de arbitraje.
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div id="noResultsRow" class="text-center text-muted py-5" style="display: none;">
-            <i class="bi bi-search fs-1 text-secondary d-block mb-2"></i>
-            No se encontraron expedientes que coincidan con la búsqueda.
-        </div>
-
-        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top flex-wrap gap-3">
-            <div class="text-muted small" id="paginationInfo">
-                Mostrando 0-0 de 0 registros
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-outline-dark btn-sm px-3 rounded-pill shadow-sm" id="btnPrevPage" disabled>
-                    <i class="bi bi-chevron-left me-1"></i> Anterior
-                </button>
-                <span class="fw-semibold text-dark small px-2" id="currentPageText">Página 1 de 1</span>
-                <button class="btn btn-outline-dark btn-sm px-3 rounded-pill shadow-sm" id="btnNextPage">
-                    Siguiente <i class="bi bi-chevron-right ms-1"></i>
-                </button>
-            </div>
-        </div>
-
-        {% for mov in disputes %}
-        <div class="modal fade" id="resolveModal-{{ mov.id }}" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-                    <form action="{{ url_for('movement_dispute.resolve_dispute', movement_id=mov.id) }}" method="POST">
-                        <div class="modal-header bg-dark text-white">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-gavel text-danger me-2"></i>Arbitraje Administrativo — Traslado #{{ mov.id }}</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body p-4">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-dark">Seleccionar Dictamen Contable <span class="text-danger">*</span></label>
-                                <select name="action_type" class="form-select ph-pill-input" required>
-                                    <option value="" selected disabled>-- Elija la resolución legal --</option>
-                                    <option value="RESOLUCION_REINTEGRO">Reintegro al Origen (Devolver faltante a stock disponible)</option>
-                                    <option value="RESOLUCION_BAJA_EXTRAVIO">Baja por Extravío / Robo (Declarar pérdida patrimonial)</option>
-                                    <option value="RETORNO_EMERGENCIA_LIQUIDACION">Liquidación de Retorno (Reingreso de carga a Central)</option>
-                                    <option value="RESOLUCION_LEGALIZAR_SOBRANTE">Legalizar Sobrante en Destino (Ingresar excedente a sucursal)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-dark">Acta y Justificación Legal (Mínimo 15 caracteres) <span class="text-danger">*</span></label>
-                                <textarea name="resolution_notes" class="form-control" rows="4" minlength="15" placeholder="Asiente los motivos técnicos, número de acta policial o reporte de muelle..." required></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer bg-light">
-                            <button type="button" class="btn btn-ph-outline-danger px-4" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-ph-danger px-4 shadow-sm">Emitir Dictamen</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
+        <script src="{{ url_for('static', filename='js/logistics/movement_dispute.js') }}?v=4"></script>
     </div>
 </div>
-
-<script src="{{ url_for('static', filename='js/logistics/movement_dispute.js') }}?v=7.0"></script>
 {% endblock %}

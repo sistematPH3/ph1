@@ -544,49 +544,4 @@ body.bg-main {
     .btn-toggle i.fs-4 {
         font-size: 1.25rem !important; /* Ajusta levemente el tamaño del lápiz */
     }
-
-    /* =========================================================================
-   ESTILOS DE ALERTAS Y MENSAJES FLASH (Para la parte superior)
-   ========================================================================= */
-.alert {
-    border-radius: 16px !important;
-    padding: 1rem 1.25rem !important;
-    font-size: 0.9rem !important;
-    line-height: 1.4 !important;
-}
-
-/* Alerta de Error / Restricción (Roja) */
-.alert-danger {
-    background-color: #FDF2F2 !important;
-    color: #991B1B !important;
-    border: 1px solid #FEE2E2 !important;
-    box-shadow: 0 4px 12px rgba(153, 27, 27, 0.08) !important;
-}
-
-.alert-danger strong {
-    color: #7F1D1D !important;
-    font-size: 0.95rem;
-}
-
-/* Alerta de Éxito (Verde) */
-.alert-success {
-    background-color: #ECFDF5 !important;
-    color: #065F46 !important;
-    border: 1px solid #D1FAE5 !important;
-    box-shadow: 0 4px 12px rgba(6, 95, 70, 0.08) !important;
-}
-
-/* Alerta de Advertencia (Naranja/Ámbar) */
-.alert-warning {
-    background-color: #FFFBEB !important;
-    color: #92400E !important;
-    border: 1px solid #FEF3C7 !important;
-    box-shadow: 0 4px 12px rgba(146, 64, 14, 0.08) !important;
-}
-
-/* Adaptación del botón para cerrar alertas */
-.alert .btn-close {
-    padding: 1.25rem !important;
-    background-size: 0.75rem !important;
-}
 }

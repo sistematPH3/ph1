@@ -5,6 +5,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const productOptionsTemplateEl = document.getElementById('productOptionsTemplate');
     const isReadOnly = dispatchForm ? dispatchForm.dataset.isReadOnly === 'true' : false;
 
+    // Autoseleccionar y BLOQUEAR la sede destino si viene especificada por parámetro en la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const destParam = urlParams.get('destination_id');
+    if (destParam) {
+        const destSelect = document.getElementById('destination_location_id');
+        if (destSelect && !destSelect.disabled) {
+            destSelect.value = destParam;
+            destSelect.disabled = true; // Bloquea el selector para que no se pueda modificar
+
+            // Crea o asegura el input oculto para que getDestinationLocationId() recoja el valor correctamente
+            let hiddenDest = document.getElementById('destination_location_id_hidden');
+            if (!hiddenDest) {
+                hiddenDest = document.createElement('input');
+                hiddenDest.type = 'hidden';
+                hiddenDest.id = 'destination_location_id_hidden';
+                destSelect.parentNode.appendChild(hiddenDest);
+            }
+            hiddenDest.value = destParam;
+
+            destSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
     if (isReadOnly) {
         if (dispatchForm) {
             dispatchForm.querySelectorAll('input, select, button').forEach(el => {
@@ -391,6 +414,14 @@ document.addEventListener('DOMContentLoaded', () => {
             items: items
         };
 
+        // Si este despacho se está generando como reposición complementaria desde
+        // una disputa, se envía el id de esa disputa para que el backend quede
+        // vinculado y pueda auto-cancelarse si la disputa no llega a resolverse.
+        const originDisputeInput = document.getElementById('origin_dispute_id');
+        if (originDisputeInput && originDisputeInput.value) {
+            payload.source_dispute_id = parseInt(originDisputeInput.value);
+        }
+
         const btnSubmit = document.getElementById('btnSubmit');
         const originalBtnHtml = btnSubmit.innerHTML;
         btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
@@ -419,7 +450,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (btnSuccessOk) {
                     btnSuccessOk.addEventListener('click', () => {
-                        window.location.href = '/logistics/movements';
+                        const originDisputeInput = document.getElementById('origin_dispute_id');
+                        const disputeReturnUrl = document.getElementById('dispute_return_url');
+                        
+                        if (originDisputeInput && originDisputeInput.value && disputeReturnUrl) {
+                            // Redirige pasando el parámetro open_dispute para reabrir el modal de la disputa
+                            window.location.href = `${disputeReturnUrl.value}?open_dispute=${originDisputeInput.value}#detalle-disputa-${originDisputeInput.value}`;
+                        } else {
+                            window.location.href = '/logistics/movements';
+                        }
                     });
                 }
             } else {

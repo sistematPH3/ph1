@@ -169,12 +169,17 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     function showAlert(message) {
-        alertBox.textContent = message;
-        alertBox.classList.remove("hidden");
+        if (alertBox) {
+            alertBox.textContent = message;
+            alertBox.classList.remove("hidden");
+            alertBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
     }
 
     function hideAlert() {
-        alertBox.classList.add("hidden");
+        if (alertBox) {
+            alertBox.classList.add("hidden");
+        }
     }
 
     function addErroneousItemRow() {
@@ -334,12 +339,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 diffBadge.textContent = "0.00";
                 if (condition === "CONFORME") row.classList.add("row-ok");
             } else if (diff < 0) {
-                hasShortage = true;
+                // Solo contamos "hasShortage" como incidencia GENÉRICA si el
+                // renglón se dejó en CONFORME. Si el usuario ya clasificó el
+                // renglón con una condición específica (ej. RECHAZO_POR_ESPACIO),
+                // esa condición ya explica la diferencia de cantidad: no hay
+                // que sumarla también como un "faltante" aparte, o se infla
+                // distinctIssuesCount y se termina forzando INCIDENCIA_MIXTA.
+                if (condition === "CONFORME") hasShortage = true;
                 diffBadge.classList.add("diff-missing");
                 diffBadge.textContent = diff.toFixed(2);
                 if (condition === "CONFORME") row.classList.add("row-missing");
             } else {
-                hasSurplus = true;
+                if (condition === "CONFORME") hasSurplus = true;
                 diffBadge.classList.add("diff-surplus");
                 diffBadge.textContent = `+${diff.toFixed(2)}`;
                 if (condition === "CONFORME") row.classList.add("row-surplus");
@@ -651,17 +662,28 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-            const result = await response.json();
+            // Captura robusta de la respuesta del servidor (sea éxito o error controlado)
+            let result = {};
+            try {
+                result = await response.json();
+            } catch (jsonErr) {
+                console.error("La respuesta no devolvió un JSON válido:", jsonErr);
+            }
 
             if (response.ok && result.success) {
                 window.location.href = result.redirect_url || "/logistics/movements";
             } else {
-                showAlert(result.message || "Error al procesar la recepción.");
+                // AQUÍ ESTÁ LA CORRECCIÓN CLAVE: Extrae el mensaje de Python y lo pinta visiblemente en la interfaz
+                const errorMessage = result.message || `Error del servidor (Código HTTP: ${response.status})`;
+                showAlert(errorMessage);
+                
+                // Restaura el botón para permitir corregir y reintentar
                 btnSubmit.disabled = false;
                 btnSubmit.textContent = "Confirmar y Asentar Stock";
             }
         } catch (error) {
-            showAlert("Error de conexión al procesar el traslado.");
+            console.error("Error de red:", error);
+            showAlert("Error de conexión al procesar el traslado con el servidor.");
             btnSubmit.disabled = false;
             btnSubmit.textContent = "Confirmar y Asentar Stock";
         }

@@ -34,12 +34,23 @@ class MovementDispatchService:
                 "errors": ["No tiene permisos para emitir despachos desde una sede distinta a la asignada."]
             }, 403
 
+        # Si el despacho se originó como reposición complementaria desde una
+        # disputa, se conserva el vínculo para poder auto-cancelarlo si esa
+        # disputa se abandona sin resolución.
+        source_dispute_id = payload.get('source_dispute_id')
+        if source_dispute_id is not None:
+            try:
+                source_dispute_id = int(source_dispute_id)
+            except (TypeError, ValueError):
+                source_dispute_id = None
+
         try:
             movement = MovementDispatchRepository.create_dispatch_transaction(
                 origin_id=origin_id,
                 destination_id=destination_id,
                 created_by_id=user.id,
-                items_payload=payload['items']
+                items_payload=payload['items'],
+                source_dispute_id=source_dispute_id
             )
             db.session.commit()
             return {

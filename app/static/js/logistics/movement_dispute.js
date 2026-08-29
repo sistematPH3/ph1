@@ -1,194 +1,109 @@
-function formatRegistrationDates() {
-    document.querySelectorAll('.js-local-date').forEach(el => {
-        const utcStr = el.getAttribute('data-utc');
-        if (utcStr) {
-            const date = new Date(utcStr);
-            if (!isNaN(date)) {
-                el.textContent = date.toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-            }
-        }
-    });
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('searchDisputeInput');
+    const statusSelect = document.getElementById('statusFilterSelect');
+    const locationSelect = document.getElementById('locationFilterSelect');
+    const tableRows = document.querySelectorAll('.ph-table tbody tr.dispute-row');
+    const noResultsRow = document.getElementById('noResultsRow');
 
-    document.querySelectorAll('.js-local-time').forEach(el => {
-        const utcStr = el.getAttribute('data-utc');
-        if (utcStr) {
-            const date = new Date(utcStr);
-            if (!isNaN(date)) {
-                el.textContent = date.toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-            }
-        }
-    });
-
-    document.querySelectorAll('.js-local-full').forEach(el => {
-        const utcStr = el.getAttribute('data-utc');
-        if (utcStr) {
-            const date = new Date(utcStr);
-            if (!isNaN(date)) {
-                const dateStr = date.toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-                const timeStr = date.toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-                el.textContent = `${dateStr} ${timeStr}`;
-            }
-        }
-    });
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-    formatRegistrationDates();
-
-    const itemsPerPage = 10;
-    let currentPage = 1;
-
-    const searchInput = document.getElementById("searchDisputeInput");
-    const statusSelect = document.getElementById("statusFilterSelect");
-    const locationSelect = document.getElementById("locationFilterSelect");
-    const noResultsRow = document.getElementById("noResultsRow");
-
-    const btnPrev = document.getElementById("btnPrevPage");
-    const btnNext = document.getElementById("btnNextPage");
-    const pageText = document.getElementById("currentPageText");
-    const pageInfo = document.getElementById("paginationInfo");
-
-    function getFilteredIndices() {
-        const desktopRows = Array.from(document.querySelectorAll(".dispute-row"));
-        const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        const selectedStatus = statusSelect ? statusSelect.value.trim() : "";
-
-        let selectedLocationText = "";
+    function filterTable() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const selectedStatus = statusSelect ? statusSelect.value.toLowerCase().trim() : '';
+        
+        let selectedLocationText = '';
         if (locationSelect && locationSelect.selectedIndex > 0) {
             selectedLocationText = locationSelect.options[locationSelect.selectedIndex].text.toLowerCase().trim();
         }
+        
+        let visibleCount = 0;
 
-        let matchingIndices = [];
-
-        desktopRows.forEach((row, index) => {
-            const mobileCard = document.querySelectorAll(".dispute-row-mobile")[index];
-            const combinedText = (row.textContent + " " + (mobileCard ? mobileCard.textContent : "")).toLowerCase();
-
-            const matchesSearch = searchTerm === "" || combinedText.includes(searchTerm);
-
-            let matchesStatus = true;
-            if (selectedStatus !== "") {
-                const selectedStatusText = statusSelect.options[statusSelect.selectedIndex].text.toLowerCase();
-                matchesStatus = combinedText.includes(selectedStatusText) || combinedText.includes(selectedStatus.toLowerCase());
-            }
-
-            const matchesLocation = selectedLocationText === "" || combinedText.includes(selectedLocationText);
+        tableRows.forEach(row => {
+            const textContent = row.textContent.toLowerCase();
+            const matchesSearch = textContent.includes(query);
+            const matchesStatus = selectedStatus === "" || textContent.includes(selectedStatus);
+            const matchesLocation = selectedLocationText === "" || textContent.includes(selectedLocationText);
 
             if (matchesSearch && matchesStatus && matchesLocation) {
-                matchingIndices.push(index);
-            }
-        });
-
-        return matchingIndices;
-    }
-
-    function renderPage() {
-        const desktopRows = document.querySelectorAll(".dispute-row");
-        const detailRows = document.querySelectorAll(".detail-collapse-row");
-        const mobileCards = document.querySelectorAll(".dispute-row-mobile");
-
-        desktopRows.forEach(r => r.style.setProperty("display", "none", "important"));
-        detailRows.forEach(d => {
-            d.style.setProperty("display", "none", "important");
-            const collapseDiv = d.querySelector('.collapse');
-            if (collapseDiv && collapseDiv.classList.contains('show')) {
-                collapseDiv.classList.remove('show');
-            }
-        });
-        mobileCards.forEach(m => m.style.setProperty("display", "none", "important"));
-
-        const filteredIndices = getFilteredIndices();
-        const totalItems = filteredIndices.length;
-        const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        const pageIndices = filteredIndices.slice(start, end);
-
-        const isMobile = window.innerWidth < 768;
-
-        pageIndices.forEach(index => {
-            if (isMobile) {
-                if (mobileCards[index]) {
-                    mobileCards[index].style.setProperty("display", "block", "important");
-                }
+                row.style.display = '';
+                visibleCount++;
             } else {
-                if (desktopRows[index]) {
-                    desktopRows[index].style.setProperty("display", "table-row", "important");
-                }
-                if (detailRows[index]) {
-                    detailRows[index].style.setProperty("display", "table-row", "important");
+                row.style.display = 'none';
+                const nextRow = row.nextElementSibling;
+                if (nextRow && nextRow.classList.contains('collapse')) {
+                    nextRow.classList.remove('show');
                 }
             }
         });
 
         if (noResultsRow) {
-            noResultsRow.style.display = totalItems === 0 ? "block" : "none";
+            if (visibleCount === 0 && tableRows.length > 0) {
+                noResultsRow.style.display = '';
+            } else {
+                noResultsRow.style.display = 'none';
+            }
         }
-
-        if (pageText) pageText.textContent = `Página ${currentPage} de ${totalPages}`;
-        const displayedStart = totalItems === 0 ? 0 : start + 1;
-        const displayedEnd = Math.min(end, totalItems);
-        if (pageInfo) pageInfo.textContent = `Mostrando ${displayedStart}-${displayedEnd} de ${totalItems} registros`;
-
-        if (btnPrev) btnPrev.disabled = currentPage === 1;
-        if (btnNext) btnNext.disabled = currentPage === totalPages || totalItems === 0;
     }
 
-    if (btnPrev) {
-        btnPrev.addEventListener("click", () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderPage();
+    if (searchInput) searchInput.addEventListener('input', filterTable);
+    if (statusSelect) statusSelect.addEventListener('change', filterTable);
+    if (locationSelect) locationSelect.addEventListener('change', filterTable);
+
+    // Al abandonar la resolución de una novedad (botón "Cancelar" o la "X" del
+    // modal) sin emitir el veredicto, se avisa al backend para que cancele
+    // cualquier despacho complementario de reposición que se haya generado
+    // desde ese mismo registro. Así se evita que quede un traslado en tránsito
+    // sin ninguna novedad que lo respalde (discrepancia de inventario).
+    document.querySelectorAll('.dispute-modal-dismiss').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const movementId = btn.dataset.movementId;
+            const modalEl = btn.closest('.modal');
+
+            const previouslyDisabled = btn.disabled;
+            btn.disabled = true;
+
+            try {
+                if (movementId) {
+                    await fetch(`/logistics/movements/admin/disputes/${movementId}/cancel-replenishment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            } catch (error) {
+                // Si falla la llamada de red, igual dejamos cerrar el modal;
+                // el traslado quedará visible para revisión manual del admin.
+            } finally {
+                btn.disabled = previouslyDisabled;
+                if (modalEl) {
+                    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modalInstance.hide();
+                }
             }
         });
-    }
+    });
 
-    if (btnNext) {
-        btnNext.addEventListener("click", () => {
-            const filtered = getFilteredIndices();
-            if (currentPage * itemsPerPage < filtered.length) {
-                currentPage++;
-                renderPage();
-            }
-        });
-    }
-
-    [searchInput, statusSelect, locationSelect].forEach(el => {
-        if (el) {
-            el.addEventListener("input", () => {
-                currentPage = 1;
-                renderPage();
-            });
-            el.addEventListener("change", () => {
-                currentPage = 1;
-                renderPage();
-            });
+    // Reapertura automática del registro de la disputa al volver del despacho complementario
+    // (ya sea porque se canceló el traslado o porque se procesó exitosamente)
+    const urlParams = new URLSearchParams(window.location.search);
+    const openDisputeId = urlParams.get('open_dispute');
+    if (openDisputeId) {
+        // El formulario de resolución (donde vive el botón "Ir a Reposición") está
+        // dentro del modal, no dentro de la fila colapsable de "Ver". Hay que reabrir
+        // el modal para que el usuario retome la resolución donde la dejó.
+        const resolveModalEl = document.getElementById(`resolveModal-${openDisputeId}`);
+        if (resolveModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(resolveModalEl);
+            modalInstance.show();
         }
-    });
 
-    window.addEventListener("resize", () => {
-        renderPage();
-    });
+        // Además, expandimos la fila de detalle como contexto adicional y
+        // desplazamos la vista suavemente hacia el registro correspondiente.
+        const detailRow = document.getElementById(`detalle-disputa-${openDisputeId}`);
+        if (detailRow) {
+            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(detailRow, { toggle: false });
+            bsCollapse.show();
 
-    renderPage();
+            setTimeout(() => {
+                detailRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    }
 });

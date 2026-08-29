@@ -5,10 +5,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=8">
 
 <div class="container-fluid mt-4 mb-5 px-4">
-    <!-- Tarjeta Principal Blanca con bordes redondeados 20px -->
     <div class="ph-card">
         
-        <!-- Cabecera idéntica a "Directorio del Personal" -->
         <div class="d-flex justify-content-between align-items-center mb-1">
             <div class="d-flex align-items-center">
                 <div class="ph-icon-box me-3 shadow-sm">
@@ -21,14 +19,12 @@
             </div>
             
             {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
-            <!-- Botón rojo redondeado con símbolo de más (+) -->
             <a href="/logistics/movements/dispatch" class="btn btn-ph-pill shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> Nuevo Traslado
             </a>
             {% endif %}
         </div>
 
-        <!-- Pestañas de Navegación con Iconos -->
         <ul class="nav nav-tabs ph-tabs" id="movementTabs" role="tablist">
             {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
             <li class="nav-item" role="presentation">
@@ -43,6 +39,15 @@
                     <i class="bi bi-box-seam me-2"></i>Por Recibir
                 </button>
             </li>
+
+            {% if current_user.is_admin %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="arbitraje-tab" data-bs-toggle="tab" data-bs-target="#arbitraje" type="button" role="tab">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Arbitraje
+                </button>
+            </li>
+            {% endif %}
+
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="historico-tab" data-bs-toggle="tab" data-bs-target="#historico" type="button" role="tab">
                     <i class="bi bi-clock-history me-2"></i>Histórico
@@ -91,13 +96,11 @@
                                     <button class="btn btn-ph-info me-2" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
                                         <i class="bi bi-eye"></i> Ver
                                     </button>
-                                    <!-- Botón para abrir el modal de cancelación -->
                                     <button type="button" class="btn btn-ph-secondary" onclick="cancelarSalida('{{ mov.id }}')">
                                         <i class="bi bi-x-circle me-1"></i>Cancelar
                                     </button>
                                 </td>
                             </tr>
-                            
                             <tr class="collapse" id="detalle-{{ mov.id }}">
                                 <td colspan="5">
                                     <div class="ph-detail-box">
@@ -194,6 +197,83 @@
                 </div>
             </div>
 
+            <!-- ================= Pestaña: Arbitraje (Retornos por Resolución de Disputa) ================= -->
+            {% if current_user.is_admin %}
+            <div class="tab-pane fade" id="arbitraje" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table ph-table">
+                        <thead>
+                            <tr>
+                                <th>ID DE TRASLADO</th>
+                                <th>FECHA Y HORA</th>
+                                <th>SEDE DESTINO</th>
+                                <th>ESTADO</th>
+                                <th class="text-end">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mov in arbitraje %}
+                            <tr>
+                                <td class="fw-bold">
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle text-dark d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold; background-color: #ffc107;">
+                                            #{{ mov.id }}
+                                        </div>
+                                        <div>
+                                            <span class="text-dark d-block">Retorno de Disputa</span>
+                                            <span class="text-muted small">Ref. Traslado #{{ mov.return_of_dispute_id }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
+                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
+                                </td>
+                                <td>
+                                    <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning text-dark">Retorno en Camino</span>
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-ph-info me-2" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-arbitraje-{{ mov.id }}">
+                                        <i class="bi bi-eye"></i> Ver
+                                    </button>
+                                    {% if current_user.is_admin or mov.destination_location_id in user_location_ids %}
+                                    <a href="/logistics/movements/reception/{{ mov.id }}" class="btn btn-ph-success">
+                                        <i class="bi bi-check2-circle"></i> Recibir
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="detalle-arbitraje-{{ mov.id }}">
+                                <td colspan="5">
+                                    <div class="ph-detail-box">
+                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Contenido del Retorno - Traslado #{{ mov.id }}</h6>
+                                        <ul class="list-group list-group-flush small bg-transparent w-75">
+                                            {% for item in mov.details %}
+                                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0 border-light">
+                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong></span>
+                                                <span class="text-muted">Cant: {{ item.quantity }} | Vence: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                            </li>
+                                            {% else %}
+                                            <li class="list-group-item bg-transparent text-muted px-0 border-0">No hay productos en este retorno.</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5">No hay traslados retenidos en arbitraje.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- ================= Pestaña: Histórico ================= -->
             <div class="tab-pane fade" id="historico" role="tabpanel">
                 <div class="table-responsive">
@@ -277,12 +357,11 @@
         </div>
     </div>
 </div>
-<!-- Modal para Motivo de Cancelación Personalizado -->
+
 <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
         <div class="modal-content text-center p-4 border-0 rounded-4 shadow-lg">
             <div class="modal-body p-2">
-                <!-- Círculo de Icono Rojo -->
                 <div class="d-flex justify-content-center mb-3">
                     <div class="danger-icon-circle">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -304,7 +383,6 @@
                     <textarea class="form-control rounded-3" id="cancelReason" rows="3" placeholder="Indique la razón de la cancelación..." style="resize: none;" required></textarea>
                 </div>
 
-                <!-- Botones Redondeados -->
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-ph-outline-danger w-50" data-bs-dismiss="modal">
                         Volver

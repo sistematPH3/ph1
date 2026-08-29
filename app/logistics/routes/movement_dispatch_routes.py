@@ -13,6 +13,9 @@ def dispatch_form_view():
     locations = Location.query.filter_by(is_active=True).all()
     products = Product.query.filter_by(is_active=True).all()
 
+    # Se captura el id de la disputa si viene como parámetro en la URL
+    dispute_id = request.args.get('dispute_id')
+
     user_location_id = None
     if hasattr(current_user, 'locations') and current_user.locations:
         user_location_id = current_user.locations[0].id
@@ -30,7 +33,8 @@ def dispatch_form_view():
         locations=locations,
         products=products,
         user_location_id=user_location_id,
-        is_admin=is_admin
+        is_admin=is_admin,
+        dispute_id=dispute_id  # Se pasa a la plantilla HTML
     )
 
 @dispatch_bp.route('/get-product-lots', methods=['GET'])

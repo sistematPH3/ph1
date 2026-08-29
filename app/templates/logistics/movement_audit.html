@@ -1,0 +1,144 @@
+{% extends "base_list.html" %}
+
+{% block title_list %}Bitácora de Auditoría Forense{% endblock %}
+{% block subtitle_list %}Trazabilidad inmutable de traslados inter-sedes y resoluciones de mercancía.{% endblock %}
+
+{% block search_placeholder %}Buscar por usuario, acción o sede...{% endblock %}
+
+{% block actions_filter %}
+<!-- Filtros dinámicos -->
+<form method="GET" action="{{ url_for('logistics_audit.view_movement_audit') }}" class="d-flex gap-2 align-items-center">
+    <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3">
+        <option value="">Todas las severidades</option>
+        <option value="NORMAL" {% if filters.get('severity') == 'NORMAL' %}selected{% endif %}>NORMAL</option>
+        <option value="ALERTA" {% if filters.get('severity') == 'ALERTA' %}selected{% endif %}>ALERTA</option>
+        <option value="CRITICO" {% if filters.get('severity') == 'CRITICO' %}selected{% endif %}>CRÍTICO</option>
+    </select>
+    
+    <input type="date" name="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3" 
+           value="{{ request.args.get('start_date', '') }}" title="Fecha de inicio">
+           
+    <input type="date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3" 
+           value="{{ request.args.get('end_date', '') }}" title="Fecha fin">
+           
+    <button type="submit" class="btn btn-sm btn-dark rounded-pill px-3">
+        <i class="bi bi-funnel-fill"></i> Filtrar
+    </button>
+    
+    {% if filters %}
+    <a href="{{ url_for('logistics_audit.view_movement_audit') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+        Limpiar
+    </a>
+    {% endif %}
+</form>
+{% endblock %}
+
+{% block table_head %}
+    <th>Fecha y Hora</th>
+    <th>Acción (Logística)</th>
+    <th>Responsable</th>
+    <th>Sede</th>
+    <th>Severidad</th>
+    <th class="text-end">Detalles</th>
+{% endblock %}
+
+{% block table_body %}
+    {% for log in audit_logs %}
+    <tr>
+        <td class="fw-bold text-nowrap">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        
+        <!-- Formateo de variable: Cambia guiones bajos por espacios y capitaliza -->
+        <td><span class="badge bg-secondary">{{ log.action | replace('_', ' ') | title }}</span></td>
+        
+        <!-- Llamada a los nombres reales mediante relaciones de SQLAlchemy -->
+        <td>{{ log.user.name if log.user else 'Usuario ID: ' ~ log.user_id }}</td>
+        <td>{{ log.location.name if log.location else 'Todas (General)' }}</td>
+        
+        <td>
+            {% if log.severity == 'CRITICO' %}
+                <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>CRÍTICO</span>
+            {% elif log.severity == 'ALERTA' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle-fill me-1"></i>ALERTA</span>
+            {% else %}
+                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>NORMAL</span>
+            {% endif %}
+        </td>
+        <td class="text-end">
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRow{{ log.id }}" aria-expanded="false" aria-controls="collapseRow{{ log.id }}">
+                <i class="bi bi-eye"></i> Ver Datos
+            </button>
+        </td>
+    </tr>
+    
+    <!-- Acordeón Desplegable -->
+    <tr id="collapseRow{{ log.id }}" class="collapse bg-light border-bottom">
+        <td colspan="6" class="p-4">
+            <div class="card card-body border-0 shadow-sm">
+                
+                <!-- Extraemos el diccionario JSONB de la base de datos -->
+                {% set data = log.changed_data %}
+                
+                <!-- 1. Mostrar detalles de texto libre (si los hay) -->
+                {% if data.get('observaciones') or data.get('remarks') or data.get('nota') or data.get('motivo') %}
+                <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
+                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
+                    <div>
+                        <strong class="d-block text-dark">Nota / Observación registrada:</strong>
+                        <span class="text-dark">{{ data.get('observaciones') or data.get('remarks') or data.get('nota') or data.get('motivo') }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 2. Tabla interna para desglose de mercancía -->
+                {% if data.get('items') %}
+                <h6 class="text-muted mb-2"><i class="bi bi-box-seam me-2"></i>Desglose de Mercancía:</h6>
+                <div class="table-responsive rounded border">
+                    <table class="table table-sm table-hover align-middle mb-0 bg-white">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th>SKU</th>
+                                <th>Producto</th>
+                                <th>Lote</th>
+                                <th>Vencimiento</th>
+                                <th class="text-center">Cant. Despachada</th>
+                                <th class="text-center">Cant. Recibida</th>
+                                <th class="text-center text-danger">Faltante</th>
+                            </tr>
+                        </thead>
+                        <tbody class="small">
+                            <!-- Iteramos sobre el array de items del JSONB -->
+                            {% for item in data.get('items', []) %}
+                            <tr>
+                                <td class="text-muted">{{ item.get('sku', 'N/A') }}</td>
+                                <td class="fw-bold">{{ item.get('product_name', 'N/A') | title }}</td>
+                                <td>{{ item.get('lot_number', 'N/A') }}</td>
+                                <td>{{ item.get('expiration_date', 'N/A') }}</td>
+                                <td class="text-center">{{ item.get('dispatched_qty', 0) }}</td>
+                                <td class="text-center">{{ item.get('received_qty', item.get('dispatched_qty', 0)) }}</td>
+                                
+                                <td class="text-center text-danger fw-bold">
+                                    {% set missing = item.get('missing_qty', 0) %}
+                                    {{ missing if missing > 0 else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i> No hay un listado de insumos estructurado en este registro.</p>
+                {% endif %}
+                
+            </div>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-shield-check fs-1 d-block mb-3 text-secondary"></i>
+            <h5>No hay registros de auditoría</h5>
+            <p class="mb-0">No se encontraron eventos logísticos que coincidan con los filtros actuales.</p>
+        </td>
+    </tr>
+    {% endfor %}
+{% endblock %}

@@ -182,14 +182,15 @@ class MovementDispatchRepository:
         return total_stock, lots
 
     @staticmethod
-    def create_dispatch_transaction(origin_id, destination_id, created_by_id, items_payload):
+    def create_dispatch_transaction(origin_id, destination_id, created_by_id, items_payload, source_dispute_id=None):
         movement = Movement(
             type='DESPACHO',
             origin_location_id=origin_id,
             destination_location_id=destination_id,
             status='EN_TRANSITO',
             user_id=created_by_id,
-            date=datetime.now()
+            date=datetime.now(),
+            source_dispute_id=source_dispute_id
         )
         db.session.add(movement)
         db.session.flush()
@@ -210,11 +211,18 @@ class MovementDispatchRepository:
             if not inventory:
                 raise ValueError(f"El insumo ID {product_id} no está registrado en la sede origen.")
 
-            if inventory.current_quantity < quantity:
-                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {inventory.current_quantity}, Solicitado: {quantity}")
+            # Saneamiento de variables nulas antes de operar con Decimal
+            curr_qty = Decimal(str(inventory.current_quantity or '0.00'))
+            trans_qty = Decimal(str(inventory.transit_quantity or '0.00'))
 
-            inventory.current_quantity -= quantity
-            inventory.transit_quantity += quantity
+            if curr_qty < quantity:
+                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {curr_qty}, Solicitado: {quantity}")
+
+            # Operación segura
+            inventory.current_quantity = curr_qty - quantity
+            inventory.transit_quantity = trans_qty + quantity
+            db.session.add(inventory)
+            
             total_dispatched += quantity
 
             exp_date_obj = None
@@ -249,6 +257,7 @@ class MovementDispatchRepository:
             'event': 'DESPACHO_EMISION',
             'origin_location_id': origin_id,
             'destination_location_id': destination_id,
+            'source_dispute_id': source_dispute_id,
             'items': audit_items,
             'stock_impact': {
                 'origin_current_delta': -float(total_dispatched),
@@ -290,8 +299,15 @@ class MovementDispatchRepository:
             )
 
             if inventory:
-                inventory.current_quantity += detail.quantity
-                inventory.transit_quantity -= detail.quantity
+                # Saneamiento de variables nulas antes de operar con Decimal
+                curr_qty = Decimal(str(inventory.current_quantity or '0.00'))
+                trans_qty = Decimal(str(inventory.transit_quantity or '0.00'))
+
+                # Operación segura con límite de cero para tránsitos erróneos
+                inventory.current_quantity = curr_qty + detail.quantity
+                inventory.transit_quantity = max(Decimal('0.00'), trans_qty - detail.quantity)
+                db.session.add(inventory)
+                
                 total_reverted += detail.quantity
 
         movement.status = 'CANCELADO_EMISOR'

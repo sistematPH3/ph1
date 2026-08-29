@@ -22,6 +22,13 @@ class MovementDispatchValidator:
         if origin_id and destination_id and int(origin_id) == int(destination_id):
             errors.append("La sede de origen y la sede de destino no pueden ser la misma.")
 
+        # Campo opcional: si el despacho se genera como reposición complementaria
+        # desde una disputa, debe venir un identificador numérico válido.
+        source_dispute_id = data.get('source_dispute_id')
+        if source_dispute_id is not None:
+            if not str(source_dispute_id).isdigit() or int(source_dispute_id) <= 0:
+                errors.append("El identificador de la disputa de origen no es válido.")
+
         if not items or not isinstance(items, list) or len(items) == 0:
             errors.append("El despacho debe incluir al menos un producto en el detalle.")
         elif len(items) > 25:

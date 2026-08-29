@@ -48,42 +48,75 @@ class MovementReceptionService:
         erroneous_products = validation_res.get("erroneous_products", [])
         has_discrepancy = validation_res["has_discrepancy"]
 
+        # LÓGICA CORREGIDA: Prioridad absoluta al novelty_type seleccionado/enviado
         final_status = "COMPLETADO"
-        if has_discrepancy or len(erroneous_products) > 0 or novelty_type != "CONFORME":
+        if novelty_type and novelty_type != "CONFORME":
+            final_status = novelty_type
+        elif has_discrepancy or len(erroneous_products) > 0:
             final_status = "NOVEDAD_FALTANTE"
 
         try:
+            audit_discrepancies = []
+
             for item in processed_items:
                 detail_id = item["detail_id"]
                 product_id = item["product_id"]
                 rec_qty = Decimal(str(item["received_quantity"]))
                 mis_qty = Decimal(str(item["missing_quantity"]))
                 dispatched_qty = Decimal(str(item["quantity"]))
+                item_cond = item.get("item_condition", "CONFORME")
 
                 MovementReceptionRepository.update_detail_quantities(detail_id, rec_qty, mis_qty)
                 MovementReceptionRepository.get_or_create_inventory(movement["origin_location_id"], product_id)
                 MovementReceptionRepository.get_or_create_inventory(movement["destination_location_id"], product_id)
 
-                effective_stock_qty = min(rec_qty, dispatched_qty)
+                # Calcular unidades extra si las hay
+                if item_cond == 'SOBRANTE_EXCEDENTE' or rec_qty > dispatched_qty:
+                    extra_units = float(rec_qty - dispatched_qty)
+                else:
+                    extra_units = 0.0
 
-                if effective_stock_qty > Decimal("0.00"):
-                    MovementReceptionRepository.update_origin_transit(
-                        movement["origin_location_id"], product_id, effective_stock_qty
-                    )
-                    MovementReceptionRepository.increment_destination_stock(
-                        movement["destination_location_id"], product_id, effective_stock_qty
-                    )
+                # LÓGICA DIFERENCIADA:
+                # Si el traslado es COMPLETADO (sin novedades), aplicamos el inventario con normalidad.
+                # Si hay discrepancia/novedad, NO afectamos el inventario de destino ni liberamos el tránsito 
+                # de forma automática; dejamos que el administrador decida en la bandeja de disputas.
+                if final_status == "COMPLETADO":
+                    effective_stock_qty = min(rec_qty, dispatched_qty)
+                    if effective_stock_qty > Decimal("0.00"):
+                        MovementReceptionRepository.update_origin_transit(
+                            movement["origin_location_id"], product_id, effective_stock_qty
+                        )
+                        MovementReceptionRepository.increment_destination_stock(
+                            movement["destination_location_id"], product_id, effective_stock_qty
+                        )
+                else:
+                    # En caso de novedad/disputa, solo liberamos el tránsito base correspondiente a lo que se despachó 
+                    # para no dejar stock bloqueado incorrectamente, pero NO sumamos nada en destino todavía.
+                    if dispatched_qty > Decimal("0.00"):
+                        MovementReceptionRepository.update_origin_transit(
+                            movement["origin_location_id"], product_id, dispatched_qty
+                        )
+
+                audit_discrepancies.append({
+                    "detail_id": item["detail_id"],
+                    "product_id": item["product_id"],
+                    "type": item_cond,
+                    "authorized_qty": float(dispatched_qty),
+                    "physical_received_qty": float(rec_qty),
+                    "extra_units": extra_units,
+                    "notes": item.get("specific_novelty", "Sin observaciones")
+                })
 
             MovementReceptionRepository.finalize_movement(movement_id, final_status, user_id)
 
             audit_event = "RECEPCION_CONFORME"
             severity = "NORMAL"
-            if final_status == "NOVEDAD_FALTANTE":
+            
+            if final_status != "COMPLETADO":
                 audit_event = "RECEPCION_NOVEDAD"
                 severity = "ALERTA"
-            elif any(it.get("item_condition") in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO'] for it in processed_items):
-                audit_event = "RECEPCION_INCIDENCIA_CALIDAD"
-                severity = "ALERTA"
+                if any(it.get("item_condition") in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO'] for it in processed_items):
+                    audit_event = "RECEPCION_INCIDENCIA_CALIDAD"
 
             audit_items = []
             for item in processed_items:
@@ -132,6 +165,7 @@ class MovementReceptionService:
                 "origin_location_id": movement["origin_location_id"],
                 "destination_location_id": movement["destination_location_id"],
                 "items": audit_items,
+                "discrepancies": audit_discrepancies,
                 "erroneous_products_delivered": erroneous_audit_list,
                 "notes": notes,
                 "received_by_user_id": user_id,
