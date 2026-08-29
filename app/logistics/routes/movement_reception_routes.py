@@ -8,7 +8,7 @@ movement_reception_bp = Blueprint("movement_reception", __name__, url_prefix="/l
 
 @movement_reception_bp.route("/reception/<int:movement_id>", methods=["GET"])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager')
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def view_reception(movement_id):
     user_id = current_user.id if hasattr(current_user, 'id') else session.get("user_id")
     user_role_id = getattr(current_user, 'role_id', None) or session.get("role_id")
@@ -23,7 +23,7 @@ def view_reception(movement_id):
 
     data, error = MovementReceptionService.get_reception_data(movement_id, user_location_ids, user_role_id)
     if error:
-        flash(error, "danger")
+        flash(error, "recibido-error")
         return redirect("/logistics/movements")
 
     catalog_products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
@@ -37,7 +37,7 @@ def view_reception(movement_id):
 
 @movement_reception_bp.route("/reception/<int:movement_id>/process", methods=["POST"])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager')
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def process_reception(movement_id):
     user_id = current_user.id if hasattr(current_user, 'id') else session.get("user_id")
     user_role_id = getattr(current_user, 'role_id', None) or session.get("role_id")
@@ -65,7 +65,7 @@ def process_reception(movement_id):
     if not success:
         return jsonify({"success": False, "message": message}), 422
 
-    flash("Cargamento recibido y procesado con éxito.", "success")
+    flash("Cargamento recibido y procesado con éxito.", "recibido")
     return jsonify({
         "success": True,
         "message": message,

@@ -5,6 +5,16 @@
 
 <!-- Agregamos translate="no" y la clase notranslate para blindar la vista contra Google Translate -->
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
+    <!-- Mensajes exclusivos del módulo de disputas: se muestran y consumen aquí,
+         sin arrastrarse hasta el login ni mezclarse con otros módulos -->
+    {% if dispute_flashes %}
+        {% for category, message in dispute_flashes %}
+        <div class="alert {{ 'alert-danger' if category == 'dispute-error' else 'alert-success' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
     <div class="ph-card">
         
         <!-- Cabecera de la Bandeja -->

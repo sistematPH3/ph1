@@ -3,7 +3,7 @@
 # Controlador HTTP del sub-módulo de Arbitraje / Bandeja de Novedades.
 # Sin lógica de negocio: delega en app/logistics/services/movement_dispute_service.py.
 
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, get_flashed_messages
 from flask_login import current_user, login_required
 from app.decorators.roles import require_roles
 from app.logistics.services.movement_dispute_service import (
@@ -23,13 +23,23 @@ def list_disputes():
     """Muestra la bandeja de novedades, incidencias o disputas de los traslados."""
     try:
         disputes, locations = get_disputes_context()
+        # Los mensajes del módulo de disputas se muestran y consumen AQUÍ;
+        # las demás categorías (recepción, traslado, etc.) se re-encolan
+        # para no perderse ni mostrarse en este archivo.
+        dispute_flashes = []
+        for category, msg in get_flashed_messages(with_categories=True):
+            if category.startswith("dispute"):
+                dispute_flashes.append((category, msg))
+            else:
+                flash(msg, category)
         return render_template(
             "logistics/movement_dispute.html",
             disputes=disputes,
-            locations=locations
+            locations=locations,
+            dispute_flashes=dispute_flashes
         )
     except Exception as e:
-        flash(f"Error al cargar la bandeja de novedades: {str(e)}", "danger")
+        flash(f"Error al cargar la bandeja de novedades: {str(e)}", "dispute-error")
         return redirect(url_for('movement_dispute.list_disputes'))
 
 
@@ -41,9 +51,9 @@ def resolve_dispute(movement_id):
     try:
         payload = request.form or request.get_json() or {}
         service_resolve_dispute(movement_id, payload, user_id=current_user.id)
-        flash(f"Disputa #{movement_id} resuelta exitosamente y saldos actualizados.", "success")
+        flash(f"Disputa #{movement_id} resuelta exitosamente y saldos actualizados.", "dispute")
     except Exception as e:
-        flash(f"Error al resolver la disputa: {str(e)}", "danger")
+        flash(f"Error al resolver la disputa: {str(e)}", "dispute-error")
     return redirect(url_for('movement_dispute.list_disputes'))
 
 

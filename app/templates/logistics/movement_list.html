@@ -1,11 +1,22 @@
 {% extends "layout.html" %}
 
 {% block content %}
+{% set can_view_en_camino = current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=8">
 
 <div class="container-fluid mt-4 mb-5 px-4">
     <div class="ph-card">
+        
+        <!-- Mensajes exclusivos de traslados (despacho) y recepciones -->
+        {% if movement_flashes %}
+            {% for category, message in movement_flashes %}
+            <div class="alert {{ 'alert-danger' if category == 'recibido-error' else 'alert-success' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
         
         <div class="d-flex justify-content-between align-items-center mb-1">
             <div class="d-flex align-items-center">
@@ -18,7 +29,7 @@
                 </div>
             </div>
             
-            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
+            {% if current_user.is_admin %}
             <a href="/logistics/movements/dispatch" class="btn btn-ph-pill shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> Nuevo Traslado
             </a>
@@ -26,16 +37,16 @@
         </div>
 
         <ul class="nav nav-tabs ph-tabs" id="movementTabs" role="tablist">
-            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
+            {% if can_view_en_camino %}
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="en-camino-tab" data-bs-toggle="tab" data-bs-target="#en-camino" type="button" role="tab">
+                <button class="nav-link {% if current_user.is_admin %}active{% endif %}" id="en-camino-tab" data-bs-toggle="tab" data-bs-target="#en-camino" type="button" role="tab">
                     <i class="bi bi-truck me-2"></i>En Camino
                 </button>
             </li>
             {% endif %}
             
             <li class="nav-item" role="presentation">
-                <button class="nav-link {% if not (current_user.is_admin or current_user.role_id in [1, 2, 3]) %}active{% endif %}" id="por-recibir-tab" data-bs-toggle="tab" data-bs-target="#por-recibir" type="button" role="tab">
+                <button class="nav-link {% if not current_user.is_admin %}active{% endif %}" id="por-recibir-tab" data-bs-toggle="tab" data-bs-target="#por-recibir" type="button" role="tab">
                     <i class="bi bi-box-seam me-2"></i>Por Recibir
                 </button>
             </li>
@@ -58,8 +69,8 @@
         <div class="tab-content" id="movementTabsContent">
             
             <!-- ================= Pestaña: En Camino ================= -->
-            {% if current_user.is_admin or current_user.role_id in [1, 2, 3] %}
-            <div class="tab-pane fade show active" id="en-camino" role="tabpanel">
+            {% if can_view_en_camino %}
+            <div class="tab-pane fade {% if current_user.is_admin %}show active{% endif %}" id="en-camino" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table ph-table">
                         <thead>
@@ -96,9 +107,11 @@
                                     <button class="btn btn-ph-info me-2" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
                                         <i class="bi bi-eye"></i> Ver
                                     </button>
+                                    {% if current_user.is_admin %}
                                     <button type="button" class="btn btn-ph-secondary" onclick="cancelarSalida('{{ mov.id }}')">
                                         <i class="bi bi-x-circle me-1"></i>Cancelar
                                     </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             <tr class="collapse" id="detalle-{{ mov.id }}">
@@ -130,7 +143,7 @@
             {% endif %}
 
             <!-- ================= Pestaña: Por Recibir ================= -->
-            <div class="tab-pane fade {% if not (current_user.is_admin or current_user.role_id in [1, 2, 3]) %}show active{% endif %}" id="por-recibir" role="tabpanel">
+            <div class="tab-pane fade {% if not current_user.is_admin %}show active{% endif %}" id="por-recibir" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table ph-table">
                         <thead>
@@ -358,6 +371,7 @@
     </div>
 </div>
 
+{% if current_user.is_admin %}
 <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
         <div class="modal-content text-center p-4 border-0 rounded-4 shadow-lg">
@@ -395,6 +409,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <script src="{{ url_for('static', filename='js/logistics/movement_dispatch.js') }}"></script>
 {% endblock %}

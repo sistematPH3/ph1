@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, flash
 from flask_login import login_required, current_user
 from app.models import Location, Product
 from app.logistics.services.movement_dispatch_service import MovementDispatchService
@@ -8,7 +8,7 @@ dispatch_bp = Blueprint('dispatch_bp', __name__)
 
 @dispatch_bp.route('/dispatch', methods=['GET'])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager', 'management', 'finance')
+@require_roles('admin')
 def dispatch_form_view():
     locations = Location.query.filter_by(is_active=True).all()
     products = Product.query.filter_by(is_active=True).all()
@@ -48,15 +48,17 @@ def get_product_lots_api():
 
 @dispatch_bp.route('/dispatch', methods=['POST'])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager')
+@require_roles('admin')
 def create_dispatch_api():
     payload = request.get_json()
     response, status_code = MovementDispatchService.execute_dispatch(current_user, payload)
+    if status_code == 200 and isinstance(response, dict) and response.get("success"):
+        flash(response.get("message") or "Despacho emitido exitosamente.", "traslado")
     return jsonify(response), status_code
 
 @dispatch_bp.route('/cancel-dispatch/<int:movement_id>', methods=['POST'])
 @login_required
-@require_roles('admin', 'manager', 'assistant_manager')
+@require_roles('admin')
 def cancel_pre_dispatch(movement_id):
     data = request.get_json() or {}
     reason = data.get('reason', '')
