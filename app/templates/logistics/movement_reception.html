@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=85">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=86">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -79,7 +79,7 @@
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}">
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}">
                             <td data-label="Insumo">
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
@@ -123,7 +123,6 @@
                                         <option value="CONFORME" selected>Conforme (Buen Estado)</option>
                                         <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre)</option>
                                         <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
-                                        <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
                                         <option value="INCIDENCIA_TEMPERATURA">Ruptura Cadena de Frío</option>
                                         <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
                                         <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
@@ -132,6 +131,11 @@
                                     </select>
                                     <div class="row-lot-mismatch hidden mt-1">
                                         <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real en empaque...">
+                                        <div class="lot-exp-lookup hidden mt-1 d-flex align-items-center gap-2">
+                                            <span class="lot-exp-label">Venc. del lote:</span>
+                                            <input type="date" class="form-control form-control-sm input-row-exp font-monospace" placeholder="AAAA-MM-DD">
+                                            <span class="lot-exp-hint text-muted small"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -154,7 +158,12 @@
                             <span class="panel-desc">Resumen consolidado generado a partir de la inspección por renglón</span>
                         </div>
                     </div>
-                    <span id="noveltyStatusBadge" class="status-pill pill-ok">Recepción Conforme</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" id="btnShowErroneous" class="btn btn-sm btn-outline-danger rounded-pill fw-bold">
+                            <i class="bi bi-box-seam me-1"></i> Registrar Insumo Entregado por Error
+                        </button>
+                        <span id="noveltyStatusBadge" class="status-pill pill-ok">Recepción Conforme</span>
+                    </div>
                 </div>
                 
                 <div class="form-grid-2col">
@@ -250,5 +259,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=85"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=89"></script>
 {% endblock %}

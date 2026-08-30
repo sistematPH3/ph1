@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const erroneousSection = document.getElementById("erroneousProductSection");
     const erroneousItemsList = document.getElementById("erroneousItemsList");
     const btnAddErroneousItem = document.getElementById("btnAddErroneousItem");
+    const btnShowErroneous = document.getElementById("btnShowErroneous");
     const catalogOptionsTemplate = document.getElementById("catalogOptionsTemplate")?.innerHTML || "";
 
     const confirmModal = document.getElementById("confirmModal");
@@ -27,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnAcceptModal = document.getElementById("btnAcceptModal");
 
     let userManuallyChangedNovelty = false;
+    let pendingReception = null;
 
     const NOVELTY_TITLES = {
         CONFORME: "Recepción Conforme al 100%",
@@ -170,7 +172,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function showAlert(message) {
         if (alertBox) {
-            alertBox.textContent = message;
+            // El servidor devuelve una lista de errores; se unen legibles en vez de
+            // dejar que un arreglo se convierta a texto plano con comas pegadas.
+            const text = Array.isArray(message) ? message.join(" ") : String(message);
+            alertBox.textContent = text;
             alertBox.classList.remove("hidden");
             alertBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
@@ -205,12 +210,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="bi bi-trash"></i>
                 </button>
             </div>
+            <div class="err-lot-exp w-100">
+                <div class="input-group input-group-sm mt-1">
+                    <span class="input-group-text" title="Lote físico real del insumo no solicitado">Lote</span>
+                    <input type="text" class="form-control err-lot-input font-monospace" placeholder="Lote real en empaque...">
+                </div>
+                <div class="input-group input-group-sm mt-1">
+                    <span class="input-group-text" title="Fecha de vencimiento del lote">Venc.</span>
+                    <input type="date" class="form-control err-exp-input font-monospace" placeholder="AAAA-MM-DD">
+                </div>
+                <div class="err-exp-hint mt-1"></div>
+            </div>
         `;
 
         const select = rowDiv.querySelector(".err-product-select");
         const skuDisplay = rowDiv.querySelector(".err-sku-display");
         const unitTag = rowDiv.querySelector(".err-unit-tag");
         const btnRemove = rowDiv.querySelector(".btn-remove-erroneous");
+        const lotInput = rowDiv.querySelector(".err-lot-input");
 
         select.addEventListener("change", function() {
             const opt = this.options[this.selectedIndex];
@@ -218,6 +235,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 skuDisplay.value = opt.dataset.sku || "";
                 unitTag.textContent = opt.dataset.unit || "UN";
             }
+            handleErroneousLotLookup(rowDiv);
+        });
+
+        lotInput.addEventListener("input", () => {
+            hideAlert();
+            handleErroneousLotLookup(rowDiv);
         });
 
         btnRemove.addEventListener("click", function() {
@@ -229,8 +252,108 @@ document.addEventListener("DOMContentLoaded", () => {
         checkAndAutoCategorize();
     }
 
+    function handleErroneousLotLookup(rowDiv) {
+        const select = rowDiv.querySelector(".err-product-select");
+        const lotInput = rowDiv.querySelector(".err-lot-input");
+        const expInput = rowDiv.querySelector(".err-exp-input");
+        const hint = rowDiv.querySelector(".err-exp-hint");
+
+        const productId = parseInt(select.value);
+        const lot = lotInput.value.trim();
+
+        if (!productId || !lot) {
+            if (expInput) expInput.value = "";
+            if (hint) hint.innerHTML = "";
+            return;
+        }
+
+        const url = `/logistics/movements/reception/lot-expiration?product_id=${encodeURIComponent(productId)}&lot_number=${encodeURIComponent(lot)}`;
+
+        fetch(url, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(res => res.json().catch(() => ({})))
+            .then(data => {
+                if (!data || !data.success) {
+                    expInput.value = "";
+                    if (hint) hint.innerHTML = "";
+                    expInput.dataset.verified = "";
+                    return;
+                }
+                if (data.exists === false) {
+                    expInput.value = "";
+                    expInput.dataset.verified = "";
+                    if (hint) {
+                        hint.className = "err-exp-hint";
+                        hint.innerHTML = `
+                            <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                                <i class="bi bi-search me-1"></i> Este registro de lote no se encuentra en el sistema
+                            </span>`;
+                    }
+                    return;
+                }
+                if (data.expiration_date) {
+                    expInput.value = data.expiration_date;
+                    if (hint) {
+                        hint.className = "err-exp-hint";
+                        hint.innerHTML = `
+                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
+                                <i class="bi bi-check-circle me-1"></i> Lote y vencimiento detectados
+                            </span>`;
+                    }
+                    expInput.dataset.verified = "1";
+                } else {
+                    expInput.value = "";
+                    expInput.dataset.verified = "";
+                    if (hint) {
+                        hint.className = "err-exp-hint";
+                        hint.innerHTML = `
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
+                                <i class="bi bi-check2 me-1"></i> Lote registrado, sin vencimiento conocido
+                            </span>`;
+                    }
+                }
+            })
+            .catch(() => {
+                expInput.value = "";
+                if (hint) hint.innerHTML = "";
+            });
+    }
+
+
     if (btnAddErroneousItem) {
         btnAddErroneousItem.addEventListener("click", addErroneousItemRow);
+    }
+
+    // Botón siempre visible del panel "Diagnóstico y Justificación de Muelle".
+    // Deja el acceso al registro de insumos entregados por error sin obligar al
+    // operario a descubrir que debe elegir "Producto Erróneo" en el selector.
+    function revealErroneousPanel() {
+        if (erroneousSection) erroneousSection.classList.remove("hidden");
+        if (erroneousItemsList && erroneousItemsList.children.length === 0) {
+            addErroneousItemRow();
+        }
+        if (noveltySelect.value === "CONFORME") {
+            noveltySelect.value = "PRODUCTO_ERRONEO";
+            userManuallyChangedNovelty = true;
+        }
+        updateBadgeAndGuidance();
+        if (noveltySelect.value !== "CONFORME") {
+            notesRequiredFlag.classList.remove("hidden");
+            notesTextarea.required = true;
+        }
+        if (erroneousItemsList) {
+            const firstRow = erroneousItemsList.querySelector(".err-row-grid");
+            if (firstRow) {
+                firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                const firstSelect = firstRow.querySelector(".err-product-select");
+                if (firstSelect) firstSelect.focus();
+            }
+        }
+    }
+
+    if (btnShowErroneous) {
+        btnShowErroneous.addEventListener("click", revealErroneousPanel);
     }
 
     function updateBadgeAndGuidance() {
@@ -270,33 +393,105 @@ document.addEventListener("DOMContentLoaded", () => {
         btnSubmit.textContent = guide.buttonText;
         btnSubmit.className = guide.buttonAlert ? "btn-ph-primary btn-alert-state" : "btn-ph-primary";
 
-        if (novelty === "PRODUCTO_ERRONEO" || novelty === "INCIDENCIA_MIXTA") {
-            if (erroneousSection) {
+        // La declaración de insumos no solicitados (erróneos) se muestra cuando la
+        // novedad es "Producto Erróneo"/"Incidencia Mixta" O mientras existan filas
+        // ya cargadas. Nunca se vacían las filas al cambiar de novedad: el auto
+        // diagnóstico re-deriva la clasificación con lo que ya está capturado.
+        const hasErroneousRows = erroneousItemsList && erroneousItemsList.children.length > 0;
+        const showUnsolicited = novelty === "PRODUCTO_ERRONEO" || novelty === "INCIDENCIA_MIXTA" || hasErroneousRows;
+        if (erroneousSection) {
+            if (showUnsolicited) {
                 erroneousSection.classList.remove("hidden");
-                if (erroneousItemsList && erroneousItemsList.children.length === 0 && novelty === "PRODUCTO_ERRONEO") {
+                if (!hasErroneousRows && novelty === "PRODUCTO_ERRONEO") {
                     addErroneousItemRow();
                 }
-            }
-        } else {
-            if (erroneousSection) {
+            } else {
                 erroneousSection.classList.add("hidden");
-                if (erroneousItemsList) {
-                    erroneousItemsList.innerHTML = "";
-                }
             }
         }
     }
 
-    function checkAndAutoCategorize() {
-        let hasShortage = false;
-        let hasSurplus = false;
-        let hasColdChain = false;
-        let hasLotMismatch = false;
-        let hasNearExp = false;
-        let hasCustodyBreach = false;
-        let hasSpaceRejection = false;
-        let hasRowErroneous = false;
-        let distinctIssuesCount = 0;
+    function updateLotExpiration(row, expiration, exists) {
+        const expBox = row.querySelector(".lot-exp-lookup");
+        const expInput = row.querySelector(".input-row-exp");
+        const hint = row.querySelector(".lot-exp-hint");
+        const lotInput = row.querySelector(".input-row-lot");
+
+        if (!expBox || !expInput) return;
+
+        const hasLot = lotInput && lotInput.value.trim().length > 0;
+
+        if (hasLot) {
+            expBox.classList.remove("hidden");
+            if (exists === false) {
+                expInput.value = "";
+                expInput.dataset.verified = "";
+                if (hint) {
+                    hint.className = "lot-exp-hint mt-1";
+                    hint.innerHTML = `
+                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                            <i class="bi bi-search me-1"></i> Este registro de lote no se encuentra en el sistema
+                        </span>`;
+                }
+            } else if (expiration) {
+                expInput.value = expiration;
+                if (hint) {
+                    hint.className = "lot-exp-hint mt-1";
+                    hint.innerHTML = `
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
+                            <i class="bi bi-check-circle me-1"></i> Vencimiento detectado del lote
+                        </span>`;
+                }
+                expInput.dataset.verified = "1";
+            } else {
+                expInput.value = "";
+                expInput.dataset.verified = "";
+                if (hint) {
+                    hint.className = "lot-exp-hint mt-1";
+                    hint.innerHTML = `
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
+                            <i class="bi bi-check2 me-1"></i> Lote registrado, sin vencimiento conocido
+                        </span>`;
+                }
+            }
+        } else {
+            expBox.classList.add("hidden");
+            expInput.value = "";
+            expInput.dataset.verified = "";
+        }
+    }
+
+    function handleLotLookup(row) {
+        const productId = row.dataset.productId;
+        const lotInput = row.querySelector(".input-row-lot");
+        const lot = lotInput ? lotInput.value.trim() : "";
+
+        if (!productId || !lot) {
+            updateLotExpiration(row, null);
+            return;
+        }
+
+        updateLotExpiration(row, null);
+
+        const url = `/logistics/movements/reception/lot-expiration?product_id=${encodeURIComponent(productId)}&lot_number=${encodeURIComponent(lot)}`;
+
+        fetch(url, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(res => res.json().catch(() => ({})))
+            .then(data => {
+                if (data && data.success) {
+                    updateLotExpiration(row, data.expiration_date || null, data.exists);
+                } else {
+                    updateLotExpiration(row, null);
+                }
+            })
+            .catch(() => updateLotExpiration(row, null));
+    }
+
+    function checkAndAutoCategorize(applyToSelect = true) {
+        let rowsAffected = 0;
+        let firstAffectedInfo = null;
 
         rows.forEach(row => {
             const dispatched = parseFloat(row.dataset.dispatched) || 0;
@@ -304,11 +499,25 @@ document.addEventListener("DOMContentLoaded", () => {
             const diffBadge = row.querySelector(".diff-badge");
             const condSelect = row.querySelector(".select-item-condition");
             const lotBox = row.querySelector(".row-lot-mismatch");
-            
+            const lotExpBox = row.querySelector(".lot-exp-lookup");
+
             let received = parseFloat(input.value);
             if (isNaN(received) || received < 0) received = 0;
 
             const diff = received - dispatched;
+
+            // Auto-clasificación de la CONDICIÓN del renglón (feedback de pruebas):
+            // si el operario NO tocó el selector de condición, al tipear una cantidad
+            // distinta la fila se etiqueta sola como "Me faltó / Me sobró"; si la
+            // cantidad vuelve a coincidir se restaura a Conforme. Si el operario
+            // eligió la condición manualmente, se respeta su decisión.
+            const conditionWasManual = condSelect ? row.dataset.condManual === "1" : true;
+            if (condSelect && !conditionWasManual) {
+                if (diff < -0.001) condSelect.value = "FALTANTE_CONTEO";
+                else if (diff > 0.001) condSelect.value = "SOBRANTE_EXCEDENTE";
+                else condSelect.value = "CONFORME";
+            }
+
             const condition = condSelect ? condSelect.value : "CONFORME";
 
             if (lotBox) {
@@ -316,22 +525,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     lotBox.classList.remove("hidden");
                 } else {
                     lotBox.classList.add("hidden");
+                    if (lotExpBox) lotExpBox.classList.add("hidden");
                 }
             }
 
             diffBadge.className = "diff-badge";
             row.classList.remove("row-ok", "row-missing", "row-surplus", "row-warning");
 
-            if (condition !== "CONFORME") {
-                row.classList.add("row-warning");
-                if (condition === "INCIDENCIA_TEMPERATURA") hasColdChain = true;
-                if (condition === "LOTE_NO_COINCIDE") hasLotMismatch = true;
-                if (condition === "VENCIMIENTO_PROXIMO") hasNearExp = true;
-                if (condition === "VIOLACION_CUSTODIA") hasCustodyBreach = true;
-                if (condition === "RECHAZO_POR_ESPACIO") hasSpaceRejection = true;
-                if (condition === "PRODUCTO_ERRONEO") hasRowErroneous = true;
-                if (condition === "FALTANTE_CONTEO") hasShortage = true;
-                if (condition === "SOBRANTE_EXCEDENTE") hasSurplus = true;
+            const hasCondIssue = condition !== "CONFORME";
+            const hasQtyIssue = Math.abs(diff) >= 0.001;
+            if (hasCondIssue || hasQtyIssue) {
+                rowsAffected++;
+                if (!firstAffectedInfo) {
+                    if (hasCondIssue) {
+                        firstAffectedInfo = { kind: "CONDITION", condition };
+                    } else {
+                        firstAffectedInfo = { kind: "QTY", diff };
+                    }
+                }
             }
 
             if (Math.abs(diff) < 0.001) {
@@ -339,59 +550,57 @@ document.addEventListener("DOMContentLoaded", () => {
                 diffBadge.textContent = "0.00";
                 if (condition === "CONFORME") row.classList.add("row-ok");
             } else if (diff < 0) {
-                // Solo contamos "hasShortage" como incidencia GENÉRICA si el
-                // renglón se dejó en CONFORME. Si el usuario ya clasificó el
-                // renglón con una condición específica (ej. RECHAZO_POR_ESPACIO),
-                // esa condición ya explica la diferencia de cantidad: no hay
-                // que sumarla también como un "faltante" aparte, o se infla
-                // distinctIssuesCount y se termina forzando INCIDENCIA_MIXTA.
-                if (condition === "CONFORME") hasShortage = true;
                 diffBadge.classList.add("diff-missing");
                 diffBadge.textContent = diff.toFixed(2);
-                if (condition === "CONFORME") row.classList.add("row-missing");
+                row.classList.add("row-missing");
             } else {
-                if (condition === "CONFORME") hasSurplus = true;
                 diffBadge.classList.add("diff-surplus");
                 diffBadge.textContent = `+${diff.toFixed(2)}`;
-                if (condition === "CONFORME") row.classList.add("row-surplus");
+                row.classList.add("row-surplus");
+            }
+
+            // Las condiciones de CALIDAD (temperatura, custodia, lote, espacio,
+            // vencimiento) se resaltan en ámbar. Las diferencias de cantidad ya
+            // tienen su borde rojo/azul, así que no hace falta otra clase.
+            if (hasCondIssue &&
+                condition !== "FALTANTE_CONTEO" &&
+                condition !== "SOBRANTE_EXCEDENTE") {
+                row.classList.add("row-warning");
             }
         });
 
-        const hasUnsolicitedItems = document.querySelectorAll(".err-row-grid").length > 0 || hasRowErroneous;
+        // Solo cuentan como insumos "no solicitados" las filas realmente completadas
+        // (producto seleccionado + cantidad > 0). Una fila vacía agregada por error
+        // no debe forzar la novedad PRODUCTO_ERRONEO ni bloquear una recepción que
+        // por lo demás es conforme.
+        const hasUnsolicitedItems = Array.from(document.querySelectorAll(".err-row-grid")).some(er => {
+            const sel = er.querySelector(".err-product-select");
+            const qtyInput = er.querySelector(".err-qty-input");
+            const prodId = parseInt(sel ? sel.value : 0);
+            const qty = qtyInput ? parseFloat(qtyInput.value) : NaN;
+            return prodId > 0 && qty > 0;
+        });
 
-        if (hasShortage) distinctIssuesCount++;
-        if (hasSurplus) distinctIssuesCount++;
-        if (hasColdChain) distinctIssuesCount++;
-        if (hasLotMismatch) distinctIssuesCount++;
-        if (hasNearExp) distinctIssuesCount++;
-        if (hasCustodyBreach) distinctIssuesCount++;
-        if (hasSpaceRejection) distinctIssuesCount++;
-        if (hasUnsolicitedItems) distinctIssuesCount++;
+        const hasAnyIssue = rowsAffected > 0 || hasUnsolicitedItems;
 
-        const hasAnyIssue = distinctIssuesCount > 0;
-
-        if (!userManuallyChangedNovelty) {
-            if (distinctIssuesCount > 1) {
-                noveltySelect.value = "INCIDENCIA_MIXTA";
-            } else if (hasUnsolicitedItems) {
-                noveltySelect.value = "PRODUCTO_ERRONEO";
-            } else if (hasSpaceRejection) {
-                noveltySelect.value = "RECHAZO_POR_ESPACIO";
-            } else if (hasShortage) {
-                noveltySelect.value = "FALTANTE_CONTEO";
-            } else if (hasSurplus) {
-                noveltySelect.value = "SOBRANTE_EXCEDENTE";
-            } else if (hasColdChain) {
-                noveltySelect.value = "INCIDENCIA_TEMPERATURA";
-            } else if (hasLotMismatch) {
-                noveltySelect.value = "LOTE_NO_COINCIDE";
-            } else if (hasNearExp) {
-                noveltySelect.value = "VENCIMIENTO_PROXIMO";
-            } else if (hasCustodyBreach) {
-                noveltySelect.value = "VIOLACION_CUSTODIA";
+        // REGLA (decisión de diseño): INCIDENCIA_MIXTA es SOLO cuando hay DOS o más
+        // renglones afectados. Un único renglón con diferencia (con o sin erróneos)
+        // NO es mixta: queda en la condición específica o en PRODUCTO_ERRONEO.
+        let autoNovelty = "CONFORME";
+        if (rowsAffected >= 2) {
+            autoNovelty = "INCIDENCIA_MIXTA";
+        } else if (hasUnsolicitedItems) {
+            autoNovelty = "PRODUCTO_ERRONEO";
+        } else if (rowsAffected === 1) {
+            if (firstAffectedInfo.kind === "CONDITION") {
+                autoNovelty = firstAffectedInfo.condition;
             } else {
-                noveltySelect.value = "CONFORME";
+                autoNovelty = firstAffectedInfo.diff < 0 ? "FALTANTE_CONTEO" : "SOBRANTE_EXCEDENTE";
             }
+        }
+
+        if (applyToSelect && !userManuallyChangedNovelty) {
+            noveltySelect.value = autoNovelty;
         }
 
         updateBadgeAndGuidance();
@@ -404,15 +613,23 @@ document.addEventListener("DOMContentLoaded", () => {
             notesTextarea.required = false;
         }
 
-        return { hasShortage, hasSurplus, hasAnyIssue, distinctIssuesCount };
+        return { hasAnyIssue, rowsAffected, hasUnsolicitedItems, autoNovelty };
     }
 
     noveltySelect.addEventListener("change", () => {
-        userManuallyChangedNovelty = true;
         hideAlert();
+        // Se captura la elección ANTES de cualquier re-derivación para que el
+        // select inferior sea siempre seleccionable a mano ("el problema era el
+        // lote entero": erróneo/faltante/sobrante global). El auto-diagnóstico
+        // sigue activo mientras el operario NO elija y marca INCIDENCIA_MIXTA
+        // automáticamente cuando hay dos o más novedades en los renglones.
+        const chosen = noveltySelect.value;
+        const result = checkAndAutoCategorize(false);
+        const isManualChoice = chosen !== "CONFORME" && chosen !== result.autoNovelty;
+        userManuallyChangedNovelty = isManualChoice;
+        noveltySelect.value = isManualChoice ? chosen : result.autoNovelty;
         updateBadgeAndGuidance();
-        const { hasAnyIssue } = checkAndAutoCategorize();
-        if (noveltySelect.value !== "CONFORME" || hasAnyIssue) {
+        if (noveltySelect.value !== "CONFORME" || result.hasAnyIssue) {
             notesRequiredFlag.classList.remove("hidden");
             notesTextarea.required = true;
         } else {
@@ -432,37 +649,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (condSelect) {
             condSelect.addEventListener("change", () => {
+                row.dataset.condManual = "1";
                 hideAlert();
-                if (condSelect.value === "PRODUCTO_ERRONEO") {
-                    input.value = "0.00";
-                    if (erroneousSection) {
-                        erroneousSection.classList.remove("hidden");
-                        if (erroneousItemsList && erroneousItemsList.children.length === 0) {
-                            addErroneousItemRow();
-                        }
-                    }
-                }
                 checkAndAutoCategorize();
+            });
+        }
+
+        const lotInput = row.querySelector(".input-row-lot");
+        if (lotInput) {
+            lotInput.addEventListener("input", () => {
+                hideAlert();
+                handleLotLookup(row);
             });
         }
     });
 
-    form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        hideAlert();
-
-        const { hasAnyIssue } = checkAndAutoCategorize();
-        const noveltyType = noveltySelect.value;
-        const readableTitle = NOVELTY_TITLES[noveltyType] || "Recepción de Mercancía";
-        const notes = notesTextarea.value.trim();
-
-        if (hasAnyIssue && notes.length < 5) {
-            showAlert("Debe ingresar una justificación detallada en las notas de muelle (mínimo 5 caracteres).");
-            notesTextarea.focus();
-            return;
-        }
-
-        const itemsPayload = [];
+    // Construcción ÚNICA del payload de la recepción: se usa para el resumen del modal
+    // y ese MISMO objeto se reutiliza en el POST final, garantizando que se envíe
+    // exactamente lo que se mostró (nada de reconstruirlo en el botón del modal).
+    function buildReceptionPayload() {
+        const items = [];
         let missingLotField = false;
 
         rows.forEach(row => {
@@ -471,6 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const input = row.querySelector(".input-received");
             const condSelect = row.querySelector(".select-item-condition");
             const lotInput = row.querySelector(".input-row-lot");
+            const expInput = row.querySelector(".input-row-exp");
 
             let receivedQty = parseFloat(input.value);
             if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
@@ -482,7 +689,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 missingLotField = true;
             }
 
-            itemsPayload.push({
+            items.push({
                 detail_id: detailId,
                 product_name: row.dataset.product,
                 sku: row.dataset.sku,
@@ -490,49 +697,128 @@ document.addEventListener("DOMContentLoaded", () => {
                 dispatched_qty: dispatched,
                 received_quantity: receivedQty,
                 item_condition: condition,
-                observed_physical_lot: observedLot
+                observed_physical_lot: observedLot,
+                observed_physical_expiration: (observedLot && expInput && expInput.value)
+                    ? expInput.value
+                    : null
             });
         });
+
+        const erroneous = [];
+        let errInvalid = false;
+
+        document.querySelectorAll(".err-row-grid").forEach(er => {
+            const sel = er.querySelector(".err-product-select");
+            const qtyInput = er.querySelector(".err-qty-input");
+            const lotInput = er.querySelector(".err-lot-input");
+            const expInput = er.querySelector(".err-exp-input");
+            const prodId = parseInt(sel.value);
+            const qty = parseFloat(qtyInput.value);
+            const qtyRaw = qtyInput.value.trim();
+
+            // Una fila errónea totalmente vacía (producto sin elegir y sin cantidad)
+            // se ignora: el sistema auto-agrega una fila al entrar a "Producto Erróneo"
+            // para guiar al operario, pero esa fila vacía no debe bloquear el submit
+            // cuando ya hay (al menos) un erróneo válido declarado.
+            const isEmptyRow = !prodId && qtyRaw === "";
+
+            if (prodId && qty > 0) {
+                const lot = lotInput ? lotInput.value.trim() : "";
+                erroneous.push({
+                    product_id: prodId,
+                    product_name: sel.options[sel.selectedIndex].text,
+                    quantity: qty,
+                    unit: sel.options[sel.selectedIndex].dataset.unit || "UN",
+                    lot_number: lot || null,
+                    expiration_date: (lot && expInput && expInput.value) ? expInput.value : null
+                });
+            } else if (!isEmptyRow) {
+                errInvalid = true;
+            }
+        });
+
+        return { items, erroneous, missingLotField, errInvalid };
+    }
+
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        hideAlert();
+
+        const { hasAnyIssue, rowsAffected } = checkAndAutoCategorize();
+        const noveltyType = noveltySelect.value;
+        const notes = notesTextarea.value.trim();
+
+        if (hasAnyIssue && notes.length < 5) {
+            showAlert("Debe ingresar una justificación detallada en las notas de muelle (mínimo 5 caracteres).");
+            notesTextarea.focus();
+            return;
+        }
+
+        // Guard espejo del servidor: INCIDENCIA_MIXTA exige DOS o más renglones
+        // afectados (regla de diseño). Con un solo renglón se bloquea antes de abrir
+        // el modal; la auto-clasificación ya asigna la condición específica correcta.
+        if (noveltyType === "INCIDENCIA_MIXTA" && rowsAffected < 2) {
+            showAlert("La clasificación 'Incidencia Mixta' exige dos o más renglones afectados (condición o diferencia de cantidad). Si solo hubo un renglón con incidencia, use su clasificación específica.");
+            return;
+        }
+
+        // Espejo del servidor: con dos o más renglones afectados además del
+        // insumo no solicitado, el backend registra INCIDENCIA_MIXTA aunque el
+        // selector diga PRODUCTO_ERRONEO (el modal mostraría algo que no se
+        // asentaría igual). Se avisa antes de abrir la certificación.
+        if (noveltyType === "PRODUCTO_ERRONEO" && rowsAffected >= 2) {
+            showAlert("El sistema registrará esta recepción como 'Incidencia Mixta' porque hay dos o más renglones con incidencia y además un insumo no solicitado. Use la clasificación 'Incidencia Mixta' o deje un solo renglón afectado.");
+            return;
+        }
+
+        // Guard de coherencia (espejo del servidor): una clasificación específica o
+        // INCIDENCIA_MIXTA debe tener respaldo en algún renglón (condición o diferencia
+        // de cantidad) o en erróneos. Si no, se bloquea antes de abrir el modal.
+        const noveltyNeedsRowBacking = [
+            "FALTANTE_CONTEO", "SOBRANTE_EXCEDENTE", "INCIDENCIA_TEMPERATURA",
+            "LOTE_NO_COINCIDE", "VIOLACION_CUSTODIA", "RECHAZO_POR_ESPACIO",
+            "INCIDENCIA_MIXTA"
+        ].includes(noveltyType);
+        if (noveltyNeedsRowBacking && !hasAnyIssue) {
+            showAlert("La clasificación seleccionada no coincide con ningún renglón: no hay condición ni diferencia de cantidad que la respalde. Revise la tabla de insumos o cambie a 'Recepción Conforme'.");
+            return;
+        }
+
+        const { items, erroneous, missingLotField, errInvalid } = buildReceptionPayload();
+        const itemsPayload = items;
+        const erroneousPayload = erroneous;
 
         if (missingLotField) {
             showAlert("Debe ingresar el lote físico real impreso en el empaque para el insumo marcado con Lote no coincide.");
             return;
         }
 
-        const erroneousPayload = [];
-        let errInvalid = false;
-        
-        if (noveltyType === "PRODUCTO_ERRONEO" || noveltyType === "INCIDENCIA_MIXTA") {
-            document.querySelectorAll(".err-row-grid").forEach(er => {
-                const sel = er.querySelector(".err-product-select");
-                const qtyInput = er.querySelector(".err-qty-input");
-                const prodId = parseInt(sel.value);
-                const qty = parseFloat(qtyInput.value);
-
-                if (prodId && qty > 0) {
-                    erroneousPayload.push({
-                        product_id: prodId,
-                        product_name: sel.options[sel.selectedIndex].text,
-                        quantity: qty,
-                        unit: sel.options[sel.selectedIndex].dataset.unit || "UN"
-                    });
-                } else {
-                    errInvalid = true;
-                }
-            });
-
-            if (noveltyType === "PRODUCTO_ERRONEO" && erroneousPayload.length === 0) {
-                showAlert("Debe declarar al menos un insumo físico entregado por error.");
-                return;
-            }
-
-            if (errInvalid) {
-                showAlert("Complete todos los campos del insumo no solicitado con cantidades válidas mayores a cero.");
-                return;
-            }
+        if (noveltyType === "PRODUCTO_ERRONEO" && erroneousPayload.length === 0) {
+            showAlert("Debe declarar al menos un insumo físico entregado por error.");
+            return;
         }
 
-        let modalHtml = `<p class="modal-lead-text">Se certificará la descarga en <strong>${destinationName}</strong> bajo la condición: <strong>${readableTitle}</strong></p>`;
+        if (errInvalid) {
+            showAlert("Complete todos los campos del insumo no solicitado con cantidades válidas mayores a cero.");
+            return;
+        }
+
+        // Guarda el contenido exacto que se certificará; el botón del modal hará el
+        // POST con ESTE payload (ya coherente con el auto-diagnóstico; solo una
+        // decisión manual legítima lo desvía).
+        pendingReception = {
+            noveltyType,
+            notes,
+            items,
+            erroneous
+        };
+
+        // Refleja la clasificación que efectivamente se enviará (coherente con filas
+        // y erróneos tras el auto-diagnóstico; solo una decisión manual legítima la desvía).
+        const effectiveTitle = NOVELTY_TITLES[noveltyType]
+            || "Recepción de Mercancía";
+
+        let modalHtml = `<p class="modal-lead-text">Se certificará la descarga en <strong>${destinationName}</strong> bajo la condición: <strong>${effectiveTitle}</strong></p>`;
         let listItemsHtml = "";
 
         itemsPayload.forEach(it => {
@@ -549,8 +835,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 conditionTag = `<span class="badge bg-danger">Empaque Dañado</span>`;
             } else if (it.item_condition === "RECHAZO_POR_ESPACIO") {
                 conditionTag = `<span class="badge bg-danger">Rechazo por Espacio</span>`;
-            } else if (it.item_condition === "PRODUCTO_ERRONEO") {
-                conditionTag = `<span class="badge bg-danger">Producto Erróneo</span>`;
             } else if (it.item_condition === "FALTANTE_CONTEO") {
                 conditionTag = `<span class="badge bg-danger">Faltante Físico</span>`;
             } else if (it.item_condition === "SOBRANTE_EXCEDENTE") {
@@ -578,9 +862,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         erroneousPayload.forEach(ep => {
+            const lotInfo = ep.lot_number
+                ? `<span class="text-muted small"> — Lote: ${ep.lot_number}${ep.expiration_date ? ` / Venc: ${ep.expiration_date}` : ""}</span>`
+                : "";
             listItemsHtml += `
                 <li class="modal-breakdown-item bg-light">
-                    <div><strong>${ep.product_name}</strong> (No Solicitado)</div>
+                    <div><strong>${ep.product_name}</strong> (No Solicitado)${lotInfo}</div>
                     <span class="text-danger fw-bold">${ep.quantity.toFixed(2)} ${ep.unit} (En Resguardo)</span>
                 </li>
             `;
@@ -607,45 +894,13 @@ document.addEventListener("DOMContentLoaded", () => {
     btnAcceptModal.addEventListener("click", async () => {
         confirmModal.classList.add("hidden");
 
-        const noveltyType = noveltySelect.value;
-        const notes = notesTextarea.value.trim();
-
-        const itemsPayload = [];
-        rows.forEach(row => {
-            const detailId = parseInt(row.dataset.detailId);
-            const input = row.querySelector(".input-received");
-            const condSelect = row.querySelector(".select-item-condition");
-            const lotInput = row.querySelector(".input-row-lot");
-
-            let receivedQty = parseFloat(input.value);
-            if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
-
-            const condition = condSelect ? condSelect.value : "CONFORME";
-            const observedLot = (lotInput && condition === "LOTE_NO_COINCIDE") ? lotInput.value.trim() : null;
-
-            itemsPayload.push({
-                detail_id: detailId,
-                received_quantity: receivedQty,
-                item_condition: condition,
-                observed_physical_lot: observedLot
-            });
-        });
-
-        const erroneousPayload = [];
-        if (noveltyType === "PRODUCTO_ERRONEO" || noveltyType === "INCIDENCIA_MIXTA") {
-            document.querySelectorAll(".err-row-grid").forEach(er => {
-                const sel = er.querySelector(".err-product-select");
-                const qtyInput = er.querySelector(".err-qty-input");
-                const prodId = parseInt(sel.value);
-                const qty = parseFloat(qtyInput.value);
-                if (prodId && qty > 0) {
-                    erroneousPayload.push({
-                        product_id: prodId,
-                        quantity: qty
-                    });
-                }
-            });
+        // Reutiliza el payload EXACTO guardado al abrir el modal: se envía lo mismo
+        // que se mostró en el resumen (nada de reconstruirlo y arriesgar divergencias).
+        if (!pendingReception) {
+            showAlert("La recepción caducó. Revise la tabla e intente nuevamente.");
+            return;
         }
+        const payload = pendingReception;
 
         btnSubmit.disabled = true;
         btnSubmit.textContent = "Procesando...";
@@ -655,10 +910,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    novelty_type: noveltyType,
-                    notes: notes,
-                    items: itemsPayload,
-                    erroneous_products: erroneousPayload
+                    novelty_type: payload.noveltyType,
+                    notes: payload.notes,
+                    items: payload.items,
+                    erroneous_products: payload.erroneous
                 })
             });
 
@@ -679,13 +934,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 // Restaura el botón para permitir corregir y reintentar
                 btnSubmit.disabled = false;
-                btnSubmit.textContent = "Confirmar y Asentar Stock";
+                updateBadgeAndGuidance();
             }
         } catch (error) {
             console.error("Error de red:", error);
             showAlert("Error de conexión al procesar el traslado con el servidor.");
             btnSubmit.disabled = false;
-            btnSubmit.textContent = "Confirmar y Asentar Stock";
+            updateBadgeAndGuidance();
         }
     });
 
