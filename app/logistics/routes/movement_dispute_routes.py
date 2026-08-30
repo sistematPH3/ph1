@@ -3,11 +3,13 @@
 # Controlador HTTP del sub-módulo de Arbitraje / Bandeja de Novedades.
 # Sin lógica de negocio: delega en app/logistics/services/movement_dispute_service.py.
 
+from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, get_flashed_messages
 from flask_login import current_user, login_required
 from app.decorators.roles import require_roles
 from app.logistics.services.movement_dispute_service import (
     get_disputes_context,
+    get_disputes_date_range,
     resolve_dispute as service_resolve_dispute,
     cancel_linked_replenishment as service_cancel_replenishment,
 )
@@ -21,8 +23,21 @@ movement_dispute_bp = Blueprint("movement_dispute", __name__, url_prefix="/logis
 @require_roles('admin', 'manager', 'assistant_manager')
 def list_disputes():
     """Muestra la bandeja de novedades, incidencias o disputas de los traslados."""
+    start_date_str = (request.args.get('start_date') or '').strip()
+    end_date_str = (request.args.get('end_date') or '').strip()
     try:
-        disputes, locations = get_disputes_context()
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d') if start_date_str else None
+    except ValueError:
+        start_date = None
+    try:
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d') if end_date_str else None
+    except ValueError:
+        end_date = None
+    try:
+        disputes, locations = get_disputes_context(start_date, end_date)
+        min_ts, max_ts = get_disputes_date_range()
+        date_min = min_ts.strftime('%Y-%m-%d') if min_ts else None
+        date_max = max_ts.strftime('%Y-%m-%d') if max_ts else None
         # Los mensajes del módulo de disputas se muestran y consumen AQUÍ;
         # las demás categorías (recepción, traslado, etc.) se re-encolan
         # para no perderse ni mostrarse en este archivo.
@@ -36,7 +51,11 @@ def list_disputes():
             "logistics/movement_dispute.html",
             disputes=disputes,
             locations=locations,
-            dispute_flashes=dispute_flashes
+            dispute_flashes=dispute_flashes,
+            start_date=start_date_str,
+            end_date=end_date_str,
+            date_min=date_min,
+            date_max=date_max
         )
     except Exception as e:
         flash(f"Error al cargar la bandeja de novedades: {str(e)}", "dispute-error")

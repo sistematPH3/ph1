@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=5">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=19">
 
 <!-- Agregamos translate="no" y la clase notranslate para blindar la vista contra Google Translate -->
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
@@ -36,17 +36,17 @@
         </div>
 
         <!-- Barra de Filtros Superior -->
-        <div class="ph-filter-bar mb-4 p-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3" style="background-color: #212529;">
+        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
             <!-- Buscador -->
             <div class="input-group" style="max-width: 320px;">
                 <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
                 <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Tipo, Sede..." id="searchDisputeInput">
             </div>
 
-            <!-- Filtros de Estado y Sede -->
-            <div class="d-flex align-items-center flex-wrap gap-2">
-                <span class="text-light small fw-semibold">Filtrar:</span>
-                
+            <!-- Filtros: Estado, Sede y rango de fechas (filtra por la llegada del mensaje) -->
+            <form method="GET" action="{{ url_for('movement_dispute.list_disputes') }}" class="d-flex align-items-center flex-wrap gap-2">
+                <span class="text-muted small fw-semibold">Filtrar:</span>
+
                 <!-- Selector dinámico de Estados / Novedades -->
                 <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 250px;">
                     <option value="" selected>Todos los estados</option>
@@ -70,7 +70,16 @@
                         <option value="{{ loc.name }}">{{ loc.name }}</option>
                     {% endfor %}
                 </select>
-            </div>
+
+                <!-- Filtro de llegada: busca por la fecha en que llego la novedad a este apartado -->
+                <span class="text-muted small fw-semibold"><i class="bi bi-bell me-1"></i>Llegada de la novedad:</span>
+                <input type="date" name="start_date" class="form-control form-control-sm bg-white border-0 shadow-none rounded-pill px-3" style="width: 150px;"
+                       value="{{ start_date or '' }}" min="{{ date_min or '' }}" max="{{ date_max or '' }}" onchange="this.form.submit()">
+
+                {% if start_date %}
+                <a href="{{ url_for('movement_dispute.list_disputes') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Limpiar</a>
+                {% endif %}
+            </form>
         </div>
 
         <!-- Tabla de Novedades / Disputas -->
@@ -80,7 +89,7 @@
                     <tr style="background-color: #af1515 !important;">
                         <th style="background-color: #af1515 !important;">ID / TIPO DE ALERTA</th>
                         <th style="background-color: #af1515 !important;">ORIGEN Y DESTINO</th>
-                        <th style="background-color: #af1515 !important;">FECHA DE INCIDENCIA</th>
+                        <th style="background-color: #af1515 !important;">FECHA DEL MENSAJE</th>
                         <th style="background-color: #af1515 !important;">ESTADO ACTUAL</th>
                         <th style="background-color: #af1515 !important;" class="text-end">ACCIONES DE RESOLUCIÓN</th>
                     </tr>
@@ -91,7 +100,7 @@
                         <td class="fw-bold">
                             <div class="d-flex align-items-center">
                                 <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold;">
-                                    #{{ mov.id }}
+                                    {{ mov.id }}
                                 </div>
                                 <div>
                                     <span class="text-dark d-block fw-bold">Incidencia Crítica</span>
@@ -100,20 +109,26 @@
                             </div>
                         </td>
                         <td>
-                            <div class="d-flex flex-column gap-1">
-                                <div class="d-flex align-items-center">
-                                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
+                            <div class="d-flex flex-column gap-2 w-100">
+                                <div class="d-flex align-items-center justify-content-between w-100">
+                                    <span class="text-muted small fw-semibold">De:</span>
                                     <span class="ph-badge-location">{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</span>
                                 </div>
-                                <div class="d-flex align-items-center">
-                                    <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
+                                <div class="d-flex align-items-center justify-content-between w-100">
+                                    <span class="text-muted small fw-semibold">A:</span>
                                     <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
                                 </div>
                             </div>
                         </td>
                         <td>
-                            <span class="text-dark d-block fw-semibold">{{ mov.date.strftime('%Y-%m-%d') }}</span>
-                            <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
+                            {% if mov.notification_date %}
+                                <div>
+                                    <span class="text-dark d-block fw-semibold">{{ mov.notification_date.strftime('%Y-%m-%d') }}</span>
+                                    <span class="text-muted small">{{ mov.notification_date.strftime('%H:%M %p') }}</span>
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if mov.status == 'FALTANTE_CONTEO' %}
@@ -158,7 +173,7 @@
                     <tr class="collapse" id="detalle-disputa-{{ mov.id }}">
                         <td colspan="5">
                             <div class="ph-detail-box shadow-sm">
-                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Tránsito (#{{ mov.id }})</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Expediente de Discrepancia en Tránsito (ID {{ mov.id }})</h6>
                                 
                                 <!-- Observaciones reales de recepción -->
                                 <div class="alert alert-warning mb-3 py-2 px-3 small border-0 shadow-sm">
@@ -167,7 +182,7 @@
                                 </div>
 
                                 <!-- Ítems del Manifestado Original -->
-                                <table class="table table-sm table-bordered bg-white mb-3 shadow-sm ph-inner-table align-middle">
+                                <table class="table table-sm table-bordered bg-white mb-3 shadow-sm ph-inner-table ph-tbl-det align-middle">
                                     <thead>
                                         <tr class="bg-light">
                                             <th>Producto / SKU</th>
@@ -218,7 +233,7 @@
                                         <i class="bi bi-exclamation-triangle-fill me-2"></i> Productos No Manifestados / Entregados por Error (Fuera de Guía)
                                     </div>
                                     <div class="card-body p-2">
-                                        <table class="table table-sm table-bordered bg-white mb-0 ph-inner-table align-middle">
+                                        <table class="table table-sm table-bordered bg-white mb-0 ph-inner-table ph-tbl-err align-middle">
                                             <thead class="table-light">
                                                 <tr>
                                                     <th>SKU</th>
@@ -250,8 +265,8 @@
                         <div class="modal-dialog modal-dialog-centered modal-lg">
                             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
                                 <form action="{{ url_for('movement_dispute.resolve_dispute', movement_id=mov.id) }}" method="POST">
-                                    <div class="modal-header bg-dark text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
-                                        <h5 class="modal-title fw-bold"><i class="bi bi-gavel text-danger me-2"></i>Dictamen Administrativo Granular — Traslado #{{ mov.id }}</h5>
+                                    <div class="modal-header ph-resolve-header text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                                        <h5 class="modal-title fw-bold"><i class="bi bi-gavel me-2"></i>Dictamen Administrativo Granular — Traslado {{ mov.id }}</h5>
                                         <button type="button" class="btn-close btn-close-white dispute-modal-dismiss" data-movement-id="{{ mov.id }}" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body p-4">
@@ -259,23 +274,26 @@
                                         <p class="text-muted small mb-3">Defina la acción administrativa de arbitraje de forma independiente para cada producto involucrado en esta incidencia:</p>
 
                                         <!-- Ítems del manifestado original -->
-                                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-box-seam me-1 text-danger"></i> Ítems del Manifestado Original:</h6>
+                                        <h6 class="ph-section-title mb-3"><i class="bi bi-box-seam me-1 text-danger"></i> Ítems del Manifestado Original</h6>
                                         {% for item in mov.details %}
-                                        <div class="card bg-light border-0 p-3 mb-3 shadow-sm">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <span class="fw-bold text-dark"><i class="bi bi-box-seam me-1 text-danger"></i> {{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span>
+                                        <div class="ph-item-decision">
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                <span class="fw-bold text-dark d-flex align-items-center gap-2">
+                                                    <span class="ph-item-idx">{{ loop.index }}</span>
+                                                    {{ item.product.name if item.product else 'Producto ' ~ item.product_id }}
+                                                </span>
                                                 {% if item.missing_quantity and item.missing_quantity > 0 %}
-                                                    <span class="badge bg-danger text-white">Discrepancia / Faltante: {{ item.missing_quantity }}</span>
+                                                    <span class="ph-badge-faltante">Discrepancia / Faltante: {{ item.missing_quantity }}</span>
                                                 {% else %}
-                                                    <span class="badge bg-secondary text-white">En Guía</span>
+                                                    <span class="ph-badge-guia">En Guía</span>
                                                 {% endif %}
                                             </div>
                                             
-                                            <div class="row g-2 align-items-center">
+                                            <div class="d-flex flex-column gap-2">
                                                 <!-- Opciones dinámicas segun catálogo -->
-                                                <div class="col-md-{% if mov.status == 'LOTE_NO_COINCIDE' %}7{% else %}12{% endif %}">
-                                                    <label class="form-label small fw-semibold text-secondary">Acción permitida:</label>
-                                                    <select name="item_{{ item.id }}_action" class="form-select form-select-sm shadow-sm" required>
+                                                <div>
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">Acción permitida:</label>
+                                                    <select name="item_{{ item.id }}_action" class="form-select form-select-sm" required>
                                                         <option value="" selected disabled>-- Seleccione resolución --</option>
                                                         
                                                         {% if mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
@@ -305,9 +323,9 @@
 
                                                 <!-- Campo de Lote condicional solo para LOTE_NO_COINCIDE -->
                                                 {% if mov.status == 'LOTE_NO_COINCIDE' %}
-                                                <div class="col-md-5">
-                                                    <label class="form-label small fw-semibold text-secondary">Nuevo Lote Real:</label>
-                                                    <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm shadow-sm" placeholder="Ej. LOTE-REAL-2026" required>
+                                                <div>
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">Nuevo Lote Real:</label>
+                                                    <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm" placeholder="Ej. LOTE-REAL-2026" required>
                                                 </div>
                                                 {% endif %}
                                             </div>
@@ -316,16 +334,19 @@
 
                                         <!-- SECCIÓN DE PRODUCTOS ERRÓNEOS: ÚNICAMENTE QUEDÁRSELO O DEVOLVERLO -->
                                         {% if mov.erroneous_products and mov.erroneous_products|length > 0 %}
-                                        <h6 class="fw-bold text-danger mt-4 mb-2"><i class="bi bi-exclamation-octagon-fill me-1"></i> Decisión sobre Producto Erróneo / Inesperado:</h6>
+                                        <h6 class="ph-section-title text-danger mt-4 mb-3"><i class="bi bi-exclamation-octagon-fill me-1"></i> Decisión sobre Producto Erróneo / Inesperado</h6>
                                         {% for err_p in mov.erroneous_products %}
-                                        <div class="card border-danger bg-light p-3 mb-3 shadow-sm">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <span class="fw-bold text-dark"><i class="bi bi-x-circle-fill text-danger me-1"></i> {{ err_p.product_name }} (SKU: {{ err_p.sku }})</span>
-                                                <span class="badge bg-danger text-white">Cantidad recibida: {{ "%.2f"|format(err_p.quantity_delivered) }}</span>
+                                        <div class="ph-item-decision is-erroneo">
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                <span class="fw-bold text-dark d-flex align-items-center gap-2">
+                                                    <span class="ph-item-idx is-danger">{{ loop.index }}</span>
+                                                    {{ err_p.product_name }} (SKU: {{ err_p.sku }})
+                                                </span>
+                                                <span class="ph-badge-faltante">Cantidad recibida: {{ "%.2f"|format(err_p.quantity_delivered) }}</span>
                                             </div>
                                             <div>
-                                                <label class="form-label small fw-semibold text-secondary">Acción para este producto erróneo:</label>
-                                                <select name="erroneous_{{ err_p.product_id }}_action" class="form-select form-select-sm shadow-sm" required>
+                                                <label class="form-label small fw-semibold text-secondary mb-1">Acción para este producto erróneo:</label>
+                                                <select name="erroneous_{{ err_p.product_id }}_action" class="form-select form-select-sm" required>
                                                     <option value="" selected disabled>-- Seleccione qué hacer con este producto --</option>
                                                     <option value="RESOLUCION_ACREDITAR_DESTINO">Quedárselo / Acreditar en Destino (Ingresar al stock local)</option>
                                                     <option value="RESOLUCION_REINTEGRO">Devolverlo al Origen (Reintegro en Transporte)</option>

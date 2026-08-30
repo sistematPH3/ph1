@@ -105,6 +105,22 @@
     color: white;
 }
 
+/* Botones de acción Ver / Resolver: mismo tamaño y alineados a la derecha */
+.ph-table tbody tr.dispute-row td:last-child .d-flex {
+    justify-content: flex-end !important;
+    gap: 0.5rem;
+}
+
+.ph-table tbody tr.dispute-row td:last-child .btn {
+    flex: 1 1 0;
+    min-width: 120px;
+    max-width: 160px;
+    white-space: nowrap;
+    text-align: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
 /* Caja de detalles con acento de alerta tipo notificación */
 .ph-detail-box {
     background-color: #fafbfc;
@@ -131,4 +147,390 @@
 
 .ph-inner-table tbody td {
     border-color: #ced4da !important;
+}
+
+/* ==========================================================================
+   BARRA DE FILTROS: limpia, sin cintillo oscuro
+   ========================================================================== */
+
+.ph-filter-bar {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+}
+
+/* ==========================================================================
+   MODAL DE RESOLUCIÓN (VEREDICTO GRANULAR)
+   ========================================================================== */
+
+.ph-resolve-header {
+    background: linear-gradient(135deg, #af1515 0%, #7f0e0e 100%);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+.ph-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #343a40;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.ph-item-decision {
+    background-color: #ffffff;
+    border: 1px solid #e9ecef;
+    border-left: 4px solid #af1515;
+    border-radius: 12px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.ph-item-decision:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    border-color: #d8dde3;
+}
+
+.ph-item-decision.is-erroneo {
+    border-left-color: #dc3545;
+    border-color: #f1c9cd;
+    background-color: #fffafa;
+}
+
+.ph-item-idx {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 8px;
+    background-color: #af1515;
+    color: #ffffff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ph-item-idx.is-danger {
+    background-color: #dc3545;
+}
+
+.ph-badge-guia {
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #e9ecef;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35em 0.85em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.ph-badge-faltante {
+    background-color: #fdecea;
+    color: #af1515;
+    border: 1px solid #f3c6c2;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.35em 0.85em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.ph-item-decision .form-select,
+.ph-item-decision .form-control {
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+
+.ph-item-decision .form-select:focus,
+.ph-item-decision .form-control:focus {
+    border-color: #af1515;
+    box-shadow: 0 0 0 0.2rem rgba(175, 21, 21, 0.15);
+}
+
+/* ==========================================================================
+   RESPONSIVE (mismo patrón acordado en auditoría):
+   - Tablet: solo compactación, los listados se mantienen en tabla.
+   - Móvil: cabecera apilada, filtros a lo ancho y tablas en tarjetas.
+   ========================================================================== */
+
+@media (max-width: 991.98px) {
+
+    .container-fluid {
+        padding-left: 18px !important;
+        padding-right: 18px !important;
+    }
+
+    .ph-card {
+        padding: 1.6rem;
+    }
+
+    .ph-title {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+
+    .container-fluid {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .ph-card {
+        padding: 1.25rem;
+    }
+
+    /* ---------- Cabecera apilada ---------- */
+    .ph-card > .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.9rem;
+    }
+
+    .ph-title {
+        font-size: 1.35rem;
+    }
+
+    /* Recuadro del icono: cuadrado y grande en móvil (igual que auditoría) */
+    .ph-icon-box {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+        flex-shrink: 0;
+        font-size: 1.5rem;
+    }
+
+    /* ---------- Filtros a lo ancho ---------- */
+    .ph-filter-bar {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.75rem;
+    }
+
+    .ph-filter-bar .input-group {
+        max-width: 100% !important;
+    }
+
+    .ph-filter-bar form {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .ph-filter-bar select {
+        width: 100% !important;
+    }
+
+    .ph-filter-bar [type="date"] {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* ---------- Tabla principal en tarjetas ---------- */
+    .ph-table {
+        display: block;
+    }
+
+    .ph-table thead {
+        display: none;
+    }
+
+    .ph-table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .ph-table tbody tr.dispute-row {
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        border: 1px solid #f0f0f0;
+        border-radius: 14px;
+        margin-bottom: 0.9rem;
+        padding: 0.9rem 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .ph-table tbody tr.dispute-row td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: none;
+        padding: 0.4rem 0;
+    }
+
+    .ph-table tbody tr.dispute-row td:first-child {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(2) {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(2)::before {
+        content: "Ruta";
+        margin-bottom: 0.4rem;
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(2) > div {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.5rem !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(2) div > div {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(3)::before {
+        content: "Llegada";
+    }
+
+    .ph-table tbody tr.dispute-row td:nth-child(4)::before {
+        content: "Estado";
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child::before {
+        content: "Acciones";
+        width: 100%;
+        text-align: center;
+        margin-bottom: 0.25rem;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child .d-flex {
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child .btn {
+        flex: 1 1 0;
+        max-width: 140px;
+        min-width: 110px;
+    }
+
+    /* ---------- Fila desplegable (detalles) ---------- */
+    .ph-table tbody tr.collapse td {
+        display: block;
+        padding: 0.5rem 0;
+    }
+
+    .ph-detail-box {
+        padding: 1rem;
+    }
+
+    /* ---------- Tablas internas del expediente en tarjetas ---------- */
+    .ph-tbl-det thead,
+    .ph-tbl-err thead {
+        display: none;
+    }
+
+    .ph-tbl-det tbody,
+    .ph-tbl-err tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .ph-tbl-det tbody tr,
+    .ph-tbl-err tbody tr {
+        display: block;
+        border-bottom: 1px solid #eef0f2;
+        padding: 0.6rem 0;
+    }
+
+    .ph-tbl-det tbody tr:last-child,
+    .ph-tbl-err tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .ph-tbl-det td,
+    .ph-tbl-err td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        border: none;
+        padding: 0.3rem 0;
+    }
+
+    .ph-tbl-det td::before {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        color: #6c757d;
+        min-width: 42%;
+    }
+
+    .ph-tbl-det td:nth-child(1)::before {
+        content: "Producto / SKU";
+    }
+    .ph-tbl-det td:nth-child(2)::before {
+        content: "Lote";
+    }
+    .ph-tbl-det td:nth-child(3)::before {
+        content: "Vencimiento";
+    }
+    .ph-tbl-det td:nth-child(4)::before {
+        content: "Despachada";
+    }
+    .ph-tbl-det td:nth-child(5)::before {
+        content: "Recibida";
+    }
+    .ph-tbl-det td:nth-child(6)::before {
+        content: "Faltante";
+    }
+    .ph-tbl-det td:nth-child(7)::before {
+        content: "Condición";
+    }
+
+    .ph-tbl-err td::before {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        color: #6c757d;
+        min-width: 42%;
+    }
+
+    .ph-tbl-err td:nth-child(1)::before {
+        content: "SKU";
+    }
+    .ph-tbl-err td:nth-child(2)::before {
+        content: "Producto";
+    }
+    .ph-tbl-err td:nth-child(3)::before {
+        content: "Cantidad";
+    }
+    .ph-tbl-err td:nth-child(4)::before {
+        content: "Incidencia";
+    }
+
+    /* ---------- Modal de resolución en móvil ---------- */
+    .modal-body {
+        padding: 1rem !important;
+    }
+
+    .ph-item-decision {
+        padding: 0.8rem 0.9rem;
+    }
 }

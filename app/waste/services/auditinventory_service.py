@@ -1,4 +1,5 @@
 from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
+from app.models import Location, Movement, PurchaseAuditLog
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
@@ -287,3 +288,464 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
         return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}
 
     return {'success': True, 'message': 'Acción procesada con éxito.'}
+
+
+# ============================================================================
+# VISOR INGRESOS / EGRESOS (diseño tipo movement_audit)
+# ============================================================================
+
+MOVEMENT_EVENT_ACTIONS = {
+    'DESPACHO_EMISION',
+    'CANCELACION_PRE_SALIDA',
+    'RECEPCION_CONFORME',
+    'RECEPCION_NOVEDAD',
+    'RESOLUCION_DISPUTA',
+}
+
+SEV_MAP = {
+    'NORMAL': ('NORMAL', 'bg-success', 'bi-check-circle-fill'),
+    'ALERTA': ('ALERTA', 'ph-badge-warning', 'bi-exclamation-circle-fill'),
+    'CRITICO': ('CRÍTICO', 'bg-danger', 'bi-exclamation-triangle-fill'),
+    'CRITICAL': ('CRÍTICO', 'bg-danger', 'bi-exclamation-triangle-fill'),
+    'EDITADO': ('EDITADO', 'bg-warning text-dark', 'bi-pencil-fill'),
+    'ANULADO': ('ANULADO', 'bg-danger', 'bi-x-circle-fill'),
+    'REABASTECIDO': ('REABASTECIDO', 'bg-info text-white', 'bi-arrow-up-circle-fill'),
+}
+
+INCOME_KEYWORDS = ('INGRESO', 'COMPRA', 'RECEPCION', 'REABASTEC', 'ACTIVACION', 'DEVOLUCION', 'ACREDITACION')
+
+
+def _changed_dict(log):
+    c = log.changed_data or {}
+    if isinstance(c, str):
+        try:
+            c = json.loads(c)
+        except json.JSONDecodeError:
+            c = {}
+    return c if isinstance(c, dict) else {}
+
+
+def _sev_badge(sev):
+    sev = (sev or 'NORMAL').upper()
+    return SEV_MAP.get(sev, ('NORMAL', 'bg-success', 'bi-check-circle-fill'))
+
+
+def _fmt_amount(val):
+    if val in (None, ''):
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _entry_seed(row, sede, product, c, is_admin, read_only_role, now):
+    sev = (row.severity or 'NORMAL').upper()
+    username = getattr(row, 'user_name', None) or 'Sistema'
+    ts = row.timestamp
+    ts_aware = None
+    if ts is not None:
+        ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+
+    entry = {
+        'id': row.id,
+        'action': row.action or '',
+        'sev': sev,
+        'sev_label': _sev_badge(sev)[0],
+        'sev_class': _sev_badge(sev)[1],
+        'sev_icon': _sev_badge(sev)[2],
+        'user_name': username,
+        'initial': username[0].upper() if username else 'S',
+        'ts': ts,
+        'sede': sede,
+        'movement_id': c.get('movement_id'),
+        'notes': c.get('notes', '') if isinstance(c.get('notes'), str) else '',
+        'event_type': 'inventory',
+        'can_manage': False,
+        'manage_mode': None,
+        'timed_out_note': '',
+        'is_retorno': False,
+        'purchase_id': None,
+        'can_view_purchase': False,
+    }
+    return entry, ts_aware, sev
+
+
+def _apply_manage(entry, ts_aware, sev, act, is_admin, read_only_role, now):
+    """Calcula si un log de inventario operativo admite Editar/Anular/Activar."""
+    if entry.get('event_type') != 'inventory':
+        return
+    if read_only_role:
+        return
+    if 'COMPRA' in act or 'INGRESO' in act or 'AJUSTE' in act or 'REVERSION' in act or 'ACTIVACION' in act:
+        return
+    if sev in ('ANULADO',):
+        entry['can_manage'] = True
+        entry['manage_mode'] = 'ACTIVAR'
+        return
+    if sev in ('EDITADO',):
+        return
+
+    hours = ((now - ts_aware).total_seconds() / 3600.0) if ts_aware else 0
+    if not is_admin and hours > 24:
+        entry['timed_out_note'] = 'Tiempo expirado (24h). Solicite corrección al Administrador.'
+        return
+    if is_admin and hours > 720:
+        entry['timed_out_note'] = 'Plazo máximo administrativo expirado (30 días).'
+        return
+
+    entry['can_manage'] = True
+    entry['manage_mode'] = 'EDITAR_ANULAR'
+
+
+def _push_inventory_rows(rows, log, c, sev, ts_aware, sede, entry, is_admin, read_only_role, now, annulled_target_ids):
+    """Crea las filas de un log operativo de stock (quantity_changed)."""
+    qty_changed = _fmt_amount(c.get('quantity_changed', 0)) or 0.0
+    prev_qty = _fmt_amount(c.get('previous_quantity'))
+    new_qty = _fmt_amount(c.get('new_quantity'))
+
+    if qty_changed != 0:
+        if qty_changed < 0:
+            if prev_qty in (0, 0.0, None):
+                if new_qty is not None and new_qty > 0:
+                    prev_qty = new_qty - qty_changed
+                else:
+                    prev_qty = abs(qty_changed)
+                    new_qty = 0.0
+            elif new_qty is None:
+                new_qty = prev_qty + qty_changed
+        else:
+            if prev_qty in (0, 0.0, None) and new_qty in (0, 0.0, None):
+                prev_qty = 0.0
+                new_qty = qty_changed
+            elif new_qty is None and prev_qty is not None:
+                new_qty = prev_qty + qty_changed
+            elif prev_qty is None and new_qty is not None:
+                prev_qty = new_qty - qty_changed
+
+    if prev_qty is None:
+        prev_qty = 0.0
+    if new_qty is None:
+        new_qty = 0.0
+    prev_qty = max(0.0, prev_qty)
+    new_qty = max(0.0, new_qty)
+
+    act = (log.action or '').upper()
+    is_adjustment = any(kw in act for kw in ['REVERSION', 'AJUSTE', 'ACTIVACION'])
+
+    row_data = dict(entry)
+    row_data.update({
+        'event_type': 'inventory',
+        'product': c.get('product_name') or c.get('producto') or c.get('nombre') or 'N/A',
+        'sku': c.get('sku', 'N/A'),
+        'lot': c.get('lot_number', 'N/A'),
+        'qty': qty_changed,
+        'prev_qty': prev_qty,
+        'new_qty': new_qty,
+        'is_annulled': log.id in annulled_target_ids,
+        'is_adjustment': is_adjustment,
+    })
+    _apply_manage(row_data, ts_aware, sev, act, is_admin, read_only_role, now)
+    rows.append(row_data)
+
+
+def _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+    items = c.get('items') or []
+    if not items:
+        return
+    total = sum(float(i.get('dispatched_qty', 0)) for i in items)
+    for it in items:
+        row = dict(entry)
+        row.update({
+            'event_type': 'despacho',
+            'product': it.get('product_name') or 'N/A',
+            'sku': it.get('sku') or 'N/A',
+            'lot': it.get('lot_number') or 'N/A',
+            'expiration': it.get('expiration_date') or 'N/A',
+            'qty': -float(it.get('dispatched_qty', 0)),
+            'dispatched_qty': float(it.get('dispatched_qty', 0)),
+            'origin': origin_name,
+            'destination': destination_name,
+            'movement_status': mov_status,
+        })
+        rows.append(row)
+
+
+def _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+    delta = _fmt_amount((c.get('stock_impact') or {}).get('origin_current_delta')) or 0.0
+    row = dict(entry)
+    row.update({
+        'event_type': 'cancelacion',
+        'product': f"Mercancía devuelta · Baja de traslado",
+        'sku': 'N/A',
+        'lot': 'N/A',
+        'qty': abs(delta),
+        'reason': c.get('reason', ''),
+        'origin': origin_name,
+        'destination': destination_name,
+        'movement_status': mov_status,
+    })
+    rows.append(row)
+
+
+def _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+    items = c.get('items') or []
+    notes = entry['notes']
+    if not items:
+        return
+    for it in items:
+        missing = float(it.get('missing_qty', 0))
+        novelty = it.get('specific_novelty', 'CONFORME')
+        row = dict(entry)
+        row.update({
+            'event_type': 'recepcion',
+            'product': it.get('product_name') or 'N/A',
+            'sku': it.get('sku') or 'N/A',
+            'lot': it.get('lot_number') or 'N/A',
+            'expiration': it.get('expiration_date') or 'N/A',
+            'qty': float(it.get('received_qty', it.get('dispatched_qty', 0))),
+            'dispatched_qty': float(it.get('dispatched_qty', 0)),
+            'received_qty': float(it.get('received_qty', it.get('dispatched_qty', 0))),
+            'missing_qty': missing,
+            'novelty': novelty,
+            'notes': notes,
+            'origin': origin_name,
+            'destination': destination_name,
+            'movement_status': mov_status,
+            'has_novedad': missing > 0.001 or (novelty or '').upper() != 'CONFORME',
+        })
+        rows.append(row)
+
+
+def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+    summary = c.get('resolution_summary') or {}
+    items = c.get('items') or []
+    notes = c.get('general_notes', '') or ''
+    credited = _fmt_amount(summary.get('credited_total')) or 0.0
+    returned = _fmt_amount(summary.get('returned_total')) or 0.0
+    lost = _fmt_amount(summary.get('lost_total')) or 0.0
+
+    if credited > 0:
+        row = dict(entry)
+        row.update({
+            'event_type': 'resolucion',
+            'product': f"Acreditación por disputa · Traslado {c.get('movement_id')}",
+            'sku': 'N/A', 'lot': 'N/A', 'expiration': 'N/A',
+            'qty': credited,
+            'origin': origin_name, 'destination': destination_name,
+            'movement_status': mov_status,
+            'resolution_items': items,
+            'resolution_notes': notes,
+        })
+        rows.append(row)
+
+    if returned > 0:
+        row = dict(entry)
+        row.update({
+            'event_type': 'resolucion',
+            'product': f"Devolución a origen por disputa · Traslado {c.get('movement_id')}",
+            'sku': 'N/A', 'lot': 'N/A', 'expiration': 'N/A',
+            'qty': returned,
+            'origin': origin_name, 'destination': destination_name,
+            'movement_status': mov_status,
+            'resolution_items': items,
+            'resolution_notes': notes,
+        })
+        rows.append(row)
+
+    if lost > 0:
+        row = dict(entry)
+        row.update({
+            'event_type': 'resolucion',
+            'product': f"Mercancía extraviada · Disputa de traslado {c.get('movement_id')}",
+            'sku': 'N/A', 'lot': 'N/A', 'expiration': 'N/A',
+            'qty': -lost,
+            'origin': origin_name, 'destination': destination_name,
+            'movement_status': mov_status,
+            'resolution_items': items,
+            'resolution_notes': notes,
+        })
+        rows.append(row)
+
+
+def _to_naive(dt):
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
+def _resolve_purchase_id(log, c, ts):
+    """Vincula un log INGRESO_COMPRA con su compra usando el historial CREATE."""
+    pid = c.get('purchase_id')
+    if pid:
+        try:
+            return int(pid)
+        except (TypeError, ValueError):
+            return None
+    if not ts:
+        return None
+    for pa in (
+        PurchaseAuditLog.query
+        .filter(PurchaseAuditLog.action_type == 'CREATE', PurchaseAuditLog.user_id == log.user_id)
+        .order_by(PurchaseAuditLog.timestamp.desc())
+        .all()
+    ):
+        if pa.timestamp and abs((_to_naive(pa.timestamp) - _to_naive(ts)).total_seconds()) <= 90:
+            return pa.purchase_id
+    return None
+
+
+def get_inventory_audit_entries(filters, user, is_admin):
+    """
+    Devuelve la lista de eventos de inventario (ingresos y egresos) con los
+    traslados repartidos por sede:
+      - DESPACHO_EMISION    -> egreso en la sede origen (por ítem/lote)
+      - CANCELACION_PRE_SALIDA -> ingreso en la sede origen (mercancía devuelta)
+      - RECEPCION_*         -> ingreso en la sede destino (por ítem/lote)
+      - RESOLUCION_DISPUTA  -> acreditación/devolución (ingreso) y extravío (egreso)
+    """
+    allowed_locations = None
+    if not is_admin:
+        allowed_locations = AuditInventoryRepository.get_user_allowed_locations(user.id)
+        if not allowed_locations:
+            return []
+
+    location_id_filter = filters.get('location_id') or None
+    if location_id_filter:
+        try:
+            location_id_filter = int(location_id_filter)
+        except (TypeError, ValueError):
+            location_id_filter = None
+
+    if not is_admin and location_id_filter and location_id_filter not in allowed_locations:
+        location_id_filter = None
+
+    severity_filter = (filters.get('severity') or '').upper() or None
+
+    raw_logs = AuditInventoryRepository.get_audit_logs(
+        allowed_locations=allowed_locations,
+        location_id_filter=location_id_filter,
+        severity_filter=severity_filter,
+        start_date=filters.get('start_date') or None,
+        end_date=filters.get('end_date') or None,
+    )
+
+    # --- Detección de anulados/reactivados (mismo criterio que el JS previo) ---
+    annulled_target_ids = set()
+    for raw in sorted(raw_logs, key=lambda x: x.id):
+        c = _changed_dict(raw)
+        notes = c.get('notes', '')
+        if isinstance(notes, str):
+            m = re.search(r'log\s*#\s*(\d+)', notes, re.IGNORECASE)
+            if m:
+                target_id = int(m.group(1))
+                if 'REVERSION' in (raw.action or '').upper():
+                    annulled_target_ids.add(target_id)
+                elif 'ACTIVACION' in (raw.action or '').upper():
+                    annulled_target_ids.discard(target_id)
+
+    # --- Mapa de traslados para resoluciones (location_id NULL) ---
+    movement_ids = set()
+    for raw in raw_logs:
+        c = _changed_dict(raw)
+        mid = c.get('movement_id')
+        if mid is not None:
+            try:
+                movement_ids.add(int(mid))
+            except (TypeError, ValueError):
+                pass
+
+    movement_map = {}
+    if movement_ids:
+        for mov in Movement.query.filter(Movement.id.in_(movement_ids)).all():
+            movement_map[mov.id] = mov
+
+    location_cache = {}
+
+    def loc_name(loc_id):
+        if not loc_id:
+            return '—'
+        if loc_id not in location_cache:
+            loc = Location.query.get(loc_id)
+            location_cache[loc_id] = loc.name if loc else f"Sede #{loc_id}"
+        return location_cache[loc_id]
+
+    role_id = getattr(user, 'role_id', None)
+    read_only_role = role_id in (4, 6)
+    can_view_purchase = (
+        is_admin
+        or bool(getattr(user, 'is_management', False))
+        or bool(getattr(user, 'is_manager', False))
+        or bool(getattr(user, 'is_finance', False))
+    )
+    now = datetime.now(timezone.utc)
+
+    rows = []
+    for log in raw_logs:
+        c = _changed_dict(log)
+        act = (log.action or '').upper()
+        aff = (getattr(log, 'affected_table', '') or '').lower()
+        sev = (log.severity or 'NORMAL').upper()
+        sede = getattr(log, 'location_name', None) or c.get('location_name') or 'Almacén Principal'
+
+        is_movement = (
+            aff == 'movements'
+            and act in MOVEMENT_EVENT_ACTIONS
+            and c.get('movement_id') is not None
+        )
+
+        entry, ts_aware, sev_upper = _entry_seed(log, sede, None, c, is_admin, read_only_role, now)
+
+        if is_movement:
+            mid = int(c['movement_id'])
+            mov_obj = movement_map.get(mid)
+            origem = mov_obj.origin_location_id if mov_obj else c.get('origin_location_id')
+            dest = (mov_obj.destination_location_id if mov_obj else c.get('destination_location_id'))
+            if mov_obj and mov_obj.type == 'RETORNO_EMERGENCIA' and not origem:
+                origem = mov_obj.destination_location_id
+            origin_name = loc_name(origem)
+            destination_name = loc_name(dest)
+            mov_status = mov_obj.status if mov_obj else None
+
+            entry['movement_id'] = mid
+            entry['is_retorno'] = bool(mov_obj and mov_obj.type == 'RETORNO_EMERGENCIA')
+
+            if act == 'DESPACHO_EMISION':
+                _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+            elif act == 'CANCELACION_PRE_SALIDA':
+                _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+            elif act in ('RECEPCION_CONFORME', 'RECEPCION_NOVEDAD'):
+                _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+            elif act == 'RESOLUCION_DISPUTA':
+                _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+            continue
+
+        # --- Logs operativos de stock ---
+        if 'COMPRA' in act or 'INGRESO' in act:
+            entry['purchase_id'] = _resolve_purchase_id(log, c, log.timestamp)
+            entry['can_view_purchase'] = can_view_purchase
+
+        _push_inventory_rows(
+            rows, log, c, sev, ts_aware, sede, entry,
+            is_admin, read_only_role, now, annulled_target_ids
+        )
+
+    return rows
+
+
+def get_filters_date_range(user, is_admin, location_id_filter):
+    """Rango (min, max) de fechas con registros para acotar el calendario."""
+    if location_id_filter:
+        try:
+            location_id_filter = int(location_id_filter)
+        except (TypeError, ValueError):
+            location_id_filter = None
+
+    allowed_locations = None
+    if not is_admin:
+        allowed_locations = AuditInventoryRepository.get_user_allowed_locations(user.id)
+        if not allowed_locations:
+            return None, None
+
+    return AuditInventoryRepository.get_audit_logs_date_range(
+        allowed_locations=allowed_locations,
+        location_id_filter=location_id_filter,
+    )

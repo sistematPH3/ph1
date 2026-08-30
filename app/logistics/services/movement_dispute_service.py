@@ -9,7 +9,7 @@
 # El archivo de rutas (movement_dispute_routes.py) se limita a recibir HTTP,
 # delegar en estas funciones y devolver respuestas.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
@@ -139,14 +139,53 @@ def _get_reception_audit(movement):
 # VISTA: BANDEJA DE NOVEDADES / INCIDENCIAS
 # ---------------------------------------------------------------------------
 
-def get_disputes_context():
+def _reception_audit_index():
+    """Índice de la auditoría de recepción: log más reciente por movimiento.
+
+    Devuelve (log_by_movement, ts_by_movement). La fecha en que "llegó el
+    mensaje" a la bandeja es el timestamp de esa auditoría de recepción.
+    """
+    logs = AuditLog.query.filter(
+        AuditLog.affected_table == 'movements',
+        AuditLog.action.in_(RECEPTION_AUDIT_ACTIONS)
+    ).order_by(AuditLog.id.desc()).all()
+
+    log_by_movement = {}
+    ts_by_movement = {}
+    for log in logs:
+        data = _read_changed_data(log)
+        mid = data.get("movement_id")
+        if mid is None or mid in log_by_movement:
+            continue
+        log_by_movement[mid] = log
+        ts_by_movement[mid] = log.timestamp
+    return log_by_movement, ts_by_movement
+
+
+def get_disputes_context(start_date=None, end_date=None):
     """Arma el contexto de la bandeja de disputas + auditoría enriquecida.
 
-    Devuelve (disputes, locations) listos para renderizar.
+    El filtro de fechas (start_date/end_date) se aplica sobre la fecha en que
+    LLEGÓ EL MENSAJE a la bandeja (timestamp de la auditoría de recepción), no
+    sobre la fecha del traslado. Los mensajes se ordenan del más reciente al
+    más antiguo. Devuelve (disputes, locations) listos para renderizar.
     """
-    disputes = Movement.query.filter(
-        Movement.status.in_(DISPUTE_STATUSES)
-    ).order_by(Movement.date.desc()).all()
+    _, ts_by_movement = _reception_audit_index()
+    one_day = timedelta(days=1)
+    end_exclusive = (end_date + one_day) if end_date else None
+
+    disputes = []
+    for mov in Movement.query.filter(Movement.status.in_(DISPUTE_STATUSES)).all():
+        # Fecha en que llegó el mensaje a la bandeja (respaldo: fecha del traslado).
+        mov.notification_date = ts_by_movement.get(mov.id, mov.date)
+        if start_date and (mov.notification_date is None or mov.notification_date < start_date):
+            continue
+        if end_exclusive and (mov.notification_date is None or mov.notification_date >= end_exclusive):
+            continue
+        disputes.append(mov)
+
+    # Orden: los mensajes más recientes primero.
+    disputes.sort(key=lambda m: m.notification_date or datetime.min, reverse=True)
 
     locations = Location.query.all()
 
@@ -162,6 +201,33 @@ def get_disputes_context():
             detail.observed_physical_lot = detail_audit.get("observed_physical_lot")
 
     return disputes, locations
+
+
+def get_disputes_date_range():
+    """Devuelve el rango (min, max) de fechas en que LLEGARON los mensajes.
+
+    De aquí sale el límite del calendario del filtro de fechas: solo se pueden
+    elegir días donde existan notificaciones registradas.
+    """
+    _, ts_by_movement = _reception_audit_index()
+    movement_ids = [
+        row[0] for row in Movement.query.filter(
+            Movement.status.in_(DISPUTE_STATUSES)
+        ).with_entities(Movement.id).all()
+    ]
+    stamps = []
+    for mid in movement_ids:
+        ts = ts_by_movement.get(mid)
+        if ts is not None:
+            stamps.append(ts)
+            continue
+        # Respaldo: movimiento sin auditoría de recepción usa su propia fecha.
+        mov = Movement.query.get(mid)
+        if mov is not None and mov.date is not None:
+            stamps.append(mov.date)
+    if not stamps:
+        return None, None
+    return min(stamps), max(stamps)
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +299,8 @@ def resolve_dispute(movement_id, payload, user_id):
 
         credited_qty = Decimal('0.00')
         qty_to_return = Decimal('0.00')
+        # Mercancía dada de baja (extravío / merma): no se acredita a nadie.
+        lost_qty = Decimal('0.00')
 
         if action == 'CORREGIR_LOTE':
             # Decisión "dejar": el producto se queda, solo se corrige el lote.
@@ -252,12 +320,14 @@ def resolve_dispute(movement_id, payload, user_id):
             # faltante/extraviado se da de baja (no se repone a nadie).
             credited_qty = conforming_qty
             _credit_inventory(inv_dest, credited_qty)
+            lost_qty = qty_missing
 
         elif action == 'DERIVAR_MERMA_SANITARIA':
             # Merma sanitaria: se descarta TODO lo recibido; no se acredita al
             # destino ni se repone en origen.
             detail.received_quantity = Decimal('0.00')
             credited_qty = Decimal('0.00')
+            lost_qty = received_qty
 
         elif action in RETURN_ACTIONS:
             # Decisión 3: DEVOLVER.
@@ -308,9 +378,11 @@ def resolve_dispute(movement_id, payload, user_id):
         resolution_items.append({
             "detail_id": detail.id,
             "product_id": detail.product_id,
+            "lot_number": detail.lot_number,
             "action": action or "SIN_ACCION",
             "credited_qty": float(credited_qty),
-            "return_qty": float(qty_to_return)
+            "return_qty": float(qty_to_return),
+            "lost_qty": float(lost_qty)
         })
 
     # 2. Procesar resoluciones sobre productos erróneos / fuera de guía
@@ -383,6 +455,12 @@ def resolve_dispute(movement_id, payload, user_id):
     movement.resolution_notes = general_notes
     movement.resolved_by_id = user_id
 
+    resolution_summary = {
+        "credited_total": round(sum(i["credited_qty"] for i in resolution_items), 2),
+        "returned_total": round(sum(i["return_qty"] for i in resolution_items), 2),
+        "lost_total": round(sum(i["lost_qty"] for i in resolution_items), 2),
+    }
+
     db.session.add(AuditLog(
         affected_table='movements',
         action='RESOLUCION_DISPUTA',
@@ -393,6 +471,7 @@ def resolve_dispute(movement_id, payload, user_id):
             "event": "RESOLUCION_DISPUTA",
             "general_notes": general_notes,
             "items": resolution_items,
+            "resolution_summary": resolution_summary,
             "linked_return_movement_id": linked_return_movement_id,
             "user_id": user_id,
             "timestamp": datetime.utcnow().isoformat() + "Z"

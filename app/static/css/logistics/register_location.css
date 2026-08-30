@@ -24,8 +24,8 @@
 .form-card-premium {
     background-color: #ffffff !important;
     border-radius: 24px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
-    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    box-shadow: 0 10px 30px rgba(176, 18, 18, 0.15) !important;
+    border: 1.5px solid rgba(176, 18, 18, 0.35) !important;
     padding: 2.5rem !important;
     width: 100%;
     max-width: 520px;
@@ -64,7 +64,7 @@
 .form-group-premium select,
 .form-group-premium .form-control {
     padding: 0.85rem 1.25rem !important;
-    border: 2px solid var(--ph-border-soft) !important;
+    border: 2px solid rgba(176, 18, 18, 0.45) !important;
     border-radius: 50px !important;
     font-size: 0.95rem !important;
     color: var(--ph-text-soft) !important;
@@ -76,7 +76,7 @@
 /* Dirección (Textarea con bordes suavizados de 20px) */
 .form-group-premium textarea {
     padding: 0.85rem 1.25rem !important;
-    border: 2px solid var(--ph-border-soft) !important;
+    border: 2px solid rgba(176, 18, 18, 0.45) !important;
     border-radius: 20px !important;
     font-size: 0.95rem !important;
     color: var(--ph-text-soft) !important;

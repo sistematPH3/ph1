@@ -19,10 +19,18 @@ def view_movement_audit():
         allowed_locations = [loc.id for loc in current_user.locations]
         filters['allowed_locations'] = allowed_locations
         
-    audit_logs = MovementAuditService.get_structured_audits(filters)
+    audit_movements, audit_bajas = MovementAuditService.get_structured_audits(filters)
+    
+    # Rango de fechas donde existen registros, para limitar el calendario.
+    min_ts, max_ts = MovementAuditService.get_movement_audit_date_range(filters)
+    date_min = min_ts.strftime('%Y-%m-%d') if min_ts else None
+    date_max = max_ts.strftime('%Y-%m-%d') if max_ts else None
     
     return render_template(
         'logistics/movement_audit.html',
-        audit_logs=audit_logs,
-        filters=filters
+        movements=audit_movements,
+        bajas=audit_bajas,
+        filters=filters,
+        date_min=date_min,
+        date_max=date_max
     )

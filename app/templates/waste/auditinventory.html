@@ -1,101 +1,470 @@
 {% extends 'layout.html' %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}?v=8">
 {% endblock %}
 
 {% block content %}
-<div class="main-container py-3 py-md-4 px-2 px-md-4" id="auditMainContainer" data-role-id="{{ current_user.role_id }}">
-    <div class="main-card-wrapper p-3 p-md-4 shadow-sm bg-white rounded-3">
-        
-        <div class="d-flex align-items-center mb-3 mb-md-4">
-            <div class="icon-header-red me-3 flex-shrink-0">
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <div class="d-flex align-items-center mb-1">
+            <div class="ph-icon-box me-3 shadow-sm">
                 <i class="bi bi-clock-history"></i>
             </div>
             <div>
-                <h2 class="header-title m-0 fw-bold">Gestión y Auditoría de Inventario</h2>
-                <p class="text-muted m-0 small">Control inalterable y trazabilidad de movimientos e insumos dañados</p>
+                <h2 class="ph-title mb-1">Gestión y Auditoría de Inventario</h2>
+                <p class="text-muted mb-0">Ingresos y egresos de todas las sedes, con traslados repartidos por su efecto físico en cada sede.</p>
             </div>
         </div>
 
-        <div class="filters-bar-container p-2 mb-4 bg-light rounded-3">
-            <div class="row g-2 align-items-center">
-                <div class="col-12 col-md-3">
-                    <div class="input-group input-pill">
-                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                        <input type="text" id="filter_search" class="form-control border-start-0 ps-0" placeholder="Buscar por usuario, insumo o acción...">
-                    </div>
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="flex-grow-1 position-relative" style="max-width: 340px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="auditSearchInput" class="form-control rounded-pill bg-light border-0 ps-5 py-2"
+                           placeholder="Buscar por insumo, sede, responsable o acción...">
                 </div>
-
-                <div class="col-12 col-md-3">
-                    <div class="input-group input-pill">
-                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-geo-alt"></i></span>
-                        <select class="form-select border-start-0 ps-0" id="filter_location">
-                            {% if is_admin %}
-                                <option value="" selected>Todas las sedes</option>
-                            {% else %}
-                                <option value="" selected>Sedes permitidas</option>
-                            {% endif %}
-                            
-                            {% if locations %}
-                                {% for loc in locations %}
-                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                {% endfor %}
-                            {% endif %}
+                <div>
+                    <form method="GET" action="{{ url_for('auditinventory_bp.view_audit_page') }}" class="d-flex gap-2 align-items-center">
+                        {% if is_admin %}
+                        <select name="location_id" id="filter_location" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                            <option value="">Todas las sedes</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if filters.get('location_id')|string == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
+                            {% endfor %}
                         </select>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-3">
-                    <div class="input-group input-pill">
-                        <span class="input-group-text bg-transparent border-end-0 text-muted"><i class="bi bi-exclamation-triangle"></i></span>
-                        <select class="form-select border-start-0 ps-0" id="filter_severity">
+                        {% endif %}
+                        <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
                             <option value="">Todas las severidades</option>
-                            <option value="NORMAL">NORMAL</option>
-                            <option value="EDITADO">EDITADO</option>
-                            <option value="ANULADO">ANULADO</option>
-                            <option value="ALERTA">ALERTA</option>
-                            <option value="CRITICO">CRÍTICO</option>
-                            <option value="REABASTECIDO">REABASTECIDO</option>
+                            {% for sev_val, sev_txt in [('NORMAL','NORMAL'), ('EDITADO','EDITADO'), ('ANULADO','ANULADO'), ('ALERTA','ALERTA'), ('CRITICO','CRÍTICO'), ('REABASTECIDO','REABASTECIDO')] %}
+                            <option value="{{ sev_val }}" {% if filters.get('severity') == sev_val %}selected{% endif %}>{{ sev_txt }}</option>
+                            {% endfor %}
                         </select>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-2">
-                    <div class="input-group input-pill">
-                        <input type="date" id="filter_date" class="form-control text-muted">
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-1 text-end">
-                    <button id="btnReset" class="btn btn-outline-secondary rounded-circle btn-icon-reset w-100-mobile" title="Limpiar Filtros">
-                        <i class="bi bi-arrow-counterclockwise"></i>
-                    </button>
+                        <div class="d-flex align-items-center gap-1">
+                            <label for="start_date" class="small text-white fw-semibold text-nowrap mb-0">Desde</label>
+                            <input type="date" id="start_date" name="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                                   value="{{ filters.get('start_date', '') }}" min="{{ date_min }}" max="{{ date_max }}" onchange="this.form.submit()">
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <label for="end_date" class="small text-white fw-semibold text-nowrap mb-0">Hasta</label>
+                            <input type="date" id="end_date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                                   value="{{ filters.get('end_date', '') }}" min="{{ date_min }}" max="{{ date_max }}" onchange="this.form.submit()">
+                        </div>
+                        <input type="hidden" name="tab" value="{{ active_tab }}">
+                        {% if filters.get('location_id') or filters.get('severity') or filters.get('start_date') or filters.get('end_date') %}
+                        <a href="{{ url_for('auditinventory_bp.view_audit_page') }}" class="btn btn-sm btn-outline-light rounded-pill px-3">Limpiar</a>
+                        {% endif %}
+                    </form>
                 </div>
             </div>
         </div>
 
-        <div class="table-responsive table-wrapper d-none d-md-block">
-            <table class="table align-middle mb-0" id="auditTable">
-                <thead>
-                    <tr class="table-header-red">
-                        <th class="ps-3">RESPONSABLE</th>
-                        <th>ACCIÓN</th>
-                        <th>INSUMO Y SEDE</th>
-                        <th class="text-center">VARIACIÓN</th>
-                        <th>SEVERIDAD</th>
-                        <th>FECHA Y HORA</th>
-                        <th class="text-end pe-3">DETALLES</th>
-                    </tr>
-                </thead>
-                <tbody id="auditTableBody">
-                </tbody>
-            </table>
-        </div>
+        <ul class="nav nav-tabs ph-tabs" id="auditInventoryTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'ingresos' %}active{% endif %}" id="ingresos-tab" data-bs-toggle="tab" data-bs-target="#ingresos" type="button" role="tab">
+                    <i class="bi bi-box-arrow-in-down me-2 text-success"></i>Ingresos ({{ ingresos | length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'egresos' %}active{% endif %}" id="egresos-tab" data-bs-toggle="tab" data-bs-target="#egresos" type="button" role="tab">
+                    <i class="bi bi-box-arrow-up me-2 text-danger"></i>Egresos ({{ egresos | length }})
+                </button>
+            </li>
+        </ul>
 
-        <div class="mobile-audit-cards d-block d-md-none" id="auditMobileContainer">
-        </div>
+        <div class="tab-content" id="auditInventoryTabsContent">
 
+            <div class="tab-pane fade {% if active_tab == 'ingresos' %}show active{% endif %}" id="ingresos" role="tabpanel">
+
+                {% for e in ingresos %}
+                {% set det_id = 'det-ing-' ~ e.id ~ '-' ~ loop.index0 %}
+                <div class="ph-audit-card is-ingreso bg-white shadow-sm rounded-4 p-4 mb-4"
+                     data-search="Ingreso {{ e.product }} {{ e.sede }} {{ e.user_name }} {{ e.action }} {{ e.movement_id or '' }}">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="ph-audit-num ingreso me-3">{{ e.id }}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="badge-action-pill action-blue">{{ e.action | replace('_', ' ') | title }}</span>
+                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    {% if e.movement_id %}
+                                    <span class="ph-badge-location">{{ 'Devolución' if e.is_retorno else 'Traslado' }} #{{ e.movement_id }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if e.event_type in ('despacho', 'recepcion', 'cancelacion', 'resolucion') %}
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="ph-badge-location">De: {{ e.origin }}</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="ph-badge-location">A: {{ e.destination }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="ph-qty-badge ph-qty-ingreso">+{{ '%.2f' | format(e.qty) }}</span>
+                            <span>
+                                <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
+                            </span>
+                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
+                        </div>
+                    </div>
+
+                    {% if e.event_type == 'recepcion' and e.has_novedad %}
+                    <div class="alert {{ 'alert-danger' if e.missing_qty > 0 else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
+                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
+                        <div>
+                            <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
+                            <span class="text-dark">Faltante: {{ '%.2f' | format(e.missing_qty) }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <button class="btn btn-ph-info btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ det_id }}" aria-expanded="false">
+                        <i class="bi bi-eye me-1"></i>Ver Detalle
+                    </button>
+                    {% if e.purchase_id and e.can_view_purchase %}
+                    <a class="btn btn-ph-action btn-sm rounded-pill px-3" href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=e.purchase_id) }}">
+                        <i class="bi bi-receipt me-1"></i>Ver Compra #{{ e.purchase_id }}
+                    </a>
+                    {% endif %}
+
+                    <div class="collapse mt-3" id="{{ det_id }}">
+                        <div class="ph-tl-detail p-3 bg-light">
+
+                            {% if e.event_type == 'despacho' %}
+                                <div class="small text-muted mb-2"><i class="bi bi-truck me-1"></i>Salida física en origen, mercancía congelada en tránsito.</div>
+                                <div class="d-flex gap-3 mb-2 small text-muted flex-wrap">
+                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ '%.2f' | format(e.dispatched_qty) }}</span>
+                                </div>
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-despacho">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>SKU</th><th>Producto</th><th>Lote</th><th>Vencimiento</th><th class="text-center">Cant. Despachada</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            <tr>
+                                                <td class="text-muted">{{ e.sku }}</td>
+                                                <td class="fw-bold">{{ e.product | title }}</td>
+                                                <td>{{ e.lot }}</td>
+                                                <td>{{ e.expiration }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% elif e.event_type == 'cancelacion' %}
+                                <div class="alert alert-danger border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-x-octagon-fill me-3 fs-4 text-danger"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Motivo de la baja / cancelación:</strong>
+                                        <span class="text-dark">{{ e.reason or '—' }}</span>
+                                    </div>
+                                </div>
+                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ '%.2f' | format(e.qty) }}</span>
+
+                            {% elif e.event_type == 'recepcion' %}
+                                {% if e.notes %}
+                                <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Nota de recepción:</strong>
+                                        <span class="text-dark">{{ e.notes }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-recepcion">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>Producto</th><th>Lote</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th>Novedad</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            <tr>
+                                                <td class="fw-bold">{{ e.product | title }}</td>
+                                                <td>{{ e.lot }}</td>
+                                                <td class="text-center">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                                <td class="text-center text-success fw-bold">{{ '%.2f' | format(e.received_qty) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.missing_qty) if e.missing_qty > 0 else '-' }}</td>
+                                                <td>{{ e.novelty | replace('_', ' ') | title }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% elif e.event_type == 'resolucion' %}
+                                {% if e.resolution_notes %}
+                                <div class="alert alert-success border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-success"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Nota de la resolución:</strong>
+                                        <span class="text-dark">{{ e.resolution_notes }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-resolucion">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for item in e.resolution_items %}
+                                            <tr>
+                                                <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
+                                                <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
+                                                <td class="text-center text-success">{{ '%.2f' | format(item.get('credited_qty', 0)) }}</td>
+                                                <td class="text-center ph-text-warning">{{ '%.2f' | format(item.get('return_qty', 0)) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% else %}
+                                <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <div class="col-4">Stock Anterior</div>
+                                    <div class="col-4">Nuevo Stock</div>
+                                    <div class="col-4">ID Log</div>
+                                </div>
+                                <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
+                                    <div class="col-4">{{ '%.2f' | format(e.prev_qty) }}</div>
+                                    <div class="col-4">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-4 text-muted">#{{ e.id }}</div>
+                                </div>
+                                <div class="pt-2 border-top">
+                                    <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                        <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
+                                    </div>
+                                    <div class="text-secondary small mb-0">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
+
+                                    {% if e.timed_out_note %}
+                                    <div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>{{ e.timed_out_note }}</div>
+                                    {% elif e.can_manage %}
+                                    <div class="mt-3 border-top pt-2 d-flex flex-wrap gap-2">
+                                        {% if e.manage_mode == 'ACTIVAR' %}
+                                        <button class="btn btn-sm btn-outline-success btn-action-log" data-action="ACTIVAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-check-circle me-1"></i>Activar
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-outline-primary btn-action-log" data-action="EDITAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-pencil-square me-1"></i>Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-x-circle me-1"></i>Anular
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-box-arrow-in-down fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay ingresos registrados</h5>
+                    <p class="mb-0">No se encontraron ingresos que coincidan con los filtros actuales.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="tab-pane fade {% if active_tab == 'egresos' %}show active{% endif %}" id="egresos" role="tabpanel">
+
+                {% for e in egresos %}
+                {% set det_id = 'det-egr-' ~ e.id ~ '-' ~ loop.index0 %}
+                <div class="ph-audit-card is-egreso bg-white shadow-sm rounded-4 p-4 mb-4"
+                     data-search="Egreso {{ e.product }} {{ e.sede }} {{ e.user_name }} {{ e.action }} {{ e.movement_id or '' }}">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="ph-audit-num egreso me-3">{{ e.id }}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="badge-action-pill action-red-light">{{ e.action | replace('_', ' ') | title }}</span>
+                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    {% if e.movement_id %}
+                                    <span class="ph-badge-location">{{ 'Devolución' if e.is_retorno else 'Traslado' }} #{{ e.movement_id }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if e.event_type in ('despacho', 'recepcion', 'cancelacion', 'resolucion') %}
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="ph-badge-location">De: {{ e.origin }}</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="ph-badge-location">A: {{ e.destination }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="ph-qty-badge ph-qty-egreso">{{ '%.2f' | format(e.qty) }}</span>
+                            <span>
+                                <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
+                            </span>
+                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
+                        </div>
+                    </div>
+
+                    {% if e.event_type == 'recepcion' and e.has_novedad %}
+                    <div class="alert {{ 'alert-danger' if e.missing_qty > 0 else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
+                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
+                        <div>
+                            <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
+                            <span class="text-dark">Faltante: {{ '%.2f' | format(e.missing_qty) }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <button class="btn btn-ph-info btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ det_id }}" aria-expanded="false">
+                        <i class="bi bi-eye me-1"></i>Ver Detalle
+                    </button>
+
+                    <div class="collapse mt-3" id="{{ det_id }}">
+                        <div class="ph-tl-detail p-3 bg-light">
+
+                            {% if e.event_type == 'despacho' %}
+                                <div class="small text-muted mb-2"><i class="bi bi-truck me-1"></i>Salida física en origen, mercancía congelada en tránsito.</div>
+                                <div class="d-flex gap-3 mb-2 small text-muted flex-wrap">
+                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ '%.2f' | format(e.dispatched_qty) }}</span>
+                                </div>
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-despacho">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>SKU</th><th>Producto</th><th>Lote</th><th>Vencimiento</th><th class="text-center">Cant. Despachada</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            <tr>
+                                                <td class="text-muted">{{ e.sku }}</td>
+                                                <td class="fw-bold">{{ e.product | title }}</td>
+                                                <td>{{ e.lot }}</td>
+                                                <td>{{ e.expiration }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% elif e.event_type == 'cancelacion' %}
+                                <div class="alert alert-danger border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-x-octagon-fill me-3 fs-4 text-danger"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Motivo de la baja / cancelación:</strong>
+                                        <span class="text-dark">{{ e.reason or '—' }}</span>
+                                    </div>
+                                </div>
+                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ '%.2f' | format(e.qty) }}</span>
+
+                            {% elif e.event_type == 'recepcion' %}
+                                {% if e.notes %}
+                                <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Nota de recepción:</strong>
+                                        <span class="text-dark">{{ e.notes }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-recepcion">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>Producto</th><th>Lote</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th>Novedad</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            <tr>
+                                                <td class="fw-bold">{{ e.product | title }}</td>
+                                                <td>{{ e.lot }}</td>
+                                                <td class="text-center">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                                <td class="text-center text-success fw-bold">{{ '%.2f' | format(e.received_qty) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.missing_qty) if e.missing_qty > 0 else '-' }}</td>
+                                                <td>{{ e.novelty | replace('_', ' ') | title }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% elif e.event_type == 'resolucion' %}
+                                {% if e.resolution_notes %}
+                                <div class="alert alert-success border-0 mb-3 py-2 d-flex align-items-center">
+                                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-success"></i>
+                                    <div>
+                                        <strong class="d-block text-dark">Nota de la resolución:</strong>
+                                        <span class="text-dark">{{ e.resolution_notes }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="table-responsive rounded border">
+                                    <table class="table table-sm align-middle mb-0 bg-white ph-tbl-resolucion">
+                                        <thead class="table-light text-muted small">
+                                            <tr><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for item in e.resolution_items %}
+                                            <tr>
+                                                <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
+                                                <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
+                                                <td class="text-center text-success">{{ '%.2f' | format(item.get('credited_qty', 0)) }}</td>
+                                                <td class="text-center ph-text-warning">{{ '%.2f' | format(item.get('return_qty', 0)) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            {% else %}
+                                <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <div class="col-4">Stock Anterior</div>
+                                    <div class="col-4">Nuevo Stock</div>
+                                    <div class="col-4">ID Log</div>
+                                </div>
+                                <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
+                                    <div class="col-4">{{ '%.2f' | format(e.prev_qty) }}</div>
+                                    <div class="col-4">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-4 text-muted">#{{ e.id }}</div>
+                                </div>
+                                <div class="pt-2 border-top">
+                                    <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                        <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
+                                    </div>
+                                    <div class="text-secondary small mb-0">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
+
+                                    {% if e.timed_out_note %}
+                                    <div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>{{ e.timed_out_note }}</div>
+                                    {% elif e.can_manage %}
+                                    <div class="mt-3 border-top pt-2 d-flex flex-wrap gap-2">
+                                        {% if e.manage_mode == 'ACTIVAR' %}
+                                        <button class="btn btn-sm btn-outline-success btn-action-log" data-action="ACTIVAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-check-circle me-1"></i>Activar
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-outline-primary btn-action-log" data-action="EDITAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-pencil-square me-1"></i>Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="{{ e.id }}">
+                                            <i class="bi bi-x-circle me-1"></i>Anular
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-box-arrow-up fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay egresos registrados</h5>
+                    <p class="mb-0">No se encontraron egresos que coincidan con los filtros actuales.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -110,7 +479,7 @@
                 <form id="actionAuditForm">
                     <input type="hidden" id="actionLogId">
                     <input type="hidden" id="actionType">
-                    
+
                     <div class="alert alert-warning small d-flex align-items-center mb-3">
                         <i class="bi bi-info-circle-fill me-2 fs-5 flex-shrink-0"></i>
                         <div>Esta acción generará un nuevo movimiento compensatorio en la auditoría. El registro original permanecerá inalterable.</div>
@@ -137,5 +506,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}"></script>
+<script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}?v=1"></script>
 {% endblock %}
