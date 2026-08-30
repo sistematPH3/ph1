@@ -109,6 +109,247 @@
 }
 
 /* =========================================================
+   PESTAÑAS "NO LEÍDOS" / "LEÍDOS" (estilo Listado Operativo)
+   ========================================================= */
+.ph-tabs {
+    border-bottom: 1px solid #e0e0e0;
+    margin-top: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+
+.ph-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 500;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+}
+
+.ph-tabs .nav-link.active {
+    color: var(--ph-orange);
+    border-bottom: 3px solid var(--ph-orange);
+    font-weight: 600;
+}
+
+/* =========================================================
+   SECCIONES "NO LEÍDOS" / "LEÍDOS" DE LA BANDEJA
+   ========================================================= */
+.inbox-section {
+    padding-top: 0.75rem;
+}
+
+.inbox-section + .inbox-section {
+    border-top: 2px solid #eef2f7;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+}
+
+.inbox-section-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* "No leídos": acento naranja fuerte */
+.inbox-section-unread .inbox-section-title {
+    color: var(--ph-orange) !important;
+}
+
+/* "Leídos": gris, tono pasivo */
+.inbox-section-read .inbox-section-title {
+    color: #64748b !important;
+}
+
+/* =========================================================
+   TABLET (768px - 991.98px): LISTADO EN TARJETAS
+   -----------------------------------------------------------------
+   En tablet la tabla de 4 columnas necesitaba ~957px y, o desbordaba,
+   o se compactaba de forma amontonada. La vista más limpia y cómoda en
+   pantallas medianas es el mismo listado en TARJETAS verticales que ya
+   se usa en el teléfono (cada mensaje = una tarjeta, nada apretado).
+   Las tablas internas de los detalles se mantienen como tabla y se
+   desplazan DENTRO del contenedor si no caben.
+   ========================================================= */
+@media (min-width: 768px) and (max-width: 991.98px) {
+
+    /* Red de seguridad: tablas internas del detalle y contenedores
+       se desplazan dentro de la página, nunca se salen de la pantalla. */
+    .table-responsive-md,
+    .table-responsive-sm {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Sin cabecera de tabla: el listado pasa a tarjetas */
+    .ph-table thead {
+        display: none;
+    }
+
+    .ph-table,
+    .ph-table tbody,
+    .ph-table tr,
+    .ph-table td {
+        display: block;
+        width: 100%;
+    }
+
+    /* Cada mensaje es una tarjeta con un poco más de aire que en móvil */
+    .dispute-row {
+        margin-bottom: 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Borde superior para filas no leídas */
+    .dispute-row.row-unread > td:first-child {
+        border-left: none !important;
+        border-top: 5px solid var(--ph-orange) !important;
+    }
+
+    /* Etiqueta ARRIBA, contenido ABAJO */
+    .dispute-row > td {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+        padding: 0.85rem 1.1rem !important;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .dispute-row > td:last-child {
+        border-bottom: none;
+    }
+
+    .dispute-row > td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.72rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.4rem;
+    }
+
+    /* Ocultar etiqueta en la celda del botón y botón a todo lo ancho.
+       Especificidad alta para neutralizar los estilos heredados del
+       arbitraje (movement_dispute.css: max-width/center/Acciones). */
+    .ph-table tbody tr.dispute-row td:last-child::before {
+        display: none !important;
+        content: none !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child {
+        align-items: stretch !important;
+        padding-top: 0.6rem !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child .btn {
+        flex: none !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        width: 100% !important;
+    }
+
+    /* Píldoras de sede adaptables que NO se cortan */
+    .location-pill {
+        width: 100%;
+        white-space: normal !important;
+        word-break: break-word;
+        padding: 0.45rem 0.65rem;
+    }
+
+    /* Detalle desplegable cómodo */
+    .ph-detail-box {
+        margin: 0.5rem 0 !important;
+        border-left-width: 4px;
+    }
+
+    .ph-detail-box .p-4 {
+        padding: 0.85rem !important;
+    }
+
+    .ph-alert-orange {
+        padding: 0.75rem !important;
+    }
+
+    .ph-notes-text {
+        font-size: 0.88rem !important;
+        word-break: break-word;
+    }
+
+    /* Pestañas y título algo más compactos */
+    .ph-tabs .nav-link {
+        padding: 0.6rem 1rem;
+    }
+
+    .ph-title {
+        font-size: 1.4rem;
+    }
+
+    /* ---------- Detalle: tablas internas en mini-tarjetas ----------
+       Las tablas de "Productos involucrados" y "Decisión administrativa"
+       tienen 6 columnas y en tablet quedan comprimidas. Se apilan igual
+       que el listado: cada fila = tarjeta, etiqueta ARRIBA, valor ABAJO. */
+    .ph-detail-box {
+        background-color: #fdfdfe;
+        border: 1px solid #e9ecef;
+    }
+
+    .ph-detail-box .table-responsive-sm {
+        overflow: visible !important;
+    }
+
+    .ph-detail-box .table-responsive-sm thead {
+        display: none;
+    }
+
+    .ph-detail-box .table-responsive-sm tbody,
+    .ph-detail-box .table-responsive-sm tr,
+    .ph-detail-box .table-responsive-sm td {
+        display: block;
+        width: 100%;
+    }
+
+    .ph-detail-box .table-responsive-sm tbody tr {
+        margin-bottom: 0.8rem;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: #ffffff;
+    }
+
+    .ph-detail-box .table-responsive-sm tbody td {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left !important;
+        padding: 0.45rem 0.9rem !important;
+        border-bottom: 1px solid #f6f8fa;
+    }
+
+    .ph-detail-box .table-responsive-sm tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .ph-detail-box .table-responsive-sm tbody td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.66rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* =========================================================
    ADAPTACIÓN RESPONSIVA PARA TELÉFONOS (< 768px)
    ========================================================= */
 @media (max-width: 767.98px) {
@@ -176,14 +417,24 @@
         margin-bottom: 0.35rem;
     }
 
-    /* Ocultar etiqueta en la celda del botón para evitar redundancia */
-    .dispute-row > td[data-label="Acción"]::before {
-        display: none;
+    /* Ocultar etiqueta en la celda del botón y botón a todo lo ancho.
+       Especificidad alta para neutralizar los estilos heredados del
+       arbitraje (movement_dispute.css: max-width/center/Acciones). */
+    .ph-table tbody tr.dispute-row td:last-child::before {
+        display: none !important;
+        content: none !important;
     }
 
-    .dispute-row > td[data-label="Acción"] {
-        align-items: stretch;
+    .ph-table tbody tr.dispute-row td:last-child {
+        align-items: stretch !important;
         padding-top: 0.5rem !important;
+    }
+
+    .ph-table tbody tr.dispute-row td:last-child .btn {
+        flex: none !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        width: 100% !important;
     }
 
     /* Badges adaptables que NO se cortan */
@@ -211,5 +462,21 @@
     .ph-notes-text {
         font-size: 0.88rem !important;
         word-break: break-word;
+    }
+}
+
+/* =========================================================
+   ESCRITORIO ESTRECHO (992px - 1199.98px)
+   -----------------------------------------------------------------
+   La tabla en modo escritorio necesita ~957px; en pantallas de 1000-
+   1200px queda justa y la última columna (Acción) podría cortarse.
+   En esa franja el contenedor se desplaza horizontalmente dentro de
+   la tarjeta (sin tocar el layout de escritorio normal ≥1200px).
+   ========================================================= */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    #unread-pane .table-responsive-md,
+    #read-pane .table-responsive-md {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
 }

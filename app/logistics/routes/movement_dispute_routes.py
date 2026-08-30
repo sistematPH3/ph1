@@ -10,6 +10,7 @@ from app.decorators.roles import require_roles
 from app.logistics.services.movement_dispute_service import (
     get_disputes_context,
     get_disputes_date_range,
+    get_dispute_notifications_summary,
     resolve_dispute as service_resolve_dispute,
     cancel_linked_replenishment as service_cancel_replenishment,
 )
@@ -60,6 +61,27 @@ def list_disputes():
     except Exception as e:
         flash(f"Error al cargar la bandeja de novedades: {str(e)}", "dispute-error")
         return redirect(url_for('movement_dispute.list_disputes'))
+
+
+@movement_dispute_bp.route("/summary", methods=["GET"], endpoint="disputes_summary")
+@login_required
+@require_roles('admin', 'manager', 'assistant_manager')
+def disputes_summary():
+    """JSON con el resumen en vivo de novedades pendientes de arbitraje.
+
+    Lo consumen el badge del sidebar (círculo rojo) y los avisos emergentes
+    del dashboard mediante polling ligero. No expone datos sensibles: solo el
+    id, tipo, sedes y fecha de llegada de cada novedad pendiente.
+    """
+    try:
+        return jsonify(get_dispute_notifications_summary())
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "pending_count": 0,
+            "items": [],
+            "last_seen_date": None,
+        }), 500
 
 
 @movement_dispute_bp.route("/<int:movement_id>/resolve", methods=["POST"])

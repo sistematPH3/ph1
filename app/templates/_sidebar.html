@@ -102,7 +102,20 @@
                 <a class="nav-link sub-link" href="/logistics/movements">Listado Operativo de Traslados</a>
                 
                 {% if current_user.is_admin %}
-                <a class="nav-link sub-link" href="/logistics/movements/admin/disputes">Arbitraje de Disputas</a>
+                <a class="nav-link sub-link dispute-sub-link" href="/logistics/movements/admin/disputes">
+                    <span>Arbitraje de Disputas</span>
+                    {% if can_view_disputes %}
+                    <span class="dispute-badge" id="disputeBadge"
+                          data-count="{{ pending_disputes_count or 0 }}"
+                          {% if not pending_disputes_count %}hidden{% endif %}>
+                        {{ pending_disputes_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
+                {% if can_view_responses %}
+                <a class="nav-link sub-link" href="{{ url_for('response_inbox.admin_responses') }}">Respuestas de Administración</a>
                 {% endif %}
                 
                 <a class="nav-link sub-link" href="#">Gestión de Mermas</a>

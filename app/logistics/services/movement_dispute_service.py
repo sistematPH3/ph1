@@ -14,7 +14,7 @@ from decimal import Decimal
 import json
 
 from app.extensions import db
-from app.models import AuditLog, Inventory, Location, Movement, MovementDetail
+from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Notification, Role, User
 
 # ---------------------------------------------------------------------------
 # CATÁLOGO DE DECISIONES CONTABLES
@@ -59,6 +59,25 @@ DISPUTE_STATUSES = (
     'LOTE_NO_COINCIDE', 'RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA',
     'NOVEDAD_FALTANTE', 'INCIDENCIA_MIXTA'
 )
+
+# Etiquetas legibles de cada tipo de novedad (para el badge y los avisos).
+NOVEDAD_STATUS_LABELS = {
+    'FALTANTE_CONTEO': 'Faltante de Conteo',
+    'SOBRANTE_EXCEDENTE': 'Sobrante / Excedente',
+    'PRODUCTO_ERRONEO': 'Producto Erróneo',
+    'VIOLACION_CUSTODIA': 'Violación de Custodia',
+    'INCIDENCIA_TEMPERATURA': 'Incidencia Temperatura',
+    'VENCIMIENTO_PROXIMO': 'Vencimiento Próximo',
+    'LOTE_NO_COINCIDE': 'Lote no Coincide',
+    'RECHAZO_POR_ESPACIO': 'Rechazo por Espacio',
+    'RETORNO_EMERGENCIA': 'Retorno de Emergencia',
+    'NOVEDAD_FALTANTE': 'Novedad Faltante',
+    'INCIDENCIA_MIXTA': 'Incidencia Mixta',
+}
+
+# Tipo de notificación interna que avisa a los receptores de traslados que
+# el Administrador ya emitió el dictamen de la novedad (bandeja de respuestas).
+RESPONSE_NOTIFICATION_TYPE = 'RESPUESTA_TRASLADO'
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +247,60 @@ def get_disputes_date_range():
     if not stamps:
         return None, None
     return min(stamps), max(stamps)
+
+
+# ---------------------------------------------------------------------------
+# NOTIFICACIONES EN VIVO: BADGE DEL SIDEBAR Y AVISOS DEL DASHBOARD
+# ---------------------------------------------------------------------------
+# Estas funciones alimentan:
+#   - El círculo rojo del sidebar junto a "Arbitraje de Disputas" (nº de
+#     novedades pendientes).
+#   - Los avisos emergentes que la interfaz muestra unos segundos cuando llega
+#     una novedad nueva a la bandeja.
+
+def get_pending_disputes_count():
+    """Cantidad de novedades/incidencias pendientes de arbitraje."""
+    return Movement.query.filter(Movement.status.in_(DISPUTE_STATUSES)).count()
+
+
+def get_dispute_notifications_summary(limit=5):
+    """Resumen en vivo de las novedades pendientes de arbitraje.
+
+    Devuelve un dict apto para serializar a JSON:
+      {
+        "pending_count": int,          # total de novedades sin resolver
+        "items": [ {...}, ... ],       # las `limit` más recientes primero
+        "last_seen_date": "ISO|None"   # fecha de la más reciente
+      }
+
+    Cada item trae: id, status, status_label, origin, destination y
+    notification_date (la fecha en que "llegó el mensaje" a la bandeja).
+    """
+    _, ts_by_movement = _reception_audit_index()
+
+    movements = Movement.query.filter(Movement.status.in_(DISPUTE_STATUSES)).all()
+    items = []
+    for mov in movements:
+        notification_date = ts_by_movement.get(mov.id, mov.date)
+        items.append({
+            "id": mov.id,
+            "status": mov.status,
+            "status_label": NOVEDAD_STATUS_LABELS.get(
+                mov.status, mov.status.replace('_', ' ').title()
+            ),
+            "origin": mov.origin_location.name if mov.origin_location else f"Sede #{mov.origin_location_id}",
+            "destination": mov.destination_location.name if mov.destination_location else f"Sede #{mov.destination_location_id}",
+            "notification_date": notification_date.isoformat() if notification_date else None,
+        })
+
+    # Las novedades más recientes primero.
+    items.sort(key=lambda i: i["notification_date"] or "", reverse=True)
+
+    return {
+        "pending_count": len(items),
+        "items": items[:limit],
+        "last_seen_date": items[0]["notification_date"] if items else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +551,8 @@ def resolve_dispute(movement_id, payload, user_id):
         }
     ))
 
+    _notify_response_resolved(movement, resolver_user_id=user_id)
+
     try:
         db.session.commit()
     except Exception:
@@ -488,6 +563,56 @@ def resolve_dispute(movement_id, payload, user_id):
 # ---------------------------------------------------------------------------
 # CANCELACIÓN DE REPOSICIÓN COMPLEMENTARIA
 # ---------------------------------------------------------------------------
+
+def _notify_response_resolved(movement, resolver_user_id):
+    """Crea una Notification (type RESPUESTA_TRASLADO) por cada usuario que
+    verá la respuesta del Administrador en la bandeja.
+
+    Destinatarios: los usuarios asignados a las sedes del traslado (origen o
+    destino) y todos los admin/finanzas (que ven la bandeja global). Se
+    incluye también al usuario que emitió el dictamen: los admins reciben
+    TODAS las respuestas, aunque las hayan resuelto ellos mismos. El estado
+    "leído" (is_read) queda en el servidor, por lo que NO depende del
+    navegador.
+    """
+    location_ids = {movement.origin_location_id, movement.destination_location_id}
+    location_ids.discard(None)
+
+    recipients = {}
+    if location_ids:
+        for user in User.query.filter(
+            User.locations.any(Location.id.in_(location_ids))
+        ).all():
+            recipients[user.id] = user
+    for user in User.query.filter(
+        User.role.has(Role.name.in_(['Administrator', 'Finance']))
+    ).all():
+        recipients[user.id] = user
+
+    for uid, user in recipients.items():
+        # Sede que corresponde a este usuario (prioriza el destino).
+        user_loc_ids = {loc.id for loc in user.locations}
+        loc_id = None
+        if movement.destination_location_id in user_loc_ids:
+            loc_id = movement.destination_location_id
+        elif movement.origin_location_id in user_loc_ids:
+            loc_id = movement.origin_location_id
+
+        if Notification.query.filter_by(
+            user_id=uid, movement_id=movement.id,
+            type=RESPONSE_NOTIFICATION_TYPE
+        ).first() is not None:
+            continue  # idempotente: no duplicar si ya se notificó esta respuesta.
+
+        db.session.add(Notification(
+            user_id=uid,
+            location_id=loc_id,
+            type=RESPONSE_NOTIFICATION_TYPE,
+            message=f"Respuesta del Administrador · Traslado #{movement.id}",
+            is_read=False,
+            movement_id=movement.id,
+        ))
+
 
 def cancel_linked_replenishment(movement_id):
     """Cancela el traslado de reposición de una disputa y devuelve el stock.

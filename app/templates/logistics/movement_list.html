@@ -2,7 +2,18 @@
 
 {% block content %}
 {% set can_view_en_camino = current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+{% macro fmt_qty(n) -%}
+{{ n | ph_qty }}
+{%- endmacro %}
+{% macro content_badges(mov) -%}
+{% set lotes = mov.details | map(attribute='lot_number') | select | unique | list | length %}
+<div class="d-flex flex-wrap align-items-center gap-1">
+    <span class="ph-badge-qty"><i class="bi bi-box-seam me-1"></i>{{ mov.details | length }} prod.</span>
+    <span class="ph-badge-qty"><i class="bi bi-tags me-1"></i>{{ lotes }} lote{{ 's' if lotes != 1 }}</span>
+    <span class="ph-badge-qty"><i class="bi bi-archive me-1"></i>{{ fmt_qty(mov.details | sum(attribute='quantity')) }} unds.</span>
+</div>
+{%- endmacro %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=14">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=8">
 
 <div class="container-fluid mt-4 mb-5 px-4">
@@ -77,7 +88,7 @@
                             <tr>
                                 <th>ID DE TRASLADO</th>
                                 <th>FECHA Y HORA</th>
-                                <th>SEDE DESTINO</th>
+                                <th>ORIGEN Y DESTINO</th>
                                 <th>ESTADO</th>
                                 <th class="text-end">ACCIONES</th>
                             </tr>
@@ -85,7 +96,7 @@
                         <tbody>
                             {% for mov in en_camino %}
                             <tr>
-                                <td class="fw-bold">
+                                <td class="fw-bold" data-label="Traslado">
                                     <div class="d-flex align-items-center">
                                         <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold;">
                                             #{{ mov.id }}
@@ -93,14 +104,23 @@
                                         <span class="text-dark">Despacho Saliente</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Fecha y Hora">
                                     <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
                                     <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
                                 </td>
-                                <td>
-                                    <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                <td data-label="Origen y Destino">
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
+                                            <span class="ph-badge-location">{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
+                                            <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td>
+                                <td data-label="Estado">
                                     <span class="ph-badge-success" style="background-color: #fff3cd; color: #856404;">En Tránsito</span>
                                 </td>
                                 <td class="text-end">
@@ -117,17 +137,34 @@
                             <tr class="collapse" id="detalle-{{ mov.id }}">
                                 <td colspan="5">
                                     <div class="ph-detail-box">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h6>
-                                        <ul class="list-group list-group-flush small bg-transparent w-75">
-                                            {% for item in mov.details %}
-                                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0 border-light">
-                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong></span>
-                                                <span class="text-muted">Cant: {{ item.quantity }} | Vence: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
-                                            </li>
-                                            {% else %}
-                                            <li class="list-group-item bg-transparent text-muted px-0 border-0">No hay productos en este traslado.</li>
-                                            {% endfor %}
-                                        </ul>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
+                                            <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
+                                            {{ content_badges(mov) }}
+                                        </div>
+                                        <div class="table-responsive ph-detail-scroll mt-3">
+                                            <table class="table ph-detail-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Producto</th>
+                                                        <th>Lote</th>
+                                                        <th class="text-center">Cantidad</th>
+                                                        <th>Vencimiento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in mov.details %}
+                                                    <tr>
+                                                        <td data-label="Producto"><span class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span></td>
+                                                        <td data-label="Lote"><span class="ph-detail-lot">{{ item.lot_number or 'N/A' }}</span></td>
+                                                        <td data-label="Cantidad" class="text-center"><span class="ph-detail-qty">{{ fmt_qty(item.quantity) }}</span></td>
+                                                        <td data-label="Vencimiento"><span class="ph-detail-exp">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span></td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr><td colspan="4" class="text-center text-muted ph-detail-empty py-3">No hay productos en este traslado.</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -150,14 +187,14 @@
                             <tr>
                                 <th>ID DE TRASLADO</th>
                                 <th>FECHA Y HORA</th>
-                                <th>SEDE DESTINO</th>
+                                <th>ORIGEN Y DESTINO</th>
                                 <th class="text-end">ACCIONES</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for mov in por_recibir %}
                             <tr>
-                                <td class="fw-bold">
+                                <td class="fw-bold" data-label="Traslado">
                                     <div class="d-flex align-items-center">
                                         <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold;">
                                             #{{ mov.id }}
@@ -165,12 +202,21 @@
                                         <span class="text-dark">Despacho Entrante</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Fecha y Hora">
                                     <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
                                     <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
                                 </td>
-                                <td>
-                                    <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                <td data-label="Origen y Destino">
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
+                                            <span class="ph-badge-location">{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
+                                            <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="text-end">
                                     <button class="btn btn-ph-info me-2" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ mov.id }}">
@@ -186,17 +232,34 @@
                             <tr class="collapse" id="detalle-{{ mov.id }}">
                                 <td colspan="4">
                                     <div class="ph-detail-box">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h6>
-                                        <ul class="list-group list-group-flush small bg-transparent w-75">
-                                            {% for item in mov.details %}
-                                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0 border-light">
-                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong></span>
-                                                <span class="text-muted">Cant: {{ item.quantity }} | Vence: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
-                                            </li>
-                                            {% else %}
-                                            <li class="list-group-item bg-transparent text-muted px-0 border-0">No hay productos en este traslado.</li>
-                                            {% endfor %}
-                                        </ul>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
+                                            <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
+                                            {{ content_badges(mov) }}
+                                        </div>
+                                        <div class="table-responsive ph-detail-scroll mt-3">
+                                            <table class="table ph-detail-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Producto</th>
+                                                        <th>Lote</th>
+                                                        <th class="text-center">Cantidad</th>
+                                                        <th>Vencimiento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in mov.details %}
+                                                    <tr>
+                                                        <td data-label="Producto"><span class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span></td>
+                                                        <td data-label="Lote"><span class="ph-detail-lot">{{ item.lot_number or 'N/A' }}</span></td>
+                                                        <td data-label="Cantidad" class="text-center"><span class="ph-detail-qty">{{ fmt_qty(item.quantity) }}</span></td>
+                                                        <td data-label="Vencimiento"><span class="ph-detail-exp">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span></td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr><td colspan="4" class="text-center text-muted ph-detail-empty py-3">No hay productos en este traslado.</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -219,7 +282,7 @@
                             <tr>
                                 <th>ID DE TRASLADO</th>
                                 <th>FECHA Y HORA</th>
-                                <th>SEDE DESTINO</th>
+                                <th>ORIGEN Y DESTINO</th>
                                 <th>ESTADO</th>
                                 <th class="text-end">ACCIONES</th>
                             </tr>
@@ -227,7 +290,7 @@
                         <tbody>
                             {% for mov in arbitraje %}
                             <tr>
-                                <td class="fw-bold">
+                                <td class="fw-bold" data-label="Traslado">
                                     <div class="d-flex align-items-center">
                                         <div class="rounded-circle text-dark d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-weight: bold; background-color: #ffc107;">
                                             #{{ mov.id }}
@@ -238,14 +301,23 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Fecha y Hora">
                                     <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
                                     <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
                                 </td>
-                                <td>
-                                    <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                <td data-label="Origen y Destino">
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
+                                            <span class="ph-badge-location">{{ mov.origin_location.name if mov.origin_location else 'Sede #' ~ mov.origin_location_id }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted small fw-semibold me-2" style="width: 35px;">A:</span>
+                                            <span class="ph-badge-location">{{ mov.destination_location.name if mov.destination_location else 'Sede #' ~ mov.destination_location_id }}</span>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td>
+                                <td data-label="Estado">
                                     <span class="badge bg-warning text-dark">Retorno en Camino</span>
                                 </td>
                                 <td class="text-end">
@@ -262,17 +334,34 @@
                             <tr class="collapse" id="detalle-arbitraje-{{ mov.id }}">
                                 <td colspan="5">
                                     <div class="ph-detail-box">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Contenido del Retorno - Traslado #{{ mov.id }}</h6>
-                                        <ul class="list-group list-group-flush small bg-transparent w-75">
-                                            {% for item in mov.details %}
-                                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0 border-light">
-                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong></span>
-                                                <span class="text-muted">Cant: {{ item.quantity }} | Vence: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
-                                            </li>
-                                            {% else %}
-                                            <li class="list-group-item bg-transparent text-muted px-0 border-0">No hay productos en este retorno.</li>
-                                            {% endfor %}
-                                        </ul>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
+                                            <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Contenido del Retorno - Traslado #{{ mov.id }}</h5>
+                                            {{ content_badges(mov) }}
+                                        </div>
+                                        <div class="table-responsive ph-detail-scroll mt-3">
+                                            <table class="table ph-detail-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Producto</th>
+                                                        <th>Lote</th>
+                                                        <th class="text-center">Cantidad</th>
+                                                        <th>Vencimiento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in mov.details %}
+                                                    <tr>
+                                                        <td data-label="Producto"><span class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span></td>
+                                                        <td data-label="Lote"><span class="ph-detail-lot">{{ item.lot_number or 'N/A' }}</span></td>
+                                                        <td data-label="Cantidad" class="text-center"><span class="ph-detail-qty">{{ fmt_qty(item.quantity) }}</span></td>
+                                                        <td data-label="Vencimiento"><span class="ph-detail-exp">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span></td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr><td colspan="4" class="text-center text-muted ph-detail-empty py-3">No hay productos en este retorno.</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -303,14 +392,14 @@
                         <tbody>
                             {% for mov in historico %}
                             <tr>
-                                <td class="fw-bold">
+                                <td class="fw-bold" data-label="Traslado">
                                     <div class="d-flex align-items-center">
                                         <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; font-weight: bold;">
                                             #{{ mov.id }}
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Origen y Destino">
                                     <div class="d-flex flex-column gap-1">
                                         <div class="d-flex align-items-center">
                                             <span class="text-muted small fw-semibold me-2" style="width: 35px;">De:</span>
@@ -322,10 +411,10 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Fecha">
                                     <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
                                 </td>
-                                <td>
+                                <td data-label="Estado">
                                     {% if mov.status == 'COMPLETADO' %}
                                         <span class="ph-badge-success">Completado</span>
                                     {% elif mov.status == 'CANCELADO_EMISOR' %}
@@ -343,17 +432,34 @@
                             <tr class="collapse" id="detalle-{{ mov.id }}">
                                 <td colspan="5">
                                     <div class="ph-detail-box">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h6>
-                                        <ul class="list-group list-group-flush small bg-transparent w-75">
-                                            {% for item in mov.details %}
-                                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0 border-light">
-                                                <span><strong>{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</strong></span>
-                                                <span class="text-muted">Cant: {{ item.quantity }} | Vence: {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
-                                            </li>
-                                            {% else %}
-                                            <li class="list-group-item bg-transparent text-muted px-0 border-0">No hay productos en este traslado.</li>
-                                            {% endfor %}
-                                        </ul>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
+                                            <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
+                                            {{ content_badges(mov) }}
+                                        </div>
+                                        <div class="table-responsive ph-detail-scroll mt-3">
+                                            <table class="table ph-detail-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Producto</th>
+                                                        <th>Lote</th>
+                                                        <th class="text-center">Cantidad</th>
+                                                        <th>Vencimiento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in mov.details %}
+                                                    <tr>
+                                                        <td data-label="Producto"><span class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</span></td>
+                                                        <td data-label="Lote"><span class="ph-detail-lot">{{ item.lot_number or 'N/A' }}</span></td>
+                                                        <td data-label="Cantidad" class="text-center"><span class="ph-detail-qty">{{ fmt_qty(item.quantity) }}</span></td>
+                                                        <td data-label="Vencimiento"><span class="ph-detail-exp">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span></td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr><td colspan="4" class="text-center text-muted ph-detail-empty py-3">No hay productos en este traslado.</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>

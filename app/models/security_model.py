@@ -120,14 +120,24 @@ class User(db.Model, UserMixin):
 class Notification(db.Model):
     """
     Representa la bandeja interna. Se filtra por sede y el Administrador la visualiza toda.
+
+    Desde la mejora de la bandeja de respuestas, se usa también para avisar a
+    los receptores de traslados cuando el Administrador emitió un dictamen
+    (movement_id apunta al traslado y type es 'RESPUESTA_TRASLADO'). El
+    estado de "leído" vive aquí (is_read), no en el navegador.
     """
     __tablename__ = 'notifications'
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'movement_id', 'type',
+                            name='uq_notif_user_movement_type'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True) 
     type = db.Column(db.String(30)) # Ej. 'ALERTA_STOCK', 'TRASLADO_PENDIENTE'
     message = db.Column(db.String(255), nullable=False)
     is_read = db.Column(db.Boolean, default=False)
+    movement_id = db.Column(db.Integer, nullable=True)  # Traslado de la respuesta (RESPUESTA_TRASLADO)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PasswordRecovery(db.Model):

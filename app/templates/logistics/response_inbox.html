@@ -3,11 +3,223 @@
 {% block content %}
 <!-- Hojas de estilo -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=6">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/response_inbox.css') }}?v=8">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/response_inbox.css') }}?v=16">
+
+{# Fila de respuesta + su desplegable. Usada dos veces: sección "no leídos" y "leídos". #}
+{% macro render_response_rows(response_list) %}
+{% for mov in response_list %}
+{# Atributos data-* para búsqueda/filtros cliente y paginación por pestaña #}
+<tr class="dispute-row {{ 'row-unread' if not mov.is_read else 'row-read' }}" id="row-mov-{{ mov.id }}"
+    data-mov-id="{{ mov.id }}"
+    data-novedad="{{ mov.novedad_type or '' }}"
+    data-sede="{{ mov.origin_location_id }} {{ mov.destination_location_id }}"
+    data-search="traslado {{ mov.id }} {{ mov.type }} {{ mov.novedad_type or '' }} {{ mov.novedad_label or '' }} despacho a {{ mov.destination_location.name if mov.destination_location else '' }} devolucion de {{ mov.origin_location.name if mov.origin_location else '' }} reporto {{ mov.reported_by.name if mov.reported_by else '' }} respuesta por {{ mov.response_by.name if mov.response_by else '' }} {{ mov.date.strftime('%Y-%m-%d') if mov.date else '' }} {{ mov.response_date.strftime('%Y-%m-%d') if mov.response_date else '' }}{% for item in mov.novedad_items %} {{ item.product_name or '' }} {{ item.lot_number or '' }}{% endfor %}{% for item in mov.resolution_items %} {{ item.action_label or '' }} {{ item.product.name if item.product else '' }}{% endfor %}">
+    <td class="fw-bold" data-label="Caso / Fecha">
+        <div class="d-flex flex-column gap-1">
+            <span class="text-dark">
+                Traslado #{{ mov.id }}
+                {% if mov.type != 'TRASLADO' %}<span class="text-muted small">({{ mov.type }})</span>{% endif %}
+            </span>
+            <!-- Clasificación de la novedad reportada -->
+            <span class="badge rounded-pill fw-medium align-self-start" style="background-color: #fdf3d1; color: #b18721;">
+                <i class="bi bi-exclamation-triangle me-1"></i>{{ mov.novedad_label }}
+            </span>
+            <span class="text-muted small">
+                <i class="bi bi-calendar3 me-1"></i>Traslado:
+                {{ mov.date.strftime('%Y-%m-%d') if mov.date else 'N/D' }}
+                <span class="mx-1">·</span>
+                <i class="bi bi-reply-all me-1"></i>Respuesta:
+                {{ mov.response_date.strftime('%Y-%m-%d %H:%M') if mov.response_date else 'N/D' }}
+            </span>
+            {% if mov.reported_by %}
+            <span class="text-muted small">
+                <i class="bi bi-person me-1"></i>Reportó:
+                {{ mov.reported_by.name }}
+            </span>
+            {% endif %}
+        </div>
+    </td>
+    <td data-label="Sucursal">
+        {% if mov.origin_location_id == 1 %}
+            <!-- Despacho Normal desde Almacén Central -->
+            <span class="location-pill" title="Envío a sucursal">
+                <i class="bi bi-box-arrow-right ph-text-orange me-1 flex-shrink-0"></i>
+                <span>Despacho a: <strong class="text-dark">{{ mov.destination_location.name if mov.destination_location else 'N/A' }}</strong></span>
+            </span>
+        {% else %}
+            <!-- Devolución desde Sucursal hacia Almacén Central -->
+            <span class="location-pill border-warning bg-warning-subtle" title="Devolución hacia Central">
+                <i class="bi bi-arrow-return-left text-warning-emphasis me-1 flex-shrink-0"></i>
+                <span>Devolución de: <strong class="text-dark">{{ mov.origin_location.name if mov.origin_location else 'N/A' }}</strong></span>
+            </span>
+        {% endif %}
+        <div class="mt-2">
+            {% for item in mov.novedad_items %}
+            <span class="badge bg-white border text-dark me-1 mb-1 text-start">
+                {{ item.product_name or 'Producto N/D' }}{% if item.lot_number %} <code class="text-muted">{{ item.lot_number }}</code>{% endif %}
+                <span class="text-secondary">x{{ item.dispatched_qty if item.dispatched_qty is not none else '—' }}</span>
+            </span>
+            {% else %}
+            <span class="badge bg-light text-muted me-1">Sin detalle de productos registrado</span>
+            {% endfor %}
+        </div>
+    </td>
+    <td data-label="Estado">
+        <span class="badge bg-light text-dark border px-3 py-2 rounded-pill fw-semibold shadow-sm">
+            <i class="bi bi-shield-check me-1"></i> Respuesta emitida
+            {% if mov.response_by %} por {{ mov.response_by.name }}{% endif %}
+        </span>
+        {% if mov.resolution_summary %}
+        <div class="d-flex flex-wrap gap-1 mt-2">
+            {% set s = mov.resolution_summary %}
+            {% if s.get('credited_total') %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2">
+                <i class="bi bi-check-circle me-1"></i>Acreditado: {{ s.get('credited_total') }}
+            </span>
+            {% endif %}
+            {% if s.get('returned_total') %}
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2">
+                <i class="bi bi-arrow-return-left me-1"></i>Devuelto: {{ s.get('returned_total') }}
+            </span>
+            {% endif %}
+            {% if s.get('lost_total') %}
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2">
+                <i class="bi bi-trash me-1"></i>Perdido: {{ s.get('lost_total') }}
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </td>
+    <td class="text-end" data-label="Acción">
+        <button class="btn ph-btn-orange btn-sm px-3 py-2 fw-bold btn-read-response w-100 w-md-auto" 
+                type="button" 
+                data-bs-toggle="collapse" 
+                data-bs-target="#respuesta-admin-{{ mov.id }}"
+                data-mov-id="{{ mov.id }}">
+            <i class="bi bi-envelope-open me-1"></i> Leer Respuesta
+        </button>
+    </td>
+</tr>
+
+<!-- Desplegable con la respuesta completa -->
+<tr class="collapse" id="respuesta-admin-{{ mov.id }}">
+    <td colspan="4" class="p-0 border-0">
+        <div class="ph-detail-box shadow-inner">
+            <div class="p-3 p-md-4">
+                <h6 class="fw-bold text-dark mb-2">
+                    <i class="bi bi-person-workspace ph-text-orange me-2"></i>Respuesta de Administración
+                    <span class="text-muted small fw-normal ms-2">
+                        Traslado #{{ mov.id }} · {{ mov.novedad_label }}
+                    </span>
+                </h6>
+
+                <!-- Síntesis de la resolución -->
+                {% if mov.resolution_summary %}
+                <p class="mb-3 small text-muted">
+                    <i class="bi bi-calculator me-1"></i>
+                    Síntesis del veredicto — Acreditado en destino:
+                    <strong class="text-success">{{ mov.resolution_summary.get('credited_total', 0) }}</strong>
+                    · Devuelto al origen:
+                    <strong>{{ mov.resolution_summary.get('returned_total', 0) }}</strong>
+                    · Dado de baja / pérdida:
+                    <strong class="text-danger">{{ mov.resolution_summary.get('lost_total', 0) }}</strong>
+                </p>
+                {% endif %}
+
+                <!-- Detalle de lo recibido (novedad original) -->
+                {% if mov.novedad_items %}
+                <h6 class="fw-bold mt-3 mb-2 text-uppercase" style="font-size: 0.8rem; letter-spacing: 0.05em;">
+                    <i class="bi bi-box-seam ph-text-orange me-2"></i>Productos involucrados en la novedad
+                </h6>
+                <div class="table-responsive-sm">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead class="text-uppercase" style="font-size: 0.68rem;">
+                            <tr>
+                                <th class="text-muted fw-semibold">Producto</th>
+                                <th class="text-muted fw-semibold">Lote</th>
+                                <th class="text-end text-muted fw-semibold">Despachado</th>
+                                <th class="text-end text-muted fw-semibold">Recibido</th>
+                                <th class="text-end text-muted fw-semibold">Faltante</th>
+                                <th class="text-muted fw-semibold">Novedad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in mov.novedad_items %}
+                            <tr>
+                                <td class="fw-bold text-dark" data-label="Producto">{{ item.product_name or 'N/D' }}
+                                    {% if item.sku %}<span class="text-muted small d-block font-monospace">{{ item.sku }}</span>{% endif %}
+                                </td>
+                                <td data-label="Lote"><code class="text-dark">{{ item.lot_number or 'S/L' }}</code>
+                                    {% if item.observed_physical_lot and item.observed_physical_lot != item.lot_number %}
+                                    <span class="badge bg-danger-subtle text-danger ms-1">físico: {{ item.observed_physical_lot }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end" data-label="Despachado">{{ item.dispatched_qty if item.dispatched_qty is not none else '—' }}</td>
+                                <td class="text-end" data-label="Recibido">{{ item.received_qty if item.received_qty is not none else '—' }}</td>
+                                <td class="text-end text-danger fw-semibold" data-label="Faltante">
+                                    {{ item.missing_qty if item.missing_qty is not none and item.missing_qty > 0 else '—' }}
+                                </td>
+                                <td data-label="Novedad">
+                                    {% if item.specific_novelty and item.specific_novelty != 'Conforme' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">{{ item.specific_novelty }}</span>
+                                    {% else %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Conforme</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                <!-- Decisiones administrativas por producto -->
+                {% if mov.resolution_items %}
+                <h6 class="fw-bold mt-3 mb-2 text-uppercase" style="font-size: 0.8rem; letter-spacing: 0.05em;">
+                    <i class="bi bi-gavel ph-text-orange me-2"></i>Decisión administrativa por producto
+                </h6>
+                <div class="table-responsive-sm">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead class="text-uppercase" style="font-size: 0.68rem;">
+                            <tr>
+                                <th class="text-muted fw-semibold">Producto</th>
+                                <th class="text-muted fw-semibold">Lote</th>
+                                <th class="text-muted fw-semibold">Decisión</th>
+                                <th class="text-end text-muted fw-semibold">Acreditado</th>
+                                <th class="text-end text-muted fw-semibold">Devuelto</th>
+                                <th class="text-end text-muted fw-semibold">Perdido</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in mov.resolution_items %}
+                            <tr>
+                                <td class="fw-bold text-dark" data-label="Producto">{{ item.product.name if item.product else ('Producto #' ~ item.product_id) }}</td>
+                                <td data-label="Lote"><code class="text-dark">{{ item.lot_number or 'S/L' }}</code></td>
+                                <td data-label="Decisión"><span class="badge bg-white border text-dark rounded-pill px-2">{{ item.action_label }}</span></td>
+                                <td class="text-end text-success fw-semibold" data-label="Acreditado">{{ item.credited_qty if item.credited_qty else '—' }}</td>
+                                <td class="text-end" data-label="Devuelto">{{ item.return_qty if item.return_qty else '—' }}</td>
+                                <td class="text-end text-danger fw-semibold" data-label="Perdido">{{ item.lost_qty if item.lost_qty else '—' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+                
+                <div class="ph-alert-orange shadow-sm border-0 py-2 px-3">
+                    <p class="mb-0 fs-6 text-dark ph-notes-text">"{{ mov.resolution_notes or 'El administrador cerró este caso sin incluir un comentario escrito.' }}"</p>
+                </div>
+                
+            </div>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+{% endmacro %}
 
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
     <!-- Contenedor con data-user-id para scoped localStorage -->
-    <div class="ph-card" data-user-id="{{ current_user.id }}">
+    <div class="ph-card" data-user-id="{{ current_user.id }}" data-read-url="{{ url_for('response_inbox.mark_response_read') }}" data-read-all-url="{{ url_for('response_inbox.mark_all_responses_read') }}">
         
         <!-- Encabezado adaptable -->
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
@@ -28,92 +240,138 @@
             </div>
             <div>
                 <span class="badge ph-badge-orange rounded-pill px-3 py-2 fs-6 shadow-sm d-inline-block">
-                    <i class="bi bi-envelope-paper-fill me-1"></i> Nuevas Respuestas: <span id="unread-count">{{ responses|length }}</span>
+                    <i class="bi bi-envelope-paper-fill me-1"></i> Nuevas Respuestas: <span id="unread-count">{{ unread_count or 0 }}</span>
                 </span>
             </div>
         </div>
 
-        <div class="table-responsive-md">
-            <table class="table ph-table">
-                <thead>
-                    <tr class="ph-table-header">
-                        <th>Nº DE CASO / FECHA</th>
-                        <th>SUCURSAL DESTINO / ORIGEN</th>
-                        <th>ESTADO DEL CASO</th>
-                        <th class="text-end">ACCIÓN</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for mov in responses %}
-                    <tr class="dispute-row row-unread" id="row-mov-{{ mov.id }}">
-                        <td class="fw-bold" data-label="Caso / Fecha">
-                            <div class="d-flex justify-content-between align-items-center w-100 d-md-block">
-                                <span class="text-dark">Traslado #{{ mov.id }}</span>
-                                <span class="text-muted small ms-2">{{ mov.date.strftime('%Y-%m-%d') }}</span>
-                            </div>
-                        </td>
-                        <td data-label="Sucursal">
-                            {% if mov.origin_location_id == 1 %}
-                                <!-- Despacho Normal desde Almacén Central -->
-                                <span class="location-pill" title="Envío a sucursal">
-                                    <i class="bi bi-box-arrow-right ph-text-orange me-1 flex-shrink-0"></i>
-                                    <span>Despacho a: <strong class="text-dark">{{ mov.destination_location.name if mov.destination_location else 'N/A' }}</strong></span>
-                                </span>
-                            {% else %}
-                                <!-- Devolución desde Sucursal hacia Almacén Central -->
-                                <span class="location-pill border-warning bg-warning-subtle" title="Devolución hacia Central">
-                                    <i class="bi bi-arrow-return-left text-warning-emphasis me-1 flex-shrink-0"></i>
-                                    <span>Devolución de: <strong class="text-dark">{{ mov.origin_location.name if mov.origin_location else 'N/A' }}</strong></span>
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td data-label="Estado">
-                            <span class="badge bg-light text-dark border px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                                <i class="bi bi-shield-check me-1"></i> {{ mov.status | replace('_', ' ') | title }}
-                            </span>
-                        </td>
-                        <td class="text-end" data-label="Acción">
-                            <button class="btn ph-btn-orange btn-sm px-3 py-2 fw-bold btn-read-response w-100 w-md-auto" 
-                                    type="button" 
-                                    data-bs-toggle="collapse" 
-                                    data-bs-target="#respuesta-admin-{{ mov.id }}"
-                                    data-mov-id="{{ mov.id }}">
-                                <i class="bi bi-envelope-open me-1"></i> Leer Respuesta
-                            </button>
-                        </td>
-                    </tr>
+        {% set unread_list = responses | selectattr('is_read', 'equalto', false) | list %}
+        {% set read_list = responses | selectattr('is_read', 'equalto', true) | list %}
+        {% set has_unread = unread_list | length > 0 %}
 
-                    <!-- Desplegable con la respuesta -->
-                    <tr class="collapse" id="respuesta-admin-{{ mov.id }}">
-                        <td colspan="4" class="p-0 border-0">
-                            <div class="ph-detail-box shadow-inner">
-                                <div class="p-3 p-md-4">
-                                    <h6 class="fw-bold text-dark mb-2">
-                                        <i class="bi bi-person-workspace ph-text-orange me-2"></i>Respuesta de Administración
-                                    </h6>
-                                    
-                                    <div class="ph-alert-orange shadow-sm border-0 mb-0 py-2 px-3">
-                                        <p class="mb-0 fs-6 text-dark ph-notes-text">"{{ mov.resolution_notes or 'El administrador cerró este caso sin incluir un comentario escrito.' }}"</p>
-                                    </div>
-                                    
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="text-center text-muted py-5">
-                            <i class="bi bi-inbox fs-1 text-secondary d-block mb-2"></i>
-                            Tu bandeja está vacía. No hay respuestas pendientes.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        {% if responses|length == 0 %}
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-1 text-secondary d-block mb-2"></i>
+            Tu bandeja está vacía. No hay respuestas pendientes.
         </div>
+        {% else %}
+
+        <!-- ========== BÚSQUEDA Y FILTROS (aplican a ambas pestañas) ========== -->
+        <div class="row g-2 align-items-center mb-1">
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" id="inbox-search" class="form-control border-start-0 shadow-none"
+                           placeholder="Buscar por #traslado, sede, producto, persona o novedad..." autocomplete="off">
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <select id="filter-novedad" class="form-select shadow-none" title="Filtrar por clasificación de novedad">
+                    <option value="">Todas las novedades</option>
+                    {% for code, label in filter_novedades.items() %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <select id="filter-sede" class="form-select shadow-none" title="Filtrar por sucursal involucrada">
+                    <option value="">Todas las sedes</option>
+                    {% for sid, sname in filter_sedes.items() %}
+                    <option value="{{ sid }}">{{ sname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- ========== PESTAÑAS (estilo Listado Operativo) ========== -->
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
+            <ul class="nav nav-tabs ph-tabs mb-0" id="responseTabs" role="tablist">
+                {% if has_unread %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="unread-tab" data-bs-toggle="tab" data-bs-target="#unread-pane" type="button" role="tab">
+                        <i class="bi bi-envelope-dash-fill me-2"></i>No leídos
+                        <span class="badge ph-badge-orange rounded-pill ms-2" id="count-unread">{{ unread_list|length }}</span>
+                    </button>
+                </li>
+                {% endif %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if not has_unread %}active{% endif %}" id="read-tab" data-bs-toggle="tab" data-bs-target="#read-pane" type="button" role="tab">
+                        <i class="bi bi-envelope-open-fill me-2"></i>Leídos
+                        <span class="badge text-bg-light text-dark border rounded-pill ms-2" id="count-read">{{ read_list|length }}</span>
+                    </button>
+                </li>
+            </ul>
+
+            {% if has_unread %}
+            <button type="button" class="btn ph-btn-orange btn-sm fw-bold mb-2 ms-auto" id="read-all-btn" title="Marca todas las respuestas pendientes como leídas">
+                <i class="bi bi-envelope-check me-1"></i> Marcar todo como leído
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="tab-content" id="responseTabsContent">
+
+            {% if has_unread %}
+            <!-- Pestaña: No leídos -->
+            <div class="tab-pane fade show active" id="unread-pane" role="tabpanel">
+                <div class="table-responsive-md">
+                    <table class="table ph-table">
+                        <thead>
+                            <tr class="ph-table-header">
+                                <th>Nº DE CASO / FECHA</th>
+                                <th>SUCURSAL DESTINO / ORIGEN</th>
+                                <th>ESTADO DEL CASO</th>
+                                <th class="text-end">ACCIÓN</th>
+                            </tr>
+                        </thead>
+<tbody id="tbody-unread">
+                        {{ render_response_rows(unread_list) }}
+                        <tr id="no-results-unread" class="d-none">
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-search-heart me-2"></i>Ninguna respuesta coincide con los criterios de búsqueda.
+                            </td>
+                        </tr>
+                    </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex justify-content-end mt-2 d-none" id="pagination-wrap-unread" aria-label="Paginación de no leídos">
+                    <ul class="pagination pagination-sm mb-0" id="pagination-unread"></ul>
+                </nav>
+            </div>
+            {% endif %}
+
+            <!-- Pestaña: Leídos -->
+            <div class="tab-pane fade {% if not has_unread %}show active{% endif %}" id="read-pane" role="tabpanel">
+                <div class="table-responsive-md">
+                    <table class="table ph-table">
+                        <thead>
+                            <tr class="ph-table-header">
+                                <th>Nº DE CASO / FECHA</th>
+                                <th>SUCURSAL DESTINO / ORIGEN</th>
+                                <th>ESTADO DEL CASO</th>
+                                <th class="text-end">ACCIÓN</th>
+                            </tr>
+                        </thead>
+<tbody id="tbody-read">
+                        {{ render_response_rows(read_list) }}
+                        <tr id="no-results-read" class="d-none">
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-search-heart me-2"></i>Ninguna respuesta coincide con los criterios de búsqueda.
+                            </td>
+                        </tr>
+                    </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex justify-content-end mt-2 d-none" id="pagination-wrap-read" aria-label="Paginación de leídos">
+                    <ul class="pagination pagination-sm mb-0" id="pagination-read"></ul>
+                </nav>
+            </div>
+
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <!-- Script JS externo -->
-<script src="{{ url_for('static', filename='js/logistics/response_inbox.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/logistics/response_inbox.js') }}?v=8"></script>
 {% endblock %}

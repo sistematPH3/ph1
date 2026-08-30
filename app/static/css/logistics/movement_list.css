@@ -15,13 +15,15 @@
 .ph-icon-box {
     background-color: #af1515;
     color: white;
-    width: 52px;
-    height: 52px;
+    width: 68px;
+    height: 68px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
-    font-size: 1.5rem;
+    border-radius: 14px;
+    font-size: 2rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(175, 21, 21, 0.25);
 }
 
 /* Título principal (Negro con sombra roja) */
@@ -102,6 +104,24 @@
     padding: 0.4em 0.8em;
     border-radius: 6px;
     border: 1px solid #e9ecef;
+}
+
+/* Badge de conteo (Totales del panel de detalles) */
+.ph-badge-qty {
+    background-color: #f8f9fa;
+    color: #212529;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 0.35em 0.8em;
+    border-radius: 50px;
+    border: 1px solid #e9ecef;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.ph-badge-qty i {
+    color: #af1515;
 }
 
 /* Badge de Estado Activo/Exitoso */
@@ -209,8 +229,219 @@ tr.collapse td, tr.collapsing td {
 }
 
 .ph-detail-box {
-    background-color: #fafbfc;
+    background-color: #ffffff;
     border-left: 4px solid #af1515;
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    border-top: 1px solid #e9ecef;
+    border-radius: 0 0 12px 12px;
     padding: 1.5rem 2rem;
     margin: 0;
+}
+
+.ph-detail-head {
+    border-bottom: 1px solid #f1f3f5;
+    padding-bottom: 1rem;
+}
+
+.ph-detail-title {
+    font-size: 1.05rem;
+    color: #1a1a1a;
+}
+
+.ph-detail-title i {
+    font-size: 1.2rem;
+    color: #af1515;
+}
+
+/* Tabla de contenido del desplegable (limpia y legible) */
+.table-responsive.ph-detail-scroll {
+}
+
+.ph-detail-lot {
+    background-color: #fff4e5;
+    color: #b45309;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 0.3em 0.7em;
+    border-radius: 6px;
+    border: 1px solid #fde4c0;
+    white-space: nowrap;
+}
+
+.ph-detail-qty {
+    font-weight: 700;
+    color: #af1515;
+    font-size: 1.05rem;
+}
+
+.ph-detail-exp {
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.ph-detail-empty {
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   VISTA MÓVIL / TELÉFONO
+   ========================================================================== */
+@media (max-width: 767.98px) {
+
+    /* Cabecera de la página: título arriba, botón debajo */
+    .ph-card > .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 1rem;
+    }
+
+    /* Pestañas que caben en el ancho (deslizables) */
+    .ph-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .ph-tabs .nav-link {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    /* Tabla principal: convertir en tarjetas */
+    table.ph-table,
+    table.ph-table tbody,
+    table.ph-table tfoot,
+    table.ph-table thead,
+    table.ph-table tr,
+    table.ph-table th,
+    table.ph-table td {
+        display: block;
+        width: 100%;
+    }
+    table.ph-table thead { display: none; }
+
+    table.ph-table tbody tr {
+        background: #ffffff;
+        border: 1px solid #e9ecef;
+        border-radius: 14px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.9rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    table.ph-table tbody td {
+        padding: 0.35rem 0 !important;
+        text-align: left !important;
+        border: none !important;
+    }
+
+    table.ph-table tbody td:nth-child(1) {
+        padding-right: 0 !important;
+    }
+
+    /* Etiqueta de cada fila (leída del atributo data-label) */
+    table.ph-table tbody td::before {
+        content: attr(data-label) !important;
+        display: block;
+        margin-bottom: 0.2rem;
+        font-weight: 700;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+    }
+    table.ph-table tbody td:last-child::before { content: none !important; }
+
+    /* Acciones al final de la tarjeta (fila completa) */
+    table.ph-table tbody tr td:last-child {
+        position: static !important;
+        top: auto !important;
+        right: auto !important;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        padding: 0.6rem 0 0 !important;
+        margin-top: 0.5rem;
+        border-top: 1px dashed #e9ecef;
+    }
+
+    table.ph-table .btn-ph-info,
+    table.ph-table .btn-ph-secondary,
+    table.ph-table .btn-ph-success {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.7rem;
+        margin: 0;
+    }
+
+    /* Fila colapsable de detalles no debe verse como tarjeta */
+    table.ph-table tbody tr.collapse,
+    table.ph-table tbody tr.collapsing {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        margin: 0 0 0.9rem 0;
+    }
+    table.ph-table tbody tr.collapse td,
+    table.ph-table tbody tr.collapsing td {
+        padding: 0 !important;
+        border-top: none !important;
+    }
+    table.ph-table tbody tr.collapse td::before,
+    table.ph-table tbody tr.collapsing td::before { content: none !important; }
+
+    /* Panel de detalle: caja más compacta */
+    .ph-detail-box {
+        padding: 1rem 1rem 1.25rem 1rem;
+    }
+    .ph-detail-head {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    .ph-badge-qty {
+        font-size: 0.75rem;
+    }
+
+    /* Tabla interna del detalle: apilada con etiquetas */
+    table.ph-detail-table,
+    table.ph-detail-table thead,
+    table.ph-detail-table tbody,
+    table.ph-detail-table tfoot,
+    table.ph-detail-table tr,
+    table.ph-detail-table th,
+    table.ph-detail-table td {
+        display: block;
+        width: 100%;
+        border: none !important;
+    }
+    table.ph-detail-table thead { display: none; }
+    table.ph-detail-table tbody tr {
+        background: #ffffff;
+        border: 1px solid #f1f3f5 !important;
+        border-radius: 10px;
+        padding: 0.7rem 0.9rem;
+        margin-bottom: 0.7rem;
+    }
+    table.ph-detail-table tbody td {
+        padding: 0.3rem 0 !important;
+        text-align: left !important;
+    }
+    table.ph-detail-table tbody td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 700;
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        margin-bottom: 0.15rem;
+    }
+    .ph-detail-lot,
+    .ph-detail-qty,
+    .ph-detail-exp {
+        white-space: normal !important;
+    }
 }

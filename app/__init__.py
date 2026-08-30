@@ -2,6 +2,17 @@ from flask import Flask
 from .extensions import db, mail, login_manager 
 from .config import Config
 
+
+def ph_qty(value):
+    """Formatea cantidades sin decimales de relleno (ej: 30 en vez de 30.0)."""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return value
+    if num.is_integer():
+        return str(int(num))
+    return ("%f" % num).rstrip("0").rstrip(".")
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -140,5 +151,47 @@ def create_app():
         @login_manager.user_loader
         def load_user(user_id):
             return User.query.get(int(user_id))
+
+        app.jinja_env.filters['ph_qty'] = ph_qty
+
+        # ==========================================================
+        # CONTEXTO GLOBAL PARA EL SIDEBAR Y LOS AVISOS DE NOVEDADES
+        # ==========================================================
+        # Provee a todas las plantillas:
+        #   - pending_disputes_count: nº de novedades pendientes de arbitraje
+        #     (alimenta el círculo rojo del sidebar).
+        #   - can_view_disputes: habilita el polling de avisos solo para el
+        #     Administrador (único rol con acceso al apartado de arbitraje).
+        @app.context_processor
+        def inject_dispute_notifications():
+            from flask_login import current_user
+            from app.logistics.services.movement_dispute_service import get_pending_disputes_count
+
+            is_authenticated = getattr(current_user, 'is_authenticated', False)
+            can_view = bool(is_authenticated and current_user.is_admin)
+            count = 0
+            if can_view:
+                try:
+                    count = get_pending_disputes_count()
+                except Exception:
+                    count = 0
+            return {
+                'pending_disputes_count': count,
+                'can_view_disputes': can_view,
+                # Roles que pueden consultar las respuestas del administrador
+                # (además de ser los receptores de traslados que usan la
+                # campana de notificaciones).
+                'can_view_responses': bool(
+                    is_authenticated and (
+                        current_user.is_admin
+                        or current_user.is_manager
+                        or current_user.is_assistant_manager
+                        or current_user.is_management
+                        or current_user.is_finance
+                        or current_user.is_operations
+                    )
+                ),
+                'current_user_id': getattr(current_user, 'id', None),
+            }
 
     return app
