@@ -1,7 +1,7 @@
 {% extends 'layout.html' %} {# Cambia 'layout.html' por el nombre exacto de tu plantilla base #}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('inventory.static', filename='css/inventory/products.css') }}">
+<link rel="stylesheet" href="{{ url_for('inventory.static', filename='css/inventory/products.css') }}?v=2">
 {% endblock %}
 
 {% block content %}

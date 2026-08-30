@@ -1,144 +1,452 @@
-{% extends "base_list.html" %}
+{% extends "layout.html" %}
 
-{% block title_list %}Bitácora de Auditoría Forense{% endblock %}
-{% block subtitle_list %}Trazabilidad inmutable de traslados inter-sedes y resoluciones de mercancía.{% endblock %}
-
-{% block search_placeholder %}Buscar por usuario, acción o sede...{% endblock %}
-
-{% block actions_filter %}
-<!-- Filtros dinámicos -->
-<form method="GET" action="{{ url_for('logistics_audit.view_movement_audit') }}" class="d-flex gap-2 align-items-center">
-    <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3">
-        <option value="">Todas las severidades</option>
-        <option value="NORMAL" {% if filters.get('severity') == 'NORMAL' %}selected{% endif %}>NORMAL</option>
-        <option value="ALERTA" {% if filters.get('severity') == 'ALERTA' %}selected{% endif %}>ALERTA</option>
-        <option value="CRITICO" {% if filters.get('severity') == 'CRITICO' %}selected{% endif %}>CRÍTICO</option>
-    </select>
-    
-    <input type="date" name="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3" 
-           value="{{ request.args.get('start_date', '') }}" title="Fecha de inicio">
-           
-    <input type="date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3" 
-           value="{{ request.args.get('end_date', '') }}" title="Fecha fin">
-           
-    <button type="submit" class="btn btn-sm btn-dark rounded-pill px-3">
-        <i class="bi bi-funnel-fill"></i> Filtrar
-    </button>
-    
-    {% if filters %}
-    <a href="{{ url_for('logistics_audit.view_movement_audit') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">
-        Limpiar
-    </a>
-    {% endif %}
-</form>
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
 {% endblock %}
 
-{% block table_head %}
-    <th>Fecha y Hora</th>
-    <th>Acción (Logística)</th>
-    <th>Responsable</th>
-    <th>Sede</th>
-    <th>Severidad</th>
-    <th class="text-end">Detalles</th>
-{% endblock %}
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
 
-{% block table_body %}
-    {% for log in audit_logs %}
-    <tr>
-        <td class="fw-bold text-nowrap">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        
-        <!-- Formateo de variable: Cambia guiones bajos por espacios y capitaliza -->
-        <td><span class="badge bg-secondary">{{ log.action | replace('_', ' ') | title }}</span></td>
-        
-        <!-- Llamada a los nombres reales mediante relaciones de SQLAlchemy -->
-        <td>{{ log.user.name if log.user else 'Usuario ID: ' ~ log.user_id }}</td>
-        <td>{{ log.location.name if log.location else 'Todas (General)' }}</td>
-        
-        <td>
-            {% if log.severity == 'CRITICO' %}
-                <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>CRÍTICO</span>
-            {% elif log.severity == 'ALERTA' %}
-                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle-fill me-1"></i>ALERTA</span>
-            {% else %}
-                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>NORMAL</span>
-            {% endif %}
-        </td>
-        <td class="text-end">
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRow{{ log.id }}" aria-expanded="false" aria-controls="collapseRow{{ log.id }}">
-                <i class="bi bi-eye"></i> Ver Datos
-            </button>
-        </td>
-    </tr>
-    
-    <!-- Acordeón Desplegable -->
-    <tr id="collapseRow{{ log.id }}" class="collapse bg-light border-bottom">
-        <td colspan="6" class="p-4">
-            <div class="card card-body border-0 shadow-sm">
-                
-                <!-- Extraemos el diccionario JSONB de la base de datos -->
-                {% set data = log.changed_data %}
-                
-                <!-- 1. Mostrar detalles de texto libre (si los hay) -->
-                {% if data.get('observaciones') or data.get('remarks') or data.get('nota') or data.get('motivo') %}
-                <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
-                    <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
-                    <div>
-                        <strong class="d-block text-dark">Nota / Observación registrada:</strong>
-                        <span class="text-dark">{{ data.get('observaciones') or data.get('remarks') or data.get('nota') or data.get('motivo') }}</span>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-shield-lock"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Bitácora de Auditoría Forense</h2>
+                    <p class="text-muted mb-0"> Reconstruye la historia completa de cada traslado a partir de los eventos registrados.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div class="flex-grow-1 position-relative" style="max-width: 340px;">
+                <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                <input type="text" id="auditSearchInput" class="form-control rounded-pill bg-light border-0 ps-5 py-2"
+                       placeholder="Buscar por id de traslado, sede o estado...">
+            </div>
+            <div>
+                <form method="GET" action="{{ url_for('logistics_audit.view_movement_audit') }}" class="d-flex gap-2 align-items-center">
+                    <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                        <option value="">Todas las severidades</option>
+                        <option value="NORMAL" {% if filters.get('severity') == 'NORMAL' %}selected{% endif %}>NORMAL</option>
+                        <option value="ALERTA" {% if filters.get('severity') == 'ALERTA' %}selected{% endif %}>ALERTA</option>
+                        <option value="CRITICO" {% if filters.get('severity') == 'CRITICO' %}selected{% endif %}>CRÍTICO</option>
+                    </select>
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="start_date" class="small text-white fw-semibold text-nowrap mb-0">Desde</label>
+                        <input type="date" id="start_date" name="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                               value="{{ request.args.get('start_date', '') }}" title="Filtra los eventos a partir de esta fecha"
+                               min="{{ date_min or '' }}" max="{{ date_max or '' }}" onchange="this.form.submit()">
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="end_date" class="small text-white fw-semibold text-nowrap mb-0">Hasta</label>
+                        <input type="date" id="end_date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                               value="{{ request.args.get('end_date', '') }}" title="Filtra los eventos hasta esta fecha"
+                               min="{{ date_min or '' }}" max="{{ date_max or '' }}" onchange="this.form.submit()">
+                    </div>
+                    {% if filters %}
+                    <a href="{{ url_for('logistics_audit.view_movement_audit') }}" class="btn btn-sm btn-outline-light rounded-pill px-3">Limpiar</a>
+                    {% endif %}
+                </form>
+            </div>
+            </div>
+        </div>
+
+        <!-- Pestañas -->
+        <ul class="nav nav-tabs ph-tabs" id="auditTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="traslados-tab" data-bs-toggle="tab" data-bs-target="#traslados" type="button" role="tab">
+                    <i class="bi bi-truck me-2"></i>Traslados ({{ movements | length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bajas-tab" data-bs-toggle="tab" data-bs-target="#bajas" type="button" role="tab">
+                    <i class="bi bi-x-circle me-2"></i>Cancelación de envíos ({{ bajas | length }})
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="auditTabsContent">
+
+            <!-- ===================== PESTAÑA: TRASLADOS (tarjetas) ===================== -->
+            <div class="tab-pane fade show active" id="traslados" role="tabpanel">
+                {% for mov_data in movements %}
+                {% set mid = mov_data['movement_id'] %}
+
+                {% if mov_data['status'] == 'COMPLETADO' %}
+                    {% set estado_badge = 'ph-badge-success' %}
+                    {% set estado_label = 'Completado' %}
+                {% elif mov_data['status'] == 'CANCELADO_EMISOR' %}
+                    {% set estado_badge = 'bg-danger' %}
+                    {% set estado_label = 'Cancelado' %}
+{% elif mov_data['status'] == 'EN_TRANSITO' %}
+                            {% set estado_badge = 'ph-badge-warning' %}
+                            {% set estado_label = 'En Tránsito' %}
+                {% elif mov_data['status'] %}
+                    {% set estado_badge = 'bg-secondary' %}
+                    {% set estado_label = mov_data['status'] | replace('_', ' ') | title %}
+                {% else %}
+                    {% set estado_badge = 'bg-light text-muted' %}
+                    {% set estado_label = 'Registro histórico' %}
+                {% endif %}
+
+                <div class="ph-audit-card bg-white shadow-sm rounded-4 p-4 mb-4"
+                     data-search="tr-{{ mid }} {{ mov_data['origin_name'] }} {{ mov_data['destination_name'] }} {{ estado_label }}
+                     {% for evt in mov_data['events'] %}{{ evt.action | replace('_', ' ') }} {{ evt.user.name if evt.user else '' }} {{ evt.location.name if evt.location else '' }} {% endfor %}">
+
+                    <!-- Cabecera de la tarjeta -->
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            {% if mov_data['is_retorno'] %}
+                            <div class="ph-audit-num ret me-3">{{ mid }}</div>
+                            {% elif mov_data['is_cancelled'] %}
+                            <div class="ph-audit-num cancel me-3">{{ mid }}</div>
+                            {% else %}
+                            <div class="ph-audit-num dark me-3">{{ mid }}</div>
+                            {% endif %}
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">
+                                    {% if mov_data['is_retorno'] %}Retorno de Disputa{% else %}Traslado{% endif %} {{ mid }}
+                                </h5>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="ph-badge-location">De: {{ mov_data['origin_name'] }}</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="ph-badge-location">A: {{ mov_data['destination_name'] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="badge {{ estado_badge }} rounded-pill px-3 py-2 text-white">{{ estado_label }}</span>
+                            <span class="text-muted small">Último evento: {{ mov_data['last_event'].strftime('%Y-%m-%d %H:%M') if mov_data['last_event'] else '—' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Línea de tiempo -->
+                    <div class="ph-timeline ps-4">
+                        {% for evt in mov_data['events'] %}
+                        {% set data = evt.changed_data or {} %}
+
+                        {% if evt.action == 'DESPACHO_EMISION' %}
+                            {% set tl_style = 'info' %}
+                            {% set tl_label = 'Despacho Emitido' %}
+                            {% set tl_icon = 'bi-truck' %}
+                        {% elif evt.action == 'CANCELACION_PRE_SALIDA' %}
+                            {% set tl_style = 'danger' %}
+                            {% set tl_label = 'Cancelado en Salida' %}
+                            {% set tl_icon = 'bi-x-circle-fill' %}
+                        {% elif evt.action == 'RECEPCION_CONFORME' %}
+                            {% set tl_style = 'success' %}
+                            {% set tl_label = 'Recepción Conforme' %}
+                            {% set tl_icon = 'bi-check-circle-fill' %}
+                        {% elif evt.action == 'RECEPCION_NOVEDAD' %}
+                            {% set tl_style = 'warning' %}
+                            {% set tl_label = 'Recepción con Novedad' %}
+                            {% set tl_icon = 'bi-exclamation-triangle-fill' %}
+                        {% elif evt.action == 'RESOLUCION_DISPUTA' %}
+                            {% set tl_style = 'warning' %}
+                            {% set tl_label = 'Resolución de Disputa' %}
+                            {% set tl_icon = 'bi-gavel' %}
+                        {% else %}
+                            {% set tl_style = 'secondary' %}
+                            {% set tl_label = evt.action | replace('_', ' ') | title %}
+                            {% set tl_icon = 'bi-journal-text' %}
+                        {% endif %}
+
+                        <div class="ph-tl-event tint-{{ tl_style }}">
+                            <div class="ph-tl-dot {{ tl_style }}">
+                                <i class="bi {{ tl_icon }}"></i>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                <div>
+                                    <span class="fw-bold text-dark">{{ tl_label }}</span>
+                                    <div class="text-muted small mt-1">
+                                        <i class="bi bi-clock me-1"></i>{{ evt.timestamp.strftime('%Y-%m-%d %H:%M:%S') if evt.timestamp else '—' }}
+                                        <span class="mx-2">|</span>
+                                        <i class="bi bi-person me-1"></i>{{ evt.user.name if evt.user else ('Usuario ID: ' ~ evt.user_id) }}
+                                        <span class="mx-2">|</span>
+                                        <i class="bi bi-geo-alt me-1"></i>{{ evt.location.name if evt.location else 'Todas (General)' }}
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if evt.severity == 'CRITICO' %}
+                                        <span class="badge bg-danger ph-sev-badge"><i class="bi bi-exclamation-triangle-fill me-1"></i>CRÍTICO</span>
+                                    {% elif evt.severity == 'ALERTA' %}
+                                        <span class="badge ph-badge-warning ph-sev-badge"><i class="bi bi-exclamation-circle-fill me-1"></i>ALERTA</span>
+                                    {% else %}
+                                        <span class="badge bg-success ph-sev-badge"><i class="bi bi-check-circle-fill me-1"></i>NORMAL</span>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-dark rounded-pill px-3" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#evt-{{ evt.id }}" aria-expanded="false">
+                                        <i class="bi bi-eye"></i> Ver Datos
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Detalle desplegable del evento -->
+                            <div id="evt-{{ evt.id }}" class="collapse mt-3">
+                                <div class="ph-tl-detail p-3 bg-light">
+
+                                    {% if evt.action == 'DESPACHO_EMISION' %}
+                                        <div class="table-responsive rounded border">
+                                            <table class="table table-sm table-hover align-middle mb-0 bg-white ph-tbl-despacho">
+                                                <thead class="table-light text-muted small">
+                                                    <tr>
+                                                        <th>SKU</th><th>Producto</th><th>Lote</th><th>Vencimiento</th>
+                                                        <th class="text-center">Cant. Despachada</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="small">
+                                                    {% if data.get('items') %}
+                                                        {% for item in data['items'] %}
+                                                        <tr>
+                                                            <td class="text-muted">{{ item.get('sku', 'N/A') }}</td>
+                                                            <td class="fw-bold">{{ item.get('product_name', 'N/A') | title }}</td>
+                                                            <td>{{ item.get('lot_number', 'N/A') }}</td>
+                                                            <td>{{ item.get('expiration_date', 'N/A') }}</td>
+                                                            <td class="text-center">{{ item.get('dispatched_qty', 0) }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <tr><td colspan="5" class="text-center text-muted py-3">Sin desglose de insumos.</td></tr>
+                                                    {% endif %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% if data.get('stock_impact') %}
+                                        <div class="d-flex gap-3 mt-2 small text-muted">
+                                            <span class="badge bg-light text-danger">Sale de origen: {{ data['stock_impact'].get('origin_current_delta', 0) }}</span>
+                                            <span class="badge bg-light ph-text-warning">Congelado en tránsito: {{ data['stock_impact'].get('origin_transit_delta', 0) }}</span>
+                                        </div>
+                                        {% endif %}
+
+                                    {% elif evt.action == 'CANCELACION_PRE_SALIDA' %}
+                                        <div class="alert alert-danger border-0 mb-3 py-2 d-flex align-items-center">
+                                            <i class="bi bi-x-octagon-fill me-3 fs-4 text-danger"></i>
+                                            <div>
+                                                <strong class="d-block text-dark">Motivo de la cancelación:</strong>
+                                                <span class="text-dark">{{ data.get('reason', '—') }}</span>
+                                            </div>
+                                        </div>
+                                        {% if data.get('stock_impact') %}
+                                        <div class="d-flex gap-3 small text-muted">
+                                            <span class="badge bg-light text-success">Reintegrado al origen: {{ data['stock_impact'].get('origin_current_delta', 0) }}</span>
+                                            <span class="badge bg-light text-muted">Transito liberado: {{ data['stock_impact'].get('origin_transit_delta', 0) }}</span>
+                                        </div>
+                                        {% endif %}
+
+                                    {% elif evt.action in ['RECEPCION_CONFORME', 'RECEPCION_NOVEDAD'] %}
+                                        {% if data.get('notes') %}
+                                        <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
+                                            <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
+                                            <div>
+                                                <strong class="d-block text-dark">Nota de recepción:</strong>
+                                                <span class="text-dark">{{ data['notes'] }}</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if data.get('novelty_type') and data['novelty_type'] != 'SIN_NOVEDAD' %}
+                                        <span class="badge ph-badge-warning mb-2">Novedad: {{ data['novelty_type'] | replace('_', ' ') | title }}</span>
+                                        {% endif %}
+                                        <div class="table-responsive rounded border">
+                                            <table class="table table-sm table-hover align-middle mb-0 bg-white ph-tbl-recepcion">
+                                                <thead class="table-light text-muted small">
+                                                    <tr>
+                                                        <th>Producto</th><th>Lote</th>
+                                                        <th class="text-center">Despachada</th><th class="text-center">Recibida</th>
+                                                        <th class="text-center text-danger">Faltante</th><th>Novedad</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="small">
+                                                    {% if data.get('items') %}
+                                                        {% for item in data['items'] %}
+                                                        <tr>
+                                                            <td class="fw-bold">{{ item.get('product_name', 'N/A') | title }}</td>
+                                                            <td>{{ item.get('lot_number', 'N/A') }}</td>
+                                                            <td class="text-center">{{ item.get('dispatched_qty', 0) }}</td>
+                                                            <td class="text-center">{{ item.get('received_qty', item.get('dispatched_qty', 0)) }}</td>
+                                                            <td class="text-center text-danger fw-bold">{{ item.get('missing_qty', 0) if item.get('missing_qty', 0) > 0 else '-' }}</td>
+                                                            <td>{{ item.get('specific_novelty', 'CONFORME') | replace('_', ' ') | title }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <tr><td colspan="6" class="text-center text-muted py-3">Sin desglose de insumos.</td></tr>
+                                                    {% endif %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% if data.get('erroneous_products_delivered') %}
+                                        <div class="mt-2 small">
+                                            <span class="fw-bold text-dark"><i class="bi bi-box-seam me-1"></i>Productos fuera de guía:</span>
+                                            {% for err in data['erroneous_products_delivered'] %}
+                                            <span class="badge bg-light border text-dark me-1">{{ err.get('product_name', 'N/A') }} ({{ err.get('quantity_delivered', 0) }})</span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                    {% elif evt.action == 'RESOLUCION_DISPUTA' %}
+                                        {% set summary = data.get('resolution_summary') or {} %}
+                                        {% set total_lost = summary.get('lost_total', 0) %}
+                                        {% if total_lost and total_lost > 0 %}
+                                        <div class="alert alert-danger border-0 mb-3 py-2 d-flex align-items-center">
+                                            <i class="bi bi-x-octagon-fill me-3 fs-4 text-danger"></i>
+                                            <div>
+                                                <strong class="d-block text-dark">Mercancía dada de baja / extraviada: {{ "%.2f"|format(total_lost) }} unidades</strong>
+                                                <span class="text-dark small">No se acreditó en destino ni se repuso en origen: se registró como pérdida en ruta.</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if data.get('general_notes') %}
+                                        <div class="alert alert-success border-0 mb-3 py-2 d-flex align-items-center">
+                                            <i class="bi bi-chat-left-text-fill me-3 fs-4 text-success"></i>
+                                            <div>
+                                                <strong class="d-block text-dark">Nota de la resolución:</strong>
+                                                <span class="text-dark">{{ data['general_notes'] }}</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if data.get('items') %}
+                                        <div class="table-responsive rounded border">
+                                            <table class="table table-sm table-hover align-middle mb-0 bg-white ph-tbl-resolucion">
+                                                <thead class="table-light text-muted small">
+                                                    <tr>
+                                                        <th>Lote</th><th>Acción</th>
+                                                        <th class="text-center">Acreditado en destino</th>
+                                                        <th class="text-center">Devuelto al origen</th>
+                                                        <th class="text-center text-danger">Dado de baja / Extraviado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="small">
+                                                    {% for item in data['items'] %}
+                                                    <tr>
+                                                        <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
+                                                        <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
+                                                        <td class="text-center text-success">{{ "%.2f"|format(item.get('credited_qty', 0)) }}</td>
+                                                        <td class="text-center ph-text-warning">{{ "%.2f"|format(item.get('return_qty', 0)) }}</td>
+                                                        <td class="text-center text-danger fw-bold">{{ "%.2f"|format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr><td colspan="5" class="text-center text-muted py-3">Sin desglose de la resolución.</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% endif %}
+                                        {% if data.get('linked_return_movement_id') %}
+                                        <span class="badge ph-badge-warning mt-2"><i class="bi bi-arrow-left-right me-1"></i>Generó retorno automático (id {{ data['linked_return_movement_id'] }})</span>
+                                        {% endif %}
+
+                                    {% else %}
+                                        <p class="text-muted small mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            {{ data | tojson }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-                {% endif %}
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-shield-check fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay traslados registrados</h5>
+                    <p class="mb-0">No se encontraron eventos de auditoría que coincidan con los filtros actuales.</p>
+                </div>
+                {% endfor %}
+            </div>
 
-                <!-- 2. Tabla interna para desglose de mercancía -->
-                {% if data.get('items') %}
-                <h6 class="text-muted mb-2"><i class="bi bi-box-seam me-2"></i>Desglose de Mercancía:</h6>
-                <div class="table-responsive rounded border">
-                    <table class="table table-sm table-hover align-middle mb-0 bg-white">
-                        <thead class="table-light text-muted small">
-                            <tr>
-                                <th>SKU</th>
-                                <th>Producto</th>
-                                <th>Lote</th>
-                                <th>Vencimiento</th>
-                                <th class="text-center">Cant. Despachada</th>
-                                <th class="text-center">Cant. Recibida</th>
-                                <th class="text-center text-danger">Faltante</th>
-                            </tr>
-                        </thead>
-                        <tbody class="small">
-                            <!-- Iteramos sobre el array de items del JSONB -->
-                            {% for item in data.get('items', []) %}
-                            <tr>
-                                <td class="text-muted">{{ item.get('sku', 'N/A') }}</td>
-                                <td class="fw-bold">{{ item.get('product_name', 'N/A') | title }}</td>
-                                <td>{{ item.get('lot_number', 'N/A') }}</td>
-                                <td>{{ item.get('expiration_date', 'N/A') }}</td>
-                                <td class="text-center">{{ item.get('dispatched_qty', 0) }}</td>
-                                <td class="text-center">{{ item.get('received_qty', item.get('dispatched_qty', 0)) }}</td>
-                                
-                                <td class="text-center text-danger fw-bold">
-                                    {% set missing = item.get('missing_qty', 0) %}
-                                    {{ missing if missing > 0 else '-' }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <!-- ===================== PESTAÑA: CANCELACIÓN DE ENVÍOS (tarjetas) ===================== -->
+            <div class="tab-pane fade" id="bajas" role="tabpanel">
+                {% for b in bajas %}
+                <div class="ph-audit-card is-baja bg-white shadow-sm rounded-4 p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="ph-audit-num baja me-3">{{ b['movement_id'] }}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">Cancelación de Envío {{ b['movement_id'] }}</h5>
+                                <div class="text-muted small mt-1">
+                                    Envió: {{ b['dispatcher_name'] }}
+                                    <span class="mx-1 text-secondary">•</span>
+                                    Canceló el envío: {{ b['user_name'] }}
+                                    <span class="mx-1 text-secondary">•</span>
+                                    Sede: {{ b['location_name'] }}
+                                </div>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-2 small">
+                                    <span class="ph-badge-location">De: {{ b['origin_name'] }}</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="ph-badge-location">A: {{ b['destination_name'] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="badge bg-danger rounded-pill px-3 py-2 text-white">CANCELADO</span>
+                            <span class="text-muted small">{{ b['timestamp'].strftime('%Y-%m-%d %H:%M') if b['timestamp'] else '—' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger border-0 mb-3 py-2 d-flex align-items-center">
+                        <i class="bi bi-x-octagon-fill me-3 fs-4 text-danger"></i>
+                        <div>
+                            <strong class="d-block text-dark">Motivo de la cancelación:</strong>
+                            <span class="text-dark">{{ b['reason'] }}</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-ph-info btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#baja-{{ loop.index }}" aria-expanded="false">
+                        <i class="bi bi-list-check me-1"></i> Mercancía cancelada ({{ b['items'] | length }} ítems · {{ b['total_reverted'] }})
+                    </button>
+
+                    <div class="collapse mt-3" id="baja-{{ loop.index }}">
+                        <div class="table-responsive rounded border">
+                            <table class="table table-sm table-hover align-middle mb-0 bg-white ph-tbl-baja">
+                                <thead class="table-light text-muted small">
+                                    <tr>
+                                        <th>SKU</th><th>Producto</th><th>Lote</th><th>Vencimiento</th>
+                                        <th class="text-center text-danger">Cant. Devuelta</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="small">
+                                    {% if b['items'] %}
+                                        {% for item in b['items'] %}
+                                        <tr>
+                                            <td class="text-muted">{{ item.get('sku', 'N/A') }}</td>
+                                            <td class="fw-bold">{{ item.get('product_name', 'N/A') | title }}</td>
+                                            <td>{{ item.get('lot_number', 'N/A') }}</td>
+                                            <td>{{ item.get('expiration_date', 'N/A') }}</td>
+                                            <td class="text-center text-danger fw-bold">{{ item.get('dispatched_qty', 0) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                    <tr><td colspan="5" class="text-center text-muted py-3">No se registró el desglose original del viaje.</td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
                 {% else %}
-                    <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i> No hay un listado de insumos estructurado en este registro.</p>
-                {% endif %}
-                
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-check2-circle fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay envíos cancelados</h5>
+                    <p class="mb-0">Ningún traslado ha sido cancelado.</p>
+                </div>
+                {% endfor %}
             </div>
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="6" class="text-center text-muted py-5">
-            <i class="bi bi-shield-check fs-1 d-block mb-3 text-secondary"></i>
-            <h5>No hay registros de auditoría</h5>
-            <p class="mb-0">No se encontraron eventos logísticos que coincidan con los filtros actuales.</p>
-        </td>
-    </tr>
-    {% endfor %}
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/logistics/movement_audit.js') }}?v=1"></script>
 {% endblock %}

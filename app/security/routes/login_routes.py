@@ -20,7 +20,6 @@ def login():
 
         if estado == "ok":
             login_user(usuario)
-            flash(f'Bienvenido al sistema PH, {usuario.name}', 'success')
             
             sede_id = usuario.locations[0].id if (hasattr(usuario, 'locations') and usuario.locations) else None
             nuevo_ingreso = LoginAudit(

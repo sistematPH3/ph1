@@ -221,5 +221,143 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertEqual(float(returns[0].details[0].quantity), 10.00)
 
 
+# =========================================================================
+    # AYUDA: escenario multi-lote (150 tomates = 100 lote A + 50 lote B)
+    # =========================================================================
+    def _seed_multi_lot(self, status, novelty_type):
+        loc_origin = Location(name="Sede Origen", state="Caracas")
+        loc_dest = Location(name="Sede Destino", state="Caracas")
+        product = Product(name="Tomate", sku="TOM-MULTI")
+        role = Role(name="Administrator")
+        db.session.add(role)
+        db.session.flush()
+        user = User(name="Admin Test", email="admin-multi@test.com",
+                    password_hash="x", role_id=role.id)
+        db.session.add_all([loc_origin, loc_dest, product, user])
+        db.session.flush()
+
+        inv_origin = Inventory(
+            location_id=loc_origin.id, product_id=product.id,
+            current_quantity=0, transit_quantity=0, min_stock=20
+        )
+        db.session.add(inv_origin)
+        db.session.flush()
+
+        mov = Movement(
+            type="TRASLADO",
+            origin_location_id=loc_origin.id,
+            destination_location_id=loc_dest.id,
+            status=status,
+            user_id=user.id
+        )
+        db.session.add(mov)
+        db.session.flush()
+
+        # Lote A: 100 despachadas, llegaron 30 (faltan 70).
+        d_a = MovementDetail(movement_id=mov.id, product_id=product.id, lot_number="LOTE-A",
+                             quantity=100, received_quantity=30, missing_quantity=70)
+        # Lote B: 50 despachadas, llegaron 50 (completo).
+        d_b = MovementDetail(movement_id=mov.id, product_id=product.id, lot_number="LOTE-B",
+                             quantity=50, received_quantity=50, missing_quantity=0)
+        db.session.add_all([d_a, d_b])
+        db.session.flush()
+
+        db.session.add(AuditLog(
+            affected_table="movements",
+            action="RECEPCION_NOVEDAD",
+            severity="ALERTA",
+            user_id=user.id,
+            location_id=loc_dest.id,
+            changed_data={
+                "movement_id": mov.id,
+                "event": "RECEPCION_NOVEDAD",
+                "novelty_type": novelty_type,
+                "notes": "Llegaron 80 de 150",
+                "erroneous_products_delivered": [],
+                "discrepancies": [
+                    {"product_id": product.id, "type": "FALTANTE", "authorized_qty": 100.0,
+                     "physical_received_qty": 30.0, "extra_units": 0.0, "notes": "Faltan 70 lote A"},
+                    {"product_id": product.id, "type": "FALTANTE", "authorized_qty": 50.0,
+                     "physical_received_qty": 50.0, "extra_units": 0.0, "notes": "Lote B completo"}
+                ]
+            }
+        ))
+        db.session.commit()
+
+        return {"mov": mov, "d_a": d_a, "d_b": d_b, "product": product,
+                "origin": loc_origin, "dest": loc_dest, "user": user, "inv_origin": inv_origin}
+
+    # =========================================================================
+    # CASO 3: BAJA POR EXTRAVÍO PARCIAL -> no suma a destino ni al origen;
+    # la cantidad perdida queda registrada en la auditoría con su lote.
+    # =========================================================================
+    def test_baja_extraviado_no_acredita_destino_ni_reintegra_origen(self):
+        # Envían 10 tomates y llegan 8: los 2 faltantes se declaran perdidos.
+        env = self._seed(
+            status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+            dispatched=10, received=8
+        )
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "BAJA_EXTRAVIO_PARCIAL",
+            "general_notes": "Pérdida en ruta, se da de baja el faltante"
+        }, user_id=env["user"].id)
+
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id
+        ).first()
+        db.session.refresh(env["inv_origin"])
+
+        # 1) La disputa queda cerrada.
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+        # 2) Destino recibe SOLO los 8 conformes.
+        self.assertIsNotNone(inv_dest)
+        self.assertEqual(float(inv_dest.current_quantity), 8.00)
+        # 3) El faltante NO vuelve al origen (se perdió en ruta).
+        self.assertEqual(float(env["inv_origin"].current_quantity), 0.00)
+        # 4) No se crea traslado de retorno.
+        self.assertEqual(
+            Movement.query.filter_by(return_of_dispute_id=env["mov"].id).count(), 0
+        )
+        # 5) La auditoría guarda exactamente cuánto y de qué lote se perdió.
+        resolution = AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").first()
+        self.assertIsNotNone(resolution)
+        item = resolution.changed_data["items"][0]
+        self.assertEqual(item["lot_number"], "L-001")
+        self.assertEqual(item["lost_qty"], 2.0)
+        self.assertEqual(resolution.changed_data["resolution_summary"]["lost_total"], 2.0)
+
+    # =========================================================================
+    # CASO 4: MULTI-LOTE -> envío de 150 (100 lote A + 50 lote B), se pierden
+    # 70 del lote A: la auditoría debe registrar el lote y la cantidad exacta.
+    # =========================================================================
+    def test_extraviado_multilote_registra_lote_y_cantidad_correcta(self):
+        env = self._seed_multi_lot(status="NOVEDAD_FALTANTE", novelty_type="FALTANTE")
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['d_a'].id}_action": "BAJA_EXTRAVIO_PARCIAL",
+            f"item_{env['d_b'].id}_action": "BAJA_EXTRAVIO_PARCIAL",
+            "general_notes": "Se perdieron 70 del lote A en ruta"
+        }, user_id=env["user"].id)
+
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id
+        ).first()
+        db.session.refresh(env["inv_origin"])
+
+        # 1) Destino recibe lo que realmente llegó: 30 (lote A) + 50 (lote B) = 80.
+        self.assertIsNotNone(inv_dest)
+        self.assertEqual(float(inv_dest.current_quantity), 80.00)
+        # 2) Los 70 perdidos NO vuelven al origen.
+        self.assertEqual(float(env["inv_origin"].current_quantity), 0.00)
+        # 3) La auditoría registra el extravío POR LOTE.
+        resolution = AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").first()
+        self.assertIsNotNone(resolution)
+        items = {i["lot_number"]: i for i in resolution.changed_data["items"]}
+        self.assertEqual(items["LOTE-A"]["lost_qty"], 70.0)
+        self.assertEqual(items["LOTE-B"]["lost_qty"], 0.0)
+        self.assertEqual(resolution.changed_data["resolution_summary"]["lost_total"], 70.0)
+
+
 if __name__ == "__main__":
     unittest.main()
