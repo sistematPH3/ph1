@@ -1,6 +1,8 @@
 from app import db
+from app.models import Movement
 from app.logistics.requests.movement_dispatch_validators import MovementDispatchValidator
 from app.logistics.repositories.movement_dispatch_repository import MovementDispatchRepository
+
 
 class MovementDispatchService:
 
@@ -25,18 +27,6 @@ class MovementDispatchService:
         origin_id = int(payload['origin_location_id'])
         destination_id = int(payload['destination_location_id'])
 
-        user_locations = getattr(user, 'locations', None)
-        user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
-
-        if getattr(user, 'role_id', None) not in [1] and user_loc_id != origin_id:
-            return {
-                "success": False,
-                "errors": ["No tiene permisos para emitir despachos desde una sede distinta a la asignada."]
-            }, 403
-
-        # Si el despacho se originó como reposición complementaria desde una
-        # disputa, se conserva el vínculo para poder auto-cancelarlo si esa
-        # disputa se abandona sin resolución.
         source_dispute_id = payload.get('source_dispute_id')
         if source_dispute_id is not None:
             try:
@@ -71,24 +61,12 @@ class MovementDispatchService:
         if not reason or not reason.strip():
             return {"success": False, "errors": ["El motivo de cancelación es obligatorio."]}, 400
 
-        try:
-            movement_check = db.session.query(db.models.Movement if hasattr(db, 'models') else MovementDispatchRepository).get(movement_id)
-        except Exception:
-            movement_check = None
+        movement_check = db.session.query(Movement).filter_by(id=movement_id).first()
+        if not movement_check:
+            return {"success": False, "errors": ["El movimiento especificado no existe."]}, 404
 
         try:
             movement = MovementDispatchRepository.cancel_dispatch_transaction(movement_id, user.id, reason)
-            
-            user_locations = getattr(user, 'locations', None)
-            user_loc_id = user_locations[0].id if user_locations else getattr(user, 'location_id', None)
-
-            if getattr(user, 'role_id', None) not in [1] and user_loc_id != movement.origin_location_id:
-                db.session.rollback()
-                return {
-                    "success": False,
-                    "errors": ["Solo el Administrador o el personal de la sede de origen pueden cancelar esta pre-salida."]
-                }, 403
-
             db.session.commit()
             return {
                 "success": True,

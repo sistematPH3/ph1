@@ -26,11 +26,8 @@
                         <a href="{{ url_for('register_consumption.show_consumption_form') }}" class="btn btn-operation active text-decoration-none">
                             <i class="bi bi-fire me-1"></i> Consumo de Cocina
                         </a>
-                        <a href="{{ url_for('logistics_list.movement_list') }}" class="btn btn-outline-secondary btn-operation text-decoration-none">
-                            <i class="bi bi-truck me-1"></i> Traslados
-                        </a>
-                        <a href="{{ url_for('inventory.render_inventory_views') }}" class="btn btn-outline-secondary btn-operation text-decoration-none">
-                            <i class="bi bi-box-seam me-1"></i> Control de Stock
+                        <a href="#" class="btn btn-outline-secondary btn-operation text-decoration-none disabled" aria-disabled="true" title="Próximamente" onclick="return false;">
+                            <i class="bi bi-egg-fried me-1"></i> Mermas
                         </a>
                     </div>
                 </div>
@@ -72,7 +69,7 @@
                         <div class="col-12 col-md-6">
                             <label for="lot_number" class="form-label small fw-bold text-muted d-flex justify-content-between">
                                 <span>Partida / Lote</span>
-                                <small class="text-danger fw-semibold">Sugerido FEFO</small>
+                                <small class="text-danger fw-semibold" id="lotStatusText">Seleccione un producto</small>
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
@@ -133,5 +130,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/inventory/register_consumption.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/inventory/register_consumption.js') }}?v=3.4"></script>
 {% endblock %}

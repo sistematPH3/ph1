@@ -15,7 +15,7 @@ def validate_consumption_payload(data):
             if 'product_id' not in item or not isinstance(item['product_id'], int) or item['product_id'] <= 0:
                 errors[f'item_{idx}_product_id'] = 'Invalid product'
             
-            if 'quantity' not in item or not isinstance(item['quantity'], (int, float)) or item['quantity'] <= 0:
+            if 'quantity' not in item or not isinstance(item['quantity'], (int, float)) or isinstance(item['quantity'], bool) or item['quantity'] <= 0:
                 errors[f'item_{idx}_quantity'] = 'Invalid quantity'
 
             if 'lot_number' in item and item['lot_number'] is not None and not isinstance(item['lot_number'], str):

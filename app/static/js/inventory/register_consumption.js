@@ -13,6 +13,55 @@ document.addEventListener('DOMContentLoaded', () => {
     let cartItems = [];
     let currentLotsData = [];
 
+    const lotStatusText = document.getElementById('lotStatusText');
+
+    const getAutoLotBreakdown = (qty) => {
+        const breakdown = [];
+        let remaining = qty;
+        for (const lot of currentLotsData) {
+            if (remaining <= 0) break;
+            const useFromLot = Math.min(remaining, parseFloat(lot.quantity));
+            if (useFromLot > 0) {
+                breakdown.push({ lot_number: lot.lot_number, qty: useFromLot });
+                remaining -= useFromLot;
+            }
+        }
+        if (remaining > 0.001) {
+            breakdown.push({ lot_number: 'S/L (General)', qty: remaining });
+        }
+        return breakdown;
+    };
+
+    const formatBreakdown = (breakdown) => {
+        if (breakdown.length === 0) return 'General (sin lote)';
+        const parts = breakdown.map(b => `${b.lot_number} (${b.qty.toFixed(2)})`);
+        if (parts.length <= 2) return parts.join(' · ');
+        return `${parts[0]} · … · ${parts[parts.length - 1]}`;
+    };
+
+    const updateLotStatus = () => {
+        if (!lotStatusText) return;
+        if (!lotSelect || !productSelect || !productSelect.value) {
+            lotStatusText.textContent = 'Seleccione un producto';
+            return;
+        }
+        const selectedVal = lotSelect.value;
+        if (selectedVal) {
+            lotStatusText.textContent = `Lote: ${selectedVal}`;
+        } else if (currentLotsData.length > 1) {
+            const qtyVal = parseFloat(inputQuantity.value);
+            if (!isNaN(qtyVal) && qtyVal > 0) {
+                lotStatusText.textContent = `Auto: ${formatBreakdown(getAutoLotBreakdown(qtyVal))}`;
+            } else {
+                lotStatusText.textContent = `Auto (1º: ${currentLotsData[0].lot_number})`;
+            }
+        } else if (currentLotsData.length === 1) {
+            lotStatusText.textContent = `Lote: ${currentLotsData[0].lot_number}`;
+        } else {
+            lotStatusText.textContent = 'General (sin lote)';
+        }
+    };
+
     const updateQuantityConstraint = () => {
         if (!lotSelect || !inputQuantity) return;
         
@@ -60,10 +109,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     defaultOption.textContent = 'Sin lotes específicos (General)';
                     defaultOption.selected = true;
                     lotSelect.appendChild(defaultOption);
+                } else if (currentLotsData.length === 1) {
+                    const onlyLot = currentLotsData[0];
+                    const onlyOption = document.createElement('option');
+                    onlyOption.value = onlyLot.lot_number;
+                    onlyOption.textContent = `${onlyLot.lot_number} (Vence: ${onlyLot.expiration_date} | Disp: ${onlyLot.quantity})`;
+                    onlyOption.dataset.maxQuantity = onlyLot.quantity;
+                    onlyOption.selected = true;
+                    lotSelect.appendChild(onlyOption);
                 } else {
                     const autoOption = document.createElement('option');
                     autoOption.value = '';
-                    autoOption.textContent = '⚡ Descontar por vencimiento más próximo (Sugerido FEFO)';
+                    autoOption.textContent = `⚡ Automático (1º: ${currentLotsData[0].lot_number})`;
                     autoOption.selected = true;
                     lotSelect.appendChild(autoOption);
 
@@ -77,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 lotSelect.disabled = false;
                 updateQuantityConstraint();
+                updateLotStatus();
             }
         } catch (error) {
             lotSelect.innerHTML = '<option value="" selected disabled>Error al cargar lotes</option>';
@@ -90,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lotSelect.innerHTML = '<option value="" selected disabled>Esperando producto...</option>';
             lotSelect.disabled = true;
         }
+        if (lotStatusText) lotStatusText.textContent = 'Seleccione un producto';
         btnAddToList.disabled = true;
         alertContainer.innerHTML = '';
         inputQuantity.value = '';
@@ -145,10 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cartItems.forEach((item, index) => {
             const tr = document.createElement('tr');
+            let displayLot = item.lot_number || 'S/L (General)';
+            if (item.auto_breakdown && item.auto_breakdown.length) {
+                displayLot = item.auto_breakdown.map(b => `${b.lot_number} (${b.qty.toFixed(2)})`).join(' · ');
+            } else if (!item.lot_number && item.nearest_lot) {
+                displayLot = `⚡ ${item.nearest_lot}`;
+            }
             tr.innerHTML = `
                 <td class="fw-bold text-dark small">${item.product_name}</td>
                 <td class="text-center text-danger fw-bold small">${item.quantity.toFixed(2)}</td>
-                <td class="text-center small"><span class="badge bg-light text-dark border font-monospace">${item.lot_number || 'Sugerido FEFO'}</span></td>
+                <td class="text-center small"><span class="badge bg-light text-dark border font-monospace">${displayLot}</span></td>
                 <td class="small text-muted">${item.notes || '-'}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeItem(${index})">
@@ -188,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (lotSelect) {
         lotSelect.addEventListener('change', () => {
             updateQuantityConstraint();
+            updateLotStatus();
         });
     }
 
@@ -195,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputQuantity.value.length > 8) {
             inputQuantity.value = inputQuantity.value.slice(0, 8);
         }
-        
+
         const selectedLotVal = lotSelect ? lotSelect.value : '';
         if (selectedLotVal) {
             const lotObj = currentLotsData.find(l => l.lot_number === selectedLotVal);
@@ -207,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        updateLotStatus();
     });
 
     btnAddToList.addEventListener('click', () => {
@@ -235,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (qty > maxQty) {
                     alertContainer.innerHTML = `
                         <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
-                            <i class="bi bi-exclamation-circle-fill me-2"></i> El lote seleccionado solo cuenta con ${maxQty.toFixed(2)} unidades. Para consumos mayores use la opción Sugerido FEFO.
+                            <i class="bi bi-exclamation-circle-fill me-2"></i> El lote seleccionado solo cuenta con ${maxQty.toFixed(2)} unidades. Para consumos mayores use la opción automática.
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     `;
@@ -260,12 +327,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             cartItems[existingIndex].quantity = newTotalQty;
+            if (!lotVal) {
+                cartItems[existingIndex].auto_breakdown = getAutoLotBreakdown(newTotalQty);
+            }
             if (notes) cartItems[existingIndex].notes = cartItems[existingIndex].notes + " | " + notes;
         } else {
+            const nearest_lot = (!lotVal && currentLotsData.length > 0) ? currentLotsData[0].lot_number : null;
+            const auto_breakdown = (!lotVal && currentLotsData.length > 0) ? getAutoLotBreakdown(qty) : [];
             cartItems.push({
                 product_id: productId,
                 product_name: productName,
                 lot_number: lotVal,
+                nearest_lot: nearest_lot,
+                auto_breakdown: auto_breakdown,
                 quantity: qty,
                 notes: notes
             });
@@ -280,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
         inputQuantity.removeAttribute('max');
         inputQuantity.setAttribute('placeholder', '0.00');
         inputNotes.value = '';
+        updateLotStatus();
         renderCart();
     });
 

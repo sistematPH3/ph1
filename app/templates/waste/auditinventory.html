@@ -239,7 +239,7 @@
                                     <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
                                         <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
                                     </div>
-                                    <div class="text-secondary small mb-0">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
+                                    <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
 
                                     {% if e.timed_out_note %}
                                     <div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>{{ e.timed_out_note }}</div>
@@ -430,7 +430,7 @@
                                     <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
                                         <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
                                     </div>
-                                    <div class="text-secondary small mb-0">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
+                                    <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Registro de movimiento de inventario' }}</div>
 
                                     {% if e.timed_out_note %}
                                     <div class="badge bg-secondary p-2 mt-2"><i class="bi bi-clock-history me-1"></i>{{ e.timed_out_note }}</div>
@@ -487,7 +487,10 @@
 
                     <div class="mb-3" id="editQuantityContainer" style="display: none;">
                         <label for="newQuantityInput" class="form-label fw-bold small text-muted">Nueva Cantidad Real Gastada</label>
-                        <input type="number" step="0.01" min="0" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">
+                        <input type="number" step="0.01" min="0" max="999999.99" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">
+
+                        <label for="editLotInput" class="form-label fw-bold small text-muted mt-3">N° de Lote Afectado (Opcional)</label>
+                        <input type="text" class="form-control font-monospace" id="editLotInput" placeholder="Ej: LOTE-001">
                     </div>
 
                     <div class="mb-3">
@@ -506,5 +509,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}?v=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}?v=4"></script>
 {% endblock %}

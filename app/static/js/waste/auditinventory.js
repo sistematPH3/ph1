@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', function () {
             actionType.value = type;
             actionNotes.value = '';
             newQuantityInput.value = '';
+            const editLotInput = document.getElementById('editLotInput');
+            if (editLotInput) editLotInput.value = '';
             document.getElementById('actionAuditModalLabel').innerText = 'Confirmar Acción: ' + type;
             editQuantityContainer.style.display = type === 'EDITAR' ? 'block' : 'none';
             if (actionModal) actionModal.show();
@@ -39,12 +41,34 @@ document.addEventListener('DOMContentLoaded', function () {
         btnConfirm.addEventListener('click', async function () {
             const notes = actionNotes.value.trim();
             if (!notes) {
-                alert('Debe justificar obligatoriamente el motivo de la acción.');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Motivo Obligatorio',
+                    text: 'Debe justificar obligatoriamente el motivo de la acción.',
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
                 return;
             }
             const type = actionType.value;
             if (type === 'EDITAR' && newQuantityInput.value === '') {
-                alert('Debe ingresar la nueva variación para editar el registro.');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Cantidad Requerida',
+                    text: 'Debe ingresar la nueva variación para editar el registro.',
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
+                return;
+            }
+            if (type === 'EDITAR' && newQuantityInput.value !== '' && parseFloat(newQuantityInput.value) > 999999.99) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Cantidad Excesiva',
+                    text: 'La cantidad ingresada es excesiva (máx. 999999.99).',
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
                 return;
             }
 
@@ -59,7 +83,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         log_id: actionLogId.value,
                         action_type: type,
                         notes: notes,
-                        new_quantity: newQuantityInput.value ? parseFloat(newQuantityInput.value) : null
+                        new_quantity: newQuantityInput.value ? parseFloat(newQuantityInput.value) : null,
+                        lot_number: document.getElementById('editLotInput') ? document.getElementById('editLotInput').value.trim() || null : null
                     })
                 });
                 const result = await response.json();
@@ -67,10 +92,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (actionModal) actionModal.hide();
                     window.location.reload();
                 } else {
-                    alert('Error: ' + result.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'No se pudo procesar',
+                        html: result.message || 'Ocurrió un error al procesar la acción.',
+                        confirmButtonColor: '#B31F24',
+                        confirmButtonText: 'Cerrar'
+                    });
                 }
             } catch (error) {
-                alert('Error en la comunicación con el servidor.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de Conexión',
+                    text: 'No se pudo comunicar con el servidor.',
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
             } finally {
                 btnConfirm.disabled = false;
                 btnConfirm.innerText = 'Procesar Acción';

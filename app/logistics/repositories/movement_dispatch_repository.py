@@ -141,9 +141,15 @@ class MovementDispatchRepository:
                 p_id = c_data.get('product_id')
                 l_num = c_data.get('lot_number')
                 qty_change = c_data.get('quantity_changed', 0.0)
-                if (p_id is None or int(p_id) == prod_id) and l_num and l_num != 'N/A':
+                try:
+                    p_matches = p_id is not None and int(p_id) == prod_id
+                    qty_delta = abs(float(qty_change))
+                except (ValueError, TypeError):
+                    p_matches = False
+                    qty_delta = 0.0
+                if p_matches and l_num and l_num != 'N/A':
                     l_num_clean = str(l_num).strip()
-                    salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(float(qty_change))
+                    salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + qty_delta
 
         lots_raw = []
         for lot_num, data in entradas_lote.items():
@@ -218,6 +224,24 @@ class MovementDispatchRepository:
             if curr_qty < quantity:
                 raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {curr_qty}, Solicitado: {quantity}")
 
+            # Validación del lote contra la disponibilidad real por partida.
+            # No se usa dict `reserved` porque get_product_lots_available ya
+            # descuenta los MovementDetail flushed por renglones anteriores
+            # del mismo payload (via salidas_traslado).
+            available_lots = MovementDispatchRepository.get_product_lots_available(origin_id, product_id)[1]
+            matching_lot = next((l for l in available_lots if l['lot_number'] == lot_number), None)
+
+            if not matching_lot:
+                raise ValueError(f"El lote {lot_number} no existe o no posee disponibilidad en la sede origen.")
+
+            lot_disp = Decimal(str(matching_lot['available_quantity']))
+
+            if lot_disp < quantity:
+                raise ValueError(
+                    f"El lote {lot_number} solo dispone de {max(lot_disp, Decimal('0.00')):.2f} unidades. "
+                    f"Cantidad solicitada: {quantity:.2f}."
+                )
+
             # Operación segura
             inventory.current_quantity = curr_qty - quantity
             inventory.transit_quantity = trans_qty + quantity
@@ -242,7 +266,7 @@ class MovementDispatchRepository:
             )
             db.session.add(detail)
 
-            product = db.session.query(Product).get(product_id)
+            product = db.session.get(Product, product_id)
             audit_items.append({
                 'product_id': product_id,
                 'sku': product.sku if product else f"PROD-{product_id}",
@@ -286,6 +310,9 @@ class MovementDispatchRepository:
 
         if not movement:
             raise ValueError("El movimiento especificado no existe.")
+
+        if movement.type != 'DESPACHO':
+            raise ValueError("Solo los despachos pueden cancelarse como pre-salida.")
 
         if movement.status != 'EN_TRANSITO':
             raise ValueError(f"No se puede cancelar un movimiento en estado '{movement.status}'.")

@@ -19,7 +19,9 @@ class MovementDispatchValidator:
         if not destination_id or not str(destination_id).isdigit() or int(destination_id) <= 0:
             errors.append("Debe seleccionar una sede de destino válida.")
 
-        if origin_id and destination_id and int(origin_id) == int(destination_id):
+        if (not errors and origin_id and destination_id
+                and str(origin_id).isdigit() and str(destination_id).isdigit()
+                and int(origin_id) == int(destination_id)):
             errors.append("La sede de origen y la sede de destino no pueden ser la misma.")
 
         # Campo opcional: si el despacho se genera como reposición complementaria
