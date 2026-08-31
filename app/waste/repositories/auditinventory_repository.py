@@ -119,20 +119,24 @@ class AuditInventoryRepository:
         return result[0] if result else 0.00
 
     @staticmethod
-    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes, original_log_id=None, new_original_severity=None):
+    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes, original_log_id=None, new_original_severity=None, lot_number=None):
         insert_log_query = text("""
             INSERT INTO audit_logs (user_id, location_id, action, severity, timestamp, changed_data)
             VALUES (:user_id, :location_id, :action, :severity, NOW(), :changed_data)
         """)
         
-        changed_data_json = json.dumps({
+        changed_data = {
             'product_id': product_id,
             'product_name': product_name,
             'previous_quantity': prev_qty,
             'new_quantity': new_qty,
             'quantity_changed': qty_changed,
             'notes': notes
-        })
+        }
+        if lot_number:
+            changed_data['lot_number'] = lot_number
+
+        changed_data_json = json.dumps(changed_data)
 
         db.session.execute(insert_log_query, {
             'user_id': user_id,

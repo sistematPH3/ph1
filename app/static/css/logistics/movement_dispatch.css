@@ -18,7 +18,7 @@ input[type=number]::-webkit-outer-spin-button {
 }
 
 input[type=number] {
-    -mozappearance: textfield !important;
+    -moz-appearance: textfield !important;
 }
 
 .ph-card {
@@ -382,8 +382,8 @@ input[type=number] {
     }
 
     .ph-table tbody td:nth-child(1)::before { content: "Producto / Insumo"; }
-    .ph-table tbody td:nth-child(2)::before { content: "Cantidad"; }
-    .ph-table tbody td:nth-child(3)::before { content: "N° de Lote"; }
+    .ph-table tbody td:nth-child(2)::before { content: "N° de Lote"; }
+    .ph-table tbody td:nth-child(3)::before { content: "Cantidad"; }
     .ph-table tbody td:nth-child(4)::before { content: "Fecha de Vencimiento"; }
 
     .ph-table tbody td:last-child {

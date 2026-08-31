@@ -16,6 +16,17 @@ def get_consumption_form_data(user_id):
 
     return locations, is_admin
 
+def user_can_access_location(user_id, location_id):
+    if not user_id:
+        return False
+    user = RegisterConsumptionRepository.get_user_by_id(int(user_id))
+    if not user:
+        return False
+    if user.role_id == 1:
+        return RegisterConsumptionRepository.is_valid_sede(location_id)
+    allowed = [loc.id for loc in RegisterConsumptionRepository.get_user_locations(int(user_id))]
+    return location_id in allowed
+
 def get_location_products(location_id):
     products = RegisterConsumptionRepository.get_products_in_inventory(location_id)
     return [{'id': p.id, 'name': p.name} for p in products]
@@ -25,6 +36,11 @@ def get_product_lots(location_id, product_id):
 
 def register_consumption(location_id, items, user_id):
     try:
+        if not user_can_access_location(user_id, location_id):
+            return {'success': False, 'message': 'No tienes permisos para registrar consumo en esta sede.'}
+
+        reserved = {}
+
         for item in items:
             product_id = item['product_id']
             quantity_to_consume = float(item['quantity'])
@@ -48,15 +64,19 @@ def register_consumption(location_id, items, user_id):
             if specified_lot and specified_lot.strip():
                 specified_lot_clean = specified_lot.strip()
                 matching_lot = next((l for l in available_lots if l['lot_number'] == specified_lot_clean), None)
-                
-                if not matching_lot or matching_lot['quantity'] < quantity_to_consume:
+
+                used_so_far = reserved.get((product_id, specified_lot_clean), 0.0)
+                lot_disp_total = matching_lot['quantity'] if matching_lot else 0.0
+                lot_disp_net = lot_disp_total - used_so_far
+
+                if not matching_lot or lot_disp_net < quantity_to_consume:
                     db.session.rollback()
-                    lot_disp = matching_lot['quantity'] if matching_lot else 0.0
                     return {
                         'success': False, 
-                        'message': f'El lote {specified_lot_clean} solo dispone de {lot_disp:.2f} unidades. Cantidad solicitada: {quantity_to_consume:.2f}.'
+                        'message': f'El lote {specified_lot_clean} solo dispone de {max(lot_disp_net, 0.0):.2f} unidades. Cantidad solicitada: {quantity_to_consume:.2f}.'
                     }
 
+                reserved[(product_id, specified_lot_clean)] = used_so_far + quantity_to_consume
                 new_stock = stock_actual - quantity_to_consume
                 inventory_item.current_quantity = new_stock
                 RegisterConsumptionRepository.record_lot_consumption_audit(
@@ -75,9 +95,13 @@ def register_consumption(location_id, items, user_id):
                 for l in available_lots:
                     if remaining_qty <= 0:
                         break
-                    lot_available = float(l['quantity'])
+                    used_so_far = reserved.get((product_id, l['lot_number']), 0.0)
+                    lot_available = float(l['quantity']) - used_so_far
+                    if lot_available <= 0:
+                        continue
                     qty_from_lot = min(remaining_qty, lot_available)
-                    
+                    reserved[(product_id, l['lot_number'])] = used_so_far + qty_from_lot
+
                     next_stock = current_global_stock - qty_from_lot
                     RegisterConsumptionRepository.record_lot_consumption_audit(
                         inventory_item=inventory_item,
@@ -107,7 +131,7 @@ def register_consumption(location_id, items, user_id):
                 inventory_item.current_quantity = current_global_stock
 
         db.session.commit()
-        return {'success': True, 'message': 'Consumo registrado exitosamente con trazabilidad FEFO.'}
+        return {'success': True, 'message': 'Consumo registrado exitosamente con trazabilidad por lote.'}
         
     except Exception as e:
         db.session.rollback()

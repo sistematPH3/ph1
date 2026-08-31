@@ -22,18 +22,13 @@ def dispatch_form_view():
     elif hasattr(current_user, 'location_id'):
         user_location_id = current_user.location_id
 
-    is_admin = getattr(current_user, 'role_id', None) == 1
-    user_role_id = getattr(current_user, 'role_id', None)
-    user_role_name = getattr(current_user, 'role_name', None)
-    is_read_only = user_role_id in [5, 6] or user_role_name in ['management', 'finance']
-
     return render_template(
         'logistics/movement_dispatch.html',
-        is_read_only=is_read_only,
         locations=locations,
         products=products,
         user_location_id=user_location_id,
-        is_admin=is_admin,
+        is_admin=True,
+        is_read_only=False,
         dispute_id=dispute_id  # Se pasa a la plantilla HTML
     )
 
