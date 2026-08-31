@@ -16,6 +16,10 @@ class RegisterConsumptionRepository:
         return Location.query.filter(Location.is_active == True, Location.id != 1).all()
 
     @staticmethod
+    def is_valid_sede(location_id):
+        return Location.query.filter(Location.id == location_id, Location.is_active == True, Location.id != 1).first() is not None
+
+    @staticmethod
     def get_user_locations(user_id):
         loc_ids_result = db.session.query(user_locations.c.location_id).filter(user_locations.c.user_id == user_id).all()
         loc_ids = [row[0] for row in loc_ids_result]
@@ -58,7 +62,7 @@ class RegisterConsumptionRepository:
             ).join(
                 Purchase, PurchaseDetail.purchase_id == Purchase.id
             ).filter(
-                func.upper(Purchase.status) == 'COMPLETED',
+                func.upper(Purchase.status).in_(['COMPLETED', 'COMPLETADO']),
                 PurchaseDetail.product_id == prod_id,
                 PurchaseDetail.lot_number.isnot(None),
                 PurchaseDetail.lot_number != ''
@@ -81,7 +85,7 @@ class RegisterConsumptionRepository:
                 Movement, MovementDetail.movement_id == Movement.id
             ).filter(
                 Movement.origin_location_id == 1,
-                Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO']),
+                Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO', 'CANCELADO_EMISOR']),
                 MovementDetail.product_id == prod_id,
                 MovementDetail.lot_number.isnot(None)
             ).group_by(MovementDetail.lot_number).all()
@@ -89,7 +93,7 @@ class RegisterConsumptionRepository:
             salidas_traslados = {r.lot_number.strip(): float(r.total_out or 0.0) for r in movements_out if r.lot_number}
 
         else:
-            valid_statuses = ['COMPLETED', 'NOVEDAD_FALTANTE', 'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
+            valid_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE', 'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
             movement_records = db.session.query(
                 MovementDetail.lot_number,
                 MovementDetail.expiration_date,
@@ -135,11 +139,21 @@ class RegisterConsumptionRepository:
                 
             p_id = c_data.get('product_id')
             l_num = c_data.get('lot_number')
-            qty_change = c_data.get('quantity_changed', 0.0)
-            
-            if (p_id is None or int(p_id) == prod_id) and l_num and l_num != 'N/A':
+            try:
+                qty_change = float(c_data.get('quantity_changed', 0.0))
+            except (TypeError, ValueError):
+                qty_change = 0.0
+
+            matches_product = False
+            if p_id is not None:
+                try:
+                    matches_product = int(p_id) == prod_id
+                except (TypeError, ValueError):
+                    matches_product = False
+
+            if matches_product and l_num and l_num != 'N/A':
                 l_num_clean = str(l_num).strip()
-                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(float(qty_change))
+                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(qty_change)
 
         lots = []
         for lot_num, data in entradas_por_lote.items():

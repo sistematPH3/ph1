@@ -138,7 +138,7 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
         
     return formatted_logs
 
-def process_inventory_action(log_id, current_user, action_type, new_quantity_requested=None, justification_notes=""):
+def process_inventory_action(log_id, current_user, action_type, new_quantity_requested=None, justification_notes="", lot_number=None):
     original_log_tuple = AuditInventoryRepository.get_audit_log_by_id(log_id)
     if not original_log_tuple:
         return {'success': False, 'message': 'El registro de auditoría solicitado no existe.'}
@@ -255,15 +255,32 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
             required_adjustment = new_requested_dec - original_qty_changed
 
         final_action = f"AJUSTE_{original_log_tuple.action}"
-        final_notes = f"Edición del log #{log_id} (Gasto original: {abs_original}, Nuevo gasto: {abs(new_requested_dec)}). Motivo: {justification_notes}"
+        base_notes = f"Edición del log #{log_id}"
+        if is_consumption:
+            final_notes = (
+                f"{base_notes}: cantidad corregida de {abs_original:.2f} a {abs_new:.2f} unidades."
+                f" Motivo: {justification_notes}"
+            )
+        else:
+            final_notes = (
+                f"{base_notes}: nueva variación de {original_qty_changed:.2f} a {new_requested_dec:.2f}."
+                f" Motivo: {justification_notes}"
+            )
+        if lot_number:
+            final_notes = f"{final_notes}\nLote afectado: {lot_number}"
         new_severity_status = 'EDITADO'
     else:
         return {'success': False, 'message': 'Acción no reconocida.'}
 
     if required_adjustment < Decimal('0') and current_stock < abs(required_adjustment):
+        deficit = abs(required_adjustment) - current_stock
         return {
             'success': False, 
-            'message': f'Imposible procesar. Stock insuficiente (Disponible: {current_stock}, Requerido: {abs(required_adjustment)}).'
+            'message': (
+                f"El ajuste excede el stock disponible de {product_name}. "
+                f"Stock actual: {current_stock:.2f} unidades; este ajuste intenta descontar "
+                f"{abs(required_adjustment):.2f} unidades. Faltan {deficit:.2f} unidades para poder procesarlo."
+            )
         }
 
     new_qty = current_stock + required_adjustment
@@ -282,7 +299,8 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
             qty_changed=float(required_adjustment),
             notes=final_notes,
             original_log_id=log_id,
-            new_original_severity=new_severity_status
+            new_original_severity=new_severity_status,
+            lot_number=lot_number
         )
     except Exception as e:
         return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}

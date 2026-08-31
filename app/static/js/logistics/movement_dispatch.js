@@ -262,15 +262,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <small class="text-muted ps-2 pt-1 d-block total-stock-info"></small>
             </td>
             <td>
-                <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control ph-pill-input quantity-input text-center fw-bold" placeholder="0.00" required>
-                <div class="invalid-feedback ps-2">La cantidad debe ser mayor a 0.</div>
-                <div class="lot-max-hint text-center"></div>
-            </td>
-            <td>
                 <select class="form-select ph-pill-input lot-select font-monospace" required disabled>
                     <option value="" selected disabled>Seleccione Lote...</option>
                 </select>
                 <div class="invalid-feedback ps-2">Debe seleccionar un lote.</div>
+            </td>
+            <td>
+                <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control ph-pill-input quantity-input text-center fw-bold" placeholder="0.00" required>
+                <div class="invalid-feedback ps-2">La cantidad debe ser mayor a 0.</div>
+                <div class="lot-max-hint text-center"></div>
             </td>
             <td>
                 <input type="date" class="form-control ph-pill-input exp-input bg-light text-center" readonly required>
@@ -465,12 +465,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnSubmit.innerHTML = originalBtnHtml;
                 btnSubmit.disabled = false;
                 const errorMsg = result.errors ? result.errors.join('\n') : (result.message || 'Error en el despacho.');
-                alert(`Error al procesar despacho:\n${errorMsg}`);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al procesar despacho',
+                    text: errorMsg,
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
             }
         } catch (error) {
             btnSubmit.innerHTML = originalBtnHtml;
             btnSubmit.disabled = false;
-            alert('Error de conexión con el servidor.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'No se pudo conectar con el servidor. Intente nuevamente.',
+                confirmButtonColor: '#B31F24',
+                confirmButtonText: 'Cerrar'
+            });
         }
     });
 });

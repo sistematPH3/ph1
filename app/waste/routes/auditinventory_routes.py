@@ -126,13 +126,15 @@ def execute_audit_action():
     action_type = data.get('action_type')
     notes = data.get('notes')
     new_quantity = data.get('new_quantity')
+    lot_number = data.get('lot_number')
     
     result = process_inventory_action(
         log_id=log_id, 
         current_user=current_user, 
         action_type=action_type, 
         new_quantity_requested=new_quantity, 
-        justification_notes=notes
+        justification_notes=notes,
+        lot_number=lot_number
     )
     
     status_code = 200 if result.get('success') else 400

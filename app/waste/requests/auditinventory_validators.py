@@ -48,7 +48,11 @@ def validate_audit_action(data):
             errors['new_quantity'] = 'Debe especificar una nueva variación para procesar la edición.'
         else:
             try:
-                float(new_qty)
+                new_qty_float = float(new_qty)
+                if new_qty_float <= 0:
+                    errors['new_quantity'] = 'La cantidad debe ser mayor a 0.'
+                elif new_qty_float > 999999.99:
+                    errors['new_quantity'] = 'La cantidad ingresada es excesiva (máx. 999999.99).'
             except (ValueError, TypeError):
                 errors['new_quantity'] = 'La cantidad debe ser un valor numérico.'
 

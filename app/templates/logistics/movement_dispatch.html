@@ -3,7 +3,7 @@
 {% block title %}Emisión de Despachos e Insumos - PML{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=4.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=4.3">
 
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
     <form id="dispatchForm" data-is-read-only="{{ 'true' if is_read_only else 'false' }}" novalidate>
@@ -24,15 +24,6 @@
                     <p class="text-muted mb-0">Gestión y transferencia de inventario entre sedes de la red.</p>
                 </div>
             </div>
-
-            {% if is_read_only %}
-            <div class="alert alert-warning d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
-                <i class="bi bi-shield-lock-fill fs-4 me-3 text-warning"></i>
-                <div>
-                    <strong>Modo de Solo Lectura:</strong> Tu rol te permite visualizar la interfaz de despacho, pero no puedes emitir transferencias de inventario.
-                </div>
-            </div>
-            {% endif %}
 
             <div class="row g-3 align-items-center mb-4">
                 <div class="col-lg-5">
@@ -113,8 +104,8 @@
                     <thead>
                         <tr>
                             <th style="width: 28%;">PRODUCTO / INSUMO</th>
-                            <th style="width: 14%;">CANTIDAD</th>
                             <th style="width: 22%;">N° DE LOTE</th>
+                            <th style="width: 14%;">CANTIDAD</th>
                             <th style="width: 20%;">VENCIMIENTO</th>
                             <th style="width: 16%;">ACCIÓN</th>
                         </tr>
@@ -219,5 +210,6 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_dispatch.js') }}?v=4.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_dispatch.js') }}?v=4.3"></script>
 {% endblock %}
