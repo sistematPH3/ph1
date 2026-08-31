@@ -1,47 +1,198 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}?v=4">
 
 <header class="dashboard-header">
     <h1>Panel de Sub-Gerencia</h1>
-    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
+    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>. Resumen operativo de tus sedes.</p>
 </header>
 
-<!-- Componente Reusable de Alertas de Stock -->
-{% include 'alerts/_alerts_stock.html' %}
+<!-- Métricas en vivo -->
+<div class="metric-grid">
+    <div class="metric-dash metric-red">
+        <i class="fas fa-truck"></i>
+        <span class="metric-number">{{ en_camino_count }}</span>
+        <span class="metric-label">Traslados en camino</span>
+    </div>
+    <div class="metric-dash metric-amber">
+        <i class="fas fa-box-open"></i>
+        <span class="metric-number">{{ por_recibir_count }}</span>
+        <span class="metric-label">Traslados por recibir</span>
+    </div>
+    <div class="metric-dash metric-coral">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span class="metric-number">{{ critical_count }}</span>
+        <span class="metric-label">Alertas de stock crítico</span>
+    </div>
+</div>
 
-<div class="dashboard-grid">
-    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-boxes"></i>
-            <h3>Inventario</h3>
-            <p>Gestionar insumos y stock</p>
+<!-- Últimos traslados -->
+<div class="dash-panel accent-red">
+    <div class="dash-panel-header">
+        <div>
+            <h2 class="dash-panel-title"><i class="fas fa-truck"></i> Últimos traslados</h2>
+            <p class="dash-panel-sub">Actividad reciente en tus sedes</p>
         </div>
-    </a>
+        <a href="{{ url_for('logistics_list.movement_list') }}" class="dash-link">Ver listado completo <i class="fas fa-arrow-right"></i></a>
+    </div>
 
-    <a href="{{ url_for('purchase_management.index') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-shopping-cart"></i>
-            <h3>Compras</h3>
-            <p>Historial y proveedores</p>
-        </div>
-    </a>
+    <div class="table-responsive">
+        <table class="table dash-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Origen y Destino</th>
+                    <th>Contenido</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in recent_movements %}
+                <tr>
+                    <td class="fw-bold">#{{ m.id }}</td>
+                    <td>
+                        <span class="text-dark d-block">{{ m.date.strftime('%Y-%m-%d') }}</span>
+                        <span class="text-muted small">{{ m.date.strftime('%I:%M %p') }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column gap-1">
+                            <span class="route-line">{{ m.origin }} <i class="fas fa-arrow-right text-muted small"></i> {{ m.destination }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="dash-chip">{{ m.num_products }} prod. · {{ m.total_qty | ph_qty }} unds.</span>
+                    </td>
+                    <td><span class="dash-badge {{ m.status_cls }}">{{ m.status_label }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No hay traslados registrados en tus sedes.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-truck"></i>
-            <h3>Traslados</h3>
-            <p>Logística de sucursales</p>
+<div class="dash-row">
+    <!-- Stock crítico -->
+    <div class="dash-panel accent-coral">
+        <div class="dash-panel-header">
+            <div>
+                <h2 class="dash-panel-title"><i class="fas fa-exclamation-triangle"></i> Stock crítico</h2>
+                <p class="dash-panel-sub">Insumos por debajo o al límite del mínimo</p>
+            </div>
         </div>
-    </a>
 
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-arrow-down"></i>
-            <h3>Mermas</h3>
-            <p>Control de pérdidas</p>
+        <div class="table-responsive">
+            <table class="table dash-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Insumo</th>
+                        <th>Sede</th>
+                        <th class="text-center">Actual / Mínimo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in critical_stock %}
+                    <tr>
+                        <td class="fw-bold text-dark">{{ a.product_name }}</td>
+                        <td><span class="dash-chip">{{ a.location_name }}</span></td>
+                        <td class="text-center">
+                            <span class="dash-qty-critical">{{ a.new_quantity | ph_qty }}</span>
+                            <span class="text-muted">/ {{ a.min_stock | ph_qty }} {{ a.unit_of_measure }}</span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">Sin alertas de stock crítico en tus sedes.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </a>
+    </div>
+
+    <!-- Vencimientos próximos -->
+    <div class="dash-panel accent-amber">
+        <div class="dash-panel-header">
+            <div>
+                <h2 class="dash-panel-title"><i class="fas fa-calendar-times"></i> Vencimientos próximos</h2>
+                <p class="dash-panel-sub">Lotes por vencer en los próximos 90 días</p>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table dash-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Lote</th>
+                        <th class="text-center">Vence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lot in expiring_lots %}
+                    <tr>
+                        <td>
+                            <span class="fw-bold text-dark d-block">{{ lot.product }}</span>
+                            <span class="text-muted small">{{ lot.location }}</span>
+                        </td>
+                        <td><span class="dash-lot">{{ lot.lot }}</span></td>
+                        <td class="text-center">
+                            <span class="exp-date d-block">{{ lot.expiration.strftime('%Y-%m-%d') }}</span>
+                            {% if lot.critical %}
+                            <span class="dash-badge dash-badge-danger">{{ lot.days }} días</span>
+                            {% else %}
+                            <span class="dash-badge dash-badge-warning">{{ lot.days }} días</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">Sin lotes próximos a vencer.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Acceso rápido -->
+<div class="dash-panel access-panel">
+    <div class="dash-panel-header">
+        <div>
+            <h2 class="dash-panel-title"><i class="fas fa-th-large"></i> Acceso rápido</h2>
+            <p class="dash-panel-sub">Módulos disponibles para tu rol</p>
+        </div>
+    </div>
+    <div class="dashboard-grid access-grid">
+        <a href="{{ url_for('inventory.list_products') }}" class="card-link">
+            <div class="card-dash">
+                <i class="fas fa-boxes"></i>
+                <h3>Inventario</h3>
+                <p>Gestionar insumos y stock</p>
+            </div>
+        </a>
+
+        <a href="{{ url_for('logistics_list.movement_list') }}" class="card-link">
+            <div class="card-dash">
+                <i class="fas fa-truck"></i>
+                <h3>Traslados</h3>
+                <p>Logística de sucursales</p>
+            </div>
+        </a>
+
+        <a href="#" class="card-link">
+            <div class="card-dash">
+                <i class="fas fa-arrow-down"></i>
+                <h3>Mermas</h3>
+                <p>Control de pérdidas</p>
+            </div>
+        </a>
+    </div>
 </div>
 {% endblock %}

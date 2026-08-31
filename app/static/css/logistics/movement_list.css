@@ -223,7 +223,7 @@
 }
 
 /* Caja de Detalles Desplegable */
-tr.collapse td, tr.collapsing td {
+tr.ph-detail-row td {
     padding: 0 !important;
     border-bottom: none;
 }
@@ -254,9 +254,6 @@ tr.collapse td, tr.collapsing td {
     color: #af1515;
 }
 
-/* Tabla de contenido del desplegable (limpia y legible) */
-.table-responsive.ph-detail-scroll {
-}
 
 .ph-detail-lot {
     background-color: #fff4e5;
@@ -286,9 +283,16 @@ tr.collapse td, tr.collapsing td {
 }
 
 /* ==========================================================================
-   VISTA MÓVIL / TELÉFONO
+   VISTA MÓVIL / TABLET (TARJETAS)
    ========================================================================== */
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
+
+    /* Icono de cabecera: mantener el tamaño aprobado (dispatch.css lo reduce) */
+    .ph-icon-box {
+        width: 68px !important;
+        height: 68px !important;
+        font-size: 2rem !important;
+    }
 
     /* Cabecera de la página: título arriba, botón debajo */
     .ph-card > .d-flex.justify-content-between {
@@ -377,21 +381,27 @@ tr.collapse td, tr.collapsing td {
     }
 
     /* Fila colapsable de detalles no debe verse como tarjeta */
-    table.ph-table tbody tr.collapse,
-    table.ph-table tbody tr.collapsing {
+    table.ph-table tbody tr.ph-detail-row {
         border: none;
         background: transparent;
         box-shadow: none;
         padding: 0;
         margin: 0 0 0.9rem 0;
     }
-    table.ph-table tbody tr.collapse td,
-    table.ph-table tbody tr.collapsing td {
+    table.ph-table tbody tr.ph-detail-row td {
+        position: static !important;
+        top: auto !important;
+        right: auto !important;
         padding: 0 !important;
         border-top: none !important;
+        display: block;
+        width: 100% !important;
     }
-    table.ph-table tbody tr.collapse td::before,
-    table.ph-table tbody tr.collapsing td::before { content: none !important; }
+    table.ph-table tbody tr.ph-detail-row td {
+        border-left: none !important;
+        border-right: none !important;
+    }
+    table.ph-table tbody tr.ph-detail-row td::before { content: none !important; }
 
     /* Panel de detalle: caja más compacta */
     .ph-detail-box {

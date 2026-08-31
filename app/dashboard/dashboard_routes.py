@@ -3,11 +3,13 @@ from flask_login import login_required, current_user
 from app.decorators.roles import (
     management_required,
     manager_required,
+    assistant_manager_required,
     admin_required,
     finance_required,
     operations_required
 )
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
+from app.dashboard.dashboard_service import get_subgerente_context
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -43,6 +45,15 @@ def director_dashboard():
 def manager_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
     return render_template('dashboard/manager_dashboard.html', alarmas=alarmas)
+
+@dashboard_bp.route('/assistant-manager')
+@login_required
+@assistant_manager_required
+def assistant_manager_dashboard():
+    return render_template(
+        'dashboard/assistant_manager_dashboard.html',
+        **get_subgerente_context(current_user)
+    )
 
 @dashboard_bp.route('/admin')
 @login_required

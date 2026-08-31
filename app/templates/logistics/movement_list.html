@@ -13,7 +13,7 @@
     <span class="ph-badge-qty"><i class="bi bi-archive me-1"></i>{{ fmt_qty(mov.details | sum(attribute='quantity')) }} unds.</span>
 </div>
 {%- endmacro %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=14">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=15">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispatch.css') }}?v=8">
 
 <div class="container-fluid mt-4 mb-5 px-4">
@@ -134,9 +134,10 @@
                                     {% endif %}
                                 </td>
                             </tr>
-                            <tr class="collapse" id="detalle-{{ mov.id }}">
-                                <td colspan="5">
-                                    <div class="ph-detail-box">
+                            <tr class="ph-detail-row">
+                                <td colspan="5" class="ph-detail-cell">
+                                    <div class="collapse" id="detalle-{{ mov.id }}">
+                                        <div class="ph-detail-box">
                                         <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
                                             <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
                                             {{ content_badges(mov) }}
@@ -165,6 +166,7 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
                                     </div>
                                 </td>
                             </tr>
@@ -229,9 +231,10 @@
                                     {% endif %}
                                 </td>
                             </tr>
-                            <tr class="collapse" id="detalle-{{ mov.id }}">
-                                <td colspan="4">
-                                    <div class="ph-detail-box">
+                            <tr class="ph-detail-row">
+                                <td colspan="4" class="ph-detail-cell">
+                                    <div class="collapse" id="detalle-{{ mov.id }}">
+                                        <div class="ph-detail-box">
                                         <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
                                             <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
                                             {{ content_badges(mov) }}
@@ -260,6 +263,7 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
                                     </div>
                                 </td>
                             </tr>
@@ -331,9 +335,10 @@
                                     {% endif %}
                                 </td>
                             </tr>
-                            <tr class="collapse" id="detalle-arbitraje-{{ mov.id }}">
-                                <td colspan="5">
-                                    <div class="ph-detail-box">
+                            <tr class="ph-detail-row">
+                                <td colspan="5" class="ph-detail-cell">
+                                    <div class="collapse" id="detalle-arbitraje-{{ mov.id }}">
+                                        <div class="ph-detail-box">
                                         <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
                                             <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Contenido del Retorno - Traslado #{{ mov.id }}</h5>
                                             {{ content_badges(mov) }}
@@ -362,6 +367,7 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
                                     </div>
                                 </td>
                             </tr>
@@ -429,9 +435,10 @@
                                     </button>
                                 </td>
                             </tr>
-                            <tr class="collapse" id="detalle-{{ mov.id }}">
-                                <td colspan="5">
-                                    <div class="ph-detail-box">
+                            <tr class="ph-detail-row">
+                                <td colspan="5" class="ph-detail-cell">
+                                    <div class="collapse" id="detalle-{{ mov.id }}">
+                                        <div class="ph-detail-box">
                                         <div class="d-flex justify-content-between align-items-center gap-2 ph-detail-head mb-3 flex-wrap">
                                             <h5 class="ph-detail-title fw-bold mb-0"><i class="bi bi-box-seam text-danger me-2"></i>Contenido del Traslado #{{ mov.id }}</h5>
                                             {{ content_badges(mov) }}
@@ -460,6 +467,7 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
                                     </div>
                                 </td>
                             </tr>
