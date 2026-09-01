@@ -52,6 +52,7 @@
     <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
     <th class="text-center text-uppercase tracking-wider">Categoría</th>
     <th class="text-center text-uppercase tracking-wider">U. Medida</th>
+    <th class="text-center text-uppercase tracking-wider">Límite de Merma</th>
     <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
     <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
 {% endblock %}
@@ -62,7 +63,7 @@
         {% if messages %}
             {% for category, message in messages %}
                 <tr class="border-0 alert-row d-md-table-row">
-                    <td colspan="6" class="border-0 p-2 d-block d-md-table-cell">
+                    <td colspan="7" class="border-0 p-2 d-block d-md-table-cell">
                         <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-2 py-2" role="alert">
                             <small class="fw-semibold">{{ message }}</small>
                             <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -74,7 +75,7 @@
     {% endwith %}
 
     <tr id="noResultsRow" style="display: none;">
-        <td colspan="6" class="text-center text-muted py-5 bg-white border-0">
+        <td colspan="7" class="text-center text-muted py-5 bg-white border-0">
             <div class="py-4">
                 <div class="mb-3">
                     <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
@@ -105,6 +106,13 @@
                 <td class="text-center product-clickable-cell">
                     <span class="badge bg-light text-secondary border px-2 py-1 fs-7">{{ product.unit_of_measure }}</span>
                 </td>
+                <td class="text-center product-clickable-cell">
+                    {% if product.waste_limit is not none %}
+                        <span class="badge bg-light text-dark border px-2 py-1 fs-7">{{ product.waste_limit }} {{ product.unit_of_measure }}</span>
+                    {% else %}
+                        <span class="text-muted fs-7">—</span>
+                    {% endif %}
+                </td>
                 <td class="text-center status-badge-cell product-clickable-cell">
                     {% if product.is_active %}
                         <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>
@@ -129,7 +137,7 @@
             </tr>
 
             <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details d-none d-md-table-row bg-light-subtle">
-                <td colspan="6" class="p-0">
+                <td colspan="7" class="p-0">
                     <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
                         <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
                             <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica y Preservación:
@@ -143,7 +151,7 @@
         {% endfor %}
 
         <tr class="d-md-none p-0 border-0 bg-transparent">
-            <td colspan="6" class="p-0 border-0 bg-transparent">
+            <td colspan="7" class="p-0 border-0 bg-transparent">
                 <div id="mobileProductsContainer">
                     {% for product in products %}
                     <div class="mobile-card-item main-product-row-mobile {% if not product.is_active %}row-inhabilitada{% endif %}" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
@@ -152,6 +160,9 @@
                                 <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold mb-1">{{ product.sku }}</span>
                                 <h6 class="fw-bold text-dark m-0">{{ product.name }}</h6>
                                 <span class="text-secondary small">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
+                                {% if product.waste_limit is not none %}
+                                    <span class="d-block text-secondary small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Límite de merma: <strong>{{ product.waste_limit }} {{ product.unit_of_measure }}</strong></span>
+                                {% endif %}
                             </div>
                             <div class="status-badge-cell-mobile">
                                 {% if product.is_active %}
@@ -195,7 +206,7 @@
     {% endif %}
 
     <tr class="border-0 generic-pagination-row d-md-table-row d-block">
-        <td colspan="6" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
+        <td colspan="7" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
             <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-3 gap-2" style="display: none !important;">
                 <nav aria-label="Paginación de insumos">
                     <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
