@@ -46,6 +46,8 @@ class Product(db.Model):
     product_type_id = db.Column(db.Integer, db.ForeignKey('product_types.id'), nullable=True)
     
     unit_of_measure = db.Column(db.String(20))
+    # CAMPO AÑADIDO: Límite de merma en la unidad del producto (se configura en product_form)
+    waste_limit = db.Column(db.Numeric(10, 2))
     technical_description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
