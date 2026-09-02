@@ -58,6 +58,13 @@ def create_app():
         from .waste.routes.auditinventory_routes import auditinventory_bp
         app.register_blueprint(auditinventory_bp)
         # ==========================================================
+
+        # ==========================================================
+        # MÓDULO 7: REGISTRO DE MERMA (PARTE 1)
+        # ==========================================================
+        from .waste.routes.register_waste_routes import register_waste_bp
+        app.register_blueprint(register_waste_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)

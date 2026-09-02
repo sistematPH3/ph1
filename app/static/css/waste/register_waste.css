@@ -1,0 +1,287 @@
+:root {
+    --waste-red: #b0121a;
+    --waste-red-hover: #8c0e14;
+    --waste-red-soft: #fff0f1;
+    --waste-red-bg: linear-gradient(135deg, #b0121a 0%, #d62532 100%);
+    --waste-border-radius: 18px;
+    --waste-border: rgba(176, 18, 26, 0.4);
+    --waste-text: #2b2b2b;
+    --waste-muted: #6b7280;
+}
+
+.merma-main-container {
+    max-width: 1240px;
+    margin: 0 auto;
+    width: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--waste-text);
+}
+
+/* ====== Encabezado de la tarjeta ====== */
+.merma-card-custom {
+    border: none;
+    border-radius: var(--waste-border-radius);
+    background-color: #ffffff;
+    box-shadow: 0 18px 50px rgba(176, 18, 26, 0.18), 0 4px 16px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.merma-card-header {
+    display: flex;
+    align-items: center;
+    padding: 1.4rem 1.5rem;
+    background: var(--waste-red-bg);
+    color: #ffffff;
+    border-bottom: 3px solid var(--waste-red-hover);
+}
+
+.merma-icon-container {
+    background-color: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(4px);
+    color: #ffffff;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.merma-header-title {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.merma-header-sub {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.85rem;
+    margin-top: 2px;
+}
+
+@media (min-width: 768px) {
+    .merma-card-header {
+        padding: 1.6rem 2rem;
+    }
+    .merma-header-title {
+        font-size: 1.7rem;
+    }
+}
+
+/* ====== Etiquetas ====== */
+.merma-label {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--waste-text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+}
+
+/* ====== Campos ====== */
+.merma-card-custom .form-control,
+.merma-card-custom .form-select,
+.merma-card-custom .form-control:read-only {
+    border: 1.5px solid var(--waste-border) !important;
+    border-radius: 10px;
+    padding: 0.55rem 0.9rem;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.merma-card-custom .form-control:focus,
+.merma-card-custom .form-select:focus {
+    border-color: var(--waste-red) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 26, 0.2), 0 0 14px rgba(176, 18, 26, 0.14) !important;
+}
+
+.merma-card-custom .form-select:disabled,
+.merma-card-custom .form-control:disabled {
+    background-color: #f4f6f9;
+    border-color: rgba(176, 18, 26, 0.25) !important;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.merma-card-custom .input-group-text {
+    border-radius: 10px 0 0 10px;
+    color: var(--waste-red);
+    background-color: var(--waste-red-soft);
+    border: 1.5px solid var(--waste-border);
+    border-right: none;
+}
+
+.merma-card-custom .input-group > .form-select:not(:first-child),
+.merma-card-custom .input-group > .form-control:not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.merma-textarea {
+    resize: vertical;
+    min-height: 76px;
+}
+
+/* ====== Dropzone foto (sustituye al botón "Subir foto") ====== */
+.merma-dropzone {
+    border: 2px dashed var(--waste-border);
+    border-radius: 14px;
+    background-color: #fffafb;
+    min-height: 128px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s ease-in-out;
+    overflow: hidden;
+}
+
+.merma-dropzone:hover,
+.merma-dropzone.dragover {
+    border-color: var(--waste-red);
+    background-color: var(--waste-red-soft);
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 26, 0.12);
+}
+
+.merma-dropzone-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    text-align: center;
+}
+
+.merma-dropzone-icon {
+    font-size: 1.9rem;
+    color: var(--waste-red);
+    margin-bottom: 0.4rem;
+    opacity: 0.85;
+}
+
+.merma-dropzone-text {
+    font-weight: 600;
+    color: var(--waste-text);
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+.merma-dropzone-hint {
+    font-size: 0.72rem;
+    color: var(--waste-muted);
+    margin-top: 0.25rem;
+}
+
+/* Vista previa de la foto subida */
+.merma-photo-preview {
+    position: relative;
+    margin-top: 0.75rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1.5px solid var(--waste-border);
+    box-shadow: 0 6px 18px rgba(176, 18, 26, 0.15);
+}
+
+.merma-photo-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+.merma-photo-state {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(0deg, rgba(0,0,0,0.72), transparent);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 1.6rem 0.75rem 0.5rem 0.75rem;
+}
+
+.merma-photo-state.text-success {
+    color: #4ade80 !important;
+}
+
+.merma-photo-remove {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ====== Botones ====== */
+.merma-btn-submit-custom {
+    background-color: var(--waste-red);
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    padding: 0.7rem 1.5rem;
+    box-shadow: 0 6px 18px rgba(176, 18, 26, 0.3);
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.15s ease;
+}
+
+.merma-btn-submit-custom:hover {
+    background-color: var(--waste-red-hover);
+    box-shadow: 0 8px 24px rgba(176, 18, 26, 0.4);
+    transform: translateY(-1px);
+}
+
+.merma-btn-submit-custom:active {
+    transform: translateY(0);
+}
+
+.merma-btn-secondary {
+    background-color: #6c757d;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.25);
+    transition: background-color 0.2s ease-in-out, transform 0.15s ease;
+}
+
+.merma-btn-secondary:hover {
+    background-color: #5a636a;
+    transform: translateY(-1px);
+}
+
+/* ====== Carrito ====== */
+.merma-cart-header {
+    color: var(--waste-text);
+    font-weight: 800;
+}
+
+.merma-cart-table {
+    border: 1.5px solid rgba(176, 18, 26, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.merma-cart-table thead th {
+    background-color: var(--waste-red-soft);
+    color: var(--waste-red);
+    font-weight: 700;
+    border-bottom: 1.5px solid rgba(176, 18, 26, 0.25);
+}
+
+.merma-cart-table tbody tr:hover {
+    background-color: #fff7f8;
+}
+
+@media (min-width: 768px) {
+    .merma-card-custom {
+        border-radius: 22px;
+    }
+}
