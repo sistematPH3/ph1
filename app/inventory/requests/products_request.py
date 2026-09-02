@@ -45,6 +45,19 @@ def validate_product_form(data, current_product_id=None):
 
     technical_description = data.get('technical_description', '').strip()
 
+    # Validación del límite de merma (obligatorio, número >= 0)
+    raw_waste_limit = data.get('waste_limit', '').strip()
+    waste_limit = None
+    if not raw_waste_limit:
+        errors['waste_limit'] = 'El límite de merma es obligatorio.'
+    else:
+        try:
+            waste_limit = float(raw_waste_limit)
+            if waste_limit < 0:
+                errors['waste_limit'] = 'El límite de merma no puede ser negativo.'
+        except ValueError:
+            errors['waste_limit'] = 'El límite de merma debe ser un número válido.'
+
     # NUEVA VALIDACIÓN: Procesar los cuadritos de fecha de manera unificada
     day = data.get('date_day')
     month = data.get('date_month')
@@ -73,6 +86,7 @@ def validate_product_form(data, current_product_id=None):
         'product_type_id': int(product_type_id) if product_type_id and str(product_type_id).isdigit() else None,
         'unit_of_measure': unit_of_measure if is_valid else '',
         'technical_description': technical_description,
+        'waste_limit': waste_limit,
         'expiration_date': expiration_date,  # Se inyecta la fecha limpia calculada
         'is_active': True
     }
