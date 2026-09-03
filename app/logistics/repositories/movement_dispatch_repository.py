@@ -55,9 +55,17 @@ class MovementDispatchRepository:
                     'total_in': float(c.total_qty or 0.0)
                 }
 
+            # Salidas desde el Central: despachos a sucursales. Se descuenta la
+            # cantidad física que realmente salió (con sobrante el excedente
+            # también salió, se usa el mayor de ambos; sin sobrante coincide
+            # con la guía). Lógica consistente con inventory_views_service.
+            salida_fisica_central = func.greatest(
+                func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity),
+                MovementDetail.quantity
+            )
             despachos = db.session.query(
                 MovementDetail.lot_number,
-                func.sum(MovementDetail.quantity).label('total_out')
+                func.sum(salida_fisica_central).label('total_out')
             ).join(
                 Movement, MovementDetail.movement_id == Movement.id
             ).filter(
@@ -68,6 +76,50 @@ class MovementDispatchRepository:
             ).group_by(MovementDetail.lot_number).all()
 
             salidas_traslado = {d.lot_number.strip(): float(d.total_out or 0.0) for d in despachos if d.lot_number}
+
+            # Entradas por RETORNO/TRASLADO que llegan al Central: sin esto, el
+            # selector de lotes del despacho no contaba las devoluciones que
+            # volvieron y mostraba stock de menos (ej. 1750 en lugar de 1850).
+            # Misma lógica de "cantidad efectivamente recibida" que la vista.
+            valid_statuses_central = ['COMPLETED', 'COMPLETADO', 'CERRADO_POR_ADMIN']
+            effective_qty_central = case(
+                (
+                    Movement.status == 'CERRADO_POR_ADMIN',
+                    func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity)
+                ),
+                else_=func.least(
+                    func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity),
+                    MovementDetail.quantity
+                )
+            )
+
+            retornos = db.session.query(
+                MovementDetail.lot_number,
+                MovementDetail.expiration_date,
+                func.sum(effective_qty_central).label('total_qty')
+            ).join(
+                Movement, MovementDetail.movement_id == Movement.id
+            ).filter(
+                func.upper(Movement.status).in_(valid_statuses_central),
+                Movement.destination_location_id == 1,
+                Movement.origin_location_id.isnot(None),
+                MovementDetail.product_id == prod_id,
+                MovementDetail.lot_number.isnot(None),
+                MovementDetail.lot_number != ''
+            ).group_by(
+                MovementDetail.lot_number,
+                MovementDetail.expiration_date
+            ).all()
+
+            for r in retornos:
+                lot = r.lot_number.strip()
+                if lot in entradas_lote:
+                    entradas_lote[lot]['total_in'] += float(r.total_qty or 0.0)
+                else:
+                    entradas_lote[lot] = {
+                        'expiration_date': r.expiration_date,
+                        'total_in': float(r.total_qty or 0.0)
+                    }
 
         else:
             valid_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE', 'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']

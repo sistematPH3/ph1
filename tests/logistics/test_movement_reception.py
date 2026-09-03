@@ -2001,6 +2001,33 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertEqual(float(env["inv_central"].current_quantity), 200.00)
         self.assertEqual(float(env["inv_sucu"].transit_quantity), 0.00)
 
+    def test_retorno_sobrante_devuelto_repone_el_excedente_al_central(self):
+        # Despacharon 100 en guía, pero llegaron 150 (50 de SOBRANTE). El
+        # excedente se devolvió al Central en un RETORNO_EMERGENCIA. El origen
+        # debitó ese excedente al resolver la disputa (extra_units), así que al
+        # RECIBIR el retorno el Central debe recuperar los 50. Con el flujo viejo
+        # get_outstanding_dispatch_debit devolvía 0 para sobrantes y el Central
+        # se quedaba corto (no se le sumaba la devolución).
+        env = self._seed_return(erroneous=False, ret_qty=50.0, orig_received=150.0,
+                                origin_current=100.0, return_transit=50.0)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 50.0,
+            "item_condition": "CONFORME",
+            "observed_physical_lot": None
+        }]
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="",
+                                items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        db.session.refresh(env["inv_central"])
+        db.session.refresh(env["inv_sucu"])
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+        # Central recupera los 50 sobrantes devueltos: 100 -> 150.
+        self.assertEqual(float(env["inv_central"].current_quantity), 150.00)
+        # El tránsito de la sede que devolvió queda liberado.
+        self.assertEqual(float(env["inv_sucu"].transit_quantity), 0.00)
+
 
 if __name__ == "__main__":
     unittest.main()

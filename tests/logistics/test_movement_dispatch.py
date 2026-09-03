@@ -221,6 +221,43 @@ class MovementDispatchTest(unittest.TestCase):
         db.session.rollback()
 
     # =========================================================================
+    # CASO 4: EL SELECTOR DE LOTES DEL CENTRAL CUENTA LOS RETORNOS RECIBIDOS
+    # El formulario de despacho (get_product_lots_available) mostraba de menos
+    # las devoluciones que volvieron al Almacén Central (ej. 1750 en vez de
+    # 1850). La disponibilidad del lote debe incluir los RETORNO_EMERGENCIA
+    # que entraron al Central, igual que la vista de inventario.
+    # =========================================================================
+    def test_selector_lotes_central_suma_retornos_recibidos(self):
+        env = self._seed_central(lot_qty_100=100.0, lot_qty_101=0.0)
+
+        # Se recibe un retorno de 30 en el lote C-100 hacia el Central.
+        ret = Movement(
+            type="RETORNO_EMERGENCIA",
+            origin_location_id=env["dest"].id,
+            destination_location_id=env["origin"].id,
+            status="COMPLETADO",
+            user_id=env["user_id"],
+        )
+        db.session.add(ret)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=ret.id, product_id=env["product"].id, lot_number="C-100",
+            quantity=30.0, received_quantity=30.0, missing_quantity=0.0
+        ))
+        # El tránsito que estaba en la sucursal vuelve; el Central ya lo tiene.
+        env["inventory"].current_quantity = 130.0
+        db.session.commit()
+
+        total, lots = MovementDispatchRepository.get_product_lots_available(
+            env["origin"].id, env["product"].id
+        )
+        self.assertEqual(total, 130.0)
+        self.assertEqual(len(lots), 1)
+        self.assertEqual(lots[0]["lot_number"], "C-100")
+        # El lote muestra el stock real (100 compra + 30 retorno), no solo la compra.
+        self.assertEqual(float(lots[0]["available_quantity"]), 130.00)
+
+    # =========================================================================
     # CASO 3: EXCEDER EL SALDO NETO DEL LOTE -> rechazado aunque el global alcance
     # =========================================================================
     def test_exceso_sobre_saldo_del_lote_rechazado(self):
