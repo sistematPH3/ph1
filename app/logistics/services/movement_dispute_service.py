@@ -422,8 +422,21 @@ def resolve_dispute(movement_id, payload, user_id):
                 # Reintegro parcial (ej. sobrante): lo conforme se queda
                 # acreditado en destino; devuelven el excedente físico
                 # (extra_units) y/o el remanente que no se descargó (missing).
+                #
+                # REGLA DEL SOBRANTE (definida por el negocio): cuando llega más
+                # de lo que dice la guía, el origen sacó FÍSICAMENTE el excedente
+                # aunque la guía no lo refleje. Ese excedente se devuelve al
+                # origen, así que se debita del current_quantity del origen y
+                # regresa vía el traslado de retorno. Así el lote del origen
+                # termina en su conforme (despachado - excedente) y el destino en
+                # lo conforme (min(recibido, autorizado)).
                 credited_qty = conforming_qty
                 _credit_inventory(inv_dest, credited_qty)
+                if inv_origin is not None and extra_units > Decimal('0.00'):
+                    inv_origin.current_quantity = max(
+                        Decimal('0.00'),
+                        _to_decimal(inv_origin.current_quantity) - extra_units
+                    )
                 qty_to_return = extra_units + qty_missing
 
             if qty_to_return > Decimal('0.00'):

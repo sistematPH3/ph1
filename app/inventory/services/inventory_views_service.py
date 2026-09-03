@@ -106,9 +106,17 @@ class InventoryViewService:
                 }
 
             # Salidas desde el Central: despachos a sucursales.
+            # Se descuenta la cantidad física que realmente salió del origen. Con
+            # sobrante (received_quantity > quantity) el excedente también salió
+            # físicamente, por lo que se usa el mayor de ambos; sin sobrante
+            # coincide con la guía.
+            salida_fisica_central = func.greatest(
+                func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity),
+                MovementDetail.quantity
+            )
             despachos = db.session.query(
                 MovementDetail.lot_number,
-                func.sum(MovementDetail.quantity).label('total_out')
+                func.sum(salida_fisica_central).label('total_out')
             ).join(
                 Movement, MovementDetail.movement_id == Movement.id
             ).filter(
@@ -203,6 +211,12 @@ class InventoryViewService:
                     'total_in': float(m.total_qty or 0.0)
                 }
 
+            # Salidas desde la sucursal. Se descuentan los DESPACHOS que salen
+            # hacia otra sede (stock que el destino envía adelante). Los
+            # RETORNO_EMERGENCIA (devoluciones al emisor, generadas por el
+            # arbitraje) NO se descuentan: devuelven excedente que nunca fue
+            # acreditado como conforme en el destino, por lo que restarlo
+            # descontaría dos veces el mismo sobrante.
             despachos_sucursal = db.session.query(
                 MovementDetail.lot_number,
                 func.sum(MovementDetail.quantity).label('total_out')
@@ -210,6 +224,7 @@ class InventoryViewService:
                 Movement, MovementDetail.movement_id == Movement.id
             ).filter(
                 Movement.origin_location_id == loc_id,
+                Movement.type != 'RETORNO_EMERGENCIA',
                 Movement.status.notin_(['CANCELADO', 'CANCELADO_EMISOR', 'ANULADO', 'RECHAZADO']),
                 MovementDetail.product_id == prod_id,
                 MovementDetail.lot_number.isnot(None)
