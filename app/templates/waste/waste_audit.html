@@ -1,0 +1,397 @@
+{% extends "layout.html" %}
+
+{% block title %}Auditoría de Mermas | Pizza Hut{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <!-- Encabezado corporativo -->
+    <div class="d-flex align-items-center mb-4">
+        <div class="ph-header-icon me-3">
+            <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold mb-0 text-dark">Historial y Auditoría de Mermas</h3>
+            <small class="text-muted">Supervisión y trazabilidad de mermas registradas en todas las sedes.</small>
+        </div>
+    </div>
+
+    <!-- Barra de Búsqueda y Filtros Dinámicos -->
+    <div class="ph-filter-card p-3 mb-4">
+        <div class="ph-filter-container">
+            <div class="position-relative mb-2">
+                <i class="bi bi-search ph-search-icon"></i>
+                <input type="text" id="search_query" class="form-control ph-search-input" placeholder="Buscar por producto mermado, sede o usuario responsable...">
+            </div>
+
+            <div class="row g-2 align-items-center">
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" id="location_filter" name="location">
+                        <option value="">Todas las sedes</option>
+                        {% for loc in locations %}
+                            <option value="{{ loc }}">{{ loc }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" id="severity_filter" name="severity">
+                        <option value="">Todas las gravedades</option>
+                        <option value="NORMAL">NORMAL</option>
+                        <option value="ALERTA">ALERTA</option>
+                        <option value="CRITICO">CRÍTICO</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-center gap-2">
+                    <span class="ph-filter-label">Desde:</span>
+                    <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" title="Fecha Inicio">
+                </div>
+                <div class="col-md-3 d-flex align-items-center gap-2">
+                    <span class="ph-filter-label">Hasta:</span>
+                    <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" title="Fecha Fin">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Eventos -->
+    <div class="ph-table-container">
+        <div class="table-responsive">
+            <table class="table ph-table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="text-start ps-3">Responsable</th>
+                        <th class="text-center">Sede</th>
+                        <th class="text-center">Producto</th>
+                        <th class="text-center">Tipo de Merma</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Gravedad</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="audit-table-body">
+                    {% for log in audit_trail %}
+                        {% set data = log.changed_data or {} %}
+                        {% set evento = (data.evento or data.estado or log.status or '')|upper %}
+                        {% set user_name = log.user or 'Usuario' %}
+                        {% set user_initial = user_name[0]|upper if user_name else 'U' %}
+                        {% set tipo_merma = data.tipo_merma or data.tipo or 'No especificado' %}
+                        
+                        {% set ns = namespace(productos_txt="") %}
+                        {% if data.productos %}
+                            {% for p in data.productos %}
+                                {% set ns.productos_txt = ns.productos_txt ~ " " ~ (p.producto or '') ~ " " ~ (p.lote or '') %}
+                            {% endfor %}
+                        {% endif %}
+
+                        <tr class="audit-row" 
+                            data-log-id="{{ log.id }}"
+                            data-user="{{ user_name|lower }}" 
+                            data-location="{{ (log.location or '')|trim|lower }}" 
+                            data-severity="{{ log.severity }}"
+                            data-timestamp="{{ (log.timestamp or '').split(' ')[0] }}"
+                            data-products="{{ ns.productos_txt|lower }}"
+                            data-products="{{ ns.productos_txt|lower }}">
+                            
+                            <td class="ps-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="ph-avatar">{{ user_initial }}</div>
+                                    <div class="d-flex flex-column">
+                                        <span class="ph-user-name">{{ user_name }}</span>
+                                        <span class="ph-user-role">{{ log.user_role or log.role or 'Administrator' }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="ph-badge-location">
+                                    <i class="bi bi-geo-alt-fill me-1"></i>{{ log.location }}
+                                </span>
+                            </td>
+                            <!-- 3. Producto -->
+                            <td class="text-center">
+                                {% if data.productos and data.productos|length > 0 %}
+                                    <span class="fw-semibold text-dark">{{ data.productos[0].producto }}</span>
+                                    {% if data.productos|length > 1 %}
+                                        <small class="text-muted d-block">(+{{ data.productos|length - 1 }} más)</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- 4. Tipo de Merma -->
+                            <td class="text-center">
+                                <span class="badge bg-dark px-2 py-1">{{ tipo_merma }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="ph-badge {% if log.status == 'PENDIENTE' %}ph-badge-warning{% elif log.status == 'RECHAZADO' %}ph-badge-secondary{% elif log.status == 'REVERTIDO' %}ph-badge-danger{% else %}ph-badge-success{% endif %}">
+                                    {{ log.status }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="ph-badge {% if log.severity == 'NORMAL' %}ph-badge-info{% elif log.severity == 'ALERTA' %}ph-badge-warning{% elif log.severity == 'CRITICO' %}ph-badge-danger{% else %}ph-badge-secondary{% endif %}">
+                                    {{ log.severity }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center align-items-center gap-2">
+                                    <!-- Botón con Texto e Ícono Encerrados -->
+                                    <button class="ph-btn-detail-text btn-ph-detail" 
+                                            type="button" 
+                                            data-bs-toggle="collapse" 
+                                            data-bs-target="#collapse-details-{{ log.id }}">
+                                        Ver detalles <i class="bi bi-eye-fill ms-1"></i>
+                                    </button>
+
+                                    {% if log.status == 'APROBADO' %}
+                                        <button class="ph-btn-action btn-ph-revert btn-revert" 
+                                                data-id="{{ log.id }}" 
+                                                data-location="{{ log.location }}"
+                                                data-tooltip="Revertir">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Fila Desplegable de Detalles -->
+                        <tr class="collapse audit-details-row" id="collapse-details-{{ log.id }}" data-detail-for="{{ log.id }}">
+                            <td colspan="7" class="bg-light p-3">
+                                {% set photo_url = data.foto_evidencia_url or data.evidence_url %}
+                                <div class="row align-items-center">
+                                    <div class="col-md-{% if photo_url %}8{% else %}12{% endif %}">
+                                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Detalles del Registro de Auditoría:</h6>
+                                        
+                                        <div class="row g-3">
+                                            {% if data.productos %}
+                                            <div class="col-12 mb-2">
+                                                <div class="card border-0 shadow-sm rounded-3">
+                                                    <div class="card-header bg-white fw-bold text-dark border-bottom py-2 d-flex justify-content-between align-items-center">
+                                                        <span><i class="bi bi-box-seam text-danger me-2"></i>Productos Afectados</span>
+                                                        <span class="badge bg-secondary">{{ data.productos|length }} ítem(s)</span>
+                                                    </div>
+                                                    <div class="list-group list-group-flush">
+                                                        {% for p in data.productos %}
+                                                            <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-white">
+                                                                <div>
+                                                                    <strong class="text-dark">{{ p.producto or 'Producto' }}</strong>
+                                                                    {% if p.lote %}<span class="badge bg-light text-dark border ms-2">Lote: {{ p.lote }}</span>{% endif %}
+                                                                </div>
+                                                                <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ p.cantidad }} und/kg</span>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Tarjeta según Evento / Estado -->
+                                            {% if evento in ['REVERSION', 'REVERTIDO'] or data.revertido_por or data.motivo_reversion %}
+                                            <div class="col-12">
+                                                <div class="card ph-detail-card border-start border-4 border-danger bg-light">
+                                                    <div class="card-body p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                            <span class="fw-bold text-danger"><i class="bi bi-x-circle-fill me-1"></i> Anulación / Reversión de Merma</span>
+                                                            <span class="badge bg-danger">Registro #{{ data.original_audit_id or data.merma_id or 'N/A' }}</span>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Anulado por:</small>
+                                                                <span class="text-dark fw-bold">{{ data.revertido_por or 'Administrador' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                <span class="text-dark fw-bold">{{ data.location or data.sede or log.location or 'Sede N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                <span class="text-dark fw-bold">{{ data.fecha_accion or data.timestamp or log.timestamp or 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-12 mt-2">
+                                                                <small class="text-muted d-block fw-semibold">Impacto en Inventario:</small>
+                                                                <span class="badge bg-info text-dark">{{ data.impacto_stock or 'Restituido al inventario (+ Stock devuelto)' }}</span>
+                                                            </div>
+                                                            <div class="col-12 mt-2">
+                                                                <small class="text-muted d-block fw-semibold">Motivo de Anulación:</small>
+                                                                <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo_reversion or data.motivo or 'Sin especificación' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {% elif evento in ['EDICION', 'EDICION_PENDIENTE'] or (data.camino_previo and data.camino_nuevo) %}
+                                            <div class="col-12">
+                                                <div class="card ph-detail-card border-start border-4 border-dark bg-light">
+                                                    <div class="card-body p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                            <span class="fw-bold text-dark"><i class="bi bi-pencil-square me-1"></i> Historial de Modificación de Merma</span>
+                                                            <span class="badge bg-secondary">Modificado</span>
+                                                        </div>
+                                                        <div class="row g-2 mb-3">
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Modificado por:</small>
+                                                                <span class="text-dark fw-bold">{{ data.modificado_por or data.usuario or log.user or 'Usuario' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                <span class="text-dark fw-bold">{{ data.location or log.location or 'Sede N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                <span class="text-dark fw-bold">{{ data.fecha_accion or log.timestamp or 'N/A' }}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-6">
+                                                                <div class="p-3 border border-danger rounded bg-white">
+                                                                    <small class="text-danger fw-bold d-block mb-1">Antes de la Edición:</small>
+                                                                    <small class="d-block"><strong>Cantidad:</strong> {{ data.camino_previo.cantidad if data.camino_previo else '-' }}</small>
+                                                                    <small class="d-block"><strong>Motivo:</strong> {{ data.camino_previo.motivo if data.camino_previo else '-' }}</small>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <div class="p-3 border border-success rounded bg-white">
+                                                                    <small class="text-success fw-bold d-block mb-1">Después de la Edición:</small>
+                                                                    <small class="d-block"><strong>Cantidad:</strong> {{ data.camino_nuevo.cantidad if data.camino_nuevo else '-' }}</small>
+                                                                    <small class="d-block"><strong>Motivo:</strong> {{ data.camino_nuevo.motivo if data.camino_nuevo else '-' }}</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {% elif evento == 'APROBADO' or data.status == 'APROBADO' or data.aprobado_por %}
+                                            <div class="col-12">
+                                                <div class="card ph-detail-card border-start border-4 border-success bg-light">
+                                                    <div class="card-body p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                            <span class="fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i> Merma Aprobada</span>
+                                                            <span class="badge bg-success">{{ data.impacto_stock or 'Descontado de inventario (- Stock definitivo)' }}</span>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Aprobado por:</small>
+                                                                <span class="text-dark fw-bold">{{ data.aprobado_por or 'Gerencia / Admin' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                <span class="text-dark fw-bold">{{ data.location or data.sede or log.location or 'Sede N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                <span class="text-dark fw-bold">{{ data.fecha_accion or data.timestamp or log.timestamp or 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-12 mt-2">
+                                                                <small class="text-muted d-block fw-semibold">Motivo de la Merma:</small>
+                                                                <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo_registro or data.motivo or 'Sin observación' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {% elif evento == 'RECHAZADO' or data.status == 'RECHAZADO' or data.motivo_rechazo %}
+                                            <div class="col-12">
+                                                <div class="card ph-detail-card border-start border-4 border-secondary bg-light">
+                                                    <div class="card-body p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                            <span class="fw-bold text-secondary"><i class="bi bi-x-octagon-fill me-1"></i> Merma Rechazada</span>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Rechazado por:</small>
+                                                                <span class="text-dark fw-bold">{{ data.rechazado_por or 'Supervisor / Admin' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                <span class="text-dark fw-bold">{{ data.location or data.sede or log.location or 'Sede N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                <span class="text-dark fw-bold">{{ data.fecha_accion or data.timestamp or log.timestamp or 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-12 mt-2">
+                                                                <small class="text-muted d-block fw-semibold">Motivo del Rechazo:</small>
+                                                                <div class="p-2 bg-white rounded border text-danger fw-semibold mt-1">{{ data.motivo_rechazo or 'No especificado' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {% else %}
+                                            <div class="col-12">
+                                                <div class="card ph-detail-card border-start border-4 border-warning bg-light">
+                                                    <div class="card-body p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                            <span class="fw-bold text-dark"><i class="bi bi-clock-fill me-1"></i> Merma Pendiente</span>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-4">
+                                                                <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                <span class="text-dark fw-bold">{{ data.location or data.sede or log.location or 'Sede N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                <span class="text-dark fw-bold">{{ data.fecha_accion or data.timestamp or log.timestamp or 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="col-12 mt-2">
+                                                                <small class="text-muted d-block fw-semibold">Motivo de Registro:</small>
+                                                                <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo or data.motivo_registro or 'Sin observación' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Evidencia Fotográfica -->
+                                    {% if photo_url %}
+                                    <div class="col-md-4 text-center border-start ps-3">
+                                        <h6 class="fw-bold text-dark mb-2">Evidencia Fotográfica:</h6>
+                                        <a href="{{ photo_url }}" target="_blank">
+                                            <img src="{{ photo_url }}" class="img-fluid img-thumbnail rounded-3 shadow-sm" style="max-height: 200px; object-fit: cover;" alt="Evidencia de Merma">
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr id="empty-table-row">
+                            <td colspan="7" class="text-center py-4 text-muted">No hay registros de auditoría disponibles.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_audit.css') }}">
+<script src="{{ url_for('static', filename='js/waste/waste_audit.js') }}"></script>
+{% endblock %}
