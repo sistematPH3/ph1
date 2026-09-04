@@ -8,9 +8,135 @@
 {# Fila de respuesta + su desplegable. Usada dos veces: sección "no leídos" y "leídos". #}
 {% macro render_response_rows(response_list) %}
 {% for mov in response_list %}
-{# Atributos data-* para búsqueda/filtros cliente y paginación por pestaña #}
+{% if mov.response_type == 'MERMA' %}
+{# ===================== RESPUESTA DE MERMA (aprobada / rechazada) ===================== #}
+<tr class="dispute-row {{ 'row-unread' if not mov.is_read else 'row-read' }}" id="row-waste-{{ mov.id }}"
+    data-mov-id="{{ mov.id }}" data-response-type="MERMA"
+    data-novedad="{{ mov.novedad_type or 'MERMA' }}"
+    data-sede="{{ mov.location_id or '' }}"
+    data-search="merma {{ mov.id }} {{ mov.waste_type_code or '' }} {{ mov.waste_type_name or '' }} {{ mov.decision_label or '' }} sede {{ mov.location.name if mov.location else '' }} registrada por {{ mov.reported_by.name if mov.reported_by else '' }} respuesta por {{ mov.response_by.name if mov.response_by else '' }} {{ mov.date.strftime('%Y-%m-%d') if mov.date else '' }} {{ mov.response_date.strftime('%Y-%m-%d') if mov.response_date else '' }}{% for item in mov.waste_details %} {{ item.product_name or '' }} {{ item.lot_number or '' }}{% endfor %}">
+    <td class="fw-bold" data-label="Caso / Fecha">
+        <div class="d-flex flex-column gap-1">
+            <span class="text-dark">
+                Merma #{{ mov.id }}
+                {% if mov.waste_type_name %}<span class="text-muted small">({{ mov.waste_type_name }})</span>{% endif %}
+            </span>
+            <!-- Decisión de la merma -->
+            <span class="badge rounded-pill fw-medium align-self-start {{ 'text-bg-success' if mov.decision == 'APROBADA' else 'text-bg-danger' }}">
+                <i class="bi bi-{{ 'check-circle' if mov.decision == 'APROBADA' else 'x-circle' }} me-1"></i>{{ mov.decision_label }}
+            </span>
+            <span class="text-muted small">
+                <i class="bi bi-calendar3 me-1"></i>Merma:
+                {{ mov.date.strftime('%Y-%m-%d') if mov.date else 'N/D' }}
+                <span class="mx-1">·</span>
+                <i class="bi bi-reply-all me-1"></i>Respuesta:
+                {{ mov.response_date.strftime('%Y-%m-%d %H:%M') if mov.response_date else 'N/D' }}
+            </span>
+        </div>
+    </td>
+    <td data-label="Sucursal">
+        {% if mov.location %}
+        <span class="location-pill" title="Sede de la merma">
+            <i class="bi bi-box-seam ph-text-orange me-1 flex-shrink-0"></i>
+            <span>Sede: <strong class="text-dark">{{ mov.location.name }}</strong></span>
+        </span>
+        {% endif %}
+        <div class="mt-2">
+            {% for item in mov.waste_details %}
+            <span class="badge bg-white border text-dark me-1 mb-1 text-start">
+                {{ item.product_name or 'Producto N/D' }}{% if item.lot_number %} <code class="text-muted">{{ item.lot_number }}</code>{% endif %}
+                <span class="text-secondary">x{{ item.quantity }}</span>
+            </span>
+            {% else %}
+            <span class="badge bg-light text-muted me-1">Sin detalle de productos registrado</span>
+            {% endfor %}
+        </div>
+    </td>
+    <td data-label="Estado">
+        <span class="badge {{ 'bg-success-subtle text-success' if mov.decision == 'APROBADA' else 'bg-danger-subtle text-danger' }} border rounded-pill px-3 py-2 fw-semibold shadow-sm">
+            <i class="bi bi-shield-check me-1"></i> {{ mov.decision_label }}
+            {% if mov.response_by %} por {{ mov.response_by.name }}{% endif %}
+        </span>
+        <div class="mt-2 text-muted small">
+            <i class="bi bi-boxes me-1"></i>Registrado:
+            <strong>{{ mov.total_quantity }}</strong>
+        </div>
+    </td>
+    <td class="text-end" data-label="Acción">
+        <button class="btn ph-btn-orange btn-sm px-3 py-2 fw-bold btn-read-response w-100 w-md-auto"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#respuesta-waste-{{ mov.id }}"
+                data-mov-id="{{ mov.id }}" data-response-type="MERMA">
+            <i class="bi bi-envelope-open me-1"></i> Leer Respuesta
+        </button>
+    </td>
+</tr>
+
+<!-- Desplegable con la respuesta de la merma -->
+<tr class="collapse" id="respuesta-waste-{{ mov.id }}">
+    <td colspan="4" class="p-0 border-0">
+        <div class="ph-detail-box shadow-inner">
+            <div class="p-3 p-md-4">
+                <h6 class="fw-bold text-dark mb-2">
+                    <i class="bi bi-person-workspace ph-text-orange me-2"></i>Respuesta de Administración
+                    <span class="text-muted small fw-normal ms-2">
+                        Merma #{{ mov.id }} · {{ mov.waste_type_name }} · {{ mov.decision_label }}
+                    </span>
+                </h6>
+
+                <!-- Productos de la merma -->
+                {% if mov.waste_details %}
+                <h6 class="fw-bold mt-3 mb-2 text-uppercase" style="font-size: 0.8rem; letter-spacing: 0.05em;">
+                    <i class="bi bi-box-seam ph-text-orange me-2"></i>Productos de la merma
+                </h6>
+                <div class="table-responsive-sm">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead class="text-uppercase" style="font-size: 0.68rem;">
+                            <tr>
+                                <th class="text-muted fw-semibold">Producto</th>
+                                <th class="text-muted fw-semibold">Lote</th>
+                                <th class="text-muted fw-semibold">Vencimiento</th>
+                                <th class="text-end text-muted fw-semibold">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in mov.waste_details %}
+                            <tr>
+                                <td class="fw-bold text-dark" data-label="Producto">{{ item.product_name or 'N/D' }}</td>
+                                <td data-label="Lote"><code class="text-dark">{{ item.lot_number or 'S/L' }}</code></td>
+                                <td data-label="Vencimiento">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '—' }}</td>
+                                <td class="text-end" data-label="Cantidad">{{ item.quantity }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if mov.rejection_reason %}
+                <div class="alert alert-danger py-2 px-3 border-0 shadow-sm mb-3">
+                    <p class="mb-1 fw-semibold"><i class="bi bi-x-octagon me-1"></i>Motivo del rechazo</p>
+                    <p class="mb-0 ph-notes-text">"{{ mov.rejection_reason }}"</p>
+                </div>
+                {% endif %}
+
+                <div class="ph-alert-orange shadow-sm border-0 py-2 px-3">
+                    {% if mov.waste_notes %}
+                    <p class="mb-0 fs-6 text-dark ph-notes-text"><strong class="pe-1">Observación de la merma:</strong> "{{ mov.waste_notes }}"</p>
+                    {% else %}
+                    <p class="mb-0 fs-6 text-dark ph-notes-text">"El administrador cerró este caso sin incluir un comentario escrito."</p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </td>
+</tr>
+{% else %}
+{# ===================== RESPUESTA DE TRASLADO ===================== #}
 <tr class="dispute-row {{ 'row-unread' if not mov.is_read else 'row-read' }}" id="row-mov-{{ mov.id }}"
-    data-mov-id="{{ mov.id }}"
+    data-mov-id="{{ mov.id }}" data-response-type="TRASLADO"
     data-novedad="{{ mov.novedad_type or '' }}"
     data-sede="{{ mov.origin_location_id }} {{ mov.destination_location_id }}"
     data-search="traslado {{ mov.id }} {{ mov.type }} {{ mov.novedad_type or '' }} {{ mov.novedad_label or '' }} despacho a {{ mov.destination_location.name if mov.destination_location else '' }} devolucion de {{ mov.origin_location.name if mov.origin_location else '' }} reporto {{ mov.reported_by.name if mov.reported_by else '' }} respuesta por {{ mov.response_by.name if mov.response_by else '' }} {{ mov.date.strftime('%Y-%m-%d') if mov.date else '' }} {{ mov.response_date.strftime('%Y-%m-%d') if mov.response_date else '' }}{% for item in mov.novedad_items %} {{ item.product_name or '' }} {{ item.lot_number or '' }}{% endfor %}{% for item in mov.resolution_items %} {{ item.action_label or '' }} {{ item.product.name if item.product else '' }}{% endfor %}">
@@ -95,7 +221,7 @@
                 type="button" 
                 data-bs-toggle="collapse" 
                 data-bs-target="#respuesta-admin-{{ mov.id }}"
-                data-mov-id="{{ mov.id }}">
+                data-mov-id="{{ mov.id }}" data-response-type="TRASLADO">
             <i class="bi bi-envelope-open me-1"></i> Leer Respuesta
         </button>
     </td>
@@ -214,6 +340,7 @@
         </div>
     </td>
 </tr>
+{% endif %}
 {% endfor %}
 {% endmacro %}
 
@@ -262,10 +389,17 @@
                 <div class="input-group">
                     <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
                     <input type="text" id="inbox-search" class="form-control border-start-0 shadow-none"
-                           placeholder="Buscar por #traslado, sede, producto, persona o novedad..." autocomplete="off">
+                           placeholder="Buscar por #traslado, #merma, sede, producto, persona o novedad..." autocomplete="off">
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-2">
+                <select id="filter-tipo" class="form-select shadow-none" title="Filtrar por tipo de respuesta">
+                    <option value="">Todas</option>
+                    <option value="TRASLADO">Traslados</option>
+                    <option value="MERMA">Mermas</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
                 <select id="filter-novedad" class="form-select shadow-none" title="Filtrar por clasificación de novedad">
                     <option value="">Todas las novedades</option>
                     {% for code, label in filter_novedades.items() %}
@@ -373,5 +507,5 @@
 </div>
 
 <!-- Script JS externo -->
-<script src="{{ url_for('static', filename='js/logistics/response_inbox.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/logistics/response_inbox.js') }}?v=10"></script>
 {% endblock %}

@@ -83,17 +83,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
         listEl.innerHTML = "";
         shown.forEach(function (item) {
+            const isMerma = item.response_type === "MERMA";
             const li = document.createElement("li");
             li.className = "response-bell-item";
+            const title = (isMerma
+                ? '<i class="bi bi-box-seam me-1"></i>Merma #' + item.id
+                : '<i class="bi bi-truck me-1"></i>Traslado #' + item.id)
+                + ' <span class="response-bell-item-tag">' + escapeHtml(item.novedad || "Novedad") + '</span>';
+            const sub = isMerma
+                ? 'Sede: ' + escapeHtml(item.origin || "N/D")
+                : escapeHtml(item.origin) + ' \u2192 ' + escapeHtml(item.destination);
             li.innerHTML =
-                '<div class="response-bell-item-title"><i class="bi bi-truck me-1"></i>Traslado #' + item.id +
-                ' <span class="response-bell-item-tag">' + escapeHtml(item.novedad || "Novedad") + '</span></div>' +
-                '<div class="response-bell-item-sub">' + escapeHtml(item.origin) + ' \u2192 ' + escapeHtml(item.destination) + '</div>' +
+                '<div class="response-bell-item-title">' + title + '</div>' +
+                '<div class="response-bell-item-sub">' + sub + '</div>' +
                 '<div class="response-bell-item-sub">' + escapeHtml(productLine(item)) + '</div>' +
                 '<div class="response-bell-item-sub text-muted">' + (item.movement_date ? escapeHtml(item.movement_date) : "") + (item.resolved_by ? " \u00b7 " + escapeHtml(item.resolved_by) : "") + '</div>' +
                 '<div class="response-bell-item-totals">' + escapeHtml(totalsLine(item)) + '</div>';
             li.addEventListener("click", function () {
-                markRead(item.id);
+                markRead(item);
                 window.location.href = inboxUrl;
             });
             listEl.appendChild(li);
@@ -101,19 +108,22 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     /* ---------- Marcar leída en el servidor ---------- */
-    function markRead(movementId) {
+    function markRead(item) {
+        const payload = item.response_type === "MERMA"
+            ? { waste_id: item.id }
+            : { movement_id: item.id };
         fetch(pollUrl.replace(/\/summary$/, "/read"), {
             method: "POST",
             headers: { "Content-Type": "application/json", "Accept": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ movement_id: movementId })
+            body: JSON.stringify(payload)
         })
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 if (data && typeof data.unread_count === "number") {
                     unreadCount = data.unread_count;
                     items = items.map(function (i) {
-                        return i.id === movementId ? Object.assign({}, i, { is_read: true }) : i;
+                        return i.id === item.id ? Object.assign({}, i, { is_read: true }) : i;
                     });
                     updateBadge();
                 }

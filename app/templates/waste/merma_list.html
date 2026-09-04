@@ -1,0 +1,199 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/merma_approvals.css') }}?v=16">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
+
+    <div id="cancelAlerts" class="approval-alerts mb-3"></div>
+
+    <div class="ph-card">
+
+        <!-- Cabecera del listado -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm" style="background-color: #af1515;">
+                    <i class="bi bi-pencil-square"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Mermas Pendientes</h2>
+                    <p class="text-muted mb-0">
+                        {% if is_admin %}
+                        Mermas en espera de respuesta de <b>todas las sedes</b>.
+                        Como administrador puedes corregir o retirar cualquiera.
+                        {% else %}
+                        Mermas en espera de respuesta en <b>tus sedes asignadas</b>.
+                        Al pertenecer a la sede, puedes corregir o retirar estas mermas mientras
+                        sigan pendientes.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex flex-column align-items-end gap-2">
+                <span class="badge bg-danger rounded-pill px-3 py-2 fs-6 shadow-sm" id="pendingCountBadge">
+                    <i class="bi bi-hourglass-split me-1"></i> Pendientes: {{ pending_count or 0 }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Barra de búsqueda + nota -->
+        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="input-group" style="max-width: 340px;">
+                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" placeholder="Buscar por ID, tipo, sede, motivo..."
+                       id="searchMermaList">
+            </div>
+            <div class="text-muted small fw-semibold">
+                <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas;
+                por eso puedes corregir o cancelar mientras siguen pendientes.
+            </div>
+        </div>
+
+        <!-- Tabla de pendientes del autor -->
+        <div class="table-responsive">
+            <table class="table ph-table align-middle" id="mermaPendingTable">
+                <thead>
+                    <tr style="background-color: #af1515 !important;">
+                        <th style="background-color: #af1515 !important;">ID / TIPO</th>
+                        <th style="background-color: #af1515 !important;">SEDE</th>
+                        <th style="background-color: #af1515 !important;">AUTOR</th>
+                        <th style="background-color: #af1515 !important;">CANTIDAD</th>
+                        <th style="background-color: #af1515 !important;">FECHA</th>
+                        <th style="background-color: #af1515 !important;">MOTIVO</th>
+                        <th style="background-color: #af1515 !important;">ESTADO</th>
+                        <th style="background-color: #af1515 !important; text-align: right !important;">ACCIONES</th>
+                    </tr>
+                </thead>
+<tbody>
+                    {% if pendientes|length == 0 %}
+                    <tr id="emptyRow">
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-check2-all fs-1 d-block mb-2"></i>
+                            {% if is_admin %}
+                            No hay mermas pendientes de respuesta en ninguna sede.
+                            {% else %}
+                            No hay mermas pendientes de respuesta en tus sedes asignadas.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                        {% for p in pendientes %}
+                        <tr class="searchable-row">
+                            <td class="fw-bold">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center me-3 shadow-sm"
+                                         style="width: 40px; height: 40px; font-weight: bold;">#{{ p['id'] }}</div>
+                                    <div>
+                                        <span class="text-dark d-block fw-bold">{{ p['type_name'] }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Sede">
+                                <span class="ph-badge-location">{{ p['location_name'] }}</span>
+                            </td>
+                            <td data-label="Autor">
+                                <span class="text-dark">{{ p['author_name'] }}</span>
+                                {% if p['es_autor'] %}
+                                <span class="badge bg-light text-dark border ms-1">T&uacute;</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Cantidad" class="fw-bold" style="color:#af1515;font-size:1.1rem;">
+                                {{ p['total_quantity'] | ph_qty }}<span class="text-muted fw-normal" style="font-size:0.8rem;"> uds.</span>
+                            </td>
+                            <td data-label="Fecha" class="text-muted small">{{ p['fecha_display'] }}</td>
+                            <td data-label="Motivo" class="text-muted small text-truncate" style="max-width:180px;">
+                                {% if p['notes'] %}
+                                <span title="{{ p['notes'] }}">{{ p['notes'] }}</span>
+                                {% else %}
+                                <span class="text-secondary fst-italic">Sin motivo</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Estado">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-hourglass-split me-1"></i>PENDIENTE
+                                </span>
+                            </td>
+                            <td class="text-end acciones-cell">
+                                {% if p['puede_editar'] or p['puede_cancelar'] %}
+                                {% if p['puede_editar'] %}
+                                <a class="btn btn-sm btn-outline-primary rounded-pill px-3 me-2"
+                                   href="/waste/merma/{{ p['id'] }}/edit"
+                                   title="Editar esta merma mientras siga pendiente">
+                                    <i class="bi bi-pencil me-1"></i>Editar
+                                </a>
+                                {% endif %}
+                                {% if p['puede_cancelar'] %}
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 btn-cancel-merma"
+                                        data-id="{{ p['id'] }}"
+                                        data-total="{{ p['total_quantity'] }}"
+                                        title="Retirar esta merma mientras siga pendiente">
+                                    <i class="bi bi-x-circle me-1"></i>Cancelar
+                                </button>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted small">
+                                    <i class="bi bi-lock me-1"></i>En espera de respuesta
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal de confirmación de cancelación -->
+<div class="modal fade" id="cancelMermaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #af1515; color: #fff;">
+                <h5 class="modal-title"><i class="bi bi-x-octagon me-2"></i>Confirmar cancelación</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cancelWasteId">
+
+                <div class="alert alert-warning small d-flex align-items-center mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2 fs-5 flex-shrink-0"></i>
+                    <div>
+                        Estás por <b>retirar</b> la merma pendiente <b>#<span id="cancelWasteIdText"></span></b>.
+                        Esta acción <b>no se puede deshacer</b> y quedará registrada en la
+                        Auditoría de Inventario. El stock no se descuenta porque la merma aún no fue aprobada.
+                    </div>
+                </div>
+
+                <div class="mb-2 d-none" id="cancelWasteSumm"></div>
+
+                <div class="mb-3">
+                    <label for="cancelReason" class="form-label fw-bold small text-muted">
+                        Motivo de la cancelación <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="cancelReason" class="form-control" rows="3" minlength="10"
+                              placeholder="Mínimo 10 caracteres. Ej: el registro fue creado por error y no corresponde dar de baja este stock."></textarea>
+                    <div class="invalid-feedback" id="cancelReasonError"></div>
+                    <div class="form-text">El motivo queda guardado en la auditoría.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Volver</button>
+                <button type="button" class="btn btn-danger px-4" id="btnConfirmCancelMerma">
+                    <i class="bi bi-check2-circle me-1"></i>Sí, cancelar merma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/waste/merma_list.js') }}?v=2"></script>
+{% endblock %}
+
+

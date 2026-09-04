@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/merma_approvals.css') }}?v=16">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
+    <div id="approvalAlerts" class="approval-alerts"></div>
+
+    <div class="ph-card">
+
+        <!-- Cabecera de la Bandeja -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm" style="background-color: #af1515;">
+                    <i class="bi bi-clipboard-check"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Aprobación de Mermas</h2>
+                    <p class="text-muted mb-0">Mermas irregulares en espera de decisión{% if not is_admin %} (solo lectura){% endif %}.</p>
+                </div>
+            </div>
+            <div>
+                <span id="pendingCountBadge" class="badge bg-danger rounded-pill px-3 py-2 fs-6 shadow-sm">
+                    <i class="bi bi-hourglass-split me-1"></i> Pendientes: 0
+                </span>
+            </div>
+        </div>
+
+        <!-- Barra de Filtros -->
+        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="input-group" style="max-width: 320px;">
+                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" placeholder="Buscar por ID, Sede, Tipo..." id="searchApprovalInput">
+            </div>
+            <div class="text-muted small fw-semibold">
+                <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas.
+            </div>
+        </div>
+
+        <!-- Tabla de Mermas Pendientes -->
+        <div class="table-responsive">
+            <table class="table ph-table align-middle">
+                <thead>
+                    <tr style="background-color: #af1515 !important;">
+                        <th style="background-color: #af1515 !important;">ID / TIPO</th>
+                        <th style="background-color: #af1515 !important;">SEDE</th>
+                        <th style="background-color: #af1515 !important;">CANTIDAD</th>
+                        <th style="background-color: #af1515 !important;">AUTOR</th>
+                        <th style="background-color: #af1515 !important;">FECHA</th>
+                        <th style="background-color: #af1515 !important;">MOTIVO</th>
+                        <th style="background-color: #af1515 !important;">NOVEDAD</th>
+                        <th style="background-color: #af1515 !important;" class="text-end">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody id="approvalTableBody">
+                    <tr id="emptylist_placeholder">
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Cargando mermas pendientes...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal de Detalle / Decisión -->
+<div class="modal fade" id="approvalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #af1515; color: #fff;">
+                <h5 class="modal-title"><i class="bi bi-clipboard-data me-2"></i>Detalle de Merma</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="approvalModalBody">
+                <div class="text-center text-muted py-5">Cargando detalle...</div>
+            </div>
+            <div class="modal-body" id="confirmDecisionBody" style="display:none;"></div>
+            <div class="modal-footer" id="approvalModalFooter" style="display:none;">
+                <div id="rejectReasonWrap" class="w-100 mb-2" style="display:none;">
+                    <label class="form-label small fw-bold text-muted">Motivo de rechazo (mín. 15 caracteres) <span class="text-danger">*</span></label>
+                    <textarea class="form-control border-secondary" id="rejectReason" rows="2" placeholder="Explique por qué se rechaza esta merma..."></textarea>
+                    <div id="rejectReasonError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
+                <button type="button" class="btn btn-secondary" id="btnCloseDetail" data-bs-dismiss="modal">Cerrar</button>
+                <div id="decisionButtons" style="display:none;">
+                    <button type="button" class="btn btn-ph-outline-danger" id="btnRejectModal">
+                        <i class="bi bi-x-circle me-1"></i>Rechazar
+                    </button>
+                    <button type="button" class="btn btn-danger" id="btnConfirmReject" style="display:none;">
+                        <i class="bi bi-check2-circle me-1"></i>Confirmar rechazo
+                    </button>
+                    <button type="button" class="btn btn-ph-success" id="btnConfirmApprove">
+                        <i class="bi bi-check-circle me-1"></i>Aprobar merma
+                    </button>
+                </div>
+                <div id="confirmButtons" style="display:none;">
+                    <button type="button" class="btn btn-secondary" id="btnConfirmCancel">Volver</button>
+                    <button type="button" class="btn btn-ph-success" id="btnConfirmDecisionOk">Sí, continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.WASTE_IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+</script>
+<script src="{{ url_for('static', filename='js/waste/merma_approvals.js') }}?v=19"></script>
+{% endblock %}
+
+
+

@@ -1,8 +1,11 @@
 import json
 from datetime import datetime
+from types import SimpleNamespace
 
 from app.extensions import db
 from app.models import AuditLog, Location, Movement, Notification, Product, User
+from app.models.security_model import user_locations
+from app.models.waste_model import Waste, WasteType, WasteDetail
 from sqlalchemy import or_
 
 
@@ -13,6 +16,15 @@ RECEPTION_AUDIT_ACTIONS = (
 
 # Tipo de notificación que representa una respuesta del Administrador.
 RESPONSE_NOTIFICATION_TYPE = 'RESPUESTA_TRASLADO'
+
+# Tipos de notificación de la decisión de una merma mayor (aprobada/rechazada).
+MERMA_NOTIFICATION_TYPES = ('MERMA_APROBADA', 'MERMA_RECHAZADA')
+
+# Etiqueta legible de cada decisión de merma.
+WASTE_DECISION_LABELS = {
+    'MERMA_APROBADA': 'Aprobada',
+    'MERMA_RECHAZADA': 'Rechazada',
+}
 
 # Etiquetas legibles de cada clasificación de novedad reportada en recepción.
 NOVEDAD_LABELS = {
@@ -91,13 +103,25 @@ class ResponseInboxRepository:
         return data.get("movement_id")
 
     @staticmethod
+    def _user_locations_ids(user_id):
+        """Ids de las sedes asignadas al usuario (user_locations)."""
+        rows = db.session.query(user_locations.c.location_id).filter(
+            user_locations.c.user_id == user_id
+        ).all()
+        return [r[0] for r in rows]
+
+    @staticmethod
     def get_unread_count(user):
-        """Cuenta las respuestas pendientes de leer por el usuario en el servidor."""
-        return Notification.query.filter_by(
+        """Cuenta las respuestas pendientes de leer (traslados + mermas)."""
+        count = Notification.query.filter_by(
             user_id=user.id,
             type=RESPONSE_NOTIFICATION_TYPE,
             is_read=False,
         ).count()
+        for w in ResponseInboxRepository.get_waste_responses(user):
+            if not w.is_read:
+                count += 1
+        return count
 
     @staticmethod
     def get_admin_responses(user, limit=None):
@@ -140,9 +164,6 @@ class ResponseInboxRepository:
                 "summary": data.get("resolution_summary") or {},
                 "items": data.get("items") or [],
             }
-
-        if not resolution_map:
-            return []
 
         # 2) Cargar los movimientos con respuesta.
         movements = Movement.query.filter(Movement.id.in_(list(resolution_map.keys()))).all()
@@ -190,19 +211,10 @@ class ResponseInboxRepository:
             Product.id.in_(list(product_ids) or [0])
         ).all()}
 
-        # 5) Orden: pendientes de leer primero; dentro del mismo grupo, la
-        #    fecha de la respuesta más reciente primero.
-        movements.sort(
-            key=lambda m: (
-                0 if (notif := notif_map.get(m.id)) and not notif.is_read else 1,
-                -(resolution_map[m.id]["resolved_at"] or m.date or datetime.min).timestamp() if (resolution_map[m.id]["resolved_at"] or m.date) else float('-inf'),
-            )
-        )
+        if not resolution_map:
+            movements = []
 
-        if limit is not None:
-            movements = movements[:limit]
-
-        # 6) Adjuntar todo en memoria (sin tocar la base de datos ni el modelo).
+        # 5) Adjuntar todo en memoria (sin tocar la base de datos ni el modelo).
         for mov in movements:
             res = resolution_map[mov.id]
             rec = reception_map.get(mov.id, {})
@@ -220,6 +232,7 @@ class ResponseInboxRepository:
             mov.response_by = users.get(res["resolved_by_id"])
             mov.resolution_notes = res["notes"] or mov.resolution_notes
             mov.resolution_summary = res["summary"]
+            mov.response_type = 'TRASLADO'
             mov.resolution_items = [
                 {
                     "product": products.get(it.get("product_id")),
@@ -261,7 +274,252 @@ class ResponseInboxRepository:
             mov.reported_notes = rec.get("notes") or ""
             mov.reported_by = received_by or users.get(mov.user_id)
 
+        # 6) Respuestas de mermas (aprobada/rechazada) visibles para el usuario.
+        movements.extend(ResponseInboxRepository.get_waste_responses(user))
+
+        # 7) Orden unificado: pendientes de leer primero; dentro del grupo, la
+        #    fecha de la respuesta más reciente primero.
+        movements.sort(
+            key=lambda r: (
+                0 if not r.is_read else 1,
+                -((r.response_date or datetime.min).timestamp())
+                if r.response_date else float('-inf'),
+            )
+        )
+
+        if limit is not None:
+            movements = movements[:limit]
+
         return movements
+
+    # ------------------------------------------------------------------
+    # Respuestas de mermas (aprobada / rechazada)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def get_waste_responses(user):
+        """Decisiones de mermas (MERMA_APROBADA / MERMA_RECHAZADA) visibles.
+
+        - Admin / Finanzas: todas las sedes (bandeja global).
+        - Otros roles: solo las mermas de las sedes que tienen asignadas
+          (aunque no hayan registrado la merma ellos).
+
+        Estado de lectura: una merma se considera NO leída si el usuario no
+        tiene todavía una notificación de "leído" para esa decisión (o la
+        tiene con is_read=False). Al abrirla / marcarla leída se crea la fila.
+        """
+        # 0) Notificaciones de decisiones emitidas (fuente de "existe decisión").
+        notifs = Notification.query.filter(
+            Notification.type.in_(MERMA_NOTIFICATION_TYPES)
+        ).all()
+        by_waste = {}
+        for n in notifs:
+            if n.waste_id is None:
+                continue
+            by_waste.setdefault(n.waste_id, n)
+
+        if not by_waste:
+            return []
+
+        is_global = user.is_admin or user.is_finance
+        scope_ids = None
+        if not is_global:
+            scope_ids = set(ResponseInboxRepository._user_locations_ids(user.id))
+            if not scope_ids:
+                return []
+
+        # Filas de "leído" de este usuario (para marcar pendientes/leídos).
+        user_read = {}
+        for n in Notification.query.filter_by(user_id=user.id).all():
+            if n.type in MERMA_NOTIFICATION_TYPES and n.waste_id is not None:
+                user_read[n.waste_id] = n
+
+        # 1) Mermas decididas.
+        waste_ids = list(by_waste.keys())
+        wastes = {
+            w.id: w for w in Waste.query.filter(Waste.id.in_(waste_ids)).all()
+        }
+
+        # 2) Catálogo de tipos, sedes y usuarios.
+        type_ids = {w.waste_type_id for w in wastes.values() if w.waste_type_id}
+        types = {}
+        if type_ids:
+            types = {
+                t.id: t for t in WasteType.query.filter(
+                    WasteType.id.in_(list(type_ids))
+                ).all()
+            }
+        locs = {loc.id: loc for loc in Location.query.all()}
+        user_ids = set()
+        for w in wastes.values():
+            user_ids.add(w.user_id)
+            if w.approved_by_id:
+                user_ids.add(w.approved_by_id)
+        users = {}
+        if user_ids:
+            users = {
+                u.id: u for u in User.query.filter(User.id.in_(list(user_ids))).all()
+            }
+
+        # 3) Líneas y productos.
+        lines_by_waste = {}
+        prod_ids = set()
+        for d in WasteDetail.query.filter(WasteDetail.waste_id.in_(waste_ids)).all():
+            lines_by_waste.setdefault(d.waste_id, []).append({
+                'product_id': d.product_id,
+                'lot_number': d.lot_number,
+                'expiration_date': d.expiration_date,
+                'quantity': float(d.quantity or 0),
+            })
+            prod_ids.add(d.product_id)
+        prods = {}
+        if prod_ids:
+            prods = {
+                p.id: p for p in Product.query.filter(Product.id.in_(list(prod_ids))).all()
+            }
+
+        # 4) Motivo del rechazo: la razón vive en la auditoría MERMA_RECHAZADA.
+        rejection_map = ResponseInboxRepository._waste_rejection_reasons(waste_ids)
+
+        # 5) Armar las respuestas.
+        respuestas = []
+        for wid, notif in by_waste.items():
+            w = wastes.get(wid)
+            if not w:
+                continue
+            # Visibilidad por sede (no-admin).
+            if not is_global and w.location_id not in scope_ids:
+                continue
+
+            tipo = notif.type
+            read_row = user_read.get(wid)
+            is_read = bool(read_row and read_row.is_read)
+            decision = 'APROBADA' if tipo == 'MERMA_APROBADA' else 'RECHAZADA'
+            t = types.get(w.waste_type_id)
+            loc = locs.get(w.location_id)
+
+            productos = [{
+                'product': prods.get(d['product_id']),
+                'product_id': d['product_id'],
+                'product_name': (
+                    prods.get(d['product_id']).name if prods.get(d['product_id'])
+                    else 'Producto N/D'
+                ),
+                'lot_number': d['lot_number'],
+                'expiration_date': d['expiration_date'],
+                'quantity': d['quantity'],
+            } for d in lines_by_waste.get(wid, [])]
+
+            respuestas.append(SimpleNamespace(
+                response_type='MERMA',
+                id=w.id,
+                waste_id=w.id,
+                is_read=is_read,
+                notification_id=getattr(read_row, 'id', None),
+                date=w.date,
+                response_date=w.approved_at or (
+                    read_row.created_at if read_row else None
+                ) or w.date,
+                response_by=users.get(w.approved_by_id),
+                reported_by=users.get(w.user_id),
+                location_id=w.location_id,
+                location=loc,
+                origin_location=None,
+                destination_location=None,
+                origin_location_id=None,
+                destination_location_id=None,
+                move_id=None,
+                waste_type_code=t.code if t else '',
+                waste_type_name=t.name if t else 'Sin tipo',
+                decision=decision,
+                decision_label=WASTE_DECISION_LABELS.get(tipo, decision.title()),
+                total_quantity=float(w.total_quantity or 0),
+                waste_notes=w.notes or '',
+                rejection_reason=rejection_map.get(wid, ''),
+                novedad_type=tipo,
+                novedad_label=WASTE_DECISION_LABELS.get(tipo, 'Merma'),
+                novedad_items=[],
+                resolution_summary={},
+                resolution_items=[],
+                resolution_notes='',
+                waste_details=productos,
+            ))
+        return respuestas
+
+    @staticmethod
+    def _waste_rejection_reasons(waste_ids):
+        """Razones de rechazo {waste_id: motivo} desde la auditoría de mermas."""
+        if not waste_ids:
+            return {}
+        out = {}
+        logs = AuditLog.query.filter(
+            AuditLog.action == 'MERMA',
+            AuditLog.affected_table == 'waste',
+        ).all()
+        for log in logs:
+            data = ResponseInboxRepository._read_data(log)
+            if data.get('event') != 'MERMA_RECHAZADA':
+                continue
+            wid = data.get('waste_id')
+            if wid is None:
+                continue
+            try:
+                wid = int(wid)
+            except (TypeError, ValueError):
+                continue
+            if wid in waste_ids and wid not in out:
+                out[wid] = (data.get('motivo_rechazo') or '').strip()
+        return out
+
+    @staticmethod
+    def _apply_waste_read(user, waste_id, decision):
+        """Crea/actualiza la fila de lectura del usuario para una decisión.
+
+        La CANCELACIÓN no es una respuesta administrativa: no fabrica fila.
+        """
+        if decision == 'CANCELADA':
+            return None
+        tipo = ('MERMA_APROBADA' if decision == 'APROBADA' else 'MERMA_RECHAZADA')
+        existing = Notification.query.filter_by(
+            user_id=user.id, waste_id=waste_id, type=tipo,
+        ).first()
+        if existing:
+            existing.is_read = True
+            return existing.id
+        waste = Waste.query.get(waste_id)
+        db.session.add(Notification(
+            user_id=user.id,
+            location_id=waste.location_id if waste else None,
+            waste_id=waste_id,
+            type=tipo,
+            message=(
+                f'Merma #{waste_id} fue '
+                f'{("aprobada" if tipo == "MERMA_APROBADA" else "rechazada")} '
+                f'por el Administrador.'
+            ),
+            is_read=True,
+        ))
+        return None
+
+    @staticmethod
+    def mark_waste_as_read(user, waste_id):
+        """Marca leída la respuesta de una merma para el usuario (servidor)."""
+        waste = Waste.query.get(waste_id)
+        if not waste:
+            return False
+        if not (user.is_admin or user.is_finance):
+            scope_ids = set(ResponseInboxRepository._user_locations_ids(user.id))
+            if waste.location_id not in scope_ids:
+                return False
+        decision = {
+            'APROBADO': 'APROBADA',
+            'RECHAZADO': 'RECHAZADA',
+            'CANCELADA': 'CANCELADA',
+        }.get(waste.status)
+        if decision not in ('APROBADA', 'RECHAZADA', 'CANCELADA'):
+            return False
+        ResponseInboxRepository._apply_waste_read(user, waste_id, decision)
+        db.session.commit()
+        return True
 
     @staticmethod
     def mark_as_read(user, movement_id):
@@ -279,7 +537,7 @@ class ResponseInboxRepository:
 
     @staticmethod
     def mark_all_as_read(user):
-        """Marca todas las respuestas del usuario como leídas."""
+        """Marca todas las respuestas del usuario como leídas (traslados + mermas)."""
         notifications = Notification.query.filter_by(
             user_id=user.id,
             type=RESPONSE_NOTIFICATION_TYPE,
@@ -287,5 +545,12 @@ class ResponseInboxRepository:
         ).all()
         for notif in notifications:
             notif.is_read = True
+        marked_wastes = 0
+        for w in ResponseInboxRepository.get_waste_responses(user):
+            if not w.is_read:
+                ResponseInboxRepository._apply_waste_read(
+                    user, w.waste_id, w.decision
+                )
+                marked_wastes += 1
         db.session.commit()
-        return len(notifications)
+        return len(notifications) + marked_wastes
