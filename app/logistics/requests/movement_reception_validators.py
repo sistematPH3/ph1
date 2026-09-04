@@ -116,6 +116,25 @@ def validate_reception_payload(payload, movement_details_map):
             has_discrepancy = True
             item_has_issue = True
 
+        # Coherencia de la condición DE CANTIDAD a nivel de renglón (regla de Mariuska):
+        # un SOBRANTE exige recibir MÁS de lo despachado, y un FALTANTE exige recibir
+        # MENOS. Si la condición declarada contradice la cantidad (p. ej. "sobrante" con
+        # la misma cantidad que llegó), se rechaza en vez de registrar un falso sobrante.
+        row_has_surplus_qty = received_qty > detail.quantity
+        row_has_missing_qty = received_qty < detail.quantity
+        if item_condition == "SOBRANTE_EXCEDENTE" and not row_has_surplus_qty:
+            errors.append(
+                f"Indicó 'Sobrante / Excedente' para '{prod_name}', pero la cantidad recibida "
+                "no es MAYOR a la despachada. Un sobrante exige recibir más de lo despachado."
+            )
+            continue
+        if item_condition == "FALTANTE_CONTEO" and not row_has_missing_qty:
+            errors.append(
+                f"Indicó 'Faltante de Conteo' para '{prod_name}', pero la cantidad recibida "
+                "no es MENOR a la despachada. Un faltante exige recibir menos de lo despachado."
+            )
+            continue
+
         if item_has_issue:
             row_issue_count += 1
 
@@ -128,6 +147,29 @@ def validate_reception_payload(payload, movement_details_map):
             errors.append(f"La fecha de vencimiento observada para '{prod_name}' no es válida (use AAAA-MM-DD).")
             continue
 
+        # Validación estructural de los LOTES DEL SOBRANTE (multilote). La existencia
+        # en BD y la coherencia de sumas se verifican en el servicio (que sí tiene
+        # acceso al repositorio); aquí solo se valida el formato/estructura.
+        raw_surplus_lots = item.get("surplus_lots") or []
+        surplus_lots = []
+        if isinstance(raw_surplus_lots, list):
+            for i, sl in enumerate(raw_surplus_lots, start=1):
+                if not isinstance(sl, dict):
+                    errors.append(f"Lote de sobrante #{i} de '{prod_name}': Formato inválido.")
+                    continue
+                sl_lot = str(sl.get("lot") or "").strip()
+                sl_exp = sl.get("expiration_date")
+                if sl_exp and not _is_valid_date(sl_exp):
+                    errors.append(
+                        f"Lote de sobrante #{i} de '{prod_name}': "
+                        "fecha de vencimiento inválida (use AAAA-MM-DD)."
+                    )
+                surplus_lots.append({
+                    "lot": sl_lot or None,
+                    "expiration_date": sl_exp or None,
+                    "quantity": sl.get("quantity", 0)
+                })
+
         processed_items.append({
             "detail_id": detail_id,
             "product_id": detail.product_id,
@@ -138,8 +180,21 @@ def validate_reception_payload(payload, movement_details_map):
             "expiration_date": detail.expiration_date,
             "item_condition": item_condition,
             "observed_physical_lot": str(observed_lot).strip() if observed_lot else None,
-            "observed_physical_expiration": item.get("observed_physical_expiration") or None
+            "observed_physical_expiration": item.get("observed_physical_expiration") or None,
+            "surplus_lots": surplus_lots
         })
+
+    # Integridad de la guía: la recepción debe declarar TODOS los renglones del
+    # movimiento. Si falta alguno, su received_quantity quedaría NULL en la BD
+    # (datos perdidos en silencio para auditorías/reportes/arbitraje). La UI
+    # siempre envía todos los renglones; este guard protege el path por API/script.
+    missing_detail_ids = set(movement_details_map.keys()) - set(seen_detail_ids)
+    if missing_detail_ids:
+        errors.append(
+            "La recepción debe declarar todos los renglones de la guía. Faltan los "
+            f"renglones #{', #'.join(map(str, sorted(missing_detail_ids)))}. "
+            "Envíe la cantidad recibida para cada insumo del traslado."
+        )
 
     processed_erroneous = []
     if novelty_type == "PRODUCTO_ERRONEO":
@@ -280,10 +335,11 @@ def validate_reception_payload(payload, movement_details_map):
             "no hay ningún renglón con recibo inferior a la guía ni marcado como faltante. "
             "Revise la tabla de insumos o cambie la clasificación."
         )
-    elif novelty_type == 'SOBRANTE_EXCEDENTE' and not any_surplus_row and 'SOBRANTE_EXCEDENTE' not in row_conditions:
+    elif novelty_type == 'SOBRANTE_EXCEDENTE' and not any_surplus_row:
         errors.append(
-            "La clasificación general 'Sobrante / Excedente' no coincide con los renglones: "
-            "no hay ningún renglón con recibo superior a la guía ni marcado como sobrante. "
+            "La clasificación general 'Sobrante / Excedente' exige que la cantidad recibida "
+            "sea MAYOR a la despachada: no hay ningún renglón con recibo superior a la guía. "
+            "Un sobrante no puede declararse con la misma cantidad que se despachó. "
             "Revise la tabla de insumos o cambie la clasificación."
         )
     elif novelty_type == 'INCIDENCIA_TEMPERATURA' and 'INCIDENCIA_TEMPERATURA' not in row_conditions:

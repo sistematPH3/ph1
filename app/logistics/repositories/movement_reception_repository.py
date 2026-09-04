@@ -108,7 +108,15 @@ class MovementReceptionRepository:
         for quantity, received_quantity in rows:
             dispatched = Decimal(str(quantity or 0))
             received = Decimal(str(received_quantity or 0))
-            total += max(dispatched - received, Decimal("0.00"))
+            # Saldo que el origen tiene derecho a recuperar al recibir una
+            # devolución: tanto el faltante (despachado - recibido) que nunca
+            # llegó, como el SOBRANTE (recibido - despachado) que el origen
+            # debitó de su inventario en resolve_dispute (extra_units) y que
+            # regresa físicamente vía el retorno. Con el flujo viejo el origen
+            # solo debitaba la guía, por lo que un sobrante daba 0 y el retorno
+            # nunca se acreditaba de vuelta (el inventario quedaba corto).
+            total += max(dispatched - received, Decimal("0.00")) \
+                   + max(received - dispatched, Decimal("0.00"))
         return total
 
     @staticmethod
@@ -152,6 +160,25 @@ class MovementReceptionRepository:
                 }).mappings().first()
 
         return inv
+
+    @staticmethod
+    def get_inventory_quantity(location_id, product_id):
+        """Stock físico actual (current_quantity) de un producto en una sede.
+
+        Solo lectura. Se usa para el 'techo' de sobrante en la recepción: un
+        excedente físico no puede superar lo que el origen conserva del producto.
+        No modifica nada del flujo de Mariuska (retornos/selector/disputa).
+        """
+        sql = text("""
+            SELECT current_quantity
+            FROM inventory
+            WHERE location_id = :location_id AND product_id = :product_id
+        """)
+        row = db.session.execute(sql, {
+            "location_id": location_id,
+            "product_id": product_id
+        }).mappings().first()
+        return Decimal(str(row["current_quantity"])) if row else Decimal("0.00")
 
     @staticmethod
     def update_origin_transit(location_id, product_id, decrement_transit):

@@ -57,6 +57,21 @@ def create_app():
         # ==========================================================
         from .waste.routes.auditinventory_routes import auditinventory_bp
         app.register_blueprint(auditinventory_bp)
+
+        # MÓDULO WASTE: BANDEJA DE APROBACIÓN DE MERMAS
+        from .waste.routes.merma_approvals_routes import merma_approvals_bp
+        app.register_blueprint(merma_approvals_bp)
+
+        # MÓDULO WASTE: MIS MERMAS PENDIENTES (EDICIÓN/CANCELACIÓN DEL AUTOR)
+        from .waste.routes.merma_list_routes import merma_list_bp
+        app.register_blueprint(merma_list_bp)
+        # ==========================================================
+
+        # ==========================================================
+        # MÓDULO 7: REGISTRO DE MERMA (PARTE 1)
+        # ==========================================================
+        from .waste.routes.register_waste_routes import register_waste_bp
+        app.register_blueprint(register_waste_bp)
         # ==========================================================
         
         from .logistics import logistics_bp
@@ -180,9 +195,19 @@ def create_app():
                     count = get_pending_disputes_count()
                 except Exception:
                     count = 0
+            # Mermas pendientes de resolución (círculo rojo del sidebar).
+            waste_count = 0
+            if can_view:
+                try:
+                    from app.waste.services.merma_approvals_service import get_pending_waste_summary
+                    waste_count = get_pending_waste_summary(current_user.id)['pending_count']
+                except Exception:
+                    waste_count = 0
             return {
                 'pending_disputes_count': count,
                 'can_view_disputes': can_view,
+                'pending_waste_approvals_count': waste_count,
+                'can_view_waste_approvals': can_view,
                 # Roles que pueden consultar las respuestas del administrador
                 # (además de ser los receptores de traslados que usan la
                 # campana de notificaciones).

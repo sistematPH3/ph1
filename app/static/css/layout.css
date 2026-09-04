@@ -379,12 +379,25 @@ html, body {
         top: 0;
         left: 100%; 
         min-width: 220px;
+        max-height: calc(100vh - 30px);
+        overflow-y: auto;
         background-color: #0d0e0e; 
         border-left: 2px solid #e31937; 
         border-radius: 0 8px 8px 0;
         box-shadow: 4px 4px 15px rgba(0,0,0,0.5);
         z-index: 1050;
         padding: 5px 0;
+        scrollbar-width: none;
+    }
+
+    .sidebar:not(.searching) .menu-desplegable::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Si el submenú se saldría por abajo, se abre hacia arriba */
+    .sidebar:not(.searching) .menu-desplegable.menu-flip-up {
+        top: auto;
+        bottom: 0;
     }
 
     /* Mostrar el menú desplegable al hacer hover SOLO si la barra no está buscando y NO está colapsada */

@@ -1,5 +1,5 @@
 from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
-from app.models import Location, Movement, PurchaseAuditLog
+from app.models import Location, Movement, PurchaseAuditLog, Product, WasteDetail
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
@@ -145,6 +145,10 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
     
     location_id = original_log_tuple.location_id
     action_name_upper = original_log_tuple.action.upper()
+
+    # Las mermas son un registro contable irrevocable: no se editan, anulan ni reactivan.
+    if 'MERMA' in action_name_upper:
+        return {'success': False, 'message': 'Operación denegada. Una merma no se puede editar, anular ni activar.'}
 
     if location_id == 1 or "COMPRA" in action_name_upper or "INGRESO" in action_name_upper:
         return {'success': False, 'message': 'Operación denegada. Las compras o registros en el Almacén General no admiten modificaciones.'}
@@ -395,7 +399,7 @@ def _apply_manage(entry, ts_aware, sev, act, is_admin, read_only_role, now):
         return
     if read_only_role:
         return
-    if 'COMPRA' in act or 'INGRESO' in act or 'AJUSTE' in act or 'REVERSION' in act or 'ACTIVACION' in act:
+    if 'MERMA' in act or 'COMPRA' in act or 'INGRESO' in act or 'AJUSTE' in act or 'REVERSION' in act or 'ACTIVACION' in act:
         return
     if sev in ('ANULADO',):
         entry['can_manage'] = True
@@ -676,6 +680,35 @@ def get_inventory_audit_entries(filters, user, is_admin):
         for mov in Movement.query.filter(Movement.id.in_(movement_ids)).all():
             movement_map[mov.id] = mov
 
+    # --- Mapa de productos de mermas (aprobadas y rechazadas) ---
+    # El log de MERMA solo guarda waste_id; el detalle (productos/lotes) vive en waste_details.
+    merma_waste_ids = set()
+    for raw in raw_logs:
+        c = _changed_dict(raw)
+        if (raw.action or '').upper() == 'MERMA':
+            wid = c.get('waste_id')
+            if wid is not None:
+                try:
+                    merma_waste_ids.add(int(wid))
+                except (TypeError, ValueError):
+                    pass
+
+    merma_details = {}
+    product_ids_all = set()
+    if merma_waste_ids:
+        for wd in WasteDetail.query.filter(WasteDetail.waste_id.in_(merma_waste_ids)).all():
+            merma_details.setdefault(wd.waste_id, []).append({
+                'product_id': wd.product_id,
+                'qty': float(wd.quantity or 0),
+                'lot': wd.lot_number or 'N/A',
+            })
+            product_ids_all.add(wd.product_id)
+
+    product_map = {}
+    if product_ids_all:
+        for pr in Product.query.filter(Product.id.in_(product_ids_all)).all():
+            product_map[pr.id] = pr.name
+
     location_cache = {}
 
     def loc_name(loc_id):
@@ -734,6 +767,167 @@ def get_inventory_audit_entries(filters, user, is_admin):
                 _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
             elif act == 'RESOLUCION_DISPUTA':
                 _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+            continue
+
+        # --- Mermas: mostrar TODAS (aprobadas, rechazadas, canceladas, editadas) con su detalle y observación ---
+        if act == 'MERMA':
+            event = (c.get('event') or '').upper()
+            wid = c.get('waste_id')
+            try:
+                wid = int(wid) if wid is not None else None
+            except (TypeError, ValueError):
+                wid = None
+
+            detalles = merma_details.get(wid) or []
+            stock_map = {}
+            admin_name = 'Administración'
+            motivo = ''
+            if event == 'MERMA_APROBADA':
+                admin_name = c.get('approved_by') or 'Administración'
+                # stock real por producto desde descuentos_stock
+                for it in c.get('descuentos_stock') or []:
+                    pid = it.get('product_id')
+                    try:
+                        pid = int(pid) if pid is not None else None
+                    except (TypeError, ValueError):
+                        pid = None
+                    if pid is None:
+                        continue
+                    try:
+                        stock_map[pid] = (
+                            float(it.get('stock_antes') or 0),
+                            float(it.get('stock_despues') or 0),
+                            float(it.get('quantity') or 0),
+                        )
+                    except (TypeError, ValueError):
+                        stock_map[pid] = (0.0, 0.0, 0.0)
+            elif event == 'MERMA_CANCELADA' or event == 'MERMA_EDITADA':
+                admin_name = c.get('cancelled_by') or c.get('edited_by') or 'el autor'
+                motivo = c.get('motivo_cancelacion') or c.get('motivo_edicion') or ''
+            else:
+                admin_name = c.get('rejected_by') or 'Administración'
+                motivo = c.get('motivo_rechazo') or ''
+
+            # Si no hay detalle en waste_details (dato suplementario), usamos descuentos_stock
+            if not detalles:
+                detalles = [
+                    {'product_id': pid, 'qty': stock_map.get(pid, (0, 0, 0))[2], 'lot': 'N/A'}
+                    for pid in stock_map
+                ]
+
+            # Cancelación de una merma PENDIENTE: nunca descontó stock.
+            # Se muestra UNA fila por log (con el motivo), sin líneas.
+            if event == 'MERMA_CANCELADA':
+                nombres = [product_map.get(d.get('product_id')) for d in detalles]
+                nombres = [n for n in nombres if n]
+                producto = ' · '.join(list(dict.fromkeys(nombres))[:2]) or 'Merma'
+
+                merma_row = dict(entry)
+                merma_row.update({
+                    'event_type': 'inventory',
+                    'product': producto,
+                    'sku': 'N/A',
+                    'lot': 'N/A',
+                    'qty': 0.0,
+                    'prev_qty': 0.0,
+                    'new_qty': 0.0,
+                    'is_merma': True,
+                    'is_merma_rejected': False,
+                    'is_merma_cancelled': True,
+                    'is_merma_edited': False,
+                    'is_adjustment': False,
+                    'is_annulled': False,
+                    'can_manage': False,
+                    'notes': (
+                        f"Cancelación de la merma{(' #' + str(wid)) if wid else ''} por {admin_name}. "
+                        f"Sin descuento de stock."
+                        + (f" Motivo: {motivo}" if motivo else "")
+                    ),
+                })
+                rows.append(merma_row)
+                continue
+
+            # Edición de una merma PENDIENTE: tampoco descontó stock.
+            # Una fila por log; si el evento guardó cantidades, se muestran antes → después.
+            if event == 'MERMA_EDITADA':
+                nombres = [product_map.get(d.get('product_id')) for d in detalles]
+                nombres = [n for n in nombres if n]
+                producto = ' · '.join(list(dict.fromkeys(nombres))[:2]) or 'Merma'
+
+                cantidad_txt = ''
+                antes = c.get('cantidad_antes')
+                despues = c.get('cantidad_despues')
+                if antes is not None and despues is not None:
+                    try:
+                        cantidad_txt = f" Cantidad: {float(antes):.2f} → {float(despues):.2f}."
+                    except (TypeError, ValueError):
+                        cantidad_txt = ''
+
+                merma_row = dict(entry)
+                merma_row.update({
+                    'event_type': 'inventory',
+                    'product': producto,
+                    'sku': 'N/A',
+                    'lot': 'N/A',
+                    'qty': 0.0,
+                    'prev_qty': 0.0,
+                    'new_qty': 0.0,
+                    'is_merma': True,
+                    'is_merma_rejected': False,
+                    'is_merma_cancelled': False,
+                    'is_merma_edited': True,
+                    'is_adjustment': False,
+                    'is_annulled': False,
+                    'can_manage': False,
+                    'notes': (
+                        f"Edición de la merma{(' #' + str(wid)) if wid else ''} por {admin_name}."
+                        f"{cantidad_txt} Sin descuento de stock."
+                        + (f" Motivo: {motivo}" if motivo else "")
+                    ),
+                })
+                rows.append(merma_row)
+                continue
+
+            for d in detalles:
+                pid = d.get('product_id')
+                try:
+                    pid = int(pid) if pid is not None else None
+                except (TypeError, ValueError):
+                    pid = None
+                qty_nominal = float(d.get('qty') or 0)
+                stock_antes, stock_despues, qty_disc = stock_map.get(pid, (0.0, 0.0, qty_nominal))
+                qty = qty_disc if qty_disc else qty_nominal
+
+                merma_row = dict(entry)
+                merma_row.update({
+                    'event_type': 'inventory',
+                    'product': product_map.get(pid, f'Insumo #{pid}' if pid else 'N/A'),
+                    'sku': 'N/A',
+                    'lot': d.get('lot') or 'N/A',
+                    'qty': -qty,
+                    'is_merma': True,
+                    'is_merma_rejected': event != 'MERMA_APROBADA',
+                    'is_adjustment': False,
+                    'is_annulled': False,
+                    'can_manage': False,
+                })
+                if event == 'MERMA_APROBADA':
+                    merma_row['prev_qty'] = stock_antes
+                    merma_row['new_qty'] = stock_despues
+                    merma_row['notes'] = (
+                        f"Merma aprobada{(' #' + str(wid)) if wid else ''} por {admin_name}. "
+                        f"Stock: {stock_antes:.2f} → {stock_despues:.2f}."
+                    )
+                else:
+                    # Rechazada: sin descuento de stock (prev == new == 0)
+                    merma_row['prev_qty'] = 0.0
+                    merma_row['new_qty'] = 0.0
+                    merma_row['notes'] = (
+                        f"Merma RECHAZADA{(' #' + str(wid)) if wid else ''} por {admin_name}. "
+                        f"Sin descuento de stock."
+                        + (f" Motivo: {motivo}" if motivo else "")
+                    )
+                rows.append(merma_row)
             continue
 
         # --- Logs operativos de stock ---

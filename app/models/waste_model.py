@@ -47,6 +47,11 @@ class Waste(db.Model):
     reverted_at = db.Column(db.DateTime)
     reversal_reason = db.Column(db.Text)
 
+    # Cancelación por el autor (merma PENDIENTE retirada antes de la respuesta)
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    cancelled_at = db.Column(db.DateTime)
+    cancel_reason = db.Column(db.Text)
+
     # Líneas (multi-lote) de la merma
     details = db.relationship('WasteDetail', backref='waste', lazy=True,
                               cascade='all, delete-orphan')

@@ -1,0 +1,572 @@
+/* =========================================================
+   BANDEJA DE APROBACIÓN DE MERMAS
+   Estilos coherentes con el resto de listados del sistema:
+   ph-card, ph-table, ph-icon-box, ph-title, botones pill.
+   ========================================================= */
+:root {
+    --ph-red: #a81119;
+    --ph-red-hover: #800c12;
+    --ph-green: #0d8a43;
+    --ph-green-hover: #096330;
+    --ph-gray-bg: #f8f9fa;
+    --ph-border-radius: 20px;
+}
+
+body {
+    background-color: #f4f6f9;
+}
+
+/* ---------- Tarjeta principal ---------- */
+.ph-card {
+    background-color: #ffffff;
+    border-radius: var(--ph-border-radius);
+    padding: 2rem;
+    border: 1.5px solid #edf2f7;
+}
+
+.ph-icon-box {
+    width: 50px;
+    height: 50px;
+    background-color: var(--ph-red);
+    color: #ffffff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+/* Título principal (Negro con sombra roja, tipo de letra del sistema) */
+.ph-title {
+    color: #1a1a1a;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: -0.5px;
+    text-shadow: 2px 2px 4px rgba(175, 21, 21, 0.25);
+}
+
+/* ---------- Tabla tipo listado ---------- */
+.ph-table {
+    border-collapse: separate !important;
+    border-spacing: 0 12px !important;
+    width: 100%;
+}
+
+.ph-table thead th {
+    background-color: var(--ph-red) !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.5px;
+    padding: 0.9rem 1.2rem !important;
+    border: none !important;
+    text-align: center !important;
+}
+
+.ph-table thead th:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.ph-table thead th:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.ph-table tbody tr {
+    background-color: #ffffff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+}
+
+.ph-table tbody tr:hover {
+    box-shadow: 0 4px 16px rgba(168, 17, 25, 0.12);
+}
+
+.ph-table tbody td {
+    padding: 0.95rem 0.8rem !important;
+    border-top: 1.5px solid #edf2f7 !important;
+    border-bottom: 1.5px solid #edf2f7 !important;
+    vertical-align: middle;
+}
+
+.ph-table tbody td:first-child {
+    border-left: 1.5px solid #edf2f7 !important;
+    border-top-left-radius: 16px !important;
+    border-bottom-left-radius: 16px !important;
+}
+
+.ph-table tbody td:last-child {
+    border-right: 1.5px solid #edf2f7 !important;
+    border-top-right-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    text-align: center;
+}
+
+/* ---------- Botones pill del sistema ---------- */
+.btn-ph-success {
+    background-color: var(--ph-green);
+    color: #ffffff;
+    border-radius: 50px;
+    padding: 0.5rem 1.4rem;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-ph-success:hover {
+    background-color: var(--ph-green-hover);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(13, 138, 67, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-ph-danger {
+    background-color: var(--ph-red);
+    color: #ffffff;
+    border-radius: 50px;
+    padding: 0.5rem 1.4rem;
+    font-weight: 700;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-ph-danger:hover {
+    background-color: var(--ph-red-hover);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(168, 17, 25, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-ph-outline-danger {
+    background-color: #212529;
+    color: #ffffff;
+    border: 1px solid #212529;
+    border-radius: 50px;
+    padding: 0.5rem 1.3rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-ph-outline-danger:hover {
+    background-color: #1a1a1a;
+    color: var(--ph-red);
+    border-color: var(--ph-red);
+    box-shadow: 0 0 12px rgba(168, 17, 25, 0.5);
+    transform: translateY(-1px);
+}
+
+/* ---------- Badges de tipo / aprobación ---------- */
+.ph-badge-location {
+    background-color: #fff0f1;
+    color: var(--ph-red);
+    border: 1px solid rgba(168, 17, 25, 0.2);
+    border-radius: 50px;
+    padding: 0.3rem 0.85rem;
+    font-weight: 700;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.ph-badge-type {
+    display: inline-block;
+    font-weight: 700;
+    color: #2b2b2b;
+    font-size: 0.9rem;
+}
+
+.badge-aprobacion {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 50px;
+    letter-spacing: 0.2px;
+    gap: 0.3rem;
+}
+
+.badge-aprobacion-req {
+    background-color: #fff4e5;
+    color: #995300;
+    border: 1px solid #ffd591;
+}
+
+.badge-aprobacion-auto {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+
+/* ---------- Badge de cantidad ---------- */
+.qty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background-color: #f1f3f5;
+    color: #212529;
+    border: 1px solid #e9ecef;
+    border-radius: 50px;
+    padding: 0.3rem 0.85rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+/* ---------- Barra de filtros ---------- */
+.ph-filter-bar {
+    background-color: #f8f9fa;
+    border: 1px solid #edf2f7;
+    border-radius: 14px;
+}
+
+.ph-filter-bar .form-control {
+    border-radius: 50px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+input#searchApprovalInput:focus {
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 0.25rem rgba(168, 17, 25, 0.15);
+}
+
+/* ---------- Alertas ---------- */
+.approval-alerts .alert {
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.approval-alerts:empty {
+    display: none;
+}
+
+/* ---------- Estado vacío ---------- */
+.waste-empty-state {
+    text-align: center;
+    color: #6c757d;
+    padding: 2.5rem 1rem;
+}
+
+.waste-empty-state i {
+    display: block;
+    font-size: 3rem;
+    margin-bottom: 0.75rem;
+    color: #cfd4da;
+}
+
+/* ---------- Modal / detalle ---------- */
+#approvalModalBody .info-cell {
+    background-color: #f8f9fa;
+    border: 1px solid #edf2f7;
+    border-radius: 12px;
+    padding: 0.6rem 0.9rem;
+    height: 100%;
+}
+
+#approvalModalBody .info-cell .label {
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+#approvalModalBody .info-cell .value {
+    font-weight: 700;
+    color: #2b2b2b;
+}
+
+.detail-table th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #6c757d;
+}
+
+.stock-disp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 50px;
+}
+
+.stock-disp-ok {
+    background-color: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+}
+
+.stock-disp-low {
+    background-color: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+}
+
+/* ---------- Columna / chips de Novedad ---------- */
+.nov-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    line-height: 1;
+    padding: 0.3rem 0.6rem;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.nov-badge i {
+    font-size: 0.72rem;
+}
+.nov-qty {
+    background-color: #fdeceb;
+    color: #b23b2e;
+    border: 1px solid #f2cfcb;
+}
+.nov-type {
+    background-color: #fff6e0;
+    color: #9a6b00;
+    border: 1px solid #f0dfb0;
+}
+.nov-time {
+    background-color: #e8f1f8;
+    color: #2f6690;
+    border: 1px solid #cfe0ef;
+}
+.nov-info {
+    background-color: #f0f0f2;
+    color: #5a5a60;
+    border: 1px solid #dddddd;
+}
+.nov-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+/* ---------- Responsive: tabla a tarjetas ---------- */
+@media (max-width: 991.98px) {
+    .container-fluid {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    .ph-card {
+        padding: 1.25rem 1rem;
+        border-radius: 16px;
+    }
+
+    .ph-icon-box {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+
+    .ph-title {
+        font-size: 1.25rem;
+    }
+
+    .ph-table,
+    .ph-table thead,
+    .ph-table tbody,
+    .ph-table th,
+    .ph-table td,
+    .ph-table tr {
+        display: block;
+    }
+
+    .ph-table thead {
+        display: none;
+    }
+
+    /* Tarjeta = fila (grid de 2 columnas en tablet) */
+    .ph-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem 1.2rem;
+        background-color: #ffffff;
+        border: 1px solid #e9ecef;
+        border-left: 4px solid var(--ph-red);
+        border-radius: 16px;
+        padding: 1.05rem 1.1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .ph-table tbody tr:hover {
+        box-shadow: 0 4px 16px rgba(168, 17, 25, 0.14);
+    }
+
+    /* Celda de mensaje (Cargando / Sin mermas) ocupa todo el ancho */
+    .ph-table tbody td[colspan] {
+        display: block;
+        grid-column: 1 / -1;
+        text-align: center !important;
+        padding: 1.2rem 0.5rem !important;
+    }
+
+    /* Celdas de datos: sin borde ni padding, cada campo con label */
+    .ph-table tbody td {
+        padding: 0 !important;
+        border: none !important;
+        text-align: left !important;
+        background: transparent;
+        min-width: 0;
+    }
+
+    /* Label de cada campo */
+    .ph-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.66rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Celda 1: ID + Tipo = cabecera de la tarjeta (ancho completo) */
+    .ph-table tbody td:nth-child(1) {
+        display: block;
+        grid-column: 1 / -1;
+        border-bottom: 1px dashed #e9ecef;
+        padding-bottom: 0.7rem !important;
+        margin-bottom: 0.3rem;
+    }
+    .ph-table tbody td:nth-child(1)::before {
+        display: none;
+    }
+
+    /* Celda 6 (Motivo): ocupa el ancho completo bajo los pares */
+    .ph-table tbody td:nth-child(6) {
+        grid-column: 1 / -1;
+    }
+
+    /* Celda 7 (Acción): botón ancho completo al pie de la tarjeta */
+    .ph-table tbody td:last-child {
+        display: block;
+        grid-column: 1 / -1;
+        text-align: center !important;
+        border-top: 1px dashed #e9ecef;
+        padding-top: 0.75rem !important;
+        margin-top: 0.25rem;
+    }
+    .ph-table tbody td:last-child::before {
+        display: none;
+    }
+    .ph-table tbody td:last-child .btn {
+        width: 100%;
+    }
+}
+
+/* Móvil pequeño: 1 sola columna para los campos */
+@media (max-width: 575.98px) {
+    .ph-table tbody tr {
+        grid-template-columns: 1fr;
+    }
+    .ph-table tbody td:nth-child(2),
+    .ph-table tbody td:nth-child(3),
+    .ph-table tbody td:nth-child(4),
+    .ph-table tbody td:nth-child(5) {
+        grid-column: span 1;
+    }
+}
+
+/* ---------- Modal de confirmación de decisión ---------- */
+/* Fondo oscuro SOLO en confirmación */
+#approvalModal.confirm-mode ~ .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+/* La página detrás se vuelve BORROSA SOLO en confirmación */
+body.ph-confirm-blur .wrapper {
+    filter: blur(6px);
+    -webkit-filter: blur(6px);
+    transition: filter 0.25s ease;
+}
+
+/* Sombra roja alrededor del cuadro SOLO en la confirmación */
+#approvalModal.confirm-mode .modal-content {
+    border: none;
+    box-shadow: 0 0 0 1px rgba(175, 21, 21, 0.2),
+        0 12px 40px -8px rgba(175, 21, 21, 0.7),
+        0 0 24px rgba(175, 21, 21, 0.4);
+}
+
+#confirmDecisionBody .confirm-cabecera {
+    border-bottom: 2px solid rgba(168, 17, 25, 0.15);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+#confirmButtons .btn-ph-success {
+    box-shadow: 0 0 0 1px rgba(13, 138, 67, 0.08), 0 4px 14px -4px rgba(13, 138, 67, 0.5);
+}
+
+#confirmButtons .btn-danger {
+    box-shadow: 0 0 0 1px rgba(175, 21, 21, 0.08), 0 4px 14px -4px rgba(175, 21, 21, 0.55);
+}
+
+/* Cabecera de confirmación con borde rojo distintivo */
+#confirmDecisionBody .confirm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: rgba(168, 17, 25, 0.08);
+    color: #af1515;
+    font-weight: 700;
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+}
+
+/* =========================================================
+   LISTADO "MIS MERMAS PENDIENTES"
+   ========================================================= */
+/* Celdas de acciones a la derecha en escritorio, anchas en móvil */
+.ph-table tbody td.acciones-cell {
+    text-align: right !important;
+    white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+    .ph-table tbody td.acciones-cell {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        text-align: center !important;
+        white-space: normal;
+    }
+    .ph-table tbody td.acciones-cell .btn {
+        width: auto;
+        margin: 0;
+    }
+}
+
+#cancelMermaModal .modal-content {
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0 0 0 1px rgba(175, 21, 21, 0.15),
+        0 24px 48px -12px rgba(175, 21, 21, 0.45);
+}
+
+#cancelMermaModal textarea:focus {
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 0.25rem rgba(168, 17, 25, 0.15);
+}
+
+/* Alerta de resultado (éxito / error) */
+#cancelAlerts .alert {
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+#cancelAlerts:empty {
+    display: none;
+}

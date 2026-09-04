@@ -1,0 +1,160 @@
+{% extends 'layout.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=1.0">
+{% endblock %}
+
+{% block content %}
+<div class="merma-main-container py-3 py-md-4 px-3 px-md-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card merma-card-custom p-0">
+                <div class="merma-card-header">
+                    <div class="merma-icon-container me-3">
+                        <i class="bi bi-recycle fs-4"></i>
+                    </div>
+                    <div>
+                        <h2 class="merma-header-title m-0">Registro de Merma</h2>
+                        <p class="merma-header-sub m-0">Reporte de pérdidas de inventario (vencido, dañado, robo, etc.)</p>
+                    </div>
+                </div>
+
+                <div class="p-3 p-md-4">
+                    <div id="alertContainer"></div>
+
+                    <form id="mermaForm">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="location_id" class="merma-label">Sede <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-shop"></i></span>
+                                    {% if is_admin %}
+                                        <select class="form-select border-secondary" id="location_id" name="location_id" required>
+                                            <option value="" selected disabled>Seleccione una sede...</option>
+                                            {% for location in locations %}
+                                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% elif single_location %}
+                                        <input type="hidden" id="location_id" name="location_id" value="{{ single_location.id }}">
+                                        <input type="text" class="form-control border-secondary bg-light fw-bold" value="{{ single_location.name }}" readonly>
+                                    {% elif locations|length > 1 %}
+                                        <select class="form-select border-secondary" id="location_id" name="location_id" required>
+                                            <option value="" selected disabled>Seleccione una sede...</option>
+                                            {% for location in locations %}
+                                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% else %}
+                                        <input type="text" class="form-control border-secondary bg-light fw-bold" value="Sin sede asignada" readonly>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="waste_type_id" class="merma-label">Tipo de Merma <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
+                                    <select class="form-select border-secondary" id="waste_type_id" name="waste_type_id" required disabled>
+                                        <option value="" selected disabled>Primero seleccione la sede...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="product_id" class="merma-label">Producto en Inventario <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-box-seam"></i></span>
+                                    <select class="form-select border-secondary" id="product_id" name="product_id" disabled>
+                                        <option value="" selected disabled>Esperando sede...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="lot_number" class="merma-label d-flex justify-content-between">
+                                    <span>Partida / Lote</span>
+                                    <small class="text-danger fw-semibold">Obligatorio</small>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
+                                    <select class="form-select border-secondary font-monospace" id="lot_number" name="lot_number" disabled required>
+                                        <option value="" selected disabled>Esperando producto...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="quantity" class="merma-label">Cantidad Mermada <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-speedometer2"></i></span>
+                                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-secondary fw-bold text-danger" id="quantity" name="quantity" placeholder="0.00" disabled>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label class="merma-label">Foto de Evidencia <small class="text-muted fw-normal">(Opcional)</small></label>
+                                <div class="merma-dropzone" id="dropzone">
+                                    <input type="file" id="photoInput" accept="image/*" hidden>
+                                    <div class="merma-dropzone-inner" id="dropzoneInner">
+                                        <i class="bi bi-camera merma-dropzone-icon"></i>
+                                        <span class="merma-dropzone-text">Haz clic o arrastra<br>tu foto aquí</span>
+                                        <span class="merma-dropzone-hint">JPG / PNG, opcional</span>
+                                    </div>
+                                </div>
+                                <div class="merma-photo-preview d-none" id="photoPreviewWrap">
+                                    <img id="photoPreview" alt="Vista previa" class="merma-photo-img">
+                                    <div class="merma-photo-state" id="photoState"><i class="bi bi-arrow-repeat me-1"></i>Subiendo...</div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger merma-photo-remove" id="btnRemovePhoto" title="Quitar foto">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" id="evidence_url" name="evidence_url" value="">
+                            </div>
+
+                            <div class="col-12">
+                                <label for="notes" class="merma-label">Motivo de la Merma <span class="text-danger">*</span></label>
+                                <textarea class="form-control border-secondary merma-textarea" id="notes" name="notes" rows="3" placeholder="Explique el motivo de la pérdida (obligatorio)"></textarea>
+                            </div>
+
+                            <div class="col-12 mt-3">
+                                <button type="button" class="btn merma-btn-secondary text-white fw-bold py-2 w-100" id="btnAddToList">
+                                    <i class="bi bi-plus-circle me-1"></i> Agregar a la Lista
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="cartSection" class="mt-5 d-none">
+                        <h5 class="merma-cart-header border-bottom pb-2"><i class="bi bi-list-check me-2 text-danger"></i>Insumos a Reportar</h5>
+                        <div class="table-responsive mt-3">
+                            <table class="table table-bordered table-sm align-middle merma-cart-table" id="cartTable">
+                                <thead class="small">
+                                    <tr>
+                                        <th>Insumo</th>
+                                        <th class="text-center">Cant.</th>
+                                        <th class="text-center">N° Lote</th>
+                                        <th>Vence</th>
+                                        <th class="text-center">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cartBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button type="button" class="btn merma-btn-submit-custom text-white fw-bold py-2" id="btnSubmitMerma">
+                                <i class="bi bi-check-all me-1"></i> Registrar Merma
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/waste/register_waste.js') }}?v=1.0"></script>
+{% endblock %}

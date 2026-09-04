@@ -138,6 +138,7 @@ class Notification(db.Model):
     message = db.Column(db.String(255), nullable=False)
     is_read = db.Column(db.Boolean, default=False)
     movement_id = db.Column(db.Integer, nullable=True)  # Traslado de la respuesta (RESPUESTA_TRASLADO)
+    waste_id = db.Column(db.Integer, nullable=True)  # Merma de la decisión (MERMA_APROBADA / MERMA_RECHAZADA)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PasswordRecovery(db.Model):

@@ -13,6 +13,14 @@ inbox_bp = Blueprint('response_inbox', __name__)
 def _inbox_filter_context(responses):
     novedades, sedes = {}, {}
     for mov in responses:
+        if getattr(mov, 'response_type', None) == 'MERMA':
+            ntype = getattr(mov, 'novedad_type', None)
+            if ntype and ntype not in novedades:
+                novedades[ntype] = mov.decision_label or 'Merma'
+            loc = getattr(mov, 'location', None)
+            if loc is not None:
+                sedes.setdefault(loc.id, loc.name)
+            continue
         ntype = getattr(mov, 'novedad_type', None)
         if ntype and ntype not in novedades:
             novedades[ntype] = mov.novedad_label or ntype.replace('_', ' ').title()
@@ -68,13 +76,17 @@ def inbox_summary():
 @login_required
 @require_roles('admin', 'manager', 'assistant_manager', 'management', 'finance', 'operations')
 def mark_response_read():
-    """Marca como leída la respuesta de un traslado (estado en el servidor)."""
+    """Marca como leída la respuesta de un traslado o de una merma (servidor)."""
     try:
         payload = request.get_json(silent=True) or {}
         movement_id = payload.get('movement_id')
-        if movement_id is None:
-            return jsonify({"error": "movement_id requerido"}), 400
-        ResponseInboxService.mark_as_read(current_user, int(movement_id))
+        waste_id = payload.get('waste_id')
+        if waste_id is not None:
+            ResponseInboxService.mark_waste_as_read(current_user, int(waste_id))
+        elif movement_id is not None:
+            ResponseInboxService.mark_as_read(current_user, int(movement_id))
+        else:
+            return jsonify({"error": "movement_id o waste_id requerido"}), 400
         return jsonify({
             "success": True,
             "unread_count": ResponseInboxRepository.get_unread_count(current_user),

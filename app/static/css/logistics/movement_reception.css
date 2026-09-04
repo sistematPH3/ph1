@@ -173,6 +173,7 @@
     margin-bottom: 24px;
     background: #ffffff;
     box-sizing: border-box;
+    overflow-x: auto;
 }
 
 .ph-table {
@@ -387,6 +388,291 @@
     background-color: #fff1f2 !important;
     padding: 4px 6px;
     border-radius: 4px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.lot-exp-lookup {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-top: 4px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.lot-exp-lookup .input-row-exp {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.lot-exp-label {
+    font-size: 11px;
+    white-space: nowrap;
+    color: #475569;
+}
+
+.lot-exp-hint {
+    min-width: 0;
+    width: 100%;
+}
+
+.lot-exp-hint .badge {
+    font-size: 10px !important;
+    white-space: normal;
+    flex-shrink: 0;
+    word-break: break-word;
+}
+
+.err-exp-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.err-exp-hint .badge {
+    font-size: 10px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.surplus-lot-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.surplus-lot-hint .badge {
+    font-size: 10px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Panel "Lote(s) del sobrante" (expansible, opción A). El body arranca abierto
+   al declarar sobrante y se puede colapsar/expandir con el botón superior. */
+.btn-toggle-surplus-lots {
+    font-size: 12px;
+    font-weight: 600;
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    color: #4338ca;
+}
+
+.btn-toggle-surplus-lots:hover {
+    background: #e0e7ff;
+    border-color: #a5b4fc;
+    color: #3730a3;
+}
+
+.surplus-caret {
+    transition: transform 0.15s ease;
+}
+
+.surplus-caret.open {
+    transform: rotate(180deg);
+}
+
+.surplus-lot-guide {
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 4px 6px;
+    border-left: 3px solid #c7d2fe;
+    background: #f8fafc;
+    border-radius: 4px;
+}
+
+/* Resumen en vivo del sobrante: cuánto hay que repartir y cuánto falta. */
+.surplus-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    border: 1px solid;
+}
+
+.surplus-summary > i {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.surplus-sum-msg {
+    white-space: normal;
+}
+
+.surplus-sum-empty {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.surplus-sum-empty > i {
+    color: #2563eb;
+}
+
+.surplus-sum-wait {
+    background-color: #fffbeb;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.surplus-sum-wait > i {
+    color: #d97706;
+}
+
+.surplus-sum-ok {
+    background-color: #f0fdf4;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.surplus-sum-ok > i {
+    color: #16a34a;
+}
+
+.surplus-lots,
+.surplus-lot-body,
+.surplus-lot-list,
+.surplus-lot-row,
+.surplus-field,
+.surplus-field .form-control,
+.surplus-field-row {
+    box-sizing: border-box;
+}
+
+.surplus-lots,
+.surplus-lot-body,
+.surplus-lot-list {
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+}
+
+.surplus-lot-row {
+    width: 100%;
+    max-width: 100%;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    white-space: normal;
+}
+
+.surplus-lot-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+    gap: 8px;
+}
+
+.surplus-lot-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.surplus-lot-row .btn-remove-surplus-lot {
+    padding: 2px 8px;
+    line-height: 1.2;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.surplus-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    min-width: 0;
+}
+
+.surplus-field > span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #64748b;
+}
+
+.surplus-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+}
+
+.surplus-field .form-control {
+    font-size: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 4px 8px;
+}
+
+.surplus-field input[readonly] {
+    background: #f1f5f9;
+    color: #475569;
+    cursor: default;
+}
+
+.row-lot-mismatch {
+    margin-top: 4px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.row-lot-mismatch .input-row-lot {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.single-lot-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.err-lot-exp {
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.err-lot-exp .badge {
+    font-size: 10px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .novelty-interactive-panel {
@@ -615,6 +901,87 @@
     align-items: center;
 }
 
+/* El bloque de "Lote / Vencimiento" (con su badge de estado) y el bloque de
+   mensajes de validación deben ocupar cada uno toda la fila (full-width) y
+   apilarse uno debajo del otro, NUNCA quedar lado a lado en la misma fila de
+   la cuadrícula (antes compartían la fila 2 y se veían amontonados/encima). */
+.err-row-grid .err-lot-exp,
+.err-row-grid .err-validation-hint {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+/* --- Mensajes de validación del insumo erróneo (tarjetas tipadas) --- */
+.err-validation-hint {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.err-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.45;
+    border: 1px solid;
+    animation: err-alert-in 0.18s ease;
+}
+
+@keyframes err-alert-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.err-alert-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.err-alert-danger {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border-color: #fca5a5;
+}
+
+.err-alert-danger .err-alert-icon {
+    color: #dc2626;
+}
+
+.err-alert-warning {
+    background-color: #fffbeb;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.err-alert-warning .err-alert-icon {
+    color: #d97706;
+}
+
+.err-alert-success {
+    background-color: #f0fdf4;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.err-alert-success .err-alert-icon {
+    color: #16a34a;
+}
+
+.err-alert-info {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.err-alert-info .err-alert-icon {
+    color: #2563eb;
+}
+
 .alert-box {
     background-color: #fee2e2;
     color: #991b1b;
@@ -647,6 +1014,11 @@
     border: 1.5px solid #cbd5e1;
     text-decoration: none;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
 }
 
 .btn-ph-secondary:hover {
@@ -664,6 +1036,11 @@
     border: none;
     cursor: pointer;
     box-shadow: 0 3px 10px rgba(153, 27, 27, 0.25);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
 }
 
 .btn-ph-primary:hover {
@@ -802,14 +1179,16 @@
     font-weight: 600;
 }
 
-@media (max-width: 768px) {
+/* ==========================================================================
+   RESPONSIVE - tablet (≤991.98px): tabla apilada, grids 1 columna
+   ========================================================================== */
+@media (max-width: 991.98px) {
     .reception-page-wrapper {
-        padding: 14px 10px;
+        padding: 20px 14px;
     }
 
     .ph-card {
-        padding: 18px 14px;
-        border-radius: 12px;
+        padding: 22px 16px;
     }
 
     .ph-card-header {
@@ -822,7 +1201,7 @@
         flex-direction: column;
         align-items: stretch;
         gap: 14px;
-        padding: 16px;
+        padding: 18px;
     }
 
     .route-connector {
@@ -837,14 +1216,15 @@
         transform: rotate(90deg);
     }
 
+    /* --- Tabla: apilada como cards --- */
     .table-container {
         border: none;
         background: transparent;
     }
 
-    .ph-table, 
-    .ph-table tbody, 
-    .ph-table tr, 
+    .ph-table,
+    .ph-table tbody,
+    .ph-table tr,
     .ph-table td {
         display: block;
         width: 100%;
@@ -861,11 +1241,11 @@
         border-radius: 12px;
         padding: 14px;
         margin-bottom: 14px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
 
     .ph-table td {
-        padding: 8px 0;
+        padding: 7px 0;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -875,18 +1255,19 @@
 
     .ph-table td::before {
         content: attr(data-label);
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 800;
         color: #64748b;
         text-transform: uppercase;
         margin-right: 8px;
         flex-shrink: 0;
+        min-width: 80px;
     }
 
     .ph-table td:first-child {
         border-bottom: 1px solid #f1f5f9;
         padding-bottom: 8px;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
 
     .ph-table td:first-child::before {
@@ -902,14 +1283,54 @@
         min-width: 0;
     }
 
+    /* --- Panel de novedades --- */
+    .panel-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .panel-header-row .d-flex {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .novelty-interactive-panel {
+        padding: 18px 14px;
+    }
+
     .form-grid-2col {
         grid-template-columns: 1fr;
         gap: 14px;
     }
 
+    /* --- Sección producto erróneo --- */
     .err-row-grid {
-        grid-template-columns: 1fr;
-        gap: 6px;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .err-row-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    /* --- Lotes sobrante: campos apilados --- */
+    .surplus-field-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /* --- Modal --- */
+    .modal-card-custom {
+        max-width: 100%;
+        padding: 20px;
+    }
+
+    .modal-breakdown-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
     }
 
     .form-actions {
@@ -922,5 +1343,238 @@
         width: 100%;
         justify-content: center;
         padding: 12px 16px;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE - móvil (≤767.98px): ajustes finos de espaciado y apilado total
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .reception-page-wrapper {
+        padding: 14px 8px;
+    }
+
+    .ph-card {
+        padding: 16px 12px;
+        border-radius: 12px;
+    }
+
+    .ph-title {
+        font-size: 17px;
+    }
+
+    .ph-subtitle {
+        font-size: 12px;
+    }
+
+    .header-badge-tag {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+
+    .route-hero-card {
+        padding: 14px;
+        gap: 10px;
+        border-radius: 12px;
+    }
+
+    .node-icon-wrapper {
+        width: 40px;
+        height: 40px;
+    }
+
+    .node-icon-wrapper svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .node-name {
+        font-size: 15px;
+    }
+
+    .connector-pill {
+        width: 32px;
+        height: 32px;
+    }
+
+    .connector-pill svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* --- Tabla --- */
+    .ph-table td {
+        padding: 6px 0;
+    }
+
+    .ph-table td::before {
+        font-size: 10px;
+        min-width: 70px;
+    }
+
+    .ph-table tbody tr {
+        padding: 12px;
+    }
+
+    .input-editable-box {
+        padding: 2px 6px;
+    }
+
+    .ph-input-number {
+        width: 60px;
+        font-size: 13px;
+    }
+
+    .item-condition-wrapper {
+        min-width: 0;
+    }
+
+    .select-item-condition {
+        font-size: 11px !important;
+    }
+
+    /* --- Panel novedades --- */
+    .novelty-interactive-panel {
+        padding: 14px 10px;
+        border-top-width: 3px;
+    }
+
+    .panel-mini-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .panel-mini-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .panel-subtitle {
+        font-size: 14px;
+    }
+
+    .panel-desc {
+        font-size: 11px;
+    }
+
+    .form-grid-2col {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* --- Error grid: apilado total --- */
+    .err-row-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    /* --- Protocolo guía --- */
+    .protocol-guide-box {
+        padding: 12px 14px;
+    }
+
+    .protocol-guide-title {
+        font-size: 13px;
+    }
+
+    .protocol-guide-body {
+        font-size: 12px;
+    }
+
+    /* --- Sección producto erróneo --- */
+    #erroneousProductSection {
+        padding: 12px !important;
+    }
+
+    #erroneousProductSection h6 {
+        font-size: 13px;
+    }
+
+    /* --- Lotes sobrante --- */
+    .surplus-lot-row {
+        padding: 10px;
+    }
+
+    .surplus-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .surplus-lot-guide {
+        font-size: 10px;
+    }
+
+    .input-row-lot {
+        font-size: 10px !important;
+    }
+
+    /* --- Lote mismatch --- */
+    .row-lot-mismatch {
+        padding: 0;
+    }
+
+    /* --- Modal --- */
+    .modal-backdrop-custom {
+        padding: 12px;
+    }
+
+    .modal-card-custom {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .modal-title-custom {
+        font-size: 16px;
+    }
+
+    .modal-lead-text {
+        font-size: 13px;
+    }
+
+    .modal-breakdown-item {
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .modal-actions-custom {
+        flex-direction: column-reverse;
+        gap: 8px;
+    }
+
+    .modal-actions-custom .btn-ph-secondary,
+    .modal-actions-custom .btn-ph-primary {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* --- Botones acción --- */
+    .form-actions {
+        flex-direction: column-reverse;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .btn-ph-secondary,
+    .btn-ph-primary {
+        width: 100%;
+        justify-content: center;
+        padding: 11px 14px;
+        font-size: 13px;
+    }
+
+    /* --- Botones del panel header --- */
+    #btnShowErroneous {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+
+    .status-pill {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+
+    /* --- Alerta --- */
+    .alert-box {
+        font-size: 13px;
+        padding: 12px 14px;
     }
 }

@@ -17,6 +17,7 @@
 
 import os
 import unittest
+from decimal import Decimal
 
 from sqlalchemy import create_engine, text
 
@@ -357,6 +358,47 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertEqual(items["LOTE-A"]["lost_qty"], 70.0)
         self.assertEqual(items["LOTE-B"]["lost_qty"], 0.0)
         self.assertEqual(resolution.changed_data["resolution_summary"]["lost_total"], 70.0)
+
+
+# =========================================================================
+    # CASO 5: SOBRANTE DEVUELTO -> el origen debita el excedente físico, el
+    # destino queda con lo conforme y se crea un retorno con el excedente.
+    # =========================================================================
+    def test_sobrante_devuelto_debita_excedente_del_origen(self):
+        # Envían 10, llegan 12 (2 de sobrante/excedente). El admin decide devolverlos.
+        env = self._seed(
+            status="SOBRANTE_EXCEDENTE", novelty_type="SOBRANTE_EXCEDENTE",
+            dispatched=10, received=12
+        )
+        # El origen arranca con 10 (ya despachó 10 de 20) y debe perder además los
+        # 2 excedentes que físicamente salieron aunque la guía no los reflejara.
+        env["inv_origin"].current_quantity = Decimal("10.00")
+        # En un sobrante no hay faltante: el muelle nunca registra missing negativo.
+        env["detail"].missing_quantity = Decimal("0.00")
+        db.session.commit()
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "RETORNO_EMERGENCIA",
+            "general_notes": "Se devuelve el excedente"
+        }, user_id=env["user"].id)
+
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id
+        ).first()
+        db.session.refresh(env["inv_origin"])
+
+        returns = Movement.query.filter_by(return_of_dispute_id=env["mov"].id).all()
+
+        # 1) La disputa queda cerrada.
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+        # 2) El destino queda con lo conforme (10).
+        self.assertIsNotNone(inv_dest)
+        self.assertEqual(float(inv_dest.current_quantity), 10.00)
+        # 3) El origen pasa de 10 a 8: debita el excedente (2) que regresa vía retorno.
+        self.assertEqual(float(env["inv_origin"].current_quantity), 8.00)
+        # 4) Se crea el traslado de retorno con el excedente (2).
+        self.assertEqual(len(returns), 1)
+        self.assertEqual(float(returns[0].details[0].quantity), 2.00)
 
 
 if __name__ == "__main__":

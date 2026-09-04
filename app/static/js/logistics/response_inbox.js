@@ -1,26 +1,11 @@
 /* =========================================================
    BANDEJA DE RESPUESTAS: ESTADO "LEÍDO" EN EL SERVIDOR
    -----------------------------------------------------------------
-   Estado vive en la tabla notifications (type RESPUESTA_TRASLADO).
-   La bandeja se divide en dos pestañas: "No leídos" y "Leídos"
-   (mismo estilo que el Listado Operativo de Traslados).
-
-   Comportamiento al leer una respuesta:
-     1) Al hacer clic en "Leer Respuesta" se DESPLIEGA el detalle en el
-        lugar (dentro de la pestaña "No leídos"), lo mismo que el
-        listado operativo expande sus desplegables.
-     2) Cuando se CIERRA el detalle, la fila (y su desplegable) se mueve
-        a la pestaña "Leídos" y el estado se persiste en el servidor
-        (POST /responses/read).
-     3) Si "No leídos" queda vacía, la pestaña se oculta y se pasa a
-        "Leídos".
-   "Marcar todo como leído" usa un solo llamado (POST /responses/read-all).
-
-   Búsqueda y filtros (v8):
-     - Buscador global de texto (data-search por fila: #traslado, sedes,
-       productos, personas, novedad, fechas...).
-     - Filtros de novedad y sucursal involucrada.
-     - Paginación independiente por pestaña (8 filas por página).
+   Estado vive en la tabla notifications (type RESPUESTA_TRASLADO y
+   tipos MERMA_APROBADA / MERMA_RECHAZADA). La bandeja se divide en
+   dos pestañas: "No leídos" y "Leídos". Soporta respuestas de
+   TRASLADOS y de MERMAS (aprobada/rechazada): cada fila tiene
+   data-response-type para distinguirlas y usar su propio id.
    ========================================================= */
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -41,12 +26,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const readTab = document.getElementById('read-tab');
     const readAllBtn = document.getElementById('read-all-btn');
 
+    // ---- Identificadores de fila / desplegable según el tipo de respuesta ----
+    function rowSel(movId, type) {
+        return '#' + (type === 'MERMA' ? 'row-waste-' : 'row-mov-') + movId;
+    }
+    function collapseSel(movId, type) {
+        return '#' + (type === 'MERMA' ? 'respuesta-waste-' : 'respuesta-admin-') + movId;
+    }
+
     // ---- Búsqueda / filtros / paginación ----
     const PER_PAGE = 8;
     const searchInput = document.getElementById('inbox-search');
+    const filterTipo = document.getElementById('filter-tipo');
     const filterNovedad = document.getElementById('filter-novedad');
     const filterSede = document.getElementById('filter-sede');
-    const searchState = { text: '', novedad: '', sede: '' };
+    const searchState = { text: '', tipo: '', novedad: '', sede: '' };
     const pageRefs = { unread: 1, read: 1 };
 
     // Traslados cuyo detalle está abierto y, al cerrarse, deben pasar a
@@ -78,11 +72,13 @@ document.addEventListener('DOMContentLoaded', function () {
     function rowMatches(row) {
         const hay = (row.getAttribute('data-search') || '').toLowerCase();
         const novedad = row.getAttribute('data-novedad') || '';
+        const tipo = row.getAttribute('data-response-type') || '';
         const sedes = (row.getAttribute('data-sede') || '').trim().split(/\s+/).filter(Boolean);
 
         const q = searchState.text.toLowerCase().replace('#', '').trim();
         const tokens = q ? q.split(/\s+/) : [];
         if (tokens.some(function (t) { return hay.indexOf(t) === -1; })) return false;
+        if (searchState.tipo && tipo !== searchState.tipo) return false;
         if (searchState.novedad && novedad !== searchState.novedad) return false;
         if (searchState.sede && sedes.indexOf(searchState.sede) === -1) return false;
         return true;
@@ -183,14 +179,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Mueve una fila (y su desplegable) de la pestaña "No leídos" a "Leídos".
-    function moveRowToRead(movId) {
-        const row = document.getElementById(`row-mov-${movId}`);
+    function moveRowToRead(movId, type) {
+        const row = document.querySelector(rowSel(movId, type));
         if (!row || !readTbody || !unreadTbody) return;
 
         row.classList.remove('row-unread');
         row.classList.add('row-read');
 
-        const collapse = document.getElementById(`respuesta-admin-${movId}`);
+        const collapse = document.querySelector(collapseSel(movId, type));
         row.remove();
         readTbody.appendChild(row);
         if (collapse) {
@@ -202,12 +198,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Persiste "leído" en el servidor y baja el contador del encabezado.
-    function syncReadServer(movId) {
+    function syncReadServer(movId, type) {
         if (unreadCountSpan && unreadCount > 0) {
             unreadCount--;
             unreadCountSpan.textContent = unreadCount;
         }
         if (readUrl && movId) {
+            const payload = type === 'MERMA'
+                ? { waste_id: parseInt(movId, 10) }
+                : { movement_id: parseInt(movId, 10) };
             fetch(readUrl, {
                 method: 'POST',
                 headers: {
@@ -215,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     'Accept': 'application/json'
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({ movement_id: parseInt(movId, 10) })
+                body: JSON.stringify(payload)
             }).then(function (resp) {
                 return resp.ok ? resp.json() : null;
             }).then(function (data) {
@@ -232,11 +231,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Marca una única respuesta como leída: mueve la fila y sincroniza.
-    function markSingleRead(movId) {
-        const row = document.getElementById(`row-mov-${movId}`);
+    function markSingleRead(movId, type) {
+        const row = document.querySelector(rowSel(movId, type));
         if (!row || !row.classList.contains('row-unread')) return;
-        moveRowToRead(movId);
-        syncReadServer(movId);
+        moveRowToRead(movId, type);
+        syncReadServer(movId, type);
     }
 
     // 1. "Leer Respuesta": al hacer clic se despliega el detalle EN EL LUGAR;
@@ -244,20 +243,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const readButtons = document.querySelectorAll('.btn-read-response');
     readButtons.forEach(button => {
         const movId = button.getAttribute('data-mov-id');
+        const type = button.getAttribute('data-response-type') || 'TRASLADO';
 
         button.addEventListener('click', function () {
-            const row = document.getElementById(`row-mov-${movId}`);
+            const row = document.querySelector(rowSel(movId, type));
             if (row && row.classList.contains('row-unread')) {
-                pendingRead[movId] = true;
+                pendingRead[movId + '-' + type] = true;
             }
         });
 
-        const collapse = document.getElementById(`respuesta-admin-${movId}`);
+        const collapse = document.querySelector(collapseSel(movId, type));
         if (collapse) {
             collapse.addEventListener('hidden.bs.collapse', function () {
-                if (pendingRead[movId]) {
-                    pendingRead[movId] = false;
-                    markSingleRead(movId);
+                if (pendingRead[movId + '-' + type]) {
+                    pendingRead[movId + '-' + type] = false;
+                    markSingleRead(movId, type);
                 }
             });
         }
@@ -273,9 +273,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // Mover todas las filas de forma optimista.
             const rows = unreadTbody ? Array.from(unreadTbody.querySelectorAll('tr.dispute-row')) : [];
             rows.forEach(row => {
-                const movId = row.id.replace('row-mov-', '');
-                if (pendingRead[movId]) pendingRead[movId] = false;
-                moveRowToRead(movId);
+                const movId = row.getAttribute('data-mov-id');
+                const type = row.getAttribute('data-response-type') || 'TRASLADO';
+                if (pendingRead[movId + '-' + type]) pendingRead[movId + '-' + type] = false;
+                moveRowToRead(movId, type);
             });
 
             if (unreadCountSpan) {
@@ -310,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let debounceTimer = null;
     function onFiltersChange() {
         searchState.text = searchInput ? searchInput.value : '';
+        searchState.tipo = filterTipo ? filterTipo.value : '';
         searchState.novedad = filterNovedad ? filterNovedad.value : '';
         searchState.sede = filterSede ? filterSede.value : '';
         resetFiltersAndRender();
@@ -326,6 +328,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+    if (filterTipo) filterTipo.addEventListener('change', onFiltersChange);
     if (filterNovedad) filterNovedad.addEventListener('change', onFiltersChange);
     if (filterSede) filterSede.addEventListener('change', onFiltersChange);
 
