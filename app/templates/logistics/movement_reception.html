@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=86">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=93">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -79,7 +79,7 @@
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}">
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-origin-stock="{{ item.origin_stock | default(0) }}">
                             <td data-label="Insumo">
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
@@ -130,11 +130,32 @@
                                         <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Espacio</option>
                                     </select>
                                     <div class="row-lot-mismatch hidden mt-1">
-                                        <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real en empaque...">
-                                        <div class="lot-exp-lookup hidden mt-1 d-flex align-items-center gap-2">
-                                            <span class="lot-exp-label">Venc. del lote:</span>
-                                            <input type="date" class="form-control form-control-sm input-row-exp font-monospace" placeholder="AAAA-MM-DD">
-                                            <span class="lot-exp-hint text-muted small"></span>
+                                        <div class="single-lot-field">
+                                            <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real del insumo que se queda...">
+                                            <div class="lot-exp-lookup hidden mt-1">
+                                                <span class="lot-exp-label">Venc. del lote:</span>
+                                                <input type="date" class="form-control form-control-sm input-row-exp font-monospace" placeholder="AAAA-MM-DD">
+                                                <span class="lot-exp-hint text-muted small"></span>
+                                            </div>
+                                        </div>
+                                        <div class="surplus-lots hidden">
+                                            <button type="button" class="btn btn-sm btn-outline-primary w-100 d-flex justify-content-between align-items-center btn-toggle-surplus-lots">
+                                                <span class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-box-seam"></i> Lote(s) del sobrante
+                                                </span>
+                                                <i class="bi bi-chevron-down surplus-caret"></i>
+                                            </button>
+                                            <div class="surplus-lot-body mt-1">
+                                                <div class="surplus-lot-guide small text-muted">
+                                                    <i class="bi bi-info-circle me-1"></i>
+                                                    Escriba el lote real del sobrante; el sistema lo reconoce y toma su fecha de vencimiento.
+                                                </div>
+                                                <div class="surplus-summary small"></div>
+                                                <div class="surplus-lot-list d-flex flex-column gap-1 mt-1"></div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-add-surplus-lot mt-1">
+                                                    + Agregar otro lote del sobrante
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -259,5 +280,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=89"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=96"></script>
 {% endblock %}

@@ -1,5 +1,5 @@
 import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from app import db
 from app.models import Product
@@ -78,7 +78,23 @@ class MovementReceptionService:
             return None, "No tiene permisos para recibir cargas destinadas a otra sede."
 
         details = MovementReceptionRepository.get_movement_details(movement_id)
-        return {"movement": movement, "details": details}, None
+
+        # 'Techo' de sobrante: el inventario NO lleva stock por lote, así que el
+        # techo razonable es el stock físico actual del PRODUCTO en el origen (el
+        # Central). Un excedente no puede superar lo que el origen conserva. Se
+        # adjunta por renglón (solo lectura; no altera el flujo de Mariuska).
+        origin_id = movement["origin_location_id"]
+        # Los rows de get_movement_details son mappings; los convertimos a dict
+        # para poder adjuntar origin_stock.
+        details_dicts = []
+        for d in details:
+            item = dict(d._mapping if hasattr(d, "_mapping") else d)
+            item["origin_stock"] = float(
+                MovementReceptionRepository.get_inventory_quantity(origin_id, d.product_id)
+            )
+            details_dicts.append(item)
+
+        return {"movement": movement, "details": details_dicts}, None
 
     @staticmethod
     def get_lot_expiration(product_id, lot_number):
@@ -125,6 +141,67 @@ class MovementReceptionService:
         erroneous_products = validation_res.get("erroneous_products", [])
         has_discrepancy = validation_res["has_discrepancy"]
 
+        # Validación de los LOTES DEL SOBRANTE (el excedente puede venir de 1..N lotes).
+        # El lote del sobrante es OBLIGATORIO y debe EXISTIR en el sistema (mismo
+        # criterio que el insumo erróneo); además, la suma de las cantidades de los
+        # lotes debe cuadrar con el excedente total. Se valida aquí (con acceso a BD)
+        # porque el validador es una función pura sin repositorio.
+        for item in processed_items:
+            rec_qty = Decimal(str(item["received_quantity"]))
+            dispatched_qty = Decimal(str(item["quantity"]))
+            extra_units = rec_qty - dispatched_qty
+            if extra_units <= Decimal("0.001"):
+                continue
+            product_id = item["product_id"]
+            surplus_lots = item.get("surplus_lots") or []
+            named_lots = [sl for sl in surplus_lots if sl.get("lot")]
+            if not named_lots:
+                return False, (
+                    f"El sobrante de '{item.get('product_name') or 'el insumo'}' debe declarar de qué "
+                    "lote del sistema proviene. Escriba al menos un lote en la lista de lotes del sobrante."
+                )
+            # Red de seguridad (espejo del frontend): una CANTIDAD declarada sin lote
+            # sería descartada en silencio al sumar (solo se suman lotes con nombre), lo
+            # que asentaría menos de lo declarado. Se rechaza con un mensaje claro en vez
+            # de ignorarla. La UI ya lo bloquea; aquí se garantiza por API/script.
+            for sl in surplus_lots:
+                if sl.get("lot"):
+                    continue
+                try:
+                    orphan_qty = Decimal(str(sl.get("quantity") or 0) or 0)
+                except (InvalidOperation, TypeError, ValueError):
+                    orphan_qty = Decimal("0.00")
+                if orphan_qty > Decimal("0.00"):
+                    return False, (
+                        f"El sobrante de '{item.get('product_name') or 'el insumo'}' declara una cantidad "
+                        f"({orphan_qty}) sin indicar de qué lote del sistema proviene. "
+                        "Escriba el lote para cada cantidad, o vacíe la fila sin lote."
+                    )
+            unknown_lots = []
+            surplus_sum = Decimal("0.00")
+            for sl in named_lots:
+                lot_val = str(sl.get("lot") or "").strip()
+                try:
+                    surplus_sum += Decimal(str(sl.get("quantity") or 0) or 0)
+                except (InvalidOperation, TypeError, ValueError):
+                    return False, (
+                        f"Lote '{lot_val}' del sobrante de '{item.get('product_name') or 'el insumo'}': "
+                        "la cantidad no es numérica válida."
+                    )
+                if not MovementReceptionRepository.lot_exists(product_id, lot_val):
+                    unknown_lots.append(lot_val)
+            if unknown_lots:
+                return False, (
+                    "Uno o más lotes del sobrante no están registrados en el sistema "
+                    f"({', '.join(unknown_lots)}). Escriba un lote existente para que el excedente quede trazable."
+                )
+            if abs(surplus_sum - extra_units) > Decimal("0.01"):
+                return False, (
+                    f"La suma de las cantidades de los lotes del sobrante de '{item.get('product_name') or 'el insumo'}' "
+                    f"({surplus_sum}) no coincide con el excedente total (+{extra_units}). "
+                    "Ajuste las cantidades de cada lote para que sumen exactamente el sobrante."
+                )
+
         # Los insumos NO SOLICITADOS (erróneos) deben existir en el catálogo. Si un id
         # no corresponde a un producto real, la recepción no podría auditarse y la bandeja
         # de arbitraje intentaría crear inventario con una FK huérfana al resolver.
@@ -139,6 +216,20 @@ class MovementReceptionService:
                     "Uno de los insumos no solicitados no existe en el catálogo "
                     f"(IDs: {', '.join(map(str, unknown_ids))}). Revise la selección."
                 )
+
+        # DERIVAR vencimiento desde el sistema cuando el lote es reconocido.
+        # Si el sistema conoce el vencimiento real del lote, se usa ese
+        # (evita que el operario forge una fecha distinta). Si el lote no
+        # está registrado en BD, se conserva el valor enviado (en la UI el
+        # campo es readonly y se llena solo, pero por API/script podría
+        # venir un valor diferente).
+        for err_p in erroneous_products:
+            pid = int(err_p["product_id"])
+            lot = str(err_p.get("lot_number") or "").strip()
+            if lot:
+                sys_exp = MovementReceptionRepository.get_expiration_for_lot(pid, lot)
+                if sys_exp:
+                    err_p["expiration_date"] = sys_exp
 
         # LÓGICA CORREGIDA: Prioridad absoluta al novelty_type seleccionado/enviado.
         # Si se envía CONFORME pero los renglones revelan discrepancias (caso solo
@@ -240,7 +331,7 @@ class MovementReceptionService:
                     specific_novelty = "FALTANTE"
                 elif item_diff > 0.001:
                     specific_novelty = "SOBRANTE"
-                elif item_cond != "CONFORME":
+                elif item_cond != "CONFORME" and item_cond not in ("SOBRANTE_EXCEDENTE", "FALTANTE_CONTEO"):
                     specific_novelty = item_cond
                 else:
                     specific_novelty = "CONFORME"
@@ -258,6 +349,7 @@ class MovementReceptionService:
                     "missing_qty": float(mis_qty),
                     "observed_physical_lot": item.get("observed_physical_lot"),
                     "observed_physical_expiration": item.get("observed_physical_expiration"),
+                    "surplus_lots": item.get("surplus_lots") or [],
                     "notes": specific_novelty
                 })
 
@@ -298,19 +390,31 @@ class MovementReceptionService:
             erroneous_audit_list = []
             for err_p in erroneous_products:
                 p_obj = db.session.get(Product, err_p["product_id"])
+                # El VENCIMIENTO del insumo erróneo se deriva del sistema cuando
+                # el lote es reconocido (evita que el operario forge una fecha).
+                # Si el lote no está registrado en BD, se conserva el valor
+                # enviado por el cliente como mejor estimación disponible.
+                err_lot = err_p.get("lot_number")
+                system_expiration = MovementReceptionRepository.get_expiration_for_lot(
+                    int(err_p["product_id"]), err_lot
+                ) if err_lot else None
                 erroneous_audit_list.append({
                     "product_id": p_obj.id if p_obj else err_p["product_id"],
                     "sku": p_obj.sku if p_obj else "N/A",
                     "product_name": p_obj.name if p_obj else "Insumo Desconocido",
                     "quantity_delivered": float(err_p["quantity"]),
-                    "lot_number": err_p.get("lot_number"),
-                    "expiration_date": err_p.get("expiration_date")
+                    "lot_number": err_lot,
+                    "expiration_date": system_expiration or err_p.get("expiration_date")
                 })
 
             changed_data = {
                 "movement_id": movement_id,
                 "event": audit_event,
                 "novelty_type": novelty_type,
+                # Estatus EFECTIVO con el que se finalizó el movimiento (puede derivarse
+                # de las diferencias si el payload llegó CONFORME por API/script). Se
+                # registra aparte para que la bitácora refleje el estado real.
+                "final_status": final_status,
                 "origin_location_id": movement["origin_location_id"],
                 "destination_location_id": movement["destination_location_id"],
                 "items": audit_items,

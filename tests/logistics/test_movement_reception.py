@@ -232,7 +232,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 12.0,
             "item_condition": "SOBRANTE_EXCEDENTE",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
         }]
         ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="Llegaron 2 kilos de mas", items_override=items)
 
@@ -676,7 +677,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 12.0,
             "item_condition": "SOBRANTE_EXCEDENTE",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
         }]
         erroneous = [{
             "product_id": extra_product.id,
@@ -708,7 +710,8 @@ class MovementReceptionTest(unittest.TestCase):
                 "detail_id": env["detail_b"].id,
                 "received_quantity": 12.0,
                 "item_condition": "SOBRANTE_EXCEDENTE",
-                "observed_physical_lot": None
+                "observed_physical_lot": None,
+                "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]
             }
         ]
         erroneous = [{
@@ -734,7 +737,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 13.0,
             "item_condition": "CONFORME",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 3.0}]
         }]
         # Novedad SOBRANTE declara 13 recibidos, orden era 10.
         ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="Tres bultos extra", items_override=items)
@@ -745,6 +749,181 @@ class MovementReceptionTest(unittest.TestCase):
         inv_dest = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product"].id).first()
         self.assertEqual(inv_dest.current_quantity, 0.0)
         self.assertEqual(inv_dest.transit_quantity, 0.0)
+
+    # =========================================================================
+    # CASO 10b: LOTES DEL SOBRANTE -> obligatorio, existe en el sistema y
+    # coherencia de cantidades (audio 3/4/5 de Mariuska)
+    # =========================================================================
+    def test_sobrante_sin_lote_declarado_da_error(self):
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llego mas tomate", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE",
+             "observed_physical_lot": None, "surplus_lots": []}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("lote" in str(e).lower() for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_sobrante_con_lote_inexistente_da_error(self):
+        # El lote del sobrante debe estar REGISTRADO en el sistema (como el erróneo).
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llego mas tomate", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE",
+             "observed_physical_lot": None, "surplus_lots": [{"lot": "LOTE-NO-EXISTE", "quantity": 2.0}]}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("no están registrados" in str(e).lower() for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_sobrante_con_lotes_que_no_sum_el_excedente_da_error(self):
+        # Coherencia: la suma de cantidades de los lotes debe cuadrar con el excedente.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llego mas tomate", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE",
+             "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-001", "quantity": 1.0}, {"lot": "L-001", "quantity": 0.5}]}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("no coincide" in str(e).lower() for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_sobrante_multilote_que_suma_el_excedente_si_pasa(self):
+        # Multilote (audio 5): varias filas cuyas cantidades suman el excedente.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="sobra en dos lotes", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE",
+             "observed_physical_lot": None,
+             "surplus_lots": [
+                 {"lot": "L-001", "quantity": 1.0},
+                 {"lot": "L-001", "quantity": 1.0}
+             ]}
+        ])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "SOBRANTE_EXCEDENTE")
+
+    def test_sobrante_con_cantidad_sin_lote_da_error(self):
+        # Red de seguridad (espejo del frontend): una CANTIDAD declarada sin lote no
+        # debe asentarse en silencio (el backend solo suma lotes con nombre). Se
+        # rechaza con un mensaje claro en vez de ignorar la cantidad huérfana.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llego mas tomate", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE",
+             "observed_physical_lot": None,
+             "surplus_lots": [
+                 {"lot": "L-001", "quantity": 1.0},
+                 {"lot": None, "quantity": 1.0}
+             ]}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("sin indicar de qué lote" in str(e).lower() for e in (msg if isinstance(msg, list) else [msg])))
+
+    # =========================================================================
+    # CASO PRUEBAS AUDIOS + NOVEDADES (sobrante + LOTE_NO_COINCIDE, trazabilidad,
+    # reconocimiento estricto por producto, auditoría del estatus efectivo)
+    # =========================================================================
+    def test_sobrante_mas_lote_no_coincide_con_lotes_declarados_si_pasa(self):
+        # Bug A (corregido): un renglón que combina SOBRANTE físico con LOTE_NO_COINCIDE
+        # exigía DOS colecciones de lote (el lote físico que se queda + el/los lote/s del
+        # excedente). Antes la UI quedaba bloqueada sin poder resolverlo; ahora, al
+        # declarar ambos, el flujo debe completarse sin error.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="LOTE_NO_COINCIDE",
+                                notes="cambio de lote y sobrante en el mismo renglon",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 12.0,
+                                    "item_condition": "LOTE_NO_COINCIDE",
+                                    "observed_physical_lot": "L-FIS-001",
+                                    "observed_physical_expiration": "2026-12-31",
+                                    "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "LOTE_NO_COINCIDE")
+        # Por ser novedad (no COMPLETADO) NO asienta stock en destino.
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_dest.current_quantity), 0.0)
+        # El origen libera el tránsito completo en novedades.
+        inv_origin = Inventory.query.filter_by(
+            location_id=env["origin"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+        # La discrepancia registra el lote físico y los lotes del sobrante.
+        log = AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first()
+        self.assertIsNotNone(log)
+        disc = log.changed_data["discrepancies"][0]
+        self.assertEqual(disc["observed_physical_lot"], "L-FIS-001")
+        self.assertEqual(disc["surplus_lots"][0]["lot"], "L-001")
+        self.assertEqual(disc["extra_units"], 2.0)
+
+    def test_sobrante_con_lote_de_otro_producto_da_error(self):
+        # Reconocimiento ESTRICTO por producto: el lote del sobrante debe pertenecer
+        # al producto del renglón. Un lote que existe pero es de OTRO producto (p. ej.
+        # aceite) en el renglón de tomate es producto erróneo.
+        env = self._seed(dispatched=10)
+        otro = Product(name="Aceite", sku="ACE-REC", unit_of_measure="L")
+        db.session.add(otro)
+        db.session.flush()
+        mdet_otro = MovementDetail(movement_id=env["mov"].id, product_id=otro.id,
+                                   lot_number="L-ACEITE", quantity=5,
+                                   received_quantity=None, missing_quantity=0.00)
+        db.session.add(mdet_otro)
+        db.session.commit()
+        # El lote L-ACEITE existe en el sistema (perteneciente a ACEITE).
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE",
+                                notes="llego mas tomate", items_override=[
+                                    {
+                                        "detail_id": env["detail"].id,
+                                        "received_quantity": 12.0,
+                                        "item_condition": "SOBRANTE_EXCEDENTE",
+                                        "observed_physical_lot": None,
+                                        "surplus_lots": [{"lot": "L-ACEITE", "quantity": 2.0}]
+                                    },
+                                    {
+                                        "detail_id": mdet_otro.id,
+                                        "received_quantity": 5.0,
+                                        "item_condition": "CONFORME",
+                                        "observed_physical_lot": None
+                                    }
+                                ])
+        # El lote no existe PARA EL PRODUCTO del renglón (tomate) -> se rechaza.
+        self.assertFalse(ok)
+        self.assertTrue(any("no están registrados" in str(e).lower() or "no registrado" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_sobrante_lote_correcto_pero_cantidad_no_cuadra_da_error(self):
+        # Coherencia: aunque el lote sea del producto correcto, las cantidades deben
+        # sumar el excedente real. Se rechaza si la suma no cuadra.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE",
+                                notes="llego mas tomate", items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 12.0,
+                                    "item_condition": "SOBRANTE_EXCEDENTE",
+                                    "observed_physical_lot": None,
+                                    "surplus_lots": [{"lot": "L-001", "quantity": 1.5}]
+                                }])
+        self.assertFalse(ok)
+        self.assertTrue(any("no coincide" in str(e).lower() for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_auditoria_registra_final_status_derivado(self):
+        # Caso solo alcanzable por API/script: payload CONFORME pero con sobrante por
+        # diferencia. El movimiento se finaliza como SOBRANTE_EXCEDENTE y la auditoría
+        # debe reflejar ese estatus EFECTIVO en "final_status" (coherencia bitácora).
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="llego de mas",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 12.0,
+                                    "item_condition": "CONFORME",
+                                    "observed_physical_lot": None,
+                                    "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "SOBRANTE_EXCEDENTE")
+        log = AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.changed_data["final_status"], "SOBRANTE_EXCEDENTE")
+        self.assertEqual(log.changed_data["novelty_type"], "CONFORME")
 
     # =========================================================================
     # CASO 11: ERRORES DE VALIDACIÓN GENERALES
@@ -905,7 +1084,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 12.0,
             "item_condition": "CONFORME",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
         }]
         ok, msg = self._process(env, novelty_type="CONFORME", notes="Llegaron 2 de mas", items_override=items)
         self.assertTrue(ok, msg)
@@ -1054,7 +1234,8 @@ class MovementReceptionTest(unittest.TestCase):
                 "detail_id": env["detail_b"].id,
                 "received_quantity": 12.0,
                 "item_condition": "SOBRANTE_EXCEDENTE",
-                "observed_physical_lot": None
+                "observed_physical_lot": None,
+                "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]
             }
         ]
         ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="Un insumo falta y otro sobra",
@@ -1101,7 +1282,8 @@ class MovementReceptionTest(unittest.TestCase):
         # Con la diferencia registrada en el renglón, la clasificación es coherente.
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llego de mas el tomate", items_override=[
-            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "CONFORME", "observed_physical_lot": None}
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "CONFORME", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]}
         ])
         self.assertTrue(ok, msg)
         db.session.refresh(env["mov"])
@@ -1191,7 +1373,9 @@ class MovementReceptionTest(unittest.TestCase):
         ).first()
         self.assertEqual(float(inv_dest.current_quantity), 10.00)
 
-    def test_sobrante_condicion_sin_diferencia_no_genera_extra(self):
+    def test_sobrante_condicion_sin_diferencia_da_error(self):
+        # Regla de Mariuska (Punto 1): no se puede declarar sobrante cuando el recibido
+        # es IGUAL (o menor) al despachado. Un sobrante exige recibir más de lo que llegó.
         env = self._seed(dispatched=10)
         items = [{
             "detail_id": env["detail"].id,
@@ -1201,12 +1385,28 @@ class MovementReceptionTest(unittest.TestCase):
         }]
         ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE",
                                 notes="Condicion sobrante con cantidades iguales", items_override=items)
+        self.assertFalse(ok)
+        self.assertTrue(any("sobrante" in str(e).lower() and "mayor" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_sobrante_condicion_con_diferencia_positiva_si_pasa(self):
+        # Caso válido opuesto al anterior: sobrante con recibido MAYOR al despachado.
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 12.0,
+            "item_condition": "SOBRANTE_EXCEDENTE",
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 2.0, "expiration_date": None}]
+        }]
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE",
+                                notes="Llegaron 2 unidades de mas", items_override=items)
         self.assertTrue(ok, msg)
         db.session.refresh(env["mov"])
         self.assertEqual(env["mov"].status, "SOBRANTE_EXCEDENTE")
         log = AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first()
         disc = log.changed_data["discrepancies"][0]
-        self.assertEqual(disc["extra_units"], 0.0)
+        self.assertEqual(disc["extra_units"], 2.0)
         self.assertEqual(disc["type"], "SOBRANTE_EXCEDENTE")
 
     def test_sobrante_sin_notas_da_error(self):
@@ -1381,6 +1581,34 @@ class MovementReceptionTest(unittest.TestCase):
         inv_dest = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product"].id).first()
         self.assertIsNone(inv_dest)
 
+    def test_falta_declarar_renglon_de_la_guia_da_error(self):
+        # Integridad: si el movimiento tiene varios renglones y NO se declaran todos,
+        # el detalle omitido quedaría con received_quantity NULL (datos perdidos en
+        # silencio). El guard debe rechazar la recepción hasta declarar la guía completa.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "CONFORME", "observed_physical_lot": None}
+        ]
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="", items_override=items)
+        self.assertFalse(ok)
+        self.assertTrue(any("todos los renglones" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+        # Ningún detalle debe quedar asentado como recibido si la guía está incompleta.
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertIsNone(detail.received_quantity)
+
+    def test_todos_los_renglones_de_la_guia_declarados_si_pasa(self):
+        # Caso válido del guard anterior: se declaran AMBOS renglones y pasa.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "CONFORME", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 10.0, "item_condition": "CONFORME", "observed_physical_lot": None}
+        ]
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+
     def test_renglon_no_dict_no_rompe_la_validacion(self):
         env = self._seed(dispatched=10)
         items = [
@@ -1499,18 +1727,40 @@ class MovementReceptionTest(unittest.TestCase):
         detail = db.session.get(MovementDetail, env["detail"].id)
         self.assertEqual(float(detail.missing_quantity), 10.0)
 
-    def test_condicion_faltante_con_cantidad_exacta_no_asienta(self):
+    def test_condicion_faltante_con_cantidad_exacta_da_error(self):
+        # Espejo del caso sobrante (regla de Mariuska, Punto 1): una condición de
+        # cantidad debe respaldarse con el conteo real. Un "faltante" con la MISMA
+        # cantidad que llegó es un falso faltante y debe rechazarse.
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="revisar calidad", items_override=[
             {"detail_id": env["detail"].id, "received_quantity": 10, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None}
         ])
-        self.assertTrue(ok, msg)
-        db.session.refresh(env["mov"])
-        self.assertEqual(env["mov"].status, "FALTANTE_CONTEO")
-        detail = db.session.get(MovementDetail, env["detail"].id)
-        self.assertEqual(float(detail.missing_quantity), 0.0)
-        inv_dest = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product"].id).first()
-        self.assertEqual(inv_dest.current_quantity, 0.0)
+        self.assertFalse(ok)
+        self.assertTrue(any("faltante" in str(e).lower() and "menor" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_condicion_faltante_con_cantidad_mayor_da_error(self):
+        # Variante del caso anterior: "faltante" con recibido MAYOR al despachado
+        # es contradictorio (eso es un sobrante) y debe rechazarse, no registrarse
+        # como un falso faltante.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="dice que falta", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 12, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("faltante" in str(e).lower() and "menor" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+
+    def test_condicion_sobrante_con_cantidad_menor_da_error(self):
+        # Variante del caso sobrante: "sobrante" con recibido MENOR al despachado
+        # es contradictorio (eso es un faltante) y debe rechazarse.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="dice que sobra", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 8, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("sobrante" in str(e).lower() and "mayor" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
 
     # =========================================================================
     # CASO 15e: AUDIO 2 y 6 -> combos de VENCIMIENTO (alerta FEFO)
@@ -1518,7 +1768,8 @@ class MovementReceptionTest(unittest.TestCase):
     def test_vencimiento_proximo_mas_sobrante_va_a_disputa(self):
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="vence y sobra de mas", items_override=[
-            {"detail_id": env["detail"].id, "received_quantity": 12, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None}
+            {"detail_id": env["detail"].id, "received_quantity": 12, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]}
         ])
         self.assertTrue(ok, msg)
         db.session.refresh(env["mov"])
@@ -2000,6 +2251,736 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertEqual(env["mov"].status, "COMPLETADO")
         self.assertEqual(float(env["inv_central"].current_quantity), 200.00)
         self.assertEqual(float(env["inv_sucu"].transit_quantity), 0.00)
+
+    def test_retorno_sobrante_devuelto_repone_el_excedente_al_central(self):
+        # Despacharon 100 en guía, pero llegaron 150 (50 de SOBRANTE). El
+        # excedente se devolvió al Central en un RETORNO_EMERGENCIA. El origen
+        # debitó ese excedente al resolver la disputa (extra_units), así que al
+        # RECIBIR el retorno el Central debe recuperar los 50. Con el flujo viejo
+        # get_outstanding_dispatch_debit devolvía 0 para sobrantes y el Central
+        # se quedaba corto (no se le sumaba la devolución).
+        env = self._seed_return(erroneous=False, ret_qty=50.0, orig_received=150.0,
+                                origin_current=100.0, return_transit=50.0)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 50.0,
+            "item_condition": "CONFORME",
+            "observed_physical_lot": None
+        }]
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="",
+                                items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        db.session.refresh(env["inv_central"])
+        db.session.refresh(env["inv_sucu"])
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+        # Central recupera los 50 sobrantes devueltos: 100 -> 150.
+        self.assertEqual(float(env["inv_central"].current_quantity), 150.00)
+        # El tránsito de la sede que devolvió queda liberado.
+        self.assertEqual(float(env["inv_sucu"].transit_quantity), 0.00)
+
+    # =========================================================================
+    # PERSISTENCIA REAL EN BD: verifica que tras procesar (y pasar un commit),
+    # los valores quedan escritos en la base y se releen correctamente desde
+    # una consulta nueva, no solo en los objetos en memoria de esta sesión.
+    # =========================================================================
+    def test_persistencia_recepcion_conforme_commit_y_relectura(self):
+        env = self._seed(dispatched=10, origin_current=100.0)
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 10.0,
+                                    "item_condition": "CONFORME",
+                                    "observed_physical_lot": None
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.commit()
+        # Expulsar todo de la sesión: obliga a releer desde la BD real.
+        db.session.expire_all()
+
+        mov = db.session.get(Movement, env["mov"].id)
+        self.assertEqual(mov.status, "COMPLETADO")
+        self.assertEqual(mov.received_by_id, env["user_id"])
+
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertEqual(float(detail.received_quantity), 10.0)
+        self.assertEqual(float(detail.missing_quantity), 0.0)
+
+        inv_dest = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_dest.current_quantity), 10.0)
+        self.assertEqual(float(inv_dest.transit_quantity), 0.0)
+
+        inv_origin = db.session.query(Inventory).filter_by(
+            location_id=env["origin"].id, product_id=env["product"].id).first()
+        # El origen conserva su current (conforme NO toca current del origen) y
+        # libera el tránsito que retenía la salida.
+        self.assertEqual(float(inv_origin.current_quantity), 100.0)
+        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+
+        log = db.session.query(AuditLog).filter_by(action="RECEPCION_CONFORME").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.severity, "NORMAL")
+        self.assertEqual(log.location_id, env["dest"].id)
+        self.assertIn("final_status", log.changed_data)
+        self.assertEqual(log.changed_data["final_status"], "COMPLETADO")
+
+    def test_persistencia_faltante_no_ensucia_inventario(self):
+        # Un faltante NO debe acreditar destino NI tocar el current del origen;
+        # solo libera tránsito y deja el movimiento en novedad (la decisión la
+        # toma el arbitraje). Verificado contra BD cometida.
+        env = self._seed(dispatched=10, origin_current=50.0)
+        ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="faltaron 2",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 8.0,
+                                    "item_condition": "FALTANTE_CONTEO",
+                                    "observed_physical_lot": None
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.commit()
+        db.session.expire_all()
+
+        mov = db.session.get(Movement, env["mov"].id)
+        self.assertEqual(mov.status, "FALTANTE_CONTEO")
+
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertEqual(float(detail.received_quantity), 8.0)
+        self.assertEqual(float(detail.missing_quantity), 2.0)
+
+        inv_dest = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        self.assertIsNotNone(inv_dest)
+        self.assertEqual(float(inv_dest.current_quantity), 0.0)
+
+        inv_origin = db.session.query(Inventory).filter_by(
+            location_id=env["origin"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_origin.current_quantity), 50.0)
+        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+
+        # La auditoría deja la incidencia para arbitraje.
+        log = db.session.query(AuditLog).filter_by(action="RECEPCION_NOVEDAD").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.severity, "ALERTA")
+
+    def test_persistencia_sobrante_no_acredita_excedente(self):
+        # El sobrante físico acredita solo lo conforme; el excedente queda para
+        # arbitraje, NUNCA se acredita de más en destino ni se restringe el
+        # tránsito del origen más allá de lo despachado.
+        env = self._seed(dispatched=10, origin_current=40.0)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llegaron 2 de mas",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 12.0,
+                                    "item_condition": "SOBRANTE_EXCEDENTE",
+                                    "observed_physical_lot": None,
+                                    "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.commit()
+        db.session.expire_all()
+
+        mov = db.session.get(Movement, env["mov"].id)
+        self.assertEqual(mov.status, "SOBRANTE_EXCEDENTE")
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertEqual(float(detail.received_quantity), 12.0)
+
+        inv_dest = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        # No se acredita NADA en destino (la novedad se resuelve en arbitraje).
+        self.assertEqual(float(inv_dest.current_quantity), 0.0)
+
+        inv_origin = db.session.query(Inventory).filter_by(
+            location_id=env["origin"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+
+        disc = db.session.query(AuditLog).filter_by(action="RECEPCION_NOVEDAD").first()
+        self.assertIsNotNone(disc)
+        d = disc.changed_data["discrepancies"][0]
+        self.assertEqual(d["type"], "SOBRANTE_EXCEDENTE")
+        self.assertEqual(float(d["extra_units"]), 2.0)
+        self.assertEqual(d["surplus_lots"][0]["lot"], "L-001")
+
+    def test_persistencia_producto_erroneo_resguardo(self):
+        # El erróneo no debe acreditar stock erróneo en el destino: va a custodia
+        # (auditoría) y no altera el inventario del producto erróneo en destino.
+        env = self._seed(dispatched=10, origin_current=30.0)
+        otro = Product(name="Papa", sku="PAP-01", unit_of_measure="kg")
+        db.session.add(otro)
+        db.session.flush()
+        ok, msg = self._process(env, novelty_type="PRODUCTO_ERRONEO",
+                                notes="llego papa por error",
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 10.0,
+                                    "item_condition": "CONFORME",
+                                    "observed_physical_lot": None
+                                }],
+                                erroneous=[{"product_id": otro.id, "quantity": 2.0,
+                                            "lot_number": "P-ERR-1"}])
+        self.assertTrue(ok, msg)
+        db.session.commit()
+        db.session.expire_all()
+
+        mov = db.session.get(Movement, env["mov"].id)
+        self.assertEqual(mov.status, "PRODUCTO_ERRONEO")
+
+        inv_dest = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        self.assertEqual(float(inv_dest.current_quantity), 0.0)
+
+        # El producto erróneo NO se acredita en destino ni crea inventario fantasma:
+        # se queda en custodia (auditoría) hasta que el arbitraje dicte su retorno.
+        inv_err = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=otro.id).first()
+        self.assertIsNone(inv_err)
+
+        log = db.session.query(AuditLog).filter_by(action="RECEPCION_NOVEDAD").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.changed_data["erroneous_products_delivered"][0]["product_name"], "Papa")
+        self.assertEqual(float(log.changed_data["erroneous_products_delivered"][0]["quantity_delivered"]), 2.0)
+
+    def test_persistencia_error_validacion_no_guarda_nada(self):
+        # Un payload inválido debe rechazarse sin dejar ningún cambio: ni stock,
+        # ni detalle, ni auditoría, ni cambio de estado.
+        env = self._seed(dispatched=10, origin_current=30.0)
+        ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="",   # nota corta -> error
+                                items_override=[{
+                                    "detail_id": env["detail"].id,
+                                    "received_quantity": 8.0,
+                                    "item_condition": "FALTANTE_CONTEO",
+                                    "observed_physical_lot": None
+                                }])
+        self.assertFalse(ok)
+        db.session.commit()
+        db.session.expire_all()
+
+        mov = db.session.get(Movement, env["mov"].id)
+        self.assertEqual(mov.status, "EN_TRANSITO")  # sin cambios
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertIsNone(detail.received_quantity)  # no se asentó
+        self.assertEqual(float(detail.missing_quantity), 0.0)
+        self.assertEqual(db.session.query(AuditLog).count(), 0)  # sin auditoría
+        inv_dest = db.session.query(Inventory).filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id).first()
+        self.assertIsNone(inv_dest)  # ni siquiera se creó el inventario del destino
+
+
+    # =========================================================================
+    # AUDITORÍA EXHAUSTIVA: TODAS LAS NOVEDADES DE CALIDAD/CONDICIÓN
+    # 1) registran correctamente su severidad; 2) el guard anti-falso-reporte
+    # las rechaza si NO llevan su condición en el renglón; 3) NUNCA acreditan
+    # stock en destino (van a custodia/disputa).
+    # =========================================================================
+    def _reset_tables(self):
+        """Limpia todas las tablas para poder volver a sembrar escenarios en un
+        mismo método de prueba (subTests en loop)."""
+        db.session.rollback()
+        for table in reversed(db.metadata.sorted_tables):
+            db.session.execute(table.delete())
+        db.session.commit()
+        db.session.expunge_all()
+
+    def test_condicion_individual_no_acredita_destino(self):
+        # Una novedad de condición (cualquiera) con recibido==autorizado NO
+        # acredita stock en destino: va a arbitraje. Verifica todas a la vez.
+        for cond, nota in [
+            ("INCIDENCIA_TEMPERATURA", "Temperatura a once grados"),
+            ("VIOLACION_CUSTODIA", "El precinto llego roto"),
+            ("RECHAZO_POR_ESPACIO", "Sin espacio en camara"),
+            ("LOTE_NO_COINCIDE", "El lote fisico es otro"),
+        ]:
+            with self.subTest(cond=cond):
+                env = self._seed(dispatched=10)
+                ok, msg = self._process(env, novelty_type=cond, notes=nota, items_override=[{
+                    "detail_id": env["detail"].id,
+                    "received_quantity": 10.0,
+                    "item_condition": cond,
+                    "observed_physical_lot": "OTRO-LOT" if cond == "LOTE_NO_COINCIDE" else None,
+                }])
+                self.assertTrue(ok, msg)
+                db.session.refresh(env["mov"])
+                self.assertNotEqual(env["mov"].status, "COMPLETADO")
+                inv_dest = Inventory.query.filter_by(
+                    location_id=env["dest"].id, product_id=env["product"].id).first()
+                if inv_dest is not None:
+                    self.assertEqual(float(inv_dest.current_quantity), 0.0)
+                inv_origin = Inventory.query.filter_by(
+                    location_id=env["origin"].id, product_id=env["product"].id).first()
+                self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+                self._reset_tables()
+
+    def test_custodia_sin_condicion_da_error(self):
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="VIOLACION_CUSTODIA", notes="roto", items_override=[{
+            "detail_id": env["detail"].id, "received_quantity": 10.0,
+            "item_condition": "CONFORME", "observed_physical_lot": None
+        }])
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_rechazo_espacio_sin_condicion_da_error(self):
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="RECHAZO_POR_ESPACIO", notes="sin espacio", items_override=[{
+            "detail_id": env["detail"].id, "received_quantity": 10.0,
+            "item_condition": "CONFORME", "observed_physical_lot": None
+        }])
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_lote_no_coincide_sin_lote_fisico_observado_da_error(self):
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="LOTE_NO_COINCIDE", notes="otro lote", items_override=[{
+            "detail_id": env["detail"].id, "received_quantity": 10.0,
+            "item_condition": "LOTE_NO_COINCIDE", "observed_physical_lot": None
+        }])
+        self.assertFalse(ok)
+
+    def test_severidades_por_condicion(self):
+        casos = {
+            "INCIDENCIA_TEMPERATURA": "RECEPCION_INCIDENCIA_CALIDAD",
+            "VIOLACION_CUSTODIA": "RECEPCION_INCIDENCIA_CALIDAD",
+            "LOTE_NO_COINCIDE": "RECEPCION_NOVEDAD",  # diseño: va como novedad, no calidad
+            "RECHAZO_POR_ESPACIO": "RECEPCION_NOVEDAD",
+            "FALTANTE_CONTEO": "RECEPCION_NOVEDAD",
+            "SOBRANTE_EXCEDENTE": "RECEPCION_NOVEDAD",
+        }
+        for cond, esperada in casos.items():
+            with self.subTest(cond=cond):
+                env = self._seed(dispatched=10)
+                notas = {"INCIDENCIA_TEMPERATURA": "Temperatura alta", "VIOLACION_CUSTODIA": "Precinto roto al recibir",
+                         "LOTE_NO_COINCIDE": "Otro lote en la caja", "RECHAZO_POR_ESPACIO": "Sin espacio en camara",
+                         "FALTANTE_CONTEO": "Faltan unidades en caja", "SOBRANTE_EXCEDENTE": "Sobran kilos en la caja"}
+                observed = None
+                surplus = None
+                if cond == "LOTE_NO_COINCIDE":
+                    observed = "OTRO-LOT"
+                elif cond == "FALTANTE_CONTEO":
+                    pass
+                elif cond == "SOBRANTE_EXCEDENTE":
+                    surplus = [{"lot": "L-001", "quantity": 2.0}]
+                    observed = None
+                item = {
+                    "detail_id": env["detail"].id,
+                    "received_quantity": 8.0 if cond == "FALTANTE_CONTEO" else (12.0 if cond == "SOBRANTE_EXCEDENTE" else 10.0),
+                    "item_condition": cond,
+                    "observed_physical_lot": observed,
+                }
+                if surplus:
+                    item["surplus_lots"] = surplus
+                ok, msg = self._process(env, novelty_type=cond, notes=notas[cond], items_override=[item])
+                self.assertTrue(ok, msg)
+                log = AuditLog.query.filter_by(action=esperada).first()
+                self.assertIsNotNone(log, f"esperaba audit {esperada} para {cond}")
+                self._reset_tables()
+
+    # =========================================================================
+    # AUDITORÍA EXHAUSTIVA: INCIDENCIAS MIXTAS (todas las combinaciones 2+)
+    # Regla: cualquier combinación de 2+ renglones afectados => INCIDENCIA_MIXTA.
+    # Debe NO acreditar destino y registrar TODAS las discrepancias.
+    # =========================================================================
+    def test_mixta_dos_condiciones_calidad(self):
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "INCIDENCIA_TEMPERATURA", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 10.0, "item_condition": "VIOLACION_CUSTODIA", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="olla con temperatura y precinto", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        # No acredita nada en destino
+        inv_a = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product"].id).first()
+        inv_b = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product_b"].id).first()
+        self.assertEqual(float(inv_a.current_quantity), 0.0)
+        self.assertEqual(float(inv_b.current_quantity), 0.0)
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        tipos = {d["type"] for d in log.changed_data["discrepancies"]}
+        self.assertSetEqual(tipos, {"INCIDENCIA_TEMPERATURA", "VIOLACION_CUSTODIA"})
+
+    def test_mixta_calidad_mas_faltante(self):
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 6.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 10.0, "item_condition": "LOTE_NO_COINCIDE", "observed_physical_lot": "L-XYZ"},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="faltan 4 y lote no coincide", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        # Verifica el faltante físico registrado en discrepancias
+        disc_faltante = next(d for d in log.changed_data["discrepancies"] if d["detail_id"] == env["detail"].id)
+        self.assertEqual(disc_faltante["missing_qty"], 4.0)
+        self.assertEqual(disc_faltante["notes"], "FALTANTE")
+        disc_lote = next(d for d in log.changed_data["discrepancies"] if d["detail_id"] == env["detail_b"].id)
+        self.assertEqual(disc_lote["observed_physical_lot"], "L-XYZ")
+
+    def test_mixta_dos_faltantes_mismo_signo(self):
+        # Dos renglones perdidos (mismo signo) siguen siendo MIXTA (multi-renglón),
+        # NO un solo FALTANTE: hay 2 afectados.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 8.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 7.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="faltan en ambos renglones", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+
+    def test_mixta_dos_sobrantes(self):
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]},
+            {"detail_id": env["detail_b"].id, "received_quantity": 13.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-002", "quantity": 3.0}]},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="sobran en ambos", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        for d in log.changed_data["discrepancies"]:
+            self.assertEqual(d["extra_units"], d["physical_received_qty"] - d["authorized_qty"])
+
+    def test_mixta_calidad_mas_erroneo(self):
+        # Regla 2026: con 2+ renglones afectados + erróneo -> INCIDENCIA_MIXTA.
+        env = self._seed_two_items()
+        err_product = Product(name="Papa roja", sku="PAPA-MIX", unit_of_measure="kg")
+        db.session.add(err_product)
+        db.session.flush()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "INCIDENCIA_TEMPERATURA", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 10.0, "item_condition": "VIOLACION_CUSTODIA", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="temperatura, custodia y producto no pedido",
+                                items_override=items,
+                                erroneous=[{"product_id": err_product.id, "product_name": "Papa roja",
+                                            "quantity": 2.0, "unit": "kg", "lot_number": "L-ERR", "expiration_date": "2030-01-01"}])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        # El erróneo va resguardado en la auditoría, además de las 2 discrepancias.
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        self.assertEqual(log.changed_data["erroneous_products_delivered"][0]["product_name"], "Papa roja")
+
+    def test_condicion_calidad_mas_erroneo_queda_en_erroneo(self):
+        # Con SOLO 1 renglón afectado (condición) + erróneo -> NO es mixta;
+        # la regla exige 2+ renglones afectados. Cae en PRODUCTO_ERRONEO.
+        env = self._seed(dispatched=10)
+        err_product = Product(name="Papa blanca", sku="PAPA-ERR1", unit_of_measure="kg")
+        db.session.add(err_product)
+        db.session.flush()
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_TEMPERATURA", notes="temperatura y producto no pedido",
+                                items_override=[{
+                                    "detail_id": env["detail"].id, "received_quantity": 10.0,
+                                    "item_condition": "INCIDENCIA_TEMPERATURA", "observed_physical_lot": None
+                                }],
+                                erroneous=[{"product_id": err_product.id, "product_name": "Papa blanca",
+                                            "quantity": 2.0, "unit": "kg", "lot_number": "L-ERR", "expiration_date": "2030-01-01"}])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "PRODUCTO_ERRONEO")
+        # Con una condición de calidad en el renglón, la auditoría se marca como
+        # INCIDENCIA_CALIDAD aunque el estatus final sea PRODUCTO_ERRONEO; el único
+        # renglón afectado queda registrado en discrepancies.
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(
+            {d["type"] for d in log.changed_data["discrepancies"]},
+            {"INCIDENCIA_TEMPERATURA"}
+        )
+        self.assertEqual(len(log.changed_data["erroneous_products_delivered"]), 1)
+
+    def test_mixta_tres_renglones_variados(self):
+        env = self._seed_two_items()
+        product_c = Product(name="Lechuga", sku="LEC-MIX", unit_of_measure="un")
+        db.session.add(product_c)
+        db.session.flush()
+        detail_c = MovementDetail(movement_id=env["mov"].id, product_id=product_c.id,
+                                  lot_number="L-003", quantity=5.0,
+                                  received_quantity=None, missing_quantity=0.00)
+        db.session.add(detail_c)
+        db.session.commit()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 6.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]},
+            {"detail_id": detail_c.id, "received_quantity": 5.0, "item_condition": "VIOLACION_CUSTODIA", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="un faltante, un sobrante y custodia", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 3)
+        # Confirma que el detalle C también registró su recepción
+        db.session.refresh(detail_c)
+        self.assertEqual(float(detail_c.received_quantity), 5.0)
+
+    def test_mixta_auto_derivada_sin_declarar(self):
+        # Cuando el payload llega CONFORME pero DOS renglones reflejan afectación
+        # (solo posible vía API; el JS ya auto-clasifica antes), el backend debe
+        # derivar solo a INCIDENCIA_MIXTA.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 8.0, "item_condition": "CONFORME", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 7.0, "item_condition": "CONFORME", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="faltan en dos renglones", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+
+    def test_sobrante_auto_derivado_con_declarado_conforme(self):
+        # CONFORME declarado con UNA fila con diferencia -> deriva a SOBRANTE/FALTANTE.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="llego de mas", items_override=[{
+            "detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "CONFORME",
+            "observed_physical_lot": None,
+            "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]
+        }])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "SOBRANTE_EXCEDENTE")
+
+    def test_anulacion_manual_del_mixta_respeta_la_eleccion_operario(self):
+        # Es una elección de diseño consistente frontend+backend: si el operario
+        # ANULA manualmente el INCIDENCIA_MIXTA y fuerza un tipo único (p. ej.
+        # FALTANTE) aunque haya 2 renglones afectados, el backend lo respeta.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 8.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 7.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="faltan en ambos renglones", items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "FALTANTE_CONTEO")
+
+    # =========================================================================
+    # AUDITORÍA EXHAUSTIVA: BORDES Y REFLEJO EN LAS INCIDENCIAS MIXTAS
+    # =========================================================================
+    def test_mixta_registra_tambien_los_renglones_conformes(self):
+        # En una mixta, las discrepancias de la auditoría deben incluir TODOS los
+        # renglones de la guía (afectados CON su condición y conformes como CONFORME),
+        # para que la bandeja tenga la foto completa del acta de recepción.
+        env = self._seed_two_items()
+        product_c = Product(name="Lechuga", sku="LEC-CONFO", unit_of_measure="un")
+        db.session.add(product_c)
+        db.session.flush()
+        detail_c = MovementDetail(movement_id=env["mov"].id, product_id=product_c.id,
+                                  lot_number="L-003", quantity=5.0,
+                                  received_quantity=None, missing_quantity=0.00)
+        db.session.add(detail_c)
+        db.session.commit()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 8.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+            {"detail_id": env["detail_b"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]},
+            {"detail_id": detail_c.id, "received_quantity": 5.0, "item_condition": "CONFORME", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="falta y sobra, otro conforme",
+                                items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        # Los 3 renglones quedan en el acta; el conforme se marca CONFORME.
+        self.assertEqual(len(log.changed_data["discrepancies"]), 3)
+        notes = {d["detail_id"]: d["notes"] for d in log.changed_data["discrepancies"]}
+        self.assertEqual(notes[env["detail"].id], "FALTANTE")
+        self.assertEqual(notes[env["detail_b"].id], "SOBRANTE")
+        self.assertEqual(notes[detail_c.id], "CONFORME")
+
+    def test_condicion_mas_diferencia_cantidad_mismo_renglon(self):
+        # Una fila con condición de calidad Y además cantidad distinta: la condición
+        # manda en la clasificación general (una sola afectación), y en el acta la
+        # condición (type) y el faltante físico (notes/missing_qty) se guardan AMBOS:
+        # la bandeja muestra la condición en item_condition y la observación en
+        # specific_novelty. No se pierde ni la condición ni la diferencia física.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="LOTE_NO_COINCIDE", notes="cambio de lote y faltan unidades",
+                                items_override=[{
+                                    "detail_id": env["detail"].id, "received_quantity": 8.0,
+                                    "item_condition": "LOTE_NO_COINCIDE",
+                                    "observed_physical_lot": "L-FISICO-9"
+                                }])
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "LOTE_NO_COINCIDE")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        disc = log.changed_data["discrepancies"][0]
+        # type = condición declarada (lo que la bandeja muestra como item_condition)
+        self.assertEqual(disc["type"], "LOTE_NO_COINCIDE")
+        # notes = observación derivada del conteo físico; el faltante queda registrado
+        self.assertEqual(disc["notes"], "FALTANTE")
+        self.assertEqual(disc["missing_qty"], 2.0)
+        self.assertEqual(disc["observed_physical_lot"], "L-FISICO-9")
+
+    def test_mixta_condicion_mas_surplus_en_dos_renglones(self):
+        # LOTE_NO_COINCIDE (1) + SOBRANTE (1) en dos renglones => MIXTA y refleja ambos.
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "LOTE_NO_COINCIDE", "observed_physical_lot": "L-X7"},
+            {"detail_id": env["detail_b"].id, "received_quantity": 13.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-002", "quantity": 3.0}]},
+        ]
+        ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="lote y sobrante",
+                                items_override=items)
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        notas = {d["notes"] for d in log.changed_data["discrepancies"]}
+        self.assertSetEqual(notas, {"LOTE_NO_COINCIDE", "SOBRANTE"})
+
+    def test_cantidad_negativa_rechazada(self):
+        # Valores imposibles (negativos) deben rechazarse sin asentar nada.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="cantidad imposible", items_override=[{
+            "detail_id": env["detail"].id, "received_quantity": -3.0,
+            "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None
+        }])
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_surplus_con_lote_de_otro_renglon_y_cantidad_registrada(self):
+        # El excedente de un renglón no puede declararse con el lote de la guía de
+        # OTRO renglón; además la identidad lote+cantidad debe cuadrar. Verifica
+        # que ese lote foráneo quede señalado (regresión del guard estructural).
+        env = self._seed_two_items()
+        items = [
+            {"detail_id": env["detail"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+             "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]},  # L-002 es lote del OTRO renglón
+            {"detail_id": env["detail_b"].id, "received_quantity": 10.0, "item_condition": "CONFORME", "observed_physical_lot": None},
+        ]
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="sobrante con lote ajeno",
+                                items_override=items)
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_sobrante_suma_de_lotes_que_da_mas_que_el_excedente_se_rechaza(self):
+        # La suma de lotes sobrantes NUNCA puede exceder el excedente físico
+        # declarado (no se fabrica excedente que no llego).
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="sobrante inexistente",
+                                items_override=[{
+                                    "detail_id": env["detail"].id, "received_quantity": 12.0,
+                                    "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+                                    "surplus_lots": [{"lot": "L-001", "quantity": 2.0}, {"lot": "L-002", "quantity": 3.0}]
+                                }])
+        # Sobrante físico = 2 pero se declaran 5 en lotes => no cuadra.
+        self.assertFalse(ok)
+
+    # =========================================================================
+    # E2E POR HTTP: INCIDENCIA MIXTA COMPLETA -> reflejo en bandeja y BD
+    # =========================================================================
+    def _get_disputes_context(self):
+        from app.logistics.services.movement_dispute_service import get_disputes_context
+        return get_disputes_context()
+
+    def test_e2e_mixta_por_http_se_refleja_en_bandeja(self):
+        # Flujo completo de una incidencia mixta a través del endpoint HTTP real:
+        #   - GET pantalla de recepción (200)
+        #   - POST process con 2 renglones afectados + erróneo (INCIDENCIA_MIXTA)
+        #   - Estado en BD MIXTA
+        #   - La bandeja de arbitraje la lista y lee item_condition/specific_novelty
+        #     y el lote físico desde la auditoría.
+        env = self._seed_two_items()
+        err_product = Product(name="Papa roja e2e", sku="PAPA-E2E", unit_of_measure="kg")
+        db.session.add(err_product)
+        db.session.flush()
+        db.session.commit()
+        client = self._e2e_login(env)
+
+        resp_get = client.get(f"/logistics/movements/reception/{env['mov'].id}")
+        self.assertEqual(resp_get.status_code, 200)
+
+        payload = {
+            "novelty_type": "INCIDENCIA_MIXTA",
+            "notes": "faltante en un renglón y sobrante en otro",
+            "items": [
+                {"detail_id": env["detail"].id, "received_quantity": 8.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None},
+                {"detail_id": env["detail_b"].id, "received_quantity": 12.0, "item_condition": "SOBRANTE_EXCEDENTE", "observed_physical_lot": None,
+                 "surplus_lots": [{"lot": "L-002", "quantity": 2.0}]},
+            ],
+            "erroneous_products": [
+                {"product_id": err_product.id, "product_name": "Papa roja e2e", "quantity": 3.0,
+                 "unit": "kg", "lot_number": "L-E2E", "expiration_date": "2030-06-01"}
+            ],
+        }
+        resp = client.post(
+            f"/logistics/movements/reception/{env['mov'].id}/process",
+            json=payload
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data["success"])
+
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+
+        # La auditoría guarda las 2 discrepancias + el erróneo.
+        log = AuditLog.query.filter_by(location_id=env["dest"].id).first()
+        self.assertEqual(len(log.changed_data["discrepancies"]), 2)
+        self.assertEqual(len(log.changed_data["erroneous_products_delivered"]), 1)
+        by_detail = {d["detail_id"]: d for d in log.changed_data["discrepancies"]}
+        self.assertEqual(by_detail[env["detail"].id]["type"], "FALTANTE_CONTEO")
+        self.assertEqual(by_detail[env["detail"].id]["missing_qty"], 2.0)
+        self.assertEqual(by_detail[env["detail_b"].id]["type"], "SOBRANTE_EXCEDENTE")
+        self.assertEqual(by_detail[env["detail_b"].id]["extra_units"], 2.0)
+
+        # La bandeja de disputas la lista y refleja condition + observación por renglón.
+        disputes, _ = self._get_disputes_context()
+        self.assertTrue(any(m.id == env["mov"].id for m in disputes))
+        mov = next(m for m in disputes if m.id == env["mov"].id)
+        self.assertEqual(mov.reception_notes, "faltante en un renglón y sobrante en otro")
+        self.assertEqual(len(mov.erroneous_products), 1)
+        detail_by_product = {d.product_id: d for d in mov.details}
+        det_a = detail_by_product[env["product"].id]
+        self.assertEqual(det_a.item_condition, "FALTANTE_CONTEO")
+        self.assertEqual(det_a.specific_novelty, "FALTANTE")
+        det_b = detail_by_product[env["product_b"].id]
+        self.assertEqual(det_b.item_condition, "SOBRANTE_EXCEDENTE")
+        self.assertEqual(det_b.specific_novelty, "SOBRANTE")
+
+    def test_e2e_lote_no_coincide_por_http_refleja_lote_fisico_en_bandeja(self):
+        # Un LOTE_NO_COINCIDE procesado por HTTP debe dejar el lote físico observado
+        # accesible en la bandeja de arbitraje.
+        env = self._seed(dispatched=10)
+        db.session.commit()
+        client = self._e2e_login(env)
+        payload = {
+            "novelty_type": "LOTE_NO_COINCIDE",
+            "notes": "el lote del pallet es otro",
+            "items": [{
+                "detail_id": env["detail"].id, "received_quantity": 10.0,
+                "item_condition": "LOTE_NO_COINCIDE", "observed_physical_lot": "L-PHYS-2026"
+            }],
+            "erroneous_products": [],
+        }
+        resp = client.post(f"/logistics/movements/reception/{env['mov'].id}/process", json=payload)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["success"])
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "LOTE_NO_COINCIDE")
+        disputes, _ = self._get_disputes_context()
+        mov = next(m for m in disputes if m.id == env["mov"].id)
+        det = next(d for d in mov.details if d.product_id == env["product"].id)
+        self.assertEqual(det.item_condition, "LOTE_NO_COINCIDE")
+        self.assertEqual(det.observed_physical_lot, "L-PHYS-2026")
 
 
 if __name__ == "__main__":
