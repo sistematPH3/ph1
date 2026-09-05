@@ -393,3 +393,251 @@ tr.audit-details-row:hover > td {
 .ph-table-container {
     overflow-x: hidden !important;
 }
+/* ==========================================================================
+   Responsividad: Adaptación para Tablets y Teléfonos
+   ========================================================================== */
+
+/* 1. Ajustes para Tabletas (Pantallas entre 768px y 991.98px) */
+@media (max-width: 991.98px) {
+    .ph-filter-container .row > div {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Reducción de relleno en encabezados y celdas para evitar desbordamiento */
+    .ph-table thead th {
+        padding: 10px 6px !important;
+        font-size: 0.75rem !important;
+        letter-spacing: 0;
+    }
+
+    .ph-table tbody td {
+        padding: 10px 4px !important;
+        font-size: 0.8rem;
+    }
+
+    /* Ajuste de avatar y elementos de celda */
+    .ph-avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.8rem;
+    }
+
+    .ph-user-name {
+        font-size: 0.78rem;
+    }
+
+    .ph-user-role {
+        font-size: 0.7rem;
+    }
+
+    .ph-badge, 
+    .ph-badge-location {
+        padding: 3px 8px;
+        font-size: 0.7rem;
+    }
+
+    .ph-btn-detail-text {
+        padding: 5px 10px;
+        font-size: 0.75rem;
+    }
+
+    .ph-btn-action {
+        width: 32px;
+        height: 32px;
+        font-size: 0.95rem;
+    }
+
+    /* Desactivar scroll horizontal en tabletas */
+    .table-responsive,
+    .ph-table-container {
+        overflow-x: hidden !important;
+    }
+
+    .ph-table {
+        width: 100% !important;
+    }
+}
+
+/* 2. Transformación a Tarjetas en Teléfonos (Menor a 768px) */
+@media (max-width: 767.98px) {
+    .ph-table thead {
+        display: none !important;
+    }
+
+    .ph-table, 
+    .ph-table tbody, 
+    .ph-table tr.audit-row {
+        display: block;
+        width: 100%;
+    }
+
+    .ph-table tr.audit-row {
+        margin-bottom: 1rem;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        padding: 12px 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .ph-table tr.audit-row:hover {
+        transform: none !important;
+    }
+
+    .ph-table tbody td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 10px 0 !important;
+        border: none !important;
+        border-bottom: 1px dashed #e2e8f0 !important;
+        border-radius: 0 !important;
+        text-align: right;
+    }
+
+    .ph-table tbody td:last-child {
+        border-bottom: none !important;
+        padding-top: 12px !important;
+        justify-content: center !important;
+    }
+
+    .ph-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.78rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: left;
+        margin-right: 12px;
+    }
+
+    .ph-table tbody td[data-label="Responsable"] .d-flex {
+        justify-content: flex-end;
+    }
+
+    /* Fila Desplegable de Detalles en Móvil */
+    .ph-table tr.audit-details-row {
+        display: none;
+    }
+
+    .ph-table tr.audit-details-row.show {
+        display: block !important;
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .ph-table tr.audit-details-row > td {
+        display: block !important;
+        width: 100%;
+        padding: 0 !important;
+        border: none !important;
+        text-align: left !important;
+    }
+
+    .ph-table tr.audit-details-row > td::before {
+        content: none !important;
+    }
+
+    /* La evidencia fotográfica se coloca debajo únicamente en teléfonos */
+    .audit-details-row .col-md-4 {
+        border-left: none !important;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+
+    .audit-details-row .card-body {
+        padding: 12px !important;
+    }
+
+    .ph-filter-container {
+        padding: 14px;
+    }
+
+    .ph-filter-label {
+        font-size: 0.78rem;
+    }
+}
+/* Adaptación exacta para vista Tablet (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    /* 1. Redistribución equilibrada de anchos */
+    .ph-table th:nth-child(1), .ph-table td:nth-child(1) { width: 16%; } /* Responsable */
+    .ph-table th:nth-child(2), .ph-table td:nth-child(2) { width: 17%; } /* Sede */
+    .ph-table th:nth-child(3), .ph-table td:nth-child(3) { width: 11%; } /* Producto */
+    .ph-table th:nth-child(4), .ph-table td:nth-child(4) { width: 20%; } /* Tipo de Merma */
+    .ph-table th:nth-child(5), .ph-table td:nth-child(5) { width: 12%; } /* Estado */
+    .ph-table th:nth-child(6), .ph-table td:nth-child(6) { width: 12%; } /* Gravedad */
+    .ph-table th:nth-child(7), .ph-table td:nth-child(7) { width: 12%; } /* Acciones */
+
+    /* 2. Centrado estricto de los botones de acciones (1 o 2 botones) */
+    .ph-table td:nth-child(7) {
+        overflow: visible !important;
+    }
+
+    .ph-table td:nth-child(7) .d-flex {
+        gap: 4px !important;
+        justify-content: center !important; /* Mantiene los botones siempre centrados */
+    }
+
+    /* 3. Ajuste del badge de ubicación para evitar montajes */
+    .ph-badge-location {
+        padding: 3px 6px !important;
+        font-size: 0.68rem !important;
+        white-space: nowrap !important;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 4. Badges en tarjetas de detalle */
+    .ph-detail-card .badge {
+        white-space: normal !important;
+        word-break: break-word;
+        max-width: 100%;
+        display: inline-block;
+        line-height: 1.2;
+    }
+
+    /* 5. Ajustes generales de celda en tablet */
+    .ph-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+    }
+
+    .ph-table tbody td {
+        padding: 8px 3px !important;
+        font-size: 0.72rem !important;
+        vertical-align: middle !important;
+    }
+
+    .ph-user-role {
+        display: none !important;
+    }
+
+    .ph-avatar {
+        width: 26px !important;
+        height: 26px !important;
+        font-size: 0.75rem !important;
+    }
+
+    .ph-btn-detail-text {
+        padding: 4px 6px !important;
+        font-size: 0.75rem !important;
+    }
+
+    .ph-btn-action {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.85rem !important;
+        flex-shrink: 0;
+    }
+}
+/* Restaurar texto en el botón de detalles para pantallas móviles */
+@media (max-width: 767.98px) {
+    .ph-btn-detail-text span,
+    .ph-btn-detail-text {
+        display: inline-flex !important;
+        white-space: nowrap !important;
+    }
+}
