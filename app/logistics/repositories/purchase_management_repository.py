@@ -1,10 +1,39 @@
 from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType, Inventory
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from datetime import datetime, timedelta
+from sqlalchemy import text
+import json
 
 class PurchaseManagementRepository:
     def __init__(self, db_connection):
         self.db = db_connection
+
+    def _write_audit(self, user_id, action, severity, product_id, lot_number,
+                     prev_qty, new_qty, notes):
+        """Escribe un registro en audit_logs (misma tabla que AGREGAR compras)."""
+        product = self.db.session.query(Product).get(product_id)
+        pname = product.name if product else f"ID {product_id}"
+        changed = {
+            "location_id": 1,
+            "location_name": "Almacén Central",
+            "product_id": product_id,
+            "product_name": pname,
+            "lot_number": lot_number,
+            "previous_quantity": float(prev_qty),
+            "new_quantity": float(new_qty),
+            "quantity_changed": float(new_qty - prev_qty),
+            "notes": notes,
+        }
+        self.db.session.execute(text("""
+            INSERT INTO audit_logs (user_id, action, severity, location_id, changed_data, timestamp)
+            VALUES (:uid, :action, :sev, 1, :cdata, :ts)
+        """), {
+            'uid': user_id,
+            'action': action,
+            'sev': severity,
+            'cdata': json.dumps(changed),
+            'ts': datetime.now()
+        })
 
     def get_filtered_history(self, start_date=None, end_date=None, supplier_id=None, status=None):
         query = self.db.session.query(Purchase, Supplier.name.label('supplier_name')).join(
@@ -14,7 +43,7 @@ class PurchaseManagementRepository:
         if start_date:
             query = query.filter(Purchase.purchase_date >= start_date)
         if end_date:
-            query = query.filter(Purchase.purchase_date <= end_date)
+            query = query.filter(Purchase.purchase_date < end_date)
             
         if supplier_id:
             query = query.filter(Purchase.supplier_id == supplier_id)
@@ -84,7 +113,15 @@ class PurchaseManagementRepository:
                     product_id=detail.product_id
                 ).first()
                 
-                inventory_record.current_quantity -= Decimal(str(detail.quantity))
+                prev_qty = Decimal(str(inventory_record.current_quantity))
+                inventory_record.current_quantity = prev_qty - Decimal(str(detail.quantity))
+                self._write_audit(
+                    user_id, "ANULACION_COMPRA", "NORMAL",
+                    detail.product_id,
+                    detail.lot_number if getattr(detail, 'lot_number', None) else None,
+                    prev_qty, inventory_record.current_quantity,
+                    f"Anulación de compra (Lote: {detail.lot_number})"
+                )
 
             audit_log = PurchaseAuditLog(
                 purchase_id=purchase.id,
@@ -152,27 +189,31 @@ class PurchaseManagementRepository:
 
             new_total_amount = Decimal('0.00')
             purchase_exchange_rate = Decimal(str(purchase.exchange_rate))
+            kept_detail_ids = {
+                str(item['id']) for item in new_items
+                if not str(item['id']).startswith('new_')
+            }
 
             for detail in details:
                 matching_new = next((item for item in new_items if str(item['id']) == str(detail.id)), None)
-                
+
                 if matching_new:
                     new_qty = Decimal(str(matching_new['quantity']))
                     new_price = Decimal(str(matching_new['foreign_price']))
                     old_qty = Decimal(str(detail.quantity))
-                    
+                    old_price = Decimal(str(detail.foreign_price)) if detail.foreign_price is not None else Decimal('0.00')
+                    old_exp = str(detail.expiration_date) if detail.expiration_date else None
+                    old_lot = str(detail.lot_number) if detail.lot_number else ''
                     qty_diff = new_qty - old_qty
-                    
+
                     if qty_diff != Decimal('0.00'):
                         inventory_record = self.db.session.query(Inventory).filter_by(
                             location_id=1, 
                             product_id=detail.product_id
                         ).first()
-                        
+
                         if inventory_record:
                             inventory_record.current_quantity += qty_diff
-                            if inventory_record.min_stock == Decimal('0.00') or inventory_record.min_stock is None:
-                                inventory_record.min_stock = Decimal('20.00')
                         elif qty_diff > Decimal('0.00'):
                             new_inv = Inventory(
                                 location_id=1, 
@@ -182,20 +223,63 @@ class PurchaseManagementRepository:
                                 transit_quantity=Decimal('0.00')
                             )
                             self.db.session.add(new_inv)
-                    
+
+                    new_exp = None
+                    if 'expiration_date' in matching_new and matching_new['expiration_date']:
+                        new_exp = datetime.strptime(matching_new['expiration_date'], '%Y-%m-%d').date()
+
+                    new_lot = None
+                    if 'lot_number' in matching_new and matching_new['lot_number']:
+                        new_lot = str(matching_new['lot_number']).strip()
+
                     detail.quantity = new_qty
                     detail.foreign_price = new_price
                     detail.price_bs = new_price * purchase_exchange_rate
-                    
-                    if 'expiration_date' in matching_new and matching_new['expiration_date']:
-                        detail.expiration_date = datetime.strptime(matching_new['expiration_date'], '%Y-%m-%d').date()
-                    else:
-                        detail.expiration_date = None
+                    detail.expiration_date = new_exp
+                    detail.lot_number = new_lot
 
-                    if 'lot_number' in matching_new and matching_new['lot_number']:
-                        detail.lot_number = str(matching_new['lot_number']).strip()
+                    changed = (
+                        qty_diff != Decimal('0.00')
+                        or new_price != old_price
+                        or (new_exp.strftime('%Y-%m-%d') if new_exp else None) != old_exp
+                        or (new_lot or '') != old_lot
+                    )
+                    if changed:
+                        severity = 'REABASTECIDO' if old_qty <= Decimal('20.00') and new_qty > Decimal('20.00') else 'NORMAL'
+                        self._write_audit(
+                            user_id, "AJUSTE_COMPRA", severity,
+                            detail.product_id,
+                            new_lot,
+                            old_qty, new_qty,
+                            f"Ajuste por edición de compra (Lote: {new_lot})"
+                        )
 
                     new_total_amount += (new_qty * new_price)
+                elif str(detail.id) not in kept_detail_ids:
+                    revert_qty = Decimal(str(detail.quantity))
+
+                    inventory_record = self.db.session.query(Inventory).filter_by(
+                        location_id=1, 
+                        product_id=detail.product_id
+                    ).first()
+
+                    if not inventory_record or inventory_record.current_quantity < revert_qty:
+                        product = self.db.session.query(Product).get(detail.product_id)
+                        prod_name = product.name if product else f"ID {detail.product_id}"
+                        raise ValueError(
+                            f"No se puede eliminar '{prod_name}'. Se intentan revertir {revert_qty} unidades, pero el stock actual es insuficiente."
+                        )
+
+                    prev_qty = Decimal(str(inventory_record.current_quantity))
+                    inventory_record.current_quantity = prev_qty - revert_qty
+                    self._write_audit(
+                        user_id, "AJUSTE_COMPRA", "NORMAL",
+                        detail.product_id,
+                        detail.lot_number if getattr(detail, 'lot_number', None) else None,
+                        prev_qty, prev_qty - revert_qty,
+                        f"Insumo eliminado de la compra (Lote: {detail.lot_number})"
+                    )
+                    self.db.session.delete(detail)
                 else:
                     new_total_amount += (Decimal(str(detail.quantity)) * Decimal(str(detail.foreign_price)))
 
@@ -210,6 +294,8 @@ class PurchaseManagementRepository:
                     
                     exp_date_obj = None
                     product = self.db.session.query(Product).filter_by(id=product_id).first()
+                    if not product:
+                        raise ValueError(f"El producto con id {product_id} no existe y no puede añadirse.")
                     
                     if item.get('expiration_date'):
                         exp_date_obj = datetime.strptime(item['expiration_date'], '%Y-%m-%d').date()
@@ -253,12 +339,12 @@ class PurchaseManagementRepository:
                         location_id=1, 
                         product_id=product_id
                     ).first()
-                    
+
                     if inventory_record:
-                        inventory_record.current_quantity += new_qty
-                        if inventory_record.min_stock == Decimal('0.00') or inventory_record.min_stock is None:
-                            inventory_record.min_stock = Decimal('20.00')
+                        inv_prev = Decimal(str(inventory_record.current_quantity))
+                        inventory_record.current_quantity = inv_prev + new_qty
                     else:
+                        inv_prev = Decimal('0.00')
                         new_inv = Inventory(
                             location_id=1, 
                             product_id=product_id, 
@@ -267,6 +353,14 @@ class PurchaseManagementRepository:
                             transit_quantity=Decimal('0.00')
                         )
                         self.db.session.add(new_inv)
+
+                    severity = 'REABASTECIDO' if inv_prev <= Decimal('20.00') and inv_prev + new_qty > Decimal('20.00') else 'NORMAL'
+                    self._write_audit(
+                        user_id, "AJUSTE_COMPRA", severity,
+                        product_id, lot_val,
+                        inv_prev, inv_prev + new_qty,
+                        f"Nuevo insumo añadido por edición de compra (Lote: {lot_val})"
+                    )
 
                     new_total_amount += (new_qty * new_price)
 

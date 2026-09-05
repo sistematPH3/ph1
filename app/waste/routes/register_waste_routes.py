@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, render_template, session
 from flask_login import login_required, current_user
 from app.decorators.roles import require_roles
 from app.waste.requests.register_waste_validators import validate_register_waste_payload
+from app.waste.repositories.register_waste_repository import RegisterWasteRepository
 from app.waste.services.register_waste_service import (
     get_form_data,
     get_location_products,
@@ -15,7 +16,6 @@ register_waste_bp = Blueprint('register_waste', __name__)
 
 OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
 
-
 @register_waste_bp.route('/waste/merma/new', methods=['GET'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
@@ -26,34 +26,68 @@ def nueva_merma():
 
     locations, is_admin, waste_types = get_form_data(user_id)
 
+    vencidos = []
+    try:
+        for loc in locations:
+            if loc.id == 1 and not RegisterWasteRepository.vencido_permitido_en_central():
+                continue
+            for v in RegisterWasteRepository.get_expired_lots(loc.id):
+                v = dict(v)
+                v['location_id'] = loc.id
+                v['location_name'] = loc.name
+                vencidos.append(v)
+    except Exception:
+        vencidos = []
+    vencidos.sort(key=lambda v: (v['location_name'], v['expiration_date']))
+
     single_location = None
     if not is_admin and len(locations) == 1:
         single_location = locations[0]
+
+    locked_type_code = (request.args.get('type') or '').strip().upper() or None
+    if locked_type_code:
+        if locked_type_code not in {wt.code for wt in waste_types}:
+            locked_type_code = None
 
     return render_template(
         'waste/register_waste.html',
         locations=locations,
         is_admin=is_admin,
         single_location=single_location,
+        locked_type_code=locked_type_code,
+        vencidos=vencidos,
     )
-
 
 @register_waste_bp.route('/api/waste/locations/<int:location_id>/types', methods=['GET'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def fetch_location_types(location_id):
-    from app.waste.repositories.register_waste_repository import RegisterWasteRepository
+    if not user_can_access_location(
+            session.get('user_id') or session.get('_user_id') or session.get('id')
+            or getattr(current_user, 'id', None), location_id):
+        return jsonify({'success': False, 'message': 'No tienes permisos para consultar esta sede.'}), 403
+
     waste_types = RegisterWasteRepository.get_waste_types()
 
     applies_central = location_id == 1
+    vencido_central = (
+        RegisterWasteRepository.get_boolean_parameter('VENCIDO_APLICA_CENTRAL', False)
+        if applies_central else False
+    )
     result = []
     for wt in waste_types:
-        if applies_central and not wt.applies_central:
+        if applies_central and not wt.applies_central \
+                and not (wt.code == 'VENCIDO' and vencido_central):
             continue
-        result.append({'id': wt.id, 'name': wt.name, 'code': wt.code, 'description': wt.description})
+        result.append({
+            'id': wt.id,
+            'name': wt.name,
+            'code': wt.code,
+            'description': wt.description,
+            'requires_approval': bool(wt.requires_approval),
+        })
 
     return jsonify({'success': True, 'types': result}), 200
-
 
 @register_waste_bp.route('/api/waste/locations/<int:location_id>/products', methods=['GET'])
 @login_required
@@ -66,7 +100,6 @@ def fetch_location_products(location_id):
     products = get_location_products(location_id)
     return jsonify({'success': True, 'products': products}), 200
 
-
 @register_waste_bp.route('/api/waste/locations/<int:location_id>/products/<int:product_id>/lots', methods=['GET'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
@@ -77,7 +110,6 @@ def fetch_product_lots(location_id, product_id):
 
     lots = get_product_lots(location_id, product_id)
     return jsonify({'success': True, 'lots': lots}), 200
-
 
 @register_waste_bp.route('/api/waste/evidence', methods=['POST'])
 @login_required
@@ -92,17 +124,21 @@ def subir_foto():
     if not file or not file.filename:
         return jsonify({'success': False, 'message': 'Archivo de imagen inválido.'}), 400
 
+    if not (file.content_type or '').startswith('image/'):
+        return jsonify({'success': False, 'message': 'Solo se permiten archivos de imagen.'}), 400
+
+    image_bytes = file.read()
+    if len(image_bytes) > 5 * 1024 * 1024:
+        return jsonify({'success': False, 'message': 'La imagen no puede superar los 5 MB.'}), 400
+
     try:
-        image_bytes = file.read()
         filename = file.filename
         memory_file = io.BytesIO(image_bytes)
         memory_file.filename = filename
         url = upload_invoice_image(memory_file)
         return jsonify({'success': True, 'url': url}), 200
     except Exception as e:
-        # La foto es OPCIONAL: si falla, no bloqueamos el registro.
         return jsonify({'success': False, 'message': f'No se pudo subir la evidencia: {str(e)}'}), 400
-
 
 @register_waste_bp.route('/waste/merma/new', methods=['POST'])
 @login_required

@@ -24,7 +24,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLotsData = [];
     let currentProductsData = [];
 
+    const lockedTypeCode = (document.getElementById('locked_type_code') || {}).value || null;
+    const wasteTypesByOption = {};
+
     const isSingleLocation = !locationElement || locationElement.tagName === 'INPUT';
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
 
     function showAlert(type, message) {
         const icon = type === 'success' ? 'bi-check-circle-fill'
@@ -32,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'bi-info-circle-fill';
         alertContainer.innerHTML = `
             <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi ${icon} me-2"></i> ${message}
+                <i class="bi ${icon} me-2"></i> ${escapeHtml(message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         `;
@@ -43,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return locationElement.tagName === 'SELECT' ? locationElement.value : locationElement.value;
     }
 
-    // ====== TIPOS DE MERMA POR SEDE ======
     const loadWasteTypes = async (locationId) => {
         if (!wasteTypeSelect) return;
         wasteTypeSelect.innerHTML = '<option value="" selected disabled>Cargando tipos...</option>';
@@ -53,21 +61,35 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (response.ok && result.success) {
                 wasteTypeSelect.innerHTML = '<option value="" selected disabled>Seleccione el tipo de merma...</option>';
+                let foundLocked = false;
                 result.types.forEach(t => {
                     const option = document.createElement('option');
                     option.value = t.id;
-                    const reqLabel = (t.code === 'TEMPERATURA' || t.code === 'ROBO_SOSPECHA') ? ' (requiere aprobación)' : '';
+                    const reqLabel = (t.requires_approval) ? ' (requiere aprobación)' : '';
                     option.textContent = `${t.name}${reqLabel}`;
                     wasteTypeSelect.appendChild(option);
+                    wasteTypesByOption[String(t.id)] = t.code;
+                    if (lockedTypeCode && t.code === lockedTypeCode) {
+                        wasteTypeSelect.value = String(t.id);
+                        foundLocked = true;
+                    }
                 });
-                wasteTypeSelect.disabled = false;
+                if (lockedTypeCode) {
+                    if (foundLocked) {
+                        wasteTypeSelect.disabled = true;
+                        if (locationId) loadProducts(locationId);
+                    } else {
+                        showAlert('warning', `El tipo "${lockedTypeCode}" no aplica para esta sede.`);
+                    }
+                } else {
+                    wasteTypeSelect.disabled = false;
+                }
             }
         } catch (e) {
             wasteTypeSelect.innerHTML = '<option value="" selected disabled>Error al cargar tipos</option>';
         }
     };
 
-    // ====== PRODUCTOS ======
     const loadProducts = async (locationId) => {
         productSelect.innerHTML = '<option value="" selected disabled>Buscando inventario...</option>';
         productSelect.disabled = true;
@@ -105,7 +127,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // ====== LOTES ======
+    const selectedTypeCode = () => {
+        if (!wasteTypeSelect || !wasteTypeSelect.value) return null;
+        return wasteTypesByOption[String(wasteTypeSelect.value)] || null;
+    };
+
+    const isExpiredLot = (expirationDateText) => {
+        if (!expirationDateText) return true;
+        const parts = String(expirationDateText).split('/');
+        if (parts.length !== 3) return true;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (!day || !month || !year) return true;
+        const parsed = new Date(year, month - 1, day);
+        if (isNaN(parsed.getTime())) return true;
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        return parsed < todayStart;
+    };
+
     const loadLots = async (locationId, productId) => {
         if (!lotSelect) return;
         lotSelect.innerHTML = '<option value="" selected disabled>Cargando lotes...</option>';
@@ -117,6 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (response.ok && result.success) {
                 currentLotsData = Array.isArray(result.lots) ? result.lots : [];
+                if (selectedTypeCode() === 'VENCIDO') {
+                    currentLotsData = currentLotsData.filter(l => isExpiredLot(l.expiration_date));
+                }
                 lotSelect.innerHTML = '';
 
                 if (currentLotsData.length === 0) {
@@ -158,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAddToList.disabled = false;
     };
 
-    // ====== INICIO: precargar si hay sede única ======
     if (isSingleLocation && currentLocationId()) {
         loadWasteTypes(currentLocationId());
         loadProducts(currentLocationId());
@@ -191,7 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
         lotSelect.addEventListener('change', updateQuantityConstraint);
     }
 
-    // ====== SUBIDA DE FOTO (dropzone, opcional, subida automática) ======
     const resetPhotoDropzone = () => {
         dropzone.classList.remove('d-none');
         photoPreviewWrap.classList.add('d-none');
@@ -228,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Mostrar vista previa inmediatamente
         dropzone.classList.add('d-none');
         photoPreviewWrap.classList.remove('d-none');
         photoPreview.src = URL.createObjectURL(file);
@@ -270,7 +311,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ====== CARRITO ======
     const renderCart = () => {
         cartBody.innerHTML = '';
         if (cartItems.length === 0) {
@@ -282,11 +322,11 @@ document.addEventListener('DOMContentLoaded', () => {
         cartItems.forEach((item, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="fw-bold text-dark small">${item.product_name}</td>
-                <td class="text-center text-danger fw-bold small">${item.quantity.toFixed(2)}</td>
-                <td class="text-center small"><span class="badge bg-light text-dark border font-monospace">${item.lot_number}</span></td>
-                <td class="text-center small text-muted">${item.expiration_date || '—'}</td>
-                <td class="text-center">
+                <td class="fw-bold text-dark small" data-label="Insumo">${item.product_name}</td>
+                <td class="text-center text-danger fw-bold small" data-label="Cant.">${item.quantity.toFixed(2)}</td>
+                <td class="text-center small" data-label="N° Lote"><span class="badge bg-light text-dark border font-monospace">${item.lot_number}</span></td>
+                <td class="text-center small text-muted" data-label="Vence">${item.expiration_date || '—'}</td>
+                <td class="text-center" data-label="Acción">
                     <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeMermaItem(${index})">
                         <i class="bi bi-trash"></i>
                     </button>
@@ -347,7 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCart();
     });
 
-    // ====== ENVÍO ======
     btnSubmitMerma.addEventListener('click', async () => {
         if (cartItems.length === 0) return;
 

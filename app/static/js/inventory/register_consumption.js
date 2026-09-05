@@ -211,11 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayLot = `⚡ ${item.nearest_lot}`;
             }
             tr.innerHTML = `
-                <td class="fw-bold text-dark small">${item.product_name}</td>
-                <td class="text-center text-danger fw-bold small">${item.quantity.toFixed(2)}</td>
-                <td class="text-center small"><span class="badge bg-light text-dark border font-monospace">${displayLot}</span></td>
-                <td class="small text-muted">${item.notes || '-'}</td>
-                <td class="text-center">
+                <td class="fw-bold text-dark small" data-label="Insumo">${item.product_name}</td>
+                <td class="text-center text-danger fw-bold small" data-label="Cant.">${item.quantity.toFixed(2)}</td>
+                <td class="text-center small" data-label="N° Lote"><span class="badge bg-light text-dark border font-monospace">${displayLot}</span></td>
+                <td class="small text-muted" data-label="Notas">${item.notes || '-'}</td>
+                <td class="text-center" data-label="Acción">
                     <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeItem(${index})">
                         <i class="bi bi-trash"></i>
                     </button>

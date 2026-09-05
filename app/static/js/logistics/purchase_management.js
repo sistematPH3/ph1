@@ -123,6 +123,12 @@ if (dateFilterInput) dateFilterInput.addEventListener('change', filterAndPaginat
 
 filterAndPaginate();
 
+function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+
 function loadCollapseDetails(purchaseId) {
     const tbodies = document.querySelectorAll(`.collapse-body-${purchaseId}`);
     if (tbodies.length === 0) return;
@@ -147,11 +153,11 @@ function loadCollapseDetails(purchaseId) {
                 const isMobile = tbody.closest('.mobile-purchase-card') !== null;
 
                 data.details.forEach(detail => {
-                    const subtotalBs = detail.quantity * detail.foreign_price * data.exchange_rate;
-                    const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                    const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                    const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${detail.expiration_date.split('-').reverse().join('/')}</span>` : `<span class="text-muted small">N/A</span>`;
-                    const lotBadge = `<span class="badge bg-light text-dark border font-monospace">${detail.lot_number || 'N/A'}</span>`;
+                    const formattedForeignPrice = Number(detail.foreign_price || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const formattedSubtotalBs = Number(detail.subtotal_bs || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${escapeHtml(detail.expiration_date.split('-').reverse().join('/'))}</span>` : `<span class="text-muted small">N/A</span>`;
+                    const lotBadge = `<span class="badge bg-light text-dark border font-monospace">${escapeHtml(detail.lot_number || 'N/A')}</span>`;
+                    const skuEscaped = escapeHtml(detail.product_sku);
                     
                     let rowHtml = "";
                     if (isMobile) {
@@ -159,19 +165,19 @@ function loadCollapseDetails(purchaseId) {
                             <tr>
                                 <td class="p-2">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span class="fw-bold text-dark small">${detail.product_sku}</span>
-                                        <span class="text-secondary small fw-bold">#${detail.id}</span>
+                                        <span class="fw-bold text-dark small">${skuEscaped}</span>
+                                        <span class="text-secondary small fw-bold">#${escapeHtml(detail.id)}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="small text-muted">Lote: ${lotBadge}</span>
-                                        <span class="small text-muted">Cant: <strong class="text-primary">${detail.quantity}</strong></span>
+                                        <span class="small text-muted">Cant: <strong class="text-primary">${escapeHtml(detail.quantity)}</strong></span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="small text-muted">Vence:</span>
                                         ${expDateBadge}
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mt-2 border-top pt-2">
-                                        <span class="text-success small fw-semibold">${data.currency} ${formattedForeignPrice}</span>
+                                        <span class="text-success small fw-semibold">${escapeHtml(data.currency)} ${formattedForeignPrice}</span>
                                         <span class="fw-bold text-dark small">Bs. ${formattedSubtotalBs}</span>
                                     </div>
                                 </td>
@@ -180,12 +186,12 @@ function loadCollapseDetails(purchaseId) {
                     } else {
                         rowHtml = `
                             <tr>
-                                <td class="text-secondary fw-bold">#${detail.id}</td>
-                                <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
-                                <td class="text-center fw-bold text-primary">${detail.quantity}</td>
+                                <td class="text-secondary fw-bold">#${escapeHtml(detail.id)}</td>
+                                <td><span class="badge bg-dark text-white">${skuEscaped}</span></td>
+                                <td class="text-center fw-bold text-primary">${escapeHtml(detail.quantity)}</td>
                                 <td class="text-center">${lotBadge}</td>
                                 <td class="text-center">${expDateBadge}</td>
-                                <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
+                                <td class="text-end text-success fw-semibold">${escapeHtml(data.currency)} ${formattedForeignPrice}</td>
                                 <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
                             </tr>
                         `;
@@ -196,7 +202,7 @@ function loadCollapseDetails(purchaseId) {
         })
         .catch(error => {
             tbodies.forEach(tbody => {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${escapeHtml(error.message)}</td></tr>`;
             });
         });
 }
@@ -240,7 +246,7 @@ const handleActionClick = function(e) {
         
         if (editErrorAlert) editErrorAlert.classList.add('d-none');
         if (editReasonInput) editReasonInput.value = '';
-        editTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
+        editTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
         modalEdit.show();
 
         fetch(`/logistics/purchases/management/${purchaseId}/details`)
@@ -253,7 +259,7 @@ const handleActionClick = function(e) {
                 currentCurrency = data.currency;
                 
                 if(data.details.length === 0) {
-                    editTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
+                    editTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
                     return;
                 }
                 data.details.forEach(item => {
@@ -261,31 +267,36 @@ const handleActionClick = function(e) {
                     tr.innerHTML = `
                         <td class="ps-3 pe-3">
                             <div class="text-end text-md-start">
-                                <span class="badge bg-secondary mb-1">${item.product_sku}</span><br>
-                                <small class="text-muted">Registro #${item.id}</small>
+                                <span class="badge bg-secondary mb-1">${escapeHtml(item.product_sku)}</span><br>
+                                <small class="text-muted">Registro #${escapeHtml(item.id)}</small>
                             </div>
                         </td>
                         <td class="text-center px-2">
-                            <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
+                            <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.quantity)}" min="0.01" step="0.01">
                         </td>
                         <td class="text-center px-2">
-                            <input type="text" class="form-control text-center edit-lot border-secondary text-dark px-1 font-monospace" data-id="${item.id}" value="${item.lot_number === 'N/A' ? '' : item.lot_number}" placeholder="Opcional">
+                            <input type="text" class="form-control text-center edit-lot border-secondary text-dark px-1 font-monospace" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.lot_number === 'N/A' ? '' : item.lot_number)}" placeholder="Opcional">
                         </td>
                         <td class="text-center px-2">
-                            <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${item.expiration_date || ''}">
+                            <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${escapeHtml(item.expiration_date || '')}">
                         </td>
                         <td class="text-center px-2">
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-secondary text-muted small px-1">${data.currency}</span>
-                                <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${item.id}" value="${item.foreign_price}" min="0" step="0.01">
+                                <span class="input-group-text bg-light border-secondary text-muted small px-1">${escapeHtml(data.currency)}</span>
+                                <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.foreign_price)}" min="0.01" step="0.01">
                             </div>
+                        </td>
+                        <td class="text-center px-1 align-middle">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-edit-row" data-id="${escapeHtml(item.id)}" title="Eliminar insumo">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </td>
                     `;
                     editTableBody.appendChild(tr);
                 });
             })
             .catch(err => {
-                editTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+                editTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
             });
     }
 };
@@ -312,7 +323,7 @@ if (btnAddRowEdit) {
                 </div>
             </td>
             <td class="text-center px-2">
-                <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" min="0" step="0.01">
+                <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" min="0.01" step="0.01">
             </td>
             <td class="text-center px-2">
                 <input type="text" class="form-control text-center edit-lot border-success text-dark px-1 font-monospace" data-id="new_${newRowCounter}" value="" placeholder="Opcional / Auto">
@@ -322,13 +333,27 @@ if (btnAddRowEdit) {
             </td>
             <td class="text-center px-2">
                 <div class="input-group">
-                    <span class="input-group-text bg-success-subtle border-success text-success small px-1">${currentCurrency}</span>
-                    <input type="number" class="form-control text-end edit-price border-success border-start-0 ps-0 text-dark" data-id="new_${newRowCounter}" value="0" min="0" step="0.01">
+                    <span class="input-group-text bg-success-subtle border-success text-success small px-1">${escapeHtml(currentCurrency)}</span>
+                    <input type="number" class="form-control text-end edit-price border-success border-start-0 ps-0 text-dark" data-id="new_${newRowCounter}" value="" placeholder="0.01" min="0.01" step="0.01">
                 </div>
+            </td>
+            <td class="text-center px-1 align-middle">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-edit-row" title="Quitar fila">
+                    <i class="bi bi-trash"></i>
+                </button>
             </td>
         `;
         if (editTableBody) editTableBody.appendChild(tr);
         newRowCounter++;
+    });
+}
+
+if (editTableBody) {
+    editTableBody.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-edit-row');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (row) row.remove();
     });
 }
 
@@ -361,22 +386,34 @@ if (btnSaveEdit) {
                 const qtyVal = parseFloat(qtyInput.value);
                 const priceVal = parseFloat(priceInput.value);
                 const lotVal = lotInput ? lotInput.value.trim() : "";
-                
+
+                let qtyValid = qtyInput.value !== '' && !isNaN(qtyVal) && qtyVal >= 0.01 && qtyVal <= 999999.99;
+                let priceValid = priceInput.value !== '' && !isNaN(priceVal) && priceVal >= 0.01 && priceVal <= 999999.99;
+                if (!qtyValid) qtyInput.classList.add('is-invalid');
+                else qtyInput.classList.remove('is-invalid');
+                if (!priceValid) priceInput.classList.add('is-invalid');
+                else priceInput.classList.remove('is-invalid');
+
+                let prodValid = true;
                 if (rowId.startsWith('new_')) {
-                    if (!prodSelect || !prodSelect.value) {
-                        formValid = false;
-                        prodSelect.classList.add('is-invalid');
-                    } else {
-                        prodSelect.classList.remove('is-invalid');
-                        items.push({
-                            id: rowId,
-                            product_id: parseInt(prodSelect.value),
-                            quantity: qtyVal,
-                            foreign_price: priceVal,
-                            expiration_date: expInput ? expInput.value : "",
-                            lot_number: lotVal
-                        });
-                    }
+                    prodValid = !!(prodSelect && prodSelect.value);
+                    if (!prodValid) prodSelect.classList.add('is-invalid');
+                    else prodSelect.classList.remove('is-invalid');
+                }
+                if (!qtyValid || !priceValid || !prodValid) {
+                    formValid = false;
+                    return;
+                }
+
+                if (rowId.startsWith('new_')) {
+                    items.push({
+                        id: rowId,
+                        product_id: parseInt(prodSelect.value),
+                        quantity: qtyVal,
+                        foreign_price: priceVal,
+                        expiration_date: expInput ? expInput.value : "",
+                        lot_number: lotVal
+                    });
                 } else {
                     items.push({
                         id: rowId,
@@ -391,7 +428,7 @@ if (btnSaveEdit) {
 
         if (!formValid) {
             if (editErrorAlert) {
-                editErrorAlert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Debe seleccionar un producto para los nuevos insumos.';
+                editErrorAlert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Corrige los campos marcados: la cantidad y el precio deben ser mayor o igual a 0.01, y los nuevos insumos deben tener un producto seleccionado.';
                 editErrorAlert.classList.remove('d-none');
             }
             return;

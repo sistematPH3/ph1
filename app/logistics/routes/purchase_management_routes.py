@@ -1,11 +1,14 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import current_user
+from sqlalchemy import func
+from decimal import ROUND_HALF_UP, Decimal
 from app.extensions import db
 from app.models import Supplier  
 from app.models.inventory_model import Product
 from app.logistics.repositories.purchase_management_repository import PurchaseManagementRepository
 from app.logistics.services.purchase_management_service import PurchaseManagementService
 from app.logistics.requests.purchase_management_request import PurchaseManagementFilterRequest
+from app.logistics.requests.purchase_validators import PurchaseValidator
 from app.decorators.roles import require_roles
 
 purchase_management_bp = Blueprint('purchase_management', __name__)
@@ -14,6 +17,9 @@ filter_request_validator = PurchaseManagementFilterRequest()
 def get_management_service():
     repository = PurchaseManagementRepository(db)
     return PurchaseManagementService(repository)
+
+ACTIVE_SUPPLIER_STATUSES = ('ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA')
+
 
 @purchase_management_bp.route('/purchases/management', methods=['GET'], strict_slashes=False)
 @require_roles('admin', 'management', 'manager')
@@ -30,7 +36,9 @@ def index():
         
         validated_data = filter_request_validator.load(params)
         
-        suppliers = Supplier.query.filter_by(status='Active').order_by(Supplier.name.asc()).all()
+        suppliers = Supplier.query.filter(
+            func.upper(Supplier.status).in_(ACTIVE_SUPPLIER_STATUSES)
+        ).order_by(Supplier.name.asc()).all()
         products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
         
         purchases = service.get_formatted_history(
@@ -74,11 +82,18 @@ def get_details(purchase_id):
             product_sku = row[1]
             requires_manual_date = row[-1] 
             
+            price = Decimal(str(d.foreign_price)) if d.foreign_price is not None else Decimal('0.00')
+            rate = Decimal(str(purchase.exchange_rate)) if purchase.exchange_rate is not None else Decimal('1.00')
+            subtotal_bs = (Decimal(str(d.quantity)) * price * rate).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
+
             details_list.append({
                 "id": d.id,
                 "product_sku": product_sku if product_sku else "(Sin SKU)",
                 "quantity": float(d.quantity),
-                "foreign_price": float(d.foreign_price) if d.foreign_price is not None else 0.0,
+                "foreign_price": float(price),
+                "subtotal_bs": float(subtotal_bs),
                 "price_bs": float(d.price_bs) if d.price_bs is not None else 0.0,
                 "expiration_date": d.expiration_date.strftime('%Y-%m-%d') if getattr(d, 'expiration_date', None) else "",
                 "lot_number": d.lot_number if getattr(d, 'lot_number', None) else "N/A",
@@ -130,7 +145,11 @@ def edit_purchase(purchase_id):
         reason = data.get('reason')
         if not reason or len(reason.strip()) < 5:
             return jsonify({"success": False, "error": "Debe proporcionar un motivo válido para justificar la edición."}), 400
-            
+
+        item_errors = PurchaseValidator.validate_edit_items(data['items'])
+        if item_errors:
+            return jsonify({"success": False, "error": "Datos inválidos", "details": item_errors}), 400
+
         success = service.process_edit(purchase_id, current_user, data['items'], reason.strip())
         
         if success:

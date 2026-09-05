@@ -1,0 +1,277 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_edit.css') }}?v=12">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 py-md-4 px-2 px-md-4 notranslate" translate="no">
+    <div id="editAlerts" class="edit-alerts"></div>
+
+    <input type="hidden" id="wasteId" value="{{ waste.id }}">
+    <input type="hidden" id="wasteStatus" value="{{ waste.status }}">
+
+    <div class="ph-top-card shadow-sm mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="ph-top-icon">
+                    <i class="bi bi-pencil-square"></i>
+                </div>
+                <div>
+                    <h2 class="ph-top-title mb-1">
+                        {% if waste.can_edit %}
+                            Modificar Merma Pendiente #{{ waste.id }}
+                        {% else %}
+                            Expediente de Merma #{{ waste.id }}
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted small mb-0">Control y trazabilidad de eventos de merma.</p>
+                </div>
+            </div>
+            <div>
+                <a href="/waste/merma/pending" class="btn btn-ph-back">
+                    <i class="bi bi-arrow-left me-1"></i>Volver a Pendientes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <div class="ph-main-card shadow-sm">
+                <div class="d-flex justify-content-between align-items-center pb-3 mb-4 border-bottom flex-wrap gap-2">
+                    <h3 class="ph-card-title mb-0">Información General</h3>
+                    <span class="badge ph-badge-state status-{{ waste.status | lower }}">
+                        {{ waste.status }}
+                    </span>
+                </div>
+
+                <div class="ph-info-grid mb-4">
+                    <div class="ph-info-col">
+                        <span class="ph-label-sub">Sede</span>
+                        <span class="ph-val-main">{{ waste.location_name }}</span>
+                    </div>
+                    <div class="ph-info-col">
+                        <span class="ph-label-sub">Fecha de Reporte</span>
+                        <span class="ph-val-main">{{ waste.date }}</span>
+                    </div>
+                    <div class="ph-info-col">
+                        <span class="ph-label-sub">Registrado por</span>
+                        <span class="ph-val-main">{{ waste.author_name }}</span>
+                    </div>
+                </div>
+
+                {% if waste.can_edit %}
+                <form id="wasteEditForm">
+                    <div class="mb-3">
+                        <label for="wasteTypeSelect" class="form-label ph-input-label">Tipo de Merma <span class="text-danger">*</span></label>
+                        <select class="form-select ph-select-ctrl" id="wasteTypeSelect" required>
+                            {% for wt in waste.waste_types %}
+                            <option value="{{ wt.id }}" {% if wt.id == waste.waste_type_id %}selected{% endif %}>
+                                {{ wt.name }} (Gravedad: {{ wt.severity }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="wasteNotesInput" class="form-label ph-input-label">Motivo / Observaciones</label>
+                        <textarea class="form-control ph-textarea-ctrl" id="wasteNotesInput" rows="3" placeholder="Indique las observaciones correspondientes...">{{ waste.notes }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <span class="ph-section-title">Detalle de Productos y Lotes</span>
+                        <span class="text-muted small">Ajuste el lote y la cantidad dentro del saldo disponible.</span>
+                    </div>
+
+                    <div class="ph-table-box mb-4">
+                        <table class="table ph-custom-grid align-middle" id="editLinesTable">
+                            <thead>
+                                <tr>
+                                    <th class="th-prod">PRODUCTO</th>
+                                    <th class="th-lote"><i class="bi bi-pencil-square me-1"></i>LOTE (EDITABLE)</th>
+                                    <th class="th-venc">VENCIMIENTO</th>
+                                    <th class="th-cant"><i class="bi bi-pencil-square me-1"></i>CANTIDAD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line in waste.lines %}
+                                <tr class="line-row"
+                                    data-product-id="{{ line.product_id }}"
+                                    data-lot="{{ line.lot_number }}"
+                                    data-exp="{{ line.expiration_date }}"
+                                    data-max-stock="{{ line.current_max_stock }}"
+                                    data-unit-cost="{{ line.unit_cost }}">
+                                    <td class="td-prod" data-label="Producto">
+                                        <div class="fw-bold text-dark mb-1">{{ line.product_name }}</div>
+                                        <span class="badge ph-tag-sku">{{ line.sku }}</span>
+                                    </td>
+                                    <td class="td-lote" data-label="Lote (Editable)">
+                                        <div class="ph-lot-select-wrapper">
+                                            <select class="form-select ph-select-lot" required>
+                                                {% for lot in line.available_lots %}
+                                                <option value="{{ lot.lot_number }}"
+                                                        data-exp="{{ lot.expiration_date or '' }}"
+                                                        data-stock="{{ lot.stock }}"
+                                                        {% if lot.lot_number == line.lot_number %}selected{% endif %}>
+                                                    {{ lot.lot_number }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td class="td-venc" data-label="Vencimiento">
+                                        <span class="line-exp-display ph-exp-date">
+                                            {{ line.expiration_date if line.expiration_date else 'N/A' }}
+                                        </span>
+                                    </td>
+                                    <td class="td-cant" data-label="Cantidad">
+                                        <div class="ph-qty-block">
+                                            <div class="input-group input-group-sm ph-qty-wrapper">
+                                                <input type="number" step="0.01" min="0.01" max="{{ line.current_max_stock }}" class="form-control text-center fw-bold line-qty" value="{{ line.quantity }}" required>
+                                                <span class="input-group-text ph-qty-addon">{{ line.unit }}</span>
+                                            </div>
+                                            <span class="ph-stock-hint">Máximo en lote: <strong class="lot-stock-val">{{ line.current_max_stock }}</strong> {{ line.unit }}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end pt-2">
+                        <button type="button" class="btn btn-ph-save" id="btnSaveEdit">
+                            <i class="bi bi-check2-circle me-1"></i>Guardar Modificaciones
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="mb-3">
+                    <span class="ph-input-label d-block mb-1">Tipo de Merma</span>
+                    <span class="fw-bold text-dark fs-6">{{ waste.waste_type_name }}</span>
+                </div>
+
+                <div class="mb-4">
+                    <span class="ph-input-label d-block mb-1">Motivo / Observaciones</span>
+                    <div class="ph-readonly-box">{{ waste.notes if waste.notes else 'Sin observaciones registradas.' }}</div>
+                </div>
+
+                <div class="ph-table-box mb-4">
+                    <table class="table ph-custom-grid align-middle">
+                        <thead>
+                            <tr>
+                                <th class="th-prod">PRODUCTO</th>
+                                <th class="th-lote">LOTE</th>
+                                <th class="th-venc">VENCIMIENTO</th>
+                                <th class="th-cant">CANTIDAD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in waste.lines %}
+                            <tr>
+                                <td class="td-prod" data-label="Producto">
+                                    <div class="fw-bold text-dark mb-1">{{ line.product_name }}</div>
+                                    <span class="badge ph-tag-sku">{{ line.sku }}</span>
+                                </td>
+                                <td class="td-lote" data-label="Lote">
+                                    <span class="ph-badge-lot-static">{{ line.lot_number }}</span>
+                                </td>
+                                <td class="td-venc" data-label="Vencimiento">
+                                    <span class="ph-exp-date">{{ line.expiration_date if line.expiration_date else 'N/A' }}</span>
+                                </td>
+                                <td class="td-cant" data-label="Cantidad">
+                                    <span class="fw-bold text-danger">{{ line.quantity }} {{ line.unit }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="ph-main-card shadow-sm mb-4">
+                <div class="pb-2 mb-3 border-bottom">
+                    <h3 class="ph-card-title mb-0">Evidencia Fotográfica</h3>
+                </div>
+
+                <div class="text-center">
+                    {% if waste.evidence_url %}
+                    <div class="ph-image-holder" onclick="window.open('{{ waste.evidence_url }}', '_blank')">
+                        <img src="{{ waste.evidence_url }}" alt="Evidencia de Merma" class="img-fluid">
+                    </div>
+                    <p class="small text-muted mt-2 mb-0"><i class="bi bi-zoom-in me-1"></i>Click para ver en tamaño completo.</p>
+                    {% else %}
+                    <div class="ph-no-image-box">
+                        <i class="bi bi-camera-off fs-1 d-block mb-2 text-secondary"></i>
+                        <p class="mb-0 small text-muted">No se adjuntó imagen en este registro.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if waste.can_revert %}
+            <div class="ph-main-card shadow-sm ph-revert-border">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="ph-revert-badge-icon me-3 shadow-sm">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </div>
+                    <div>
+                        <span class="fw-bold text-danger fs-6 d-block">Reversión de Merma</span>
+                        <span class="text-muted small">Exclusivo Administradores</span>
+                    </div>
+                </div>
+                <p class="small text-muted mb-3">
+                    Esta merma ya descontó inventario. Al revertirla, el stock volverá a la sede y el registro quedará catalogado como <strong>REVERTIDO</strong>.
+                </p>
+                <button type="button" class="btn btn-ph-revert-btn w-100" id="btnOpenRevertModal">
+                    <i class="bi bi-shield-x me-1"></i>Revertir Merma Aprobada
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="revertModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content ph-modal-surface shadow border-0">
+            <div class="modal-header ph-modal-header-red text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon me-2"></i>Confirmar Reversión</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-danger border-0 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>Atención:</strong> Esta operación restituirá las cantidades descontadas al inventario de la sede <strong>{{ waste.location_name }}</strong>.
+                </div>
+                <div class="mb-3">
+                    <label for="revertReasonInput" class="form-label small fw-bold text-muted">
+                        Motivo de Anulación (Mínimo 15 caracteres) <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control ph-textarea-ctrl" id="revertReasonInput" rows="3" placeholder="Explique explícitamente el motivo por el cual se devuelve el inventario..."></textarea>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted small" id="revertCharCount">0 / 15 caracteres mínimos</span>
+                        <span class="text-danger small" id="revertReasonError" style="display:none;"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger rounded-pill px-4" id="btnConfirmRevert" disabled>
+                    <i class="bi bi-check2-circle me-1"></i>Confirmar y Restituir Stock
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/waste/waste_edit.js') }}?v=12"></script>
+{% endblock %}

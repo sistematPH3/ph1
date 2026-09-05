@@ -1,5 +1,10 @@
 let productOptionsHtml = '';
 
+function parseNum(value) {
+    if (typeof value !== 'string' && typeof value !== 'number') return NaN;
+    return parseFloat(String(value).trim().replace(',', '.'));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const productsCard = document.getElementById('productsCard');
     const invoiceCard = document.getElementById('invoiceCard');
@@ -102,11 +107,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshRateBtn.addEventListener('click', fetchExchangeRate);
 
+    const manualRateBtn = document.getElementById('manualRateBtn');
+    if (manualRateBtn) {
+        manualRateBtn.addEventListener('click', () => {
+            rateInput.removeAttribute('readonly');
+            rateInput.classList.replace('text-muted', 'text-dark');
+            rateInput.focus();
+        });
+    }
+
     rateInput.addEventListener('input', () => {
-        if (rateInput.value.length > 10) {
-            rateInput.value = rateInput.value.slice(0, 10);
+        const rateVal = parseNum(rateInput.value);
+        if (rateVal > 999999.99) {
+            rateInput.value = '999999.99';
+        }
+        if (rateInput.value.length > 12) {
+            rateInput.value = rateInput.value.slice(0, 12);
         }
         saveDraft();
+        updateSummary();
     });
 
     document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
@@ -330,20 +349,18 @@ function attachRowValidationListeners(row) {
 
     if (prodQty) {
         prodQty.addEventListener('input', () => {
-            if (prodQty.value.length > 8) {
-                prodQty.value = prodQty.value.slice(0, 8);
-            }
-            const val = parseFloat(prodQty.value);
+            const val = parseNum(prodQty.value);
             if (!prodQty.value || isNaN(val)) {
                 setFieldError(prodQty, 'La cantidad es obligatoria.');
-            } else if (val <= 0) {
-                setFieldError(prodQty, 'Debe ser mayor a 0.');
+            } else if (val < 0.01) {
+                setFieldError(prodQty, 'Debe ser mayor o igual a 0.01.');
             } else if (val > 999999.99) {
-                setFieldError(prodQty, 'Máximo 999,999.99');
+                setFieldError(prodQty, 'Máximo 999.999,99');
             } else {
                 clearFieldError(prodQty);
             }
             saveDraft();
+            updateSummary();
         });
     }
 
@@ -363,14 +380,11 @@ function attachRowValidationListeners(row) {
 
     if (prodPrice) {
         prodPrice.addEventListener('input', () => {
-            if (prodPrice.value.length > 8) {
-                prodPrice.value = prodPrice.value.slice(0, 8);
-            }
             const val = parseFloat(prodPrice.value);
             if (!prodPrice.value || isNaN(val)) {
                 setFieldError(prodPrice, 'El precio es obligatorio.');
-            } else if (val <= 0) {
-                setFieldError(prodPrice, 'Debe ser mayor a 0.');
+            } else if (val < 0.01) {
+                setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.');
             } else if (val > 999999.99) {
                 setFieldError(prodPrice, 'Máximo 999,999.99');
             } else {
@@ -398,7 +412,7 @@ function createProductRowElement() {
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
+                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" required>
                 </div>
             </div>
         </td>
@@ -420,7 +434,7 @@ function createProductRowElement() {
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
                     <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
+                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="0.00" required>
                 </div>
             </div>
         </td>
@@ -455,9 +469,12 @@ function validateFormBeforeSubmit() {
     if (!currency.value) { setFieldError(currency, 'Debes seleccionar una moneda.'); isValid = false; }
     
     const rateVal = parseFloat(exchangeRate.value);
-    if (!exchangeRate.value || isNaN(rateVal) || rateVal <= 0) { 
-        setFieldError(exchangeRate, 'La tasa de cambio debe ser un número mayor a cero.'); 
+    if (!exchangeRate.value || isNaN(rateVal) || rateVal < 0.01) { 
+        setFieldError(exchangeRate, 'La tasa de cambio debe ser un número mayor o igual a 0.01.'); 
         isValid = false; 
+    } else if (rateVal > 999999.99) {
+        setFieldError(exchangeRate, 'La tasa máxima permitida es 999,999.99.');
+        isValid = false;
     }
 
     if (!invoicePhoto.files || invoicePhoto.files.length === 0) {
@@ -494,8 +511,8 @@ function validateFormBeforeSubmit() {
         if (!prodQty.value || isNaN(qtyVal)) { 
             setFieldError(prodQty, 'La cantidad es obligatoria.'); 
             isValid = false; 
-        } else if (qtyVal <= 0) { 
-            setFieldError(prodQty, 'Debe ser mayor a 0.'); 
+        } else if (qtyVal < 0.01) { 
+            setFieldError(prodQty, 'Debe ser mayor o igual a 0.01.'); 
             isValid = false; 
         } else if (qtyVal > 999999.99) {
             setFieldError(prodQty, 'Máximo 999,999.99');
@@ -506,8 +523,8 @@ function validateFormBeforeSubmit() {
         if (!prodPrice.value || isNaN(priceVal)) { 
             setFieldError(prodPrice, 'El precio es obligatorio.'); 
             isValid = false; 
-        } else if (priceVal <= 0) { 
-            setFieldError(prodPrice, 'Debe ser mayor a 0.'); 
+        } else if (priceVal < 0.01) { 
+            setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.'); 
             isValid = false; 
         } else if (priceVal > 999999.99) {
             setFieldError(prodPrice, 'Máximo 999,999.99');

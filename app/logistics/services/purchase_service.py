@@ -87,20 +87,18 @@ class PurchaseService:
                     "lot_number": lot_number
                 })
 
-                # Búsqueda o creación de inventario asegurando min_stock = 20 y transit = 0
+                # Búsqueda o creación de inventario (min_stock lo define la
+                # configuración previa; aquí NO se fuerza ningún valor).
                 inventory_record = db.session.query(Inventory).filter_by(
                     location_id=1, 
                     product_id=product_id
                 ).first()
                 
                 if inventory_record:
-                    prev_qty = float(inventory_record.current_quantity)
-                    inventory_record.current_quantity = Decimal(str(inventory_record.current_quantity)) + quantity
-                    # Aseguramos que no tenga min_stock en 0 si era un registro previo dañado
-                    if inventory_record.min_stock == Decimal('0.00') or inventory_record.min_stock is None:
-                        inventory_record.min_stock = Decimal('20.00')
+                    prev_qty = Decimal(str(inventory_record.current_quantity))
+                    inventory_record.current_quantity = prev_qty + quantity
                 else:
-                    prev_qty = 0.0
+                    prev_qty = Decimal('0.00')
                     new_inv = Inventory(
                         location_id=1, 
                         product_id=product_id, 
@@ -110,7 +108,7 @@ class PurchaseService:
                     )
                     db.session.add(new_inv)
 
-                new_qty = prev_qty + float(quantity)
+                new_qty = prev_qty + quantity
 
                 changed_data = {
                     "location_id": 1,
@@ -118,13 +116,13 @@ class PurchaseService:
                     "product_id": product_id,
                     "product_name": prod_name,
                     "lot_number": lot_number,
-                    "previous_quantity": prev_qty,
-                    "new_quantity": new_qty,
+                    "previous_quantity": float(prev_qty),
+                    "new_quantity": float(new_qty),
                     "quantity_changed": float(quantity),
                     "notes": f"Ingreso por compra a proveedor (Lote: {lot_number})"
                 }
                 
-                severity = 'REABASTECIDO' if prev_qty <= 20 and new_qty > 20 else 'NORMAL'
+                severity = 'REABASTECIDO' if prev_qty <= Decimal('20.00') and new_qty > Decimal('20.00') else 'NORMAL'
                 
                 db.session.execute(text("""
                     INSERT INTO audit_logs (user_id, action, severity, location_id, changed_data, timestamp)

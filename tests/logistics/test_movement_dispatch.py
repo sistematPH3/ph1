@@ -221,8 +221,6 @@ class MovementDispatchTest(unittest.TestCase):
         db.session.rollback()
 
     # =========================================================================
-<<<<<<< HEAD
-=======
     # CASO 4: EL SELECTOR DE LOTES DEL CENTRAL CUENTA LOS RETORNOS RECIBIDOS
     # El formulario de despacho (get_product_lots_available) mostraba de menos
     # las devoluciones que volvieron al Almacén Central (ej. 1750 en vez de
@@ -260,7 +258,6 @@ class MovementDispatchTest(unittest.TestCase):
         self.assertEqual(float(lots[0]["available_quantity"]), 130.00)
 
     # =========================================================================
->>>>>>> 495e2530a11bb74fff6c73f51d9af14a4305121c
     # CASO 3: EXCEDER EL SALDO NETO DEL LOTE -> rechazado aunque el global alcance
     # =========================================================================
     def test_exceso_sobre_saldo_del_lote_rechazado(self):

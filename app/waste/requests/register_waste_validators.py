@@ -1,3 +1,5 @@
+import math
+
 def validate_register_waste_payload(data):
     errors = {}
 
@@ -17,7 +19,8 @@ def validate_register_waste_payload(data):
         errors['items'] = 'Debe agregar al menos un producto a la merma.'
     else:
         for idx, item in enumerate(data['items']):
-            if 'product_id' not in item or not isinstance(item['product_id'], int) or item['product_id'] <= 0:
+            if ('product_id' not in item or isinstance(item['product_id'], bool)
+                    or not isinstance(item['product_id'], int) or item['product_id'] <= 0):
                 errors[f'item_{idx}_product_id'] = 'Producto inválido.'
 
             if 'lot_number' not in item or not item['lot_number'] or not isinstance(item['lot_number'], str):
@@ -25,7 +28,12 @@ def validate_register_waste_payload(data):
             elif len(item['lot_number'].strip()) > 50:
                 errors[f'item_{idx}_lot_number'] = 'El lote no puede exceder los 50 caracteres.'
 
-            if 'quantity' not in item or not isinstance(item['quantity'], (int, float)) or item['quantity'] <= 0:
+            quantity = item.get('quantity')
+            if ('quantity' not in item or isinstance(quantity, bool)
+                    or not isinstance(quantity, (int, float))
+                    or (isinstance(quantity, float) and not math.isfinite(quantity))):
+                errors[f'item_{idx}_quantity'] = 'Cantidad inválida (debe ser mayor a 0).'
+            elif quantity <= 0:
                 errors[f'item_{idx}_quantity'] = 'Cantidad inválida (debe ser mayor a 0).'
 
     notes = data.get('notes')
