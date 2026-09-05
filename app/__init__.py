@@ -163,6 +163,10 @@ def create_app():
         from app.logistics.routes.movement_audit_routes import logistics_audit_bp
         app.register_blueprint(logistics_audit_bp)
 
+        # --- REGISTRO DE CONFIGURACIÓN DE MERMAS ---
+        from app.waste.routes.waste_config_routes import waste_config_bp
+        app.register_blueprint(waste_config_bp)
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model

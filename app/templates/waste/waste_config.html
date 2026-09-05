@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_config.css') }}?v=11">
+{% endblock %}
+
+{% block content %}
+<div class="register-wrapper">
+  <div class="form-card-premium">
+    
+    <h2>Reglas y Parámetros Globales</h2>
+    <p class="subtitle-custom text-center mb-4 text-muted">Configure las tolerancias y estimaciones aplicadas a nivel global en el sistema.</p>
+
+    <form id="form-waste-config">
+      
+      <div class="config-card-custom mb-4 p-3 rounded-4">
+        <label class="field-label-custom d-block mb-1" for="WASTE_TIME_TOLERANCE">Tolerancia de Exceso en Mermas</label>
+        <p class="field-desc-custom mb-3 text-muted">Porcentaje adicional permitido sobre el límite esperado antes de requerir autorización.</p>
+        
+        <div class="d-flex justify-content-end align-items-center mb-2">
+          <div class="d-flex align-items-center gap-1">
+            <button type="button" class="btn btn-step-custom" id="btn-decrement-tolerance">-</button>
+            
+            <!-- AQUÍ ESTÁ EL CAMBIO (min="1.00" max="3.00") -->
+            <input type="number" 
+                   class="form-control text-center custom-input-box" 
+                   id="WASTE_TIME_TOLERANCE" 
+                   name="WASTE_TIME_TOLERANCE" 
+                   step="0.01" 
+                   min="1.00" 
+                   max="3.00"
+                   value="{{ '%.2f'|format(configs.WASTE_TIME_TOLERANCE|float if configs.WASTE_TIME_TOLERANCE else 1.50) }}" 
+                   style="width: 80px;">
+                   
+            <button type="button" class="btn btn-step-custom" id="btn-increment-tolerance">+</button>
+          </div>
+        </div>
+
+        <div class="mb-3 px-1">
+          <input type="range" 
+                 class="custom-slider-red w-100" 
+                 id="slider-tolerance" 
+                 min="1.00" 
+                 max="3.00" 
+                 step="0.01" 
+                 value="{{ '%.2f'|format(configs.WASTE_TIME_TOLERANCE|float if configs.WASTE_TIME_TOLERANCE else 1.50) }}">
+        </div>
+
+        <div class="simulation-box p-3 rounded-3 bg-white border border-light-subtle">
+          <small class="d-block font-weight-bold text-danger mb-1 fw-bold">SIMULACIÓN EN VIVO</small>
+          <small class="text-secondary d-block">
+            Si la merma esperada es <strong>10 kg</strong>, con tu ajuste del <strong id="preview-percent-val">+50%</strong>, el sistema aprobará hasta <strong id="preview-result-val">15.0 kg</strong> automáticamente.
+          </small>
+        </div>
+      </div>
+
+      <div class="config-card-custom mb-4 p-3 rounded-4">
+        <label class="field-label-custom d-block mb-1" for="WASTE_BASE_PERIOD_DAYS">Período Base de Estimación</label>
+        <p class="field-desc-custom mb-3 text-muted">Días por defecto asignados a sedes o locales nuevos sin histórico de registros.</p>
+        
+        <div class="d-flex justify-content-end align-items-center mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <input type="number" 
+                   class="form-control text-center custom-input-box" 
+                   id="WASTE_BASE_PERIOD_DAYS" 
+                   name="WASTE_BASE_PERIOD_DAYS" 
+                   step="1" 
+                   min="1" 
+                   max="90" 
+                   value="{{ (configs.WASTE_BASE_PERIOD_DAYS | int) if configs.WASTE_BASE_PERIOD_DAYS else 7 }}" 
+                   style="width: 80px;">
+            <span class="field-label-custom text-muted">días</span>
+          </div>
+        </div>
+
+        <div class="mb-3 px-1">
+          <input type="range" 
+                 class="custom-slider-red w-100" 
+                 id="slider-days" 
+                 min="1" 
+                 max="90" 
+                 step="1" 
+                 value="{{ (configs.WASTE_BASE_PERIOD_DAYS | int) if configs.WASTE_BASE_PERIOD_DAYS else 7 }}">
+        </div>
+
+        <div class="simulation-box p-3 rounded-3 bg-white border border-light-subtle">
+          <small class="d-block font-weight-bold text-danger mb-1 fw-bold">IMPACTO EN EL SISTEMA</small>
+          <small class="text-secondary d-block">
+            Las nuevas sedes calcularán sus mermas estimadas promediando los registros de sus primeros <strong id="preview-days-val">7</strong> días de operaciones.
+          </small>
+        </div>
+      </div>
+
+      <div class="form-actions-premium">
+        <a href="/" class="btn-premium btn-premium-secondary">Cancelar</a>
+        <button type="submit" class="btn-premium btn-premium-primary" id="btn-save-config">
+          Guardar Cambios
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<div id="success-modal" class="custom-modal">
+  <div class="custom-modal-content">
+    <div class="success-icon-wrapper">
+      <div class="success-checkmark animate-check">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+    </div>
+    <h3>¡Parámetros Guardados!</h3>
+    <p>Las reglas y estimaciones globales se han actualizado con éxito en el sistema.</p>
+    <button type="button" class="btn-premium btn-premium-primary w-100" id="btn-modal-accept">Aceptar</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/waste/waste_config.js') }}?v=11"></script>
+{% endblock %}
