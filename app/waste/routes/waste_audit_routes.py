@@ -241,9 +241,6 @@ def revertir_merma_api(log_id):
             changed_data=new_changed_data
         )
 
-        # 6. Actualizar el estado del evento original
-        original_data['estado'] = 'REVERTIDO'
-        original_log.changed_data = make_json_safe(original_data)
 
         db.session.add(reversion_audit)
         db.session.commit()
