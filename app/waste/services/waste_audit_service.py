@@ -27,7 +27,7 @@ class WasteAuditService:
             severity=filters.get('severity')
         )
         
-        # 1. ORDENAMIENTO CRONOLÓGICO: Forzar que las mermas más recientes (mayor ID) vayan primero
+        # Ordenamiento cronológico (más recientes primero)
         try:
             logs = sorted(logs, key=lambda x: getattr(x, 'id', 0) or 0, reverse=True)
         except Exception:
@@ -61,6 +61,15 @@ class WasteAuditService:
             except Exception:
                 return None
 
+        # Acciones para mapear cada evento
+        REVERT_ACTIONS = {'REVERSION', 'REVERTIDO', 'REVERTIDA', 'ANULACION', 'ANULADO', 'REVERTIR', 'REVERT', 'CANCELADO', 'CANCELAR'}
+        REJECT_ACTIONS = {'RECHAZO', 'RECHAZADO', 'RECHAZADA', 'RECHAZAR', 'REJECT', 'REJECTED'}
+        APPROVE_ACTIONS = {'APROBACION', 'APROBADO', 'APROBADA', 'APROBAR', 'APPROVE', 'APPROVED'}
+        PENDING_ACTIONS = {
+            'CREACION', 'CREAR', 'CREADO', 'NUEVO', 'REGISTRO', 'REGISTRADO', 'CREATE', 'INSERT',
+            'EDICION', 'EDITADO', 'EDITADA', 'CORRECCION', 'CORREGIDO', 'EDIT', 'UPDATE', 'ACTUALIZADO', 'ACTUALIZACION', 'PENDIENTE'
+        }
+
         formatted_logs = []
         for log in logs:
             raw_data = log.changed_data or {}
@@ -85,6 +94,7 @@ class WasteAuditService:
                     changed_data.get('user') or 
                     changed_data.get('autor') or 
                     changed_data.get('aprobado_por') or 
+                    changed_data.get('rechazado_por') or
                     'Sistema'
                 )
 
@@ -186,7 +196,7 @@ class WasteAuditService:
                     p_cant = changed_data.get('cantidad') or changed_data.get('quantity') or changed_data.get('total_quantity') or 1
                     normalized_products.append({'producto': str(p_name), 'lote': str(p_lote), 'cantidad': p_cant})
 
-            # 2. MOTIVO DE REGISTRO: Detección ampliada de claves
+            # Motivo de Registro
             motivo = (
                 changed_data.get('motivo_registro') or 
                 changed_data.get('motivo') or 
@@ -201,7 +211,7 @@ class WasteAuditService:
                 changed_data.get('comments')
             )
 
-            # 3. EVIDENCIA FOTOGRÁFICA: Detección ampliada de claves
+            # Evidencia Fotográfica
             foto_url = (
                 changed_data.get('foto_evidencia_url') or 
                 changed_data.get('evidence_url') or 
@@ -213,19 +223,17 @@ class WasteAuditService:
                 changed_data.get('file_path')
             )
 
-            # Consulta directa al modelo Waste si faltan datos en el JSON
-            # Consulta directa al modelo Waste si faltan datos en el JSON
+            # Verificar si la merma matriz ya está revertida en la base de datos
             merma_id = changed_data.get('merma_id') or changed_data.get('waste_id') or changed_data.get('original_audit_id')
+            is_reverted_in_db = False
+            
             if merma_id:
                 try:
                     waste_obj = Waste.query.get(int(merma_id))
                     if waste_obj:
-                        # ==================== AGREGAR AQUÍ ====================
-                        # Sincronizar el estado real de la base de datos
-                        if hasattr(waste_obj, 'status') and waste_obj.status:
-                            if not changed_data.get('status') and not changed_data.get('estado'):
-                                changed_data['status'] = waste_obj.status
-                        # =======================================================
+                        st_obj = str(getattr(waste_obj, 'status', '')).upper().strip()
+                        if st_obj in ['REVERTIDO', 'REVERTIDA', 'ANULADO', 'CANCELADO']:
+                            is_reverted_in_db = True
 
                         if (not tipo_merma or tipo_merma == 'No especificado') and hasattr(waste_obj, 'waste_type_id') and waste_obj.waste_type_id:
                             tipo_merma = resolve_waste_type_name(waste_obj.waste_type_id)
@@ -257,13 +265,61 @@ class WasteAuditService:
                 except Exception:
                     pass
 
+            # EVALUACIÓN DEL ESTADO HISTÓRICO DE ESTE LOG
+            action_signals = []
+            
+            for attr in ['action', 'accion', 'event', 'evento', 'event_type', 'tipo_evento', 'operation', 'operacion', 'type', 'tipo']:
+                val = getattr(log, attr, None)
+                if val:
+                    action_signals.append(str(val).upper().strip())
+
+            for key in ['action', 'accion', 'event', 'evento', 'event_type', 'tipo_evento', 'operation', 'operacion', 'tipo_accion', 'nuevo_estado', 'estado_nuevo', 'new_status']:
+                val = changed_data.get(key)
+                if val:
+                    action_signals.append(str(val).upper().strip())
+
+            status_display = None
+            for signal in action_signals:
+                if signal in REVERT_ACTIONS:
+                    status_display = 'REVERTIDO'
+                    break
+                elif signal in REJECT_ACTIONS:
+                    status_display = 'RECHAZADO'
+                    break
+                elif signal in APPROVE_ACTIONS:
+                    status_display = 'APROBADO'
+                    break
+                elif signal in PENDING_ACTIONS:
+                    status_display = 'PENDIENTE'
+                    break
+
+            if not status_display:
+                if any(k in changed_data for k in ['motivo_reversion', 'reversal_reason', 'motivo_anulacion']):
+                    status_display = 'REVERTIDO'
+                elif any(k in changed_data for k in ['motivo_rechazo', 'rejection_reason', 'rechazado_por']):
+                    status_display = 'RECHAZADO'
+                elif any(k in changed_data for k in ['aprobado_por', 'approved_by']) and not any(k in changed_data for k in ['motivo_rechazo', 'motivo_reversion']):
+                    status_display = 'APROBADO'
+                else:
+                    status_display = 'PENDIENTE'
+
+            # Es revertida si la merma ya está revertida en BD o si este log es una reversión
+            is_reverted = is_reverted_in_db or (status_display == 'REVERTIDO')
+
+            motivo_reversion = (
+                changed_data.get('motivo_reversion') or 
+                changed_data.get('reversal_reason') or 
+                changed_data.get('motivo_anulacion')
+            )
+            if motivo_reversion:
+                changed_data['motivo_reversion'] = motivo_reversion
+
             if not tipo_merma:
                 tipo_merma = 'No especificado'
 
             if not motivo:
                 motivo = 'Sin observación'
 
-            # Normalización de la URL de la imagen (evita errores 404 por rutas relativas)
             if foto_url:
                 foto_url = str(foto_url).strip()
                 if foto_url and not foto_url.startswith(('http://', 'https://', '/')):
@@ -271,20 +327,12 @@ class WasteAuditService:
 
             formatted_time = log.timestamp.strftime('%Y-%m-%d %I:%M:%S %p') if getattr(log, 'timestamp', None) else 'N/A'
 
-            # Actualizar diccionario formateado para Jinja2
             changed_data['tipo_merma'] = tipo_merma
             changed_data['productos'] = normalized_products
             changed_data['motivo_registro'] = motivo
             if foto_url:
                 changed_data['foto_evidencia_url'] = foto_url
             changed_data['aprobado_por'] = changed_data.get('aprobado_por') or user_display
-
-            status_display = (
-                changed_data.get('status') or 
-                changed_data.get('estado') or 
-                changed_data.get('evento') or 
-                'PENDIENTE'
-            )
 
             formatted_logs.append({
                 'id': log.id,
@@ -293,6 +341,7 @@ class WasteAuditService:
                 'location': location_display,
                 'severity': getattr(log, 'severity', 'NORMAL'),
                 'status': status_display,
+                'is_reverted': is_reverted,
                 'changed_data': changed_data
             })
             

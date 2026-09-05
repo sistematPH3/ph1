@@ -33,14 +33,14 @@
             </div>
 
             <div class="row g-2 align-items-center">
-                <div class="col-md-3">
-                    <select id="locationFilter" class="form-select">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <select id="location_filter" class="form-select">
                     {% if is_admin %}
                         <option value="" selected>Todas las sedes</option>
                         {% if locations is defined %}
                         {% for loc in locations %}
                             {% set loc_name = loc.nombre if loc.nombre is defined else (loc.name if loc.name is defined else loc) %}
-                            <option value="{{ loc_name|lower }}">{{ loc_name }}</option>
+                            <option value="{{ loc_name|lower|trim }}">{{ loc_name }}</option>
                         {% endfor %}
                         {% endif %}
                     {% else %}
@@ -48,7 +48,7 @@
                     {% endif %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-sm-6 col-lg-3">
                     <select class="form-select form-select-sm" id="severity_filter" name="severity">
                         <option value="">Todas las gravedades</option>
                         <option value="NORMAL">NORMAL</option>
@@ -56,11 +56,11 @@
                         <option value="CRITICO">CRÍTICO</option>
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-center gap-2">
+                <div class="col-12 col-sm-6 col-lg-3 d-flex align-items-center gap-2">
                     <span class="ph-filter-label">Desde:</span>
                     <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" title="Fecha Inicio">
                 </div>
-                <div class="col-md-3 d-flex align-items-center gap-2">
+                <div class="col-12 col-sm-6 col-lg-3 d-flex align-items-center gap-2">
                     <span class="ph-filter-label">Hasta:</span>
                     <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" title="Fecha Fin">
                 </div>
@@ -85,7 +85,7 @@
                 </thead>
                 <tbody id="audit-table-body">
                     {% for log in audit_trail %}
-                    {% set log_loc = (log.location_display or log.location or '')|string|lower|trim %}
+                    {% set log_loc = (log.location_display or (log.location.nombre if log.location is mapping or log.location.nombre is defined else (log.location.name if log.location.name is defined else log.location)) or '')|string|lower|trim %}
 
                     {# Si es Admin pasa directamente; si no, exige coincidencia con la sede #}
                     {% if is_admin or (user_user_loc and log_loc == user_user_loc) %}
@@ -105,12 +105,12 @@
                             <tr class="audit-row" 
                                 data-log-id="{{ log.id }}"
                                 data-user="{{ user_name|lower }}" 
-                                data-location="{{ (log.location or '')|trim|lower }}" 
+                                data-location="{{ log_loc }}" 
                                 data-severity="{{ log.severity }}"
                                 data-timestamp="{{ (log.timestamp or '').split(' ')[0] }}"
                                 data-products="{{ ns.productos_txt|lower }}">
                                 
-                                <td class="ps-3">
+                                <td class="ps-3" data-label="Responsable">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="ph-avatar">{{ user_initial }}</div>
                                         <div class="d-flex flex-column">
@@ -119,14 +119,14 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" data-label="Sede">
                                     <span class="ph-badge-location">
-                                        <i class="bi bi-geo-alt-fill me-1"></i>{{ log.location }}
+                                        <i class="bi bi-geo-alt-fill me-1"></i>{{ log.location | replace('Almacén', 'A.') | replace('Almacen', 'A.') | replace('almacen', 'A.') }}
                                     </span>
                                 </td>
 
                                 <!-- Producto Principal -->
-                                <td class="text-center">
+                                <td class="text-center" data-label="Producto">
                                     {% if data.productos and data.productos|length > 0 %}
                                         <span class="fw-semibold text-dark">{{ data.productos[0].producto }}</span>
                                         {% if data.productos|length > 1 %}
@@ -138,29 +138,29 @@
                                 </td>
 
                                 <!-- Tipo de Merma -->
-                                <td class="text-center">
+                                <td class="text-center" data-label="Tipo de Merma">
                                     <span class="badge bg-dark px-2 py-1">{{ tipo_merma }}</span>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" data-label="Estado">
                                     <span class="ph-badge {% if log.status == 'PENDIENTE' %}ph-badge-warning{% elif log.status == 'RECHAZADO' %}ph-badge-secondary{% elif log.status == 'REVERTIDO' %}ph-badge-danger{% else %}ph-badge-success{% endif %}">
                                         {{ log.status }}
                                     </span>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" data-label="Gravedad">
                                     <span class="ph-badge {% if log.severity == 'NORMAL' %}ph-badge-info{% elif log.severity == 'ALERTA' %}ph-badge-warning{% elif log.severity == 'CRITICO' %}ph-badge-danger{% else %}ph-badge-secondary{% endif %}">
                                         {{ log.severity }}
                                     </span>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" data-label="Acciones">
                                     <div class="d-flex justify-content-center align-items-center gap-2">
                                         <button class="ph-btn-detail-text btn-ph-detail" 
                                                 type="button" 
                                                 data-bs-toggle="collapse" 
                                                 data-bs-target="#collapse-details-{{ log.id }}">
-                                            Ver detalles <i class="bi bi-eye-fill ms-1"></i>
+                                            <span class="d-none d-lg-inline">Ver detalles</span> <i class="bi bi-eye-fill"></i>
                                         </button>
 
-                                        {% if is_admin and log.status == 'APROBADO' %}
+                                        {% if is_admin and log.status == 'APROBADO' and not log.is_reverted %}
                                             <button class="ph-btn-action btn-ph-revert btn-revert" 
                                                     data-id="{{ log.id }}" 
                                                     data-location="{{ log.location }}"
@@ -191,12 +191,12 @@
                                                         </div>
                                                         <div class="list-group list-group-flush">
                                                             {% for p in data.productos %}
-                                                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-white">
-                                                                    <div>
-                                                                        <strong class="text-dark">{{ p.producto or 'Producto' }}</strong>
-                                                                        {% if p.lote %}<span class="badge bg-light text-dark border ms-2">Lote: {{ p.lote }}</span>{% endif %}
+                                                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-white flex-wrap gap-2">
+                                                                    <div class="text-break me-2" style="max-width: 65%;">
+                                                                        <strong class="text-dark d-block text-wrap">{{ p.producto or 'Producto' }}</strong>
+                                                                        {% if p.lote %}<span class="badge bg-light text-dark border">Lote: {{ p.lote }}</span>{% endif %}
                                                                     </div>
-                                                                    <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ p.cantidad }} und/kg</span>
+                                                                    <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold flex-shrink-0">{{ p.cantidad }} und/kg</span>
                                                                 </div>
                                                             {% endfor %}
                                                         </div>
@@ -214,19 +214,19 @@
                                                                 <span class="badge bg-danger">Registro #{{ data.original_audit_id or data.merma_id or 'N/A' }}</span>
                                                             </div>
                                                             <div class="row g-2">
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
-                                                                    <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                                    <span class="badge bg-dark mt-1 text-wrap text-start">{{ tipo_merma }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Anulado por:</small>
                                                                     <span class="text-dark fw-bold">{{ data.revertido_por or 'Administrador' }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
                                                                     <span class="text-dark fw-bold">{{ log.location }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
                                                                     <span class="text-dark fw-bold">{{ log.timestamp }}</span>
                                                                 </div>
@@ -236,7 +236,7 @@
                                                                 </div>
                                                                 <div class="col-12 mt-2">
                                                                     <small class="text-muted d-block fw-semibold">Motivo de Anulación:</small>
-                                                                    <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo_registro }}</div>
+                                                                    <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo_reversion or data.motivo_registro }}</div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -252,19 +252,19 @@
                                                                 <span class="badge bg-success">{{ data.impacto_stock or 'Descontado de inventario (- Stock definitivo)' }}</span>
                                                             </div>
                                                             <div class="row g-2">
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
-                                                                    <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                                    <span class="badge bg-dark mt-1 text-wrap text-start">{{ tipo_merma }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Aprobado por:</small>
                                                                     <span class="text-dark fw-bold">{{ data.aprobado_por }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
                                                                     <span class="text-dark fw-bold">{{ log.location }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
                                                                     <span class="text-dark fw-bold">{{ log.timestamp }}</span>
                                                                 </div>
@@ -285,19 +285,19 @@
                                                                 <span class="fw-bold text-secondary"><i class="bi bi-x-octagon-fill me-1"></i> Merma Rechazada</span>
                                                             </div>
                                                             <div class="row g-2">
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
-                                                                    <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                                    <span class="badge bg-dark mt-1 text-wrap text-start">{{ tipo_merma }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Rechazado por:</small>
                                                                     <span class="text-dark fw-bold">{{ data.rechazado_por or 'Supervisor / Admin' }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
                                                                     <span class="text-dark fw-bold">{{ log.location }}</span>
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                                <div class="col-6 col-lg-3">
                                                                     <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
                                                                     <span class="text-dark fw-bold">{{ log.timestamp }}</span>
                                                                 </div>
@@ -314,19 +314,19 @@
                                                 <div class="col-12">
                                                     <div class="card ph-detail-card border-start border-4 border-warning bg-light">
                                                         <div class="row g-2">
-                                                            <div class="col-md-3">
+                                                            <div class="col-6 col-lg-3">
                                                                 <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
-                                                                <span class="badge bg-dark mt-1">{{ tipo_merma }}</span>
+                                                                <span class="badge bg-dark mt-1 text-wrap text-start">{{ tipo_merma }}</span>
                                                             </div>
-                                                            <div class="col-md-3">
+                                                            <div class="col-6 col-lg-3">
                                                                 <small class="text-muted d-block fw-semibold">Registrado por:</small>
                                                                 <span class="text-dark fw-bold">{{ user_name }}</span>
                                                             </div>
-                                                            <div class="col-md-3">
+                                                            <div class="col-6 col-lg-3">
                                                                 <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
                                                                 <span class="text-dark fw-bold">{{ log.location }}</span>
                                                             </div>
-                                                            <div class="col-md-3">
+                                                            <div class="col-6 col-lg-3">
                                                                 <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
                                                                 <span class="text-dark fw-bold">{{ log.timestamp }}</span>
                                                             </div>
