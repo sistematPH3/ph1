@@ -5,17 +5,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const startDateInput = document.getElementById('start_date');
     const endDateInput = document.getElementById('end_date');
 
+    // Modales Bootstrap
     const revertModalEl = document.getElementById('revertMermaModal');
     const revertModal = revertModalEl ? new bootstrap.Modal(revertModalEl) : null;
+
+    const successModalEl = document.getElementById('successRevertModal');
+    const successModal = successModalEl ? new bootstrap.Modal(successModalEl) : null;
+
     const revertForm = document.getElementById('revert-merma-form');
 
-    // Filtro ultra-rápido en tiempo real leyendo los atributos data-* del DOM
+    // Definición de función ANTES de ser ejecutada
     const applyFilters = () => {
-        const query = searchInput.value.toLowerCase().trim();
-        const selectedLocation = locationSelect.value.toLowerCase().trim();
-        const selectedSeverity = severitySelect.value;
-        const startDate = startDateInput.value;
-        const endDate = endDateInput.value;
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const selectedLocation = locationSelect ? locationSelect.value.toLowerCase().trim() : '';
+        const selectedSeverity = severitySelect ? severitySelect.value : '';
+        const startDate = startDateInput ? startDateInput.value : '';
+        const endDate = endDateInput ? endDateInput.value : '';
 
         const mainRows = document.querySelectorAll('tr.audit-row');
 
@@ -45,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.classList.remove('d-none');
             } else {
                 row.classList.add('d-none');
-                // Si la fila se oculta y sus detalles estaban desplegados, los replegamos
                 if (detailRow && detailRow.classList.contains('show')) {
                     const bsCollapse = bootstrap.Collapse.getInstance(detailRow);
                     if (bsCollapse) bsCollapse.hide();
@@ -53,32 +57,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        const visibleRows = document.querySelectorAll('tr.audit-row:not(.d-none)');
+        const noResultsRow = document.getElementById('no-filter-results-row');
+
+        if (noResultsRow) {
+            if (visibleRows.length === 0) {
+                noResultsRow.classList.remove('d-none');
+            } else {
+                noResultsRow.classList.add('d-none');
+            }
+        }
     };
 
-    // Escuchar eventos de entrada y cambio en los filtros
+    // Forzar el filtrado inicial al cargar la página
+if (locationSelect) {
+    applyFilters();
+}
+
+    // Escuchar eventos de cambio en los filtros
     if (searchInput) searchInput.addEventListener('input', applyFilters);
     if (locationSelect) locationSelect.addEventListener('change', applyFilters);
     if (severitySelect) severitySelect.addEventListener('change', applyFilters);
     if (startDateInput) startDateInput.addEventListener('change', applyFilters);
     if (endDateInput) endDateInput.addEventListener('change', applyFilters);
 
-    // Evento del botón Revertir
-    document.querySelectorAll('.btn-revert').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const target = e.currentTarget;
-            const id = target.getAttribute('data-id');
-            const location = target.getAttribute('data-location');
+    // Delegación global para el botón Revertir
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-revert');
+        if (btn) {
+            const id = btn.getAttribute('data-id');
+            const location = btn.getAttribute('data-location');
 
-            document.getElementById('revert-log-id').value = id;
-            document.getElementById('revert-target-id').textContent = `#${id}`;
-            document.getElementById('revert-target-location').textContent = location;
-            document.getElementById('revert_reason').value = '';
+            const logIdInput = document.getElementById('revert-log-id');
+            const targetIdEl = document.getElementById('revert-target-id');
+            const targetLocEl = document.getElementById('revert-target-location');
+            const reasonInput = document.getElementById('revert_reason');
+
+            if (logIdInput) logIdInput.value = id;
+            if (targetIdEl) targetIdEl.textContent = `#${id}`;
+            if (targetLocEl) targetLocEl.textContent = location;
+            if (reasonInput) reasonInput.value = '';
 
             if (revertModal) revertModal.show();
-        });
+        }
     });
 
-    // Procesar formulario de reversión vía AJAX
+    // Envío del formulario de reversión
     if (revertForm) {
         revertForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -90,23 +115,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
             try {
                 const response = await fetch(`/waste/merma/api/revert/${logId}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
                     body: JSON.stringify({ motivo_reversion: reason })
                 });
 
-                const result = await response.json();
-                if (result.success) {
-                    if (revertModal) revertModal.hide();
-                    // Recargar la página para refrescar el historial renderizado por Jinja2
-                    window.location.reload();
+                const contentType = response.headers.get('content-type');
+                let result = {};
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
                 } else {
-                    alert('Error: ' + (result.errors || []).join(', '));
+                    throw new Error(`El servidor devolvió un error HTTP ${response.status}`);
+                }
+
+                if (response.ok && result.success) {
+                    if (revertModal) revertModal.hide();
+
+                    if (successModal) {
+                        const msgEl = document.getElementById('success-revert-message');
+                        if (msgEl && result.message) msgEl.textContent = result.message;
+                        
+                        successModal.show();
+
+                        const btnAccept = document.getElementById('btn-accept-success');
+                        if (btnAccept) {
+                            btnAccept.addEventListener('click', () => window.location.reload(), { once: true });
+                        }
+                        if (successModalEl) {
+                            successModalEl.addEventListener('hidden.bs.modal', () => window.location.reload(), { once: true });
+                        }
+                    } else {
+                        window.location.reload();
+                    }
+                } else {
+                    const errorMsg = result.errors ? result.errors.join(', ') : (result.message || 'Error desconocido');
+                    alert(`No se pudo revertir: ${errorMsg}`);
                 }
             } catch (error) {
-                alert('Ocurrió un error al procesar la reversión.');
+                console.error('Error detallado:', error);
+                alert(`Error al procesar la solicitud: ${error.message}`);
             }
         });
     }
