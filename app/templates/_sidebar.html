@@ -146,6 +146,7 @@
                 <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_purchase.list_purchase_audits') }}">Auditoría de Compras</a>
                 <a class="nav-link sub-link" href="{{ url_for('logistics_audit.view_movement_audit') }}">Auditoría de Traslados</a>
+                <a class="nav-link sub-link" href="{{ url_for('waste_audit.ver_auditoria') }}">Auditoría de Mermas</a>
                 
                 {% if current_user.is_finance %}
                 <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Auditoría de Inventario</a>

@@ -172,12 +172,21 @@ def create_app():
         from app.logistics.routes.movement_reception_routes import movement_reception_bp
         app.register_blueprint(movement_reception_bp)
         # ==========================================================
+        #modulo 7
+        from app.waste.routes.waste_audit_routes import waste_audit_bp
+        # Registrar el blueprint en la app
+        app.register_blueprint(waste_audit_bp)
+    
 
         from app.logistics.routes.response_inbox_routes import inbox_bp
         app.register_blueprint(inbox_bp)
 
         from app.logistics.routes.movement_audit_routes import logistics_audit_bp
         app.register_blueprint(logistics_audit_bp)
+
+        # --- REGISTRO DE CONFIGURACIÓN DE MERMAS ---
+        from app.waste.routes.waste_config_routes import waste_config_bp
+        app.register_blueprint(waste_config_bp)
 
         from . import models 
         from .models.security_model import User
