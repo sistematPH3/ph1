@@ -594,6 +594,18 @@ class WasteRegisterTest(unittest.TestCase):
         self.assertTrue(res["success"])
         self.assertEqual(res["status"], "APROBADO")
 
+    def test_tiempo_sede_con_menos_de_periodo_base_no_aplica(self):
+        # Sede con solo 3 días de historial (por debajo del período base=7):
+        # la regla de tiempo NO evalúa y la merma queda APROBADO, aunque
+        # supere lo esperado del período transcurrido (15 kg > 4.5 si aplicara).
+        env = self._seed_env(stock=100.0, waste_limit=100.0)
+        self._seed_waste_history(env, 30.0, "APROBADO", 3)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 15.0}
+        ])
+        self.assertTrue(res["success"])
+        self.assertEqual(res["status"], "APROBADO")
+
     def test_micro_merma_segunda_del_dia_aprueba_con_piso(self):
         # Fix opción A: con piso elapsed=1 la 2ª merma del mismo día se compara
         # contra el esperado de 1 día (tasa=2/30=0.067 -> umbral 0.10), por lo
@@ -643,10 +655,12 @@ class WasteRegisterTest(unittest.TestCase):
         self.assertEqual(float(lots[0]["quantity"]), 45.0)
 
     def test_dos_mermas_dentro_de_24h_segunda_queda_pendiente(self):
-        # Regla de TIEMPO de la propuesta: mismo día / menos de 24h la segunda
-        # merma entra PENDIENTE si supera lo esperado en 1 día (piso elapsed=1)
-        # por tolerancia: r2 = 5 kg con tasa 5/30=0.167 -> umbral 0.25 -> PENDIENTE.
+        # Regla de TIEMPO de la propuesta: con sede ya con período base de
+        # historial, mismo día / menos de 24h la segunda merma entra PENDIENTE
+        # si supera lo esperado en 1 día (piso elapsed=1): r2 = 5 kg con tasa
+        # (30+5)/30=1.17 -> umbral 1.75 -> PENDIENTE.
         env = self._seed_env(stock=50.0, waste_limit=20.0)
+        self._seed_waste_history(env, 30.0, "APROBADO", 15)
         r1 = self._register(env, [
             {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0}
         ])

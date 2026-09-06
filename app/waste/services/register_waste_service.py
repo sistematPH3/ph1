@@ -49,7 +49,8 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
     cumple CUALQUIERA de estas reglas:
       1) CANTIDAD: total >= límite de merma de CADA producto (waste_limit).
       2) TIPO: el tipo exige aprobación siempre (requires_approval).
-      3) TIEMPO: supera lo "esperado" según el historial de la sede.
+      3) TIEMPO: supera lo "esperado" según el historial de la sede, una vez
+         que la sede acumuló el período base de días de registros.
 
     Devuelve (pendiente, motivos) donde 'motivos' es un dict por producto
     (product_id -> [códigos]) con las novedades de CADA producto:
@@ -98,13 +99,15 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
 
     time_data = RegisterWasteRepository.get_time_rule_data(location_id)
     tolerance = RegisterWasteRepository.get_parameter('WASTE_TIME_TOLERANCE', 1.5)
-    base_period = RegisterWasteRepository.get_parameter('WASTE_BASE_PERIOD_DAYS', 7)
+    base_period = max(1.0, float(
+        RegisterWasteRepository.get_parameter('WASTE_BASE_PERIOD_DAYS', 7)))
 
-    if time_data['total_normal'] > 0:
+    if (time_data['total_normal'] > 0
+            and time_data.get('history_days', 0) >= base_period):
         daily_rate = float(time_data['total_normal']) / 30.0
         elapsed = (time_data['days_since_last']
                    if time_data['days_since_last'] is not None
-                   else float(base_period))
+                   else base_period)
         elapsed = max(1.0, float(elapsed))
         expected = daily_rate * elapsed
         threshold = expected * tolerance
