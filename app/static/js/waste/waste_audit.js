@@ -5,15 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startDateInput = document.getElementById('start_date');
     const endDateInput = document.getElementById('end_date');
 
-    // Modales Bootstrap
-    const revertModalEl = document.getElementById('revertMermaModal');
-    const revertModal = revertModalEl ? new bootstrap.Modal(revertModalEl) : null;
-
-    const successModalEl = document.getElementById('successRevertModal');
-    const successModal = successModalEl ? new bootstrap.Modal(successModalEl) : null;
-
-    const revertForm = document.getElementById('revert-merma-form');
-
     // Definición de función ANTES de ser ejecutada
     const applyFilters = () => {
         const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
@@ -81,89 +72,4 @@ if (locationSelect) {
     if (severitySelect) severitySelect.addEventListener('change', applyFilters);
     if (startDateInput) startDateInput.addEventListener('change', applyFilters);
     if (endDateInput) endDateInput.addEventListener('change', applyFilters);
-
-    // Delegación global para el botón Revertir
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-revert');
-        if (btn) {
-            const id = btn.getAttribute('data-id');
-            const location = btn.getAttribute('data-location');
-
-            const logIdInput = document.getElementById('revert-log-id');
-            const targetIdEl = document.getElementById('revert-target-id');
-            const targetLocEl = document.getElementById('revert-target-location');
-            const reasonInput = document.getElementById('revert_reason');
-
-            if (logIdInput) logIdInput.value = id;
-            if (targetIdEl) targetIdEl.textContent = `#${id}`;
-            if (targetLocEl) targetLocEl.textContent = location;
-            if (reasonInput) reasonInput.value = '';
-
-            if (revertModal) revertModal.show();
-        }
-    });
-
-    // Envío del formulario de reversión
-    if (revertForm) {
-        revertForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const logId = document.getElementById('revert-log-id').value;
-            const reason = document.getElementById('revert_reason').value.trim();
-
-            if (reason.length < 15) {
-                alert('El motivo debe contener al menos 15 caracteres.');
-                return;
-            }
-
-            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-
-            try {
-                const response = await fetch(`/waste/merma/api/revert/${logId}`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify({ motivo_reversion: reason })
-                });
-
-                const contentType = response.headers.get('content-type');
-                let result = {};
-                
-                if (contentType && contentType.includes('application/json')) {
-                    result = await response.json();
-                } else {
-                    throw new Error(`El servidor devolvió un error HTTP ${response.status}`);
-                }
-
-                if (response.ok && result.success) {
-                    if (revertModal) revertModal.hide();
-
-                    if (successModal) {
-                        const msgEl = document.getElementById('success-revert-message');
-                        if (msgEl && result.message) msgEl.textContent = result.message;
-                        
-                        successModal.show();
-
-                        const btnAccept = document.getElementById('btn-accept-success');
-                        if (btnAccept) {
-                            btnAccept.addEventListener('click', () => window.location.reload(), { once: true });
-                        }
-                        if (successModalEl) {
-                            successModalEl.addEventListener('hidden.bs.modal', () => window.location.reload(), { once: true });
-                        }
-                    } else {
-                        window.location.reload();
-                    }
-                } else {
-                    const errorMsg = result.errors ? result.errors.join(', ') : (result.message || 'Error desconocido');
-                    alert(`No se pudo revertir: ${errorMsg}`);
-                }
-            } catch (error) {
-                console.error('Error detallado:', error);
-                alert(`Error al procesar la solicitud: ${error.message}`);
-            }
-        });
-    }
 });

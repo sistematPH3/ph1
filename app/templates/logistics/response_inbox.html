@@ -53,8 +53,8 @@
         </div>
     </td>
     <td data-label="Estado">
-        <span class="badge {{ 'bg-success-subtle text-success' if mov.decision == 'APROBADA' else 'bg-danger-subtle text-danger' }} border rounded-pill px-3 py-2 fw-semibold shadow-sm">
-            <i class="bi bi-shield-check me-1"></i> {{ mov.decision_label }}
+        <span class="badge {{ 'bg-success-subtle text-success' if mov.decision == 'APROBADA' else ('bg-info-subtle text-info' if mov.decision == 'PARCIAL' else 'bg-danger-subtle text-danger') }} border rounded-pill px-3 py-2 fw-semibold shadow-sm">
+            <i class="bi bi-{{ 'check-circle' if mov.decision == 'APROBADA' else ('ui-checks' if mov.decision == 'PARCIAL' else 'x-circle') }} me-1"></i> {{ mov.decision_label }}
             {% if mov.response_by %} por {{ mov.response_by.name }}{% endif %}
         </span>
         <div class="mt-2 text-muted small">
@@ -98,6 +98,7 @@
                                 <th class="text-muted fw-semibold">Lote</th>
                                 <th class="text-muted fw-semibold">Vencimiento</th>
                                 <th class="text-end text-muted fw-semibold">Cantidad</th>
+                                <th class="text-muted fw-semibold">Decisión</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -107,6 +108,16 @@
                                 <td data-label="Lote"><code class="text-dark">{{ item.lot_number or 'S/L' }}</code></td>
                                 <td data-label="Vencimiento">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '—' }}</td>
                                 <td class="text-end" data-label="Cantidad">{{ item.quantity }}</td>
+                                <td data-label="Decisión">
+                                    {% if item.decision == 'APROBADO' %}
+                                    <span class="badge bg-success-subtle text-success border rounded-pill"><i class="bi bi-check-circle me-1"></i>Aprobado</span>
+                                    {% elif item.decision == 'RECHAZADO' %}
+                                    <span class="badge bg-danger-subtle text-danger border rounded-pill"><i class="bi bi-x-circle me-1"></i>Rechazado</span>
+                                    {% if item.rejection_reason %}<div class="small text-danger mt-1">{{ item.rejection_reason }}</div>{% endif %}
+                                    {% else %}
+                                    <span class="badge bg-light text-muted border rounded-pill">Pendiente</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>

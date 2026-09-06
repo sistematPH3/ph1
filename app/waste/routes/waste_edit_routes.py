@@ -17,7 +17,7 @@ def editar_merma(waste_id):
     data, error = WasteEditService.get_waste_for_edit(waste_id, user_id, is_admin)
     if error:
         flash(error, "danger")
-        return redirect(url_for("merma_approvals.bandeja_aprobaciones"))
+        return redirect(url_for("waste_approvals.bandeja_aprobaciones"))
 
     return render_template(
         "waste/waste_edit.html",

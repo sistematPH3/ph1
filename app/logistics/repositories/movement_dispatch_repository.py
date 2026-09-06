@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import func, case
 from app import db
@@ -247,7 +248,7 @@ class MovementDispatchRepository:
             destination_location_id=destination_id,
             status='EN_TRANSITO',
             user_id=created_by_id,
-            date=datetime.now(),
+            date=current_ve_time(),
             source_dispute_id=source_dispute_id
         )
         db.session.add(movement)
@@ -340,7 +341,7 @@ class MovementDispatchRepository:
                 'origin_transit_delta': float(total_dispatched)
             },
             'user_id': created_by_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': current_ve_time().isoformat()
         }
 
         audit_entry = AuditLog(
@@ -349,7 +350,7 @@ class MovementDispatchRepository:
             severity='NORMAL',
             user_id=created_by_id,
             location_id=origin_id,
-            timestamp=datetime.now(),
+            timestamp=current_ve_time(),
             changed_data=changed_data
         )
         db.session.add(audit_entry)
@@ -404,7 +405,7 @@ class MovementDispatchRepository:
                 'origin_transit_delta': -float(total_reverted)
             },
             'user_id': user_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': current_ve_time().isoformat()
         }
 
         audit_entry = AuditLog(
@@ -413,7 +414,7 @@ class MovementDispatchRepository:
             severity='ALERTA',
             user_id=user_id,
             location_id=movement.origin_location_id,
-            timestamp=datetime.now(),
+            timestamp=current_ve_time(),
             changed_data=changed_data
         )
         db.session.add(audit_entry)

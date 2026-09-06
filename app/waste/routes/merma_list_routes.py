@@ -9,8 +9,8 @@ from flask import Blueprint, render_template, jsonify, request
 from flask_login import current_user, login_required
 
 from app.decorators.roles import require_roles
-from app.waste.requests.merma_approvals_validators import validate_resolution_payload
-from app.waste.services import merma_approvals_service as svc
+from app.waste.requests.waste_approvals_validators import validate_resolution_payload
+from app.waste.services import waste_approvals_service as svc
 
 merma_list_bp = Blueprint('merma_list', __name__)
 

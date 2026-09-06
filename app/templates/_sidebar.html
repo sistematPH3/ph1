@@ -120,7 +120,7 @@
 
                 <a class="nav-link sub-link" href="{{ url_for('register_waste.nueva_merma') }}">Nueva Merma</a>
                 <a class="nav-link sub-link" href="{{ url_for('merma_list.mis_pendientes') }}">Mermas Pendientes</a>
-                <a class="nav-link sub-link dispute-sub-link" href="{{ url_for('merma_approvals.bandeja_aprobaciones') }}">
+                <a class="nav-link sub-link dispute-sub-link" href="{{ url_for('waste_approvals.bandeja_aprobaciones') }}">
                     <span>Gestión de Mermas</span>
                     {% if can_view_waste_approvals %}
                     <span class="dispute-badge" id="wastePendingBadge"

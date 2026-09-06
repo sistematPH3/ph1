@@ -77,8 +77,8 @@ def create_app():
         app.register_blueprint(auditinventory_bp)
 
         # MÓDULO WASTE: BANDEJA DE APROBACIÓN DE MERMAS
-        from .waste.routes.merma_approvals_routes import merma_approvals_bp
-        app.register_blueprint(merma_approvals_bp)
+        from .waste.routes.waste_approvals_routes import waste_approvals_bp
+        app.register_blueprint(waste_approvals_bp)
 
         # MÓDULO WASTE: MIS MERMAS PENDIENTES (EDICIÓN/CANCELACIÓN DEL AUTOR)
         from .waste.routes.merma_list_routes import merma_list_bp
@@ -225,7 +225,7 @@ def create_app():
             waste_count = 0
             if can_view:
                 try:
-                    from app.waste.services.merma_approvals_service import get_pending_waste_summary
+                    from app.waste.services.waste_approvals_service import get_pending_waste_summary
                     waste_count = get_pending_waste_summary(current_user.id)['pending_count']
                 except Exception:
                     waste_count = 0

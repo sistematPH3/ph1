@@ -17,13 +17,14 @@ RECEPTION_AUDIT_ACTIONS = (
 # Tipo de notificación que representa una respuesta del Administrador.
 RESPONSE_NOTIFICATION_TYPE = 'RESPUESTA_TRASLADO'
 
-# Tipos de notificación de la decisión de una merma mayor (aprobada/rechazada).
-MERMA_NOTIFICATION_TYPES = ('MERMA_APROBADA', 'MERMA_RECHAZADA')
+# Tipos de notificación de la decisión de una merma mayor (aprobada/rechazada/parcial).
+MERMA_NOTIFICATION_TYPES = ('MERMA_APROBADA', 'MERMA_RECHAZADA', 'MERMA_PARCIAL')
 
 # Etiqueta legible de cada decisión de merma.
 WASTE_DECISION_LABELS = {
     'MERMA_APROBADA': 'Aprobada',
     'MERMA_RECHAZADA': 'Rechazada',
+    'MERMA_PARCIAL': 'Decisión mixta',
 }
 
 # Etiquetas legibles de cada clasificación de novedad reportada en recepción.
@@ -369,6 +370,8 @@ class ResponseInboxRepository:
                 'lot_number': d.lot_number,
                 'expiration_date': d.expiration_date,
                 'quantity': float(d.quantity or 0),
+                'status': d.status or 'PENDIENTE',
+                'resolution_reason': d.resolution_reason or '',
             })
             prod_ids.add(d.product_id)
         prods = {}
@@ -393,7 +396,11 @@ class ResponseInboxRepository:
             tipo = notif.type
             read_row = user_read.get(wid)
             is_read = bool(read_row and read_row.is_read)
-            decision = 'APROBADA' if tipo == 'MERMA_APROBADA' else 'RECHAZADA'
+            decision = {
+                'MERMA_APROBADA': 'APROBADA',
+                'MERMA_RECHAZADA': 'RECHAZADA',
+                'MERMA_PARCIAL': 'PARCIAL',
+            }.get(tipo, 'RECHAZADA')
             t = types.get(w.waste_type_id)
             loc = locs.get(w.location_id)
 
@@ -407,6 +414,8 @@ class ResponseInboxRepository:
                 'lot_number': d['lot_number'],
                 'expiration_date': d['expiration_date'],
                 'quantity': d['quantity'],
+                'decision': d['status'],
+                'rejection_reason': d['resolution_reason'],
             } for d in lines_by_waste.get(wid, [])]
 
             respuestas.append(SimpleNamespace(
@@ -447,7 +456,11 @@ class ResponseInboxRepository:
 
     @staticmethod
     def _waste_rejection_reasons(waste_ids):
-        """Razones de rechazo {waste_id: motivo} desde la auditoría de mermas."""
+        """Razones de rechazo {waste_id: motivo} desde la auditoría de mermas.
+
+        Soporta el payload clásico (motivo_rechazo único en MERMA_RECHAZADA) y el
+        de decisión por producto (motivo de cada línea RECHAZADA en decisiones).
+        """
         if not waste_ids:
             return {}
         out = {}
@@ -457,7 +470,8 @@ class ResponseInboxRepository:
         ).all()
         for log in logs:
             data = ResponseInboxRepository._read_data(log)
-            if data.get('event') != 'MERMA_RECHAZADA':
+            event = data.get('event')
+            if event not in ('MERMA_RECHAZADA', 'MERMA_PARCIAL', 'MERMA_DECISION'):
                 continue
             wid = data.get('waste_id')
             if wid is None:
@@ -466,8 +480,18 @@ class ResponseInboxRepository:
                 wid = int(wid)
             except (TypeError, ValueError):
                 continue
-            if wid in waste_ids and wid not in out:
-                out[wid] = (data.get('motivo_rechazo') or '').strip()
+            if wid not in waste_ids or wid in out:
+                continue
+            motivos = []
+            for dec in data.get('decisiones') or []:
+                if (dec.get('decision') or '').upper() == 'RECHAZADO' and dec.get('motivo'):
+                    motivos.append(str(dec['motivo']).strip())
+            if not motivos:
+                motivo = (data.get('motivo_rechazo') or '').strip()
+                if motivo:
+                    motivos.append(motivo)
+            if motivos:
+                out[wid] = ' '.join(dict.fromkeys(motivos))
         return out
 
     @staticmethod
@@ -478,7 +502,11 @@ class ResponseInboxRepository:
         """
         if decision == 'CANCELADA':
             return None
-        tipo = ('MERMA_APROBADA' if decision == 'APROBADA' else 'MERMA_RECHAZADA')
+        tipo = {
+            'APROBADA': 'MERMA_APROBADA',
+            'RECHAZADA': 'MERMA_RECHAZADA',
+            'PARCIAL': 'MERMA_PARCIAL',
+        }.get(decision, 'MERMA_RECHAZADA')
         existing = Notification.query.filter_by(
             user_id=user.id, waste_id=waste_id, type=tipo,
         ).first()
@@ -491,11 +519,11 @@ class ResponseInboxRepository:
             location_id=waste.location_id if waste else None,
             waste_id=waste_id,
             type=tipo,
-            message=(
-                f'Merma #{waste_id} fue '
-                f'{("aprobada" if tipo == "MERMA_APROBADA" else "rechazada")} '
-                f'por el Administrador.'
-            ),
+message=(
+            f'Merma #{waste_id} fue '
+            f'{"aprobada" if tipo == "MERMA_APROBADA" else ("resuelta parcialmente" if tipo == "MERMA_PARCIAL" else "rechazada")} '
+            f'por el Administrador.'
+        ),
             is_read=True,
         ))
         return None
@@ -513,9 +541,10 @@ class ResponseInboxRepository:
         decision = {
             'APROBADO': 'APROBADA',
             'RECHAZADO': 'RECHAZADA',
+            'APROBADO_PARCIAL': 'PARCIAL',
             'CANCELADA': 'CANCELADA',
         }.get(waste.status)
-        if decision not in ('APROBADA', 'RECHAZADA', 'CANCELADA'):
+        if decision not in ('APROBADA', 'RECHAZADA', 'PARCIAL', 'CANCELADA'):
             return False
         ResponseInboxRepository._apply_waste_read(user, waste_id, decision)
         db.session.commit()

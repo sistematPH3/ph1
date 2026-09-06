@@ -1,6 +1,6 @@
 import json
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, timezone
+from app.time_utils import current_ve_time
 from app import db
 from app.models import Product
 from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
@@ -264,7 +264,7 @@ class MovementReceptionService:
             final_status = "COMPLETADO"
 
         try:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = current_ve_time()
             audit_discrepancies = []
             specific_novelty_map = {}
 
@@ -422,7 +422,7 @@ class MovementReceptionService:
                 "erroneous_products_delivered": erroneous_audit_list,
                 "notes": notes,
                 "received_by_user_id": user_id,
-                "timestamp": now.isoformat() + "Z"
+                "timestamp": now.isoformat()
             }
 
             MovementReceptionRepository.insert_audit_log({

@@ -62,9 +62,10 @@ class WasteAuditService:
                 return None
 
         # Acciones para mapear cada evento
-        REVERT_ACTIONS = {'REVERSION', 'REVERTIDO', 'REVERTIDA', 'ANULACION', 'ANULADO', 'REVERTIR', 'REVERT', 'CANCELADO', 'CANCELAR'}
-        REJECT_ACTIONS = {'RECHAZO', 'RECHAZADO', 'RECHAZADA', 'RECHAZAR', 'REJECT', 'REJECTED'}
-        APPROVE_ACTIONS = {'APROBACION', 'APROBADO', 'APROBADA', 'APROBAR', 'APPROVE', 'APPROVED'}
+        REVERT_ACTIONS = {'REVERSION', 'REVERTIDO', 'REVERTIDA', 'ANULACION', 'ANULADO', 'REVERTIR', 'REVERT', 'CANCELADO', 'CANCELAR', 'MERMA_CANCELADA'}
+        REJECT_ACTIONS = {'RECHAZO', 'RECHAZADO', 'RECHAZADA', 'RECHAZAR', 'REJECT', 'REJECTED', 'MERMA_RECHAZADA'}
+        APPROVE_ACTIONS = {'APROBACION', 'APROBADO', 'APROBADA', 'APROBAR', 'APPROVE', 'APPROVED', 'MERMA_APROBADA'}
+        MERMA_PARTIAL_ACTIONS = {'MERMA_PARCIAL', 'MERMA_DECISION', 'APROBADO_PARCIAL'}
         PENDING_ACTIONS = {
             'CREACION', 'CREAR', 'CREADO', 'NUEVO', 'REGISTRO', 'REGISTRADO', 'CREATE', 'INSERT',
             'EDICION', 'EDITADO', 'EDITADA', 'CORRECCION', 'CORREGIDO', 'EDIT', 'UPDATE', 'ACTUALIZADO', 'ACTUALIZACION', 'PENDIENTE'
@@ -153,7 +154,33 @@ class WasteAuditService:
             )
 
             normalized_products = []
-            if isinstance(raw_products, list):
+            decisiones_raw = changed_data.get('decisiones')
+            if isinstance(decisiones_raw, list) and decisiones_raw:
+                for item in decisiones_raw:
+                    if not isinstance(item, dict):
+                        continue
+                    p_id = item.get('product_id') or item.get('producto_id')
+                    p_name = (
+                        item.get('product_name') or
+                        item.get('producto') or
+                        item.get('product') or
+                        item.get('nombre')
+                    )
+                    if p_id and (not p_name or str(p_name).isdigit()):
+                        db_pname = resolve_product_name(p_id)
+                        if db_pname:
+                            p_name = db_pname
+                    if not p_name:
+                        p_name = 'Producto'
+                    normalized_products.append({
+                        'producto': str(p_name),
+                        'lote': str(item.get('lot') or item.get('lote') or item.get('lot_number') or ''),
+                        'cantidad': item.get('quantity') or item.get('cantidad') or 0,
+                        'decision': item.get('decision') or '',
+                        'motivo': item.get('motivo') or '',
+                        'foto': item.get('evidence_url') or '',
+                    })
+            elif isinstance(raw_products, list):
                 for item in raw_products:
                     if isinstance(item, dict):
                         p_id = item.get('product_id') or item.get('producto_id')
@@ -289,16 +316,19 @@ class WasteAuditService:
                 elif signal in APPROVE_ACTIONS:
                     status_display = 'APROBADO'
                     break
+                elif signal in MERMA_PARTIAL_ACTIONS:
+                    status_display = 'APROBADO_PARCIAL'
+                    break
                 elif signal in PENDING_ACTIONS:
                     status_display = 'PENDIENTE'
                     break
 
             if not status_display:
-                if any(k in changed_data for k in ['motivo_reversion', 'reversal_reason', 'motivo_anulacion']):
+                if any(changed_data.get(k) for k in ['motivo_reversion', 'reversal_reason', 'motivo_anulacion']):
                     status_display = 'REVERTIDO'
-                elif any(k in changed_data for k in ['motivo_rechazo', 'rejection_reason', 'rechazado_por']):
+                elif any(changed_data.get(k) for k in ['motivo_rechazo', 'rejection_reason', 'rechazado_por']):
                     status_display = 'RECHAZADO'
-                elif any(k in changed_data for k in ['aprobado_por', 'approved_by']) and not any(k in changed_data for k in ['motivo_rechazo', 'motivo_reversion']):
+                elif any(changed_data.get(k) for k in ['aprobado_por', 'approved_by', 'resolved_by']) and not any(changed_data.get(k) for k in ['motivo_rechazo', 'motivo_reversion']):
                     status_display = 'APROBADO'
                 else:
                     status_display = 'PENDIENTE'
@@ -333,6 +363,15 @@ class WasteAuditService:
             if foto_url:
                 changed_data['foto_evidencia_url'] = foto_url
             changed_data['aprobado_por'] = changed_data.get('aprobado_por') or user_display
+
+            fotos = []
+            for p in normalized_products:
+                f = str(p.get('foto') or '').strip()
+                if f:
+                    fotos.append({'url': f, 'label': p.get('producto') or 'Producto'})
+            if not fotos and foto_url:
+                fotos.append({'url': foto_url, 'label': 'Evidencia general'})
+            changed_data['fotos'] = fotos
 
             formatted_logs.append({
                 'id': log.id,

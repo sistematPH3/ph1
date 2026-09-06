@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import text
 from app.extensions import db
@@ -169,7 +169,7 @@ class WasteEditRepository:
             severity="NORMAL",
             user_id=user_id,
             location_id=waste.location_id,
-            timestamp=datetime.utcnow(),
+            timestamp=current_ve_time(),
             changed_data={
                 "event": "MERMA_EDITADA",
                 "waste_id": waste.id,
@@ -227,7 +227,7 @@ class WasteEditRepository:
 
         waste.status = "REVERTIDO"
         waste.reverted_by_id = user_id
-        waste.reverted_at = datetime.utcnow()
+        waste.reverted_at = current_ve_time()
         waste.reversal_reason = reason
 
         audit = AuditLog(
@@ -236,7 +236,7 @@ class WasteEditRepository:
             severity="CRITICO",
             user_id=user_id,
             location_id=waste.location_id,
-            timestamp=datetime.utcnow(),
+            timestamp=current_ve_time(),
             changed_data={
                 "event": "MERMA_REVERTIDA",
                 "waste_id": waste.id,

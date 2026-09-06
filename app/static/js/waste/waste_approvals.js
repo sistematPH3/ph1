@@ -241,14 +241,36 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.remove('ph-confirm-blur');
         modalBody.style.display = '';
         confirmDecisionBody.style.display = 'none';
-        let fotoHtml = '';
-        if (w.evidence_url) {
+        // Galería: TODAS las fotos de la evidencia. Cada producto puede llevar
+        // su propia foto (evidence_url por línea). Si ningún producto tiene foto,
+        // se muestra la foto general de la merma (registros antiguos).
+        const fotos = (w.lines || [])
+            .filter(function (l) { return l.evidence_url; })
+            .map(function (l) { return { url: l.evidence_url, label: l.product_name }; });
+        if (w.evidence_url && fotos.length === 0) {
+            fotos.push({ url: w.evidence_url, label: w.type_name || 'Merma' });
+        }
+        let fotoHtml;
+        if (fotos.length > 0) {
+            const thumbs = fotos.map(function (f) {
+                return '<div class="col-6 col-md-4 col-lg-3">' +
+                    '<div class="border rounded overflow-hidden h-100">' +
+                    '<img src="' + esc(f.url) + '" class="img-fluid w-100" style="height:120px;object-fit:cover;" alt="Evidencia">' +
+                    '<div class="small text-muted px-1 py-1 text-truncate" title="' + esc(f.label) + '">' + esc(f.label) + '</div>' +
+                    '</div></div>';
+            }).join('');
             fotoHtml = '<div class="mb-3"><div class="small text-muted fw-semibold mb-1"><i class="bi bi-image me-1"></i>Evidencia fotográfica</div>' +
-                '<img src="' + esc(w.evidence_url) + '" class="img-fluid rounded border" style="max-height:180px;" alt="Evidencia"></div>';
+                '<div class="row g-2">' + thumbs + '</div></div>';
         } else {
             fotoHtml = '<div class="mb-3 border rounded p-3 text-center bg-light"><div class="small text-muted fw-semibold mb-1"><i class="bi bi-image me-1"></i>Evidencia fotográfica</div>' +
                 '<span class="text-muted fst-italic small"><i class="bi bi-camera-off me-1"></i>No se adjuntó foto</span></div>';
         }
+
+        const puedeDecidir = isAdmin && w.status === 'PENDIENTE' && w.puede_resolver;
+        const pendientes = (w.lines || []).filter(function (l) { return l.status === 'PENDIENTE'; });
+        // La decisión POR PRODUCTO solo aplica cuando hay 2 o más productos.
+        // Con un solo producto se decide con los botones masivos ("Aprobar"/"Rechazar").
+        const esMultiproducto = w.lineas_total > 1;
 
         let rowsHtml = '';
         if (w.lines && w.lines.length > 0) {
@@ -265,6 +287,32 @@ document.addEventListener('DOMContentLoaded', function () {
                     limiteHtml = '<span class="text-muted fst-italic small">Sin configurar</span>';
                 }
                 const stockOk = parseFloat(l.stock_en_lote) >= parseFloat(l.quantity);
+                let decisionHtml = '';
+                if (esMultiproducto) {
+                    if (l.status === 'APROBADO') {
+                        decisionHtml = '<div><span class="badge bg-success rounded-pill px-3"><i class="bi bi-check-circle me-1"></i>Aprobado</span>' +
+                            (l.resolved_by ? '<div class="small text-muted mt-1">' + esc(l.resolved_by) + '</div>' : '') + '</div>';
+                    } else if (l.status === 'RECHAZADO') {
+                        decisionHtml = '<div><span class="badge bg-danger rounded-pill px-3"><i class="bi bi-x-circle me-1"></i>Rechazado</span>' +
+                            (l.resolution_reason ? '<div class="small text-danger mt-1 fst-italic">' + esc(l.resolution_reason) + '</div>' : '') + '</div>';
+                    } else if (puedeDecidir) {
+                        decisionHtml =
+                            '<div class="d-flex flex-column gap-1">' +
+                            '<div class="d-flex gap-1 flex-wrap">' +
+                            '<button type="button" class="btn btn-sm btn-ph-success rounded-pill px-3 btn-line-aprobar" data-detail="' + l.detail_id + '"><i class="bi bi-check-circle me-1"></i>Aprobar</button>' +
+                            '<button type="button" class="btn btn-sm btn-ph-outline-danger rounded-pill px-3 btn-line-rechazar" data-detail="' + l.detail_id + '"><i class="bi bi-x-circle me-1"></i>Rechazar</button>' +
+                            '</div>' +
+                            '<div class="line-reason-wrap" data-detail="' + l.detail_id + '" style="display:none;">' +
+                            '<textarea class="form-control form-control-sm border-danger line-reason-input" rows="2" placeholder="Motivo del rechazo de este producto (mín. 15 caracteres)"></textarea>' +
+                            '<div class="small text-danger line-reason-error" style="display:none;"></div>' +
+                            '<div class="d-flex gap-1 mt-1">' +
+                            '<button type="button" class="btn btn-sm btn-danger rounded-pill px-3 btn-line-confirm-reject" data-detail="' + l.detail_id + '"><i class="bi bi-check2-circle me-1"></i>Confirmar rechazo</button>' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 btn-line-cancel-reject" data-detail="' + l.detail_id + '">Cancelar</button>' +
+                            '</div></div></div>';
+                    } else {
+                        decisionHtml = '<span class="badge bg-light text-dark border rounded-pill px-3">Pendiente</span>';
+                    }
+                }
                 rowsHtml += '<tr>' +
                     '<td>' + esc(l.product_name) + '</td>' +
                     '<td><span class="badge bg-light text-dark border font-monospace">' + esc(l.lot_number || 'N/A') + '</span></td>' +
@@ -273,10 +321,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<td>' + limiteHtml + '</td>' +
                     '<td><span class="badge ' + (stockOk ? 'bg-success' : 'bg-danger') + '">' +
                     Number(l.stock_en_lote).toLocaleString('en-US', { minimumFractionDigits: 2 }) +
-                    '</span> <span class="text-muted small">en sede</span></td></tr>';
+                    '</span> <span class="text-muted small">en sede</span></td>' +
+                    (esMultiproducto ? '<td>' + decisionHtml + '</td>' : '') + '</tr>';
             });
         } else {
-            rowsHtml = '<tr><td colspan="6" class="text-center text-muted py-3">Sin líneas de detalle.</td></tr>';
+            rowsHtml = '<tr><td colspan="7" class="text-center text-muted py-3">Sin líneas de detalle.</td></tr>';
+        }
+
+        let progresoHtml = '';
+        if (esMultiproducto) {
+            progresoHtml = '<div class="small text-muted mb-2"><i class="bi bi-list-check me-1"></i>' +
+                '<b>' + w.lineas_decididas + ' de ' + w.lineas_total + '</b> producto(s) decidido(s)' +
+                (pendientes.length > 0
+                    ? ' · <span class="fw-semibold" style="color:#af1515;">' + pendientes.length + ' pendiente(s)</span>'
+                    : ' · <span class="text-success fw-semibold">todos resueltos</span>') +
+                '</div>';
         }
 
         modalBody.innerHTML =
@@ -288,28 +347,126 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Fecha</span><div class="fw-bold">' + formatFecha(w.date) + '</div></div></div>' +
             '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Cantidad total</span><div class="fw-bold text-danger">' + w.total_quantity + ' uds.</div></div></div>' +
             '</div>' +
+            (esMultiproducto && w.puede_resolver && w.status === 'PENDIENTE'
+                ? '<div class="alert alert-info border-0 py-2 small"><i class="bi bi-ui-checks me-2"></i>Decida <b>producto por producto</b> o use los botones masivos. Algunos pueden aprobarse y otros rechazarse con su propio motivo.</div>'
+                : '') +
             '<div class="mb-2 small text-muted fw-semibold">Motivo / Observaciones</div>' +
             '<div class="alert alert-light border text-dark">' + esc(w.notes || '—') + '</div>' +
             (w.es_autor
                 ? '<div class="alert alert-warning border-0 py-2 small"><i class="bi bi-shield-lock me-2"></i>Usted registró esta merma. La decisión (aprobar/rechazar) debe tomarla <b>otro administrador</b>.</div>'
                 : '') +
             bloqueNovedad(w.novelty) +
-            '<div class="mb-2 small text-muted fw-semibold">Detalle de líneas</div>' +
+            '<div class="mb-1 small text-muted fw-semibold">Detalle de líneas</div>' +
+            progresoHtml +
             '<div class="table-responsive"><table class="table table-sm align-middle"><thead>' +
-            '<tr class="text-uppercase small text-muted"><th>Producto</th><th>Lote</th><th>Vencimiento</th><th>Cant. merma</th><th>Límite de merma</th><th>Stock disponible</th></tr>' +
+            '<tr class="text-uppercase small text-muted"><th>Producto</th><th>Lote</th><th>Vencimiento</th><th>Can. merma</th><th>Límite de merma</th><th>Stock disponible</th><th>Decisión</th></tr>' +
             '</thead><tbody>' + rowsHtml + '</tbody></table></div>';
 
         modalFooter.style.display = 'flex';
-        if (isAdmin && w.status === 'PENDIENTE' && w.puede_resolver) {
+        if (puedeDecidir) {
             decisionButtons.style.display = 'flex';
         } else {
             decisionButtons.style.display = 'none';
         }
+        // Con un solo producto los botones masivos vuelven a "Aprobar"/"Rechazar".
+        const lblAprobar = document.getElementById('lblAprobarTodo');
+        const lblRechazar = document.getElementById('lblRechazarTodo');
+        const helperText = document.getElementById('decisionHelperText');
+        if (lblAprobar) lblAprobar.textContent = esMultiproducto ? 'Aprobar todo' : 'Aprobar';
+        if (lblRechazar) lblRechazar.textContent = esMultiproducto ? 'Rechazar todo' : 'Rechazar';
+        if (helperText) helperText.style.display = esMultiproducto ? '' : 'none';
         confirmButtons.style.display = 'none';
         rejectReasonWrap.style.display = 'none';
         btnRejectModal.style.display = '';
         btnConfirmApprove.style.display = 'inline-block';
         btnConfirmReject.style.display = 'none';
+
+        bindLineDecisionHandlers();
+    }
+
+    function bindLineDecisionHandlers() {
+        modalBody.querySelectorAll('.btn-line-aprobar').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                enviarDecision(Number(btn.dataset.detail), 'aprobar', '');
+            });
+        });
+
+        modalBody.querySelectorAll('.btn-line-rechazar').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const wrap = modalBody.querySelector('.line-reason-wrap[data-detail="' + btn.dataset.detail + '"]');
+                if (wrap) {
+                    wrap.style.display = 'block';
+                    btn.style.display = 'none';
+                }
+            });
+        });
+
+        modalBody.querySelectorAll('.btn-line-cancel-reject').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const wrap = modalBody.querySelector('.line-reason-wrap[data-detail="' + btn.dataset.detail + '"]');
+                const aprobarBtn = modalBody.querySelector('.btn-line-aprobar[data-detail="' + btn.dataset.detail + '"]');
+                const rechazarBtn = modalBody.querySelector('.btn-line-rechazar[data-detail="' + btn.dataset.detail + '"]');
+                if (wrap) {
+                    wrap.style.display = 'none';
+                    const input = wrap.querySelector('.line-reason-input');
+                    const err = wrap.querySelector('.line-reason-error');
+                    if (input) input.value = '';
+                    if (err) {
+                        err.textContent = '';
+                        err.style.display = 'none';
+                    }
+                }
+                if (rechazarBtn) rechazarBtn.style.display = '';
+            });
+        });
+
+        modalBody.querySelectorAll('.btn-line-confirm-reject').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const wrap = modalBody.querySelector('.line-reason-wrap[data-detail="' + btn.dataset.detail + '"]');
+                if (!wrap) return;
+                const input = wrap.querySelector('.line-reason-input');
+                const err = wrap.querySelector('.line-reason-error');
+                const reason = (input.value || '').trim();
+                if (reason.length < 15) {
+                    if (err) {
+                        err.textContent = 'El motivo debe tener al menos 15 caracteres (actual: ' + reason.length + ').';
+                        err.style.display = 'block';
+                    }
+                    return;
+                }
+                const detailId = Number(btn.dataset.detail);
+                btn.disabled = true;
+                enviarDecision(detailId, 'rechazar', reason).finally(function () { btn.disabled = false; });
+            });
+        });
+    }
+
+    async function enviarDecision(detailId, decision, reason) {
+        try {
+            const res = await fetch('/api/waste/merma/' + currentWaste.id + '/decision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({
+                    decisiones: [{ detail_id: detailId, decision: decision, reason: reason }]
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showAlert(data.message, false);
+                if (data.finalizado) {
+                    currentWaste = null;
+                    approvalModal.hide();
+                    await loadPending();
+                } else {
+                    await openDetail(currentWaste.id);
+                }
+            } else {
+                const e = data.errors ? Object.values(data.errors)[0] : (data.message || 'No se pudo completar la acción.');
+                showAlert(e, true);
+            }
+        } catch (err) {
+            showAlert('Error de conexión al decidir el producto.', true);
+        }
     }
 
     function openConfirmDecision(tipo, bodyHtml, reason) {

@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/merma_approvals.css') }}?v=16">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_approvals.css') }}?v=18">
 {% endblock %}
 
 {% block content %}
@@ -89,14 +89,15 @@
                 </div>
                 <button type="button" class="btn btn-secondary" id="btnCloseDetail" data-bs-dismiss="modal">Cerrar</button>
                 <div id="decisionButtons" style="display:none;">
+                    <span class="small text-muted align-self-center me-2 d-none d-md-inline" id="decisionHelperText">Decidir por producto en la tabla:</span>
                     <button type="button" class="btn btn-ph-outline-danger" id="btnRejectModal">
-                        <i class="bi bi-x-circle me-1"></i>Rechazar
+                        <i class="bi bi-x-circle me-1"></i><span id="lblRechazarTodo">Rechazar todo</span>
                     </button>
                     <button type="button" class="btn btn-danger" id="btnConfirmReject" style="display:none;">
                         <i class="bi bi-check2-circle me-1"></i>Confirmar rechazo
                     </button>
                     <button type="button" class="btn btn-ph-success" id="btnConfirmApprove">
-                        <i class="bi bi-check-circle me-1"></i>Aprobar merma
+                        <i class="bi bi-check-circle me-1"></i><span id="lblAprobarTodo">Aprobar todo</span>
                     </button>
                 </div>
                 <div id="confirmButtons" style="display:none;">
@@ -113,7 +114,7 @@
 <script>
     window.WASTE_IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 </script>
-<script src="{{ url_for('static', filename='js/waste/merma_approvals.js') }}?v=19"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_approvals.js') }}?v=23"></script>
 {% endblock %}
 
 

@@ -2,19 +2,22 @@
 
 Parte 3 de la propuesta (Módulo de Mermas). Reúne en un solo archivo la lista
 de mermas en espera y la bandeja donde el Administrador decide aprobar o
-rechazar. Sin lógica de negocio: se delega en merma_approvals_service.py.
+rechazar. Sin lógica de negocio: se delega en waste_approvals_service.py.
 """
 from flask import Blueprint, render_template, jsonify, request, redirect, url_for
 from flask_login import current_user, login_required
 
 from app.decorators.roles import require_roles
-from app.waste.requests.merma_approvals_validators import validate_resolution_payload
-from app.waste.services import merma_approvals_service as svc
+from app.waste.requests.waste_approvals_validators import (
+    validate_lines_decision_payload,
+    validate_resolution_payload,
+)
+from app.waste.services import waste_approvals_service as svc
 
-merma_approvals_bp = Blueprint('merma_approvals', __name__)
+waste_approvals_bp = Blueprint('waste_approvals', __name__)
 
 
-@merma_approvals_bp.route('/waste/merma/approvals', methods=['GET'])
+@waste_approvals_bp.route('/waste/merma/approvals', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def bandeja_aprobaciones():
@@ -24,12 +27,12 @@ def bandeja_aprobaciones():
     aprobar/rechazar; el resto ve solo sus sedes en modo lectura.
     """
     return render_template(
-        'waste/merma_approvals.html',
+        'waste/waste_approvals.html',
         is_admin=bool(getattr(current_user, 'is_admin', False)),
     )
 
 
-@merma_approvals_bp.route('/api/waste/merma/approvals', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/merma/approvals', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def bandeja_api():
@@ -41,7 +44,7 @@ def bandeja_api():
         return jsonify({'success': False, 'message': f'Error al listar mermas: {str(exc)}'}), 500
 
 
-@merma_approvals_bp.route('/api/waste/merma/pending-summary', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/merma/pending-summary', methods=['GET'])
 @login_required
 @require_roles('admin')
 def pending_summary():
@@ -52,7 +55,7 @@ def pending_summary():
         return jsonify({'pending_count': 0, 'items': [], 'error': str(exc)}), 500
 
 
-@merma_approvals_bp.route('/api/waste/merma/<int:waste_id>', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def detalle_merma(waste_id):
@@ -67,7 +70,7 @@ def detalle_merma(waste_id):
         return jsonify({'success': False, 'message': f'Error al cargar el detalle: {str(exc)}'}), 500
 
 
-@merma_approvals_bp.route('/api/waste/merma/<int:waste_id>/approve', methods=['POST'])
+@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/approve', methods=['POST'])
 @login_required
 @require_roles('admin')
 def aprobar_merma(waste_id):
@@ -82,7 +85,7 @@ def aprobar_merma(waste_id):
     return jsonify(result), code
 
 
-@merma_approvals_bp.route('/api/waste/merma/<int:waste_id>/reject', methods=['POST'])
+@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/reject', methods=['POST'])
 @login_required
 @require_roles('admin')
 def rechazar_merma(waste_id):
@@ -93,6 +96,30 @@ def rechazar_merma(waste_id):
         return jsonify({'success': False, 'errors': validation['errors']}), 400
     try:
         result = svc.reject_waste(waste_id, current_user.id, data.get('reason'))
+    except PermissionError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 403
+    except Exception as exc:
+        return jsonify({'success': False, 'message': f'Error interno: {str(exc)}'}), 500
+    code = 200 if result['success'] else 400
+    return jsonify(result), code
+
+
+@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/decision', methods=['POST'])
+@login_required
+@require_roles('admin')
+def decidir_merma(waste_id):
+    """Admin decide POR PRODUCTO las líneas de una merma pendiente.
+
+    Body: {"decisiones": [{"detail_id": 1, "decision": "aprobar"},
+                          {"detail_id": 2, "decision": "rechazar", "reason": "..."}]}
+    Cada producto lleva su propia decisión y, si se rechaza, su motivo.
+    """
+    data = request.get_json(silent=True) or {}
+    validation = validate_lines_decision_payload(data)
+    if not validation['is_valid']:
+        return jsonify({'success': False, 'errors': validation['errors']}), 400
+    try:
+        result = svc.decidir_lineas(waste_id, current_user.id, data.get('decisiones'))
     except PermissionError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 403
     except Exception as exc:

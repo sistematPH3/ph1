@@ -1,4 +1,5 @@
 from app.extensions import db
+from app.time_utils import current_ve_time
 from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
@@ -58,7 +59,14 @@ class Waste(db.Model):
 
 
 class WasteDetail(db.Model):
-    """Línea de una merma (producto + lote + vencimiento + cantidad + costo interno)."""
+    """Línea de una merma (producto + lote + vencimiento + cantidad + costo interno).
+
+    Desde la decisión por producto cada línea lleva SU PROPIO estado de resolución:
+    PENDIENTE/APROBADO/RECHAZADO. La cabecera (Waste.status) sigue siendo la suma
+    final: mientras haya líneas pendientes la merma permanece PENDIENTE; cuando la
+    última línea se decide, la cabecera pasa a APROBADO (todas), RECHAZADO (todas)
+    o APROBADO_PARCIAL (mixto).
+    """
     __tablename__ = 'waste_details'
     __table_args__ = (
         db.Index('idx_waste_details_waste_id', 'waste_id'),
@@ -72,6 +80,13 @@ class WasteDetail(db.Model):
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
     unit_cost = db.Column(db.Numeric(15, 4), nullable=False, default=0)  # Costo interno (M9)
     subtotal_cost = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    evidence_url = db.Column(db.Text)  # Foto de la evidencia de ESE producto (opcional)
+
+    # Decisión por producto
+    status = db.Column(db.String(20), nullable=False, default='PENDIENTE')  # PENDIENTE/APROBADO/RECHAZADO
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    resolved_at = db.Column(db.DateTime)
+    resolution_reason = db.Column(db.Text)  # Motivo si la línea fue RECHAZADA
 
 
 class AppParameter(db.Model):
@@ -97,5 +112,5 @@ class AuditLog(db.Model):
     # NUEVO CAMPO: Relación explícita con la sede para la auditoría
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=current_ve_time)
     changed_data = db.Column(JSONB) # Almacena el antes/después en formato JSON

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from app.time_utils import current_ve_time, TZ_VENEZUELA
 
 def validar_plazo_edicion(timestamp_movimiento, usuario):
     """
@@ -6,7 +6,11 @@ def validar_plazo_edicion(timestamp_movimiento, usuario):
     - Director/Gerente: 24 horas.
     - Administrador: 2 meses (aprox 60 días).
     """
-    tiempo_transcurrido = datetime.now(timezone.utc) - timestamp_movimiento.replace(tzinfo=timezone.utc)
+    ts_base = timestamp_movimiento
+    if ts_base and ts_base.tzinfo is not None:
+        ts_base = ts_base.astimezone(TZ_VENEZUELA).replace(tzinfo=None)
+
+    tiempo_transcurrido = current_ve_time() - (ts_base or current_ve_time())
     horas_transcurridas = tiempo_transcurrido.total_seconds() / 3600
     
     if not usuario.is_admin:

@@ -39,8 +39,8 @@
     <div id="disputeToastContainer" class="dispute-toast-container"
          data-poll-url="{{ url_for('movement_dispute.disputes_summary') }}"
          data-disputes-url="{{ url_for('movement_dispute.list_disputes') }}"
-         data-waste-url="{{ url_for('merma_approvals.pending_summary') }}"
-         data-wastes-url="{{ url_for('merma_approvals.bandeja_aprobaciones') }}"
+         data-waste-url="{{ url_for('waste_approvals.pending_summary') }}"
+         data-wastes-url="{{ url_for('waste_approvals.bandeja_aprobaciones') }}"
          data-user-id="{{ current_user_id or '' }}"
          data-enabled="true"></div>
     <script src="{{ url_for('static', filename='js/notifications.js') }}?v=3"></script>

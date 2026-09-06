@@ -2,12 +2,12 @@
 
 Sigue el patrón Route -> Service -> Repository del proyecto. Aquí SOLO hay
 consultas y escrituras a la base; la lógica de negocio (descuento de stock,
-notificación y auditoría) vive en merma_approvals_service.py.
+notificación y auditoría) vive en waste_approvals_service.py.
 """
 import json
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 
 from app.models.inventory_model import db, Inventory, Product
 from app.models.logistics_model import Location
@@ -119,6 +119,37 @@ class MermaApprovalsRepository:
         return WasteDetail.query.filter_by(waste_id=waste_id).all()
 
     @staticmethod
+    def get_detail_state_counts(waste_ids):
+        """Líneas decididas / totales por merma: {waste_id: (decididas, total)}.
+
+        Sirve para que la bandeja muestre avance cuando la decisión es por
+        producto (algunas líneas ya resueltas, la cabecera aún PENDIENTE).
+        """
+        if not waste_ids:
+            return {}
+        rows = db.session.query(
+            WasteDetail.waste_id,
+            func.count(WasteDetail.id).label('total'),
+            func.coalesce(func.sum(case(
+                (WasteDetail.status != 'PENDIENTE', 1), else_=0
+            )), 0).label('decididas'),
+        ).filter(WasteDetail.waste_id.in_(waste_ids)).group_by(
+            WasteDetail.waste_id
+        ).all()
+        return {
+            r[0]: (int(r[2] or 0), int(r[1] or 0))
+            for r in rows
+        }
+
+    @staticmethod
+    def get_users(ids):
+        """Mapa {user_id: name} de varios usuarios a la vez."""
+        if not ids:
+            return {}
+        users = User.query.filter(User.id.in_(ids)).all()
+        return {u.id: u.name for u in users}
+
+    @staticmethod
     def get_product_names(ids):
         if not ids:
             return {}
@@ -195,6 +226,14 @@ class MermaApprovalsRepository:
         waste.status = new_status
         waste.approved_by_id = user_id
         waste.approved_at = datetime.now()
+
+    @staticmethod
+    def mark_line_resolved(detail, user_id, decision, reason=None):
+        """Marca UNA línea como APROBADO o RECHAZADO (decisión por producto)."""
+        detail.status = 'APROBADO' if decision == 'aprobar' else 'RECHAZADO'
+        detail.resolved_by_id = user_id
+        detail.resolved_at = datetime.now()
+        detail.resolution_reason = (reason or '').strip() or None
 
     @staticmethod
     def mark_cancelled(waste, user_id, reason):

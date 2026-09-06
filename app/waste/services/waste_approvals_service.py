@@ -10,17 +10,20 @@ from datetime import datetime, timedelta
 from app.extensions import db
 from app.models.inventory_model import Product
 from app.models.security_model import Notification
-from app.waste.repositories.merma_approvals_repository import MermaApprovalsRepository
+from app.waste.repositories.waste_approvals_repository import MermaApprovalsRepository
 
 # Tipos de evento de la auditoría de mermas (van dentro de changed_data['event'],
 # nunca en audit_logs.action, que siempre es 'MERMA').
 EV_APROBAR = 'MERMA_APROBADA'
 EV_RECHAZAR = 'MERMA_RECHAZADA'
+EV_PARCIAL = 'MERMA_PARCIAL'        # Decisión final mixta: unos productos sí, otros no.
+EV_DECISION = 'MERMA_DECISION'      # Batch de decisión mientras la merma sigue PENDIENTE.
 EV_CANCELAR = 'MERMA_CANCELADA'
 EV_EDITAR = 'MERMA_EDITADA'
 
 NOTIF_TIPO_APROBADA = 'MERMA_APROBADA'
 NOTIF_TIPO_RECHAZADA = 'MERMA_RECHAZADA'
+NOTIF_TIPO_PARCIAL = 'MERMA_PARCIAL'
 
 # Tipos que SIEMPRE requieren aprobación según la propuesta (regla de TIPO)
 TIPOS_SENSIBLES = ('TEMPERATURA', 'ROBO_SOSPECHA')
@@ -158,7 +161,11 @@ def get_pending_wastes(user_id):
         if not loc_ids:
             return []
         rows = MermaApprovalsRepository.list_pending(loc_ids)
+    counts = MermaApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
     for r in rows:
+        decididas, total = counts.get(r['id'], (0, 0))
+        r['lineas_decididas'] = decididas
+        r['lineas_total'] = total
         r['novelty'] = _clasificar_novedad(
             r['id'], r['location_id'], r['total_quantity'],
             r.get('type_code') or '', bool(r.get('type_requires_approval')),
@@ -236,7 +243,11 @@ def get_pending_wastes_for_view(user_id):
             # Sin sedes: solo sus propias mermas pendientes.
             rows = [r for r in MermaApprovalsRepository.list_pending(None) if r.get('created_by') == user.id]
 
+    counts = MermaApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
     for r in rows:
+        decididas, total = counts.get(r['id'], (0, 0))
+        r['lineas_decididas'] = decididas
+        r['lineas_total'] = total
         fecha = r.get('date')
         r['fecha_display'] = fecha.strftime('%d/%m/%Y %H:%M') if fecha else '—'
         es_autor = (r.get('created_by') == user.id)
@@ -266,6 +277,8 @@ def get_waste_detail(waste_id, user_id):
 
     items = MermaApprovalsRepository.get_details_by_waste(waste_id)
     prods = MermaApprovalsRepository.get_products_info({d.product_id for d in items})
+    resolved_ids = {d.resolved_by_id for d in items if d.resolved_by_id}
+    resolvers = MermaApprovalsRepository.get_users(resolved_ids)
 
     lines = []
     for d in items:
@@ -273,6 +286,7 @@ def get_waste_detail(waste_id, user_id):
         qty = float(d.quantity)
         limite = prods.get(d.product_id, {}).get('waste_limit')
         lines.append({
+            'detail_id': d.id,
             'product_id': d.product_id,
             'product_name': prods.get(d.product_id, {}).get('name') or f'Insumo #{d.product_id}',
             'lot_number': d.lot_number,
@@ -284,8 +298,14 @@ def get_waste_detail(waste_id, user_id):
             'waste_limit': limite,
             'unit': prods.get(d.product_id, {}).get('unit', ''),
             'excede_limite': (limite is not None) and (qty > limite),
+            'status': d.status or 'PENDIENTE',
+            'resolved_by': resolvers.get(d.resolved_by_id) or '',
+            'resolved_at': d.resolved_at.isoformat() if d.resolved_at else None,
+            'resolution_reason': d.resolution_reason or '',
+            'evidence_url': d.evidence_url or '',
         })
 
+    decididas = sum(1 for ln in lines if ln['status'] != 'PENDIENTE')
     return {
         'id': waste.id,
         'location_name': row.location_name,
@@ -302,6 +322,8 @@ def get_waste_detail(waste_id, user_id):
         'es_autor': (waste.user_id == user.id),
         'puede_resolver': getattr(user, 'is_admin', False) and (waste.user_id != user.id),
         'total_quantity': float(waste.total_quantity or 0),
+        'lineas_decididas': decididas,
+        'lineas_total': len(lines),
         'novelty': _clasificar_novedad(
             waste.id, waste.location_id, float(waste.total_quantity or 0),
             row.type_code or '', bool(row.type_requires_approval),
@@ -324,39 +346,233 @@ def _stock_disponible(location_id, product_id):
     return float(inv.current_quantity or 0)
 
 
-def _descontar_stock(waste):
-    """Descuenta current_quantity por producto/sede por cada línea de la merma.
+def _descontar_stock_lines(waste, details):
+    """Descuenta current_quantity por producto/sede por cada línea a aprobar.
 
-    Valida que el stock alcance antes de descontar. Si algún producto no tiene
-    suficiente stock se aborta (nada se descuenta; quien llama revierte).
+    Valida que el stock alcance ANTES de descontar (de forma acumulada cuando
+    varias líneas de la misma sede apuntan al mismo insumo). Si algún producto
+    no tiene suficiente stock se aborta: nada se descuenta.
     """
     cambios = []
-    for d in waste.details:
+    saldos = {}
+    for d in details:
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         if inv is None:
             raise ValueError(
                 f'No existe inventario para el insumo #{d.product_id} en la sede #{waste.location_id}.'
             )
         stock = float(inv.current_quantity or 0)
+        disponible = saldos.get(d.product_id, stock)
         qty = float(d.quantity or 0)
-        if stock < qty:
+        if disponible < qty:
             prod = Product.query.get(d.product_id)
             nombre = prod.name if prod else f'#{d.product_id}'
             raise ValueError(
-                f'Stock insuficiente para {nombre}: disponible {stock:.2f}, merma {qty:.2f}.'
+                f'Stock insuficiente para {nombre}: disponible {disponible:.2f}, merma {qty:.2f}.'
             )
-        inv.current_quantity = round(stock - qty, 2)
+        saldos[d.product_id] = disponible - qty
         cambios.append({
             'product_id': d.product_id,
             'quantity': qty,
-            'stock_antes': stock,
-            'stock_despues': float(inv.current_quantity),
+            'stock_antes': disponible,
+            'stock_despues': disponible - qty,
         })
+    # Aplicar los descuentos una vez validado todo.
+    for d in details:
+        inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+        inv.current_quantity = round(float(inv.current_quantity or 0) - float(d.quantity or 0), 2)
     return cambios
 
 
+def _productos_name(ids):
+    """Mapa {product_id: nombre} para los payloads de auditoría."""
+    prods = MermaApprovalsRepository.get_products_info(ids)
+    return {pid: info.get('name', f'#{pid}') for pid, info in prods.items()}
+
+
+def decidir_lineas(waste_id, user_id, decisiones):
+    """Aplica la decisión POR PRODUCTO a una merma pendiente.
+
+    decisiones: lista de {detail_id, decision: 'aprobar'|'rechazar', reason?}
+    - aprobar: descuenta el stock de esa línea y la marca APROBADO.
+    - rechazar: no toca stock, exige motivo y la marca RECHAZADO.
+
+    Mientras queden líneas PENDIENTES la cabecera sigue PENDIENTE (el Admin
+    puede reabrir la merma). Al decidirse la última línea, la cabecera pasa a
+    APROBADO / RECHAZADO / APROBADO_PARCIAL y se notifica al autor una sola vez
+    con el resumen. Cada batch escribe una auditoría con el detalle por línea.
+    """
+    user = _only_admin(user_id)
+    waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
+    if not waste:
+        return {'success': False, 'message': 'La merma no existe.'}
+    if waste.status != 'PENDIENTE':
+        return {
+            'success': False,
+            'message': f'Solo se pueden decidir mermas pendientes (estado actual: {waste.status}).',
+        }
+    if waste.user_id == user.id:
+        return {
+            'success': False,
+            'message': 'No puede decidir una merma que usted mismo registró. Debe resolverla otro administrador.',
+        }
+
+    detalle = {d.id: d for d in waste.details}
+    aprobar = []
+    rechazar = []
+    usados = set()
+    for dec in decisiones:
+        try:
+            detail_id = int(dec.get('detail_id'))
+        except (TypeError, ValueError):
+            return {'success': False, 'message': 'Identificador de línea inválido.'}
+        if detail_id in usados:
+            continue
+        usados.add(detail_id)
+        d = detalle.get(detail_id)
+        if not d:
+            return {'success': False, 'message': f'La línea #{detail_id} no pertenece a la merma #{waste_id}.'}
+        if d.status != 'PENDIENTE':
+            return {
+                'success': False,
+                'message': f'El producto de la línea #{detail_id} ya fue decidido ({d.status}).',
+            }
+        if dec.get('decision') == 'aprobar':
+            aprobar.append(d)
+        elif dec.get('decision') == 'rechazar':
+            rechazar.append((d, (dec.get('reason') or '').strip()))
+        else:
+            return {'success': False, 'message': f'Decisión inválida en la línea #{detail_id}.'}
+
+    if not aprobar and not rechazar:
+        return {'success': False, 'message': 'No hay líneas pendientes por decidir en esta merma.'}
+
+    for _d, reason in rechazar:
+        if len(reason) < 15:
+            return {
+                'success': False,
+                'message': 'El motivo de rechazo de cada producto debe tener al menos 15 caracteres.',
+            }
+
+    try:
+        cambios = _descontar_stock_lines(waste, aprobar) if aprobar else []
+    except Exception as exc:
+        db.session.rollback()
+        return {'success': False, 'message': str(exc)}
+
+    for d in aprobar:
+        MermaApprovalsRepository.mark_line_resolved(d, user.id, 'aprobar')
+    for d, reason in rechazar:
+        MermaApprovalsRepository.mark_line_resolved(d, user.id, 'rechazar', reason)
+
+    pendientes = [d for d in detalle.values() if (d.status or 'PENDIENTE') == 'PENDIENTE']
+    finalizado = not pendientes
+
+    if finalizado:
+        todas_aprobadas = all(d.status == 'APROBADO' for d in detalle.values())
+        todas_rechazadas = all(d.status == 'RECHAZADO' for d in detalle.values())
+        if todas_aprobadas:
+            estado_final = 'APROBADO'
+        elif todas_rechazadas:
+            estado_final = 'RECHAZADO'
+        else:
+            estado_final = 'APROBADO_PARCIAL'
+        MermaApprovalsRepository.mark_resolved(waste, user.id, estado_final)
+
+    # --- Auditoría del batch con detalle por línea ---
+    nombres = _productos_name({d.product_id for d in aprobar} | {d.product_id for d, _reason in rechazar})
+    decisiones_audit = []
+    for d in aprobar:
+        cambio = next(c for c in cambios if c['product_id'] == d.product_id and c['quantity'] == float(d.quantity or 0))
+        decisiones_audit.append({
+            'detail_id': d.id,
+            'product_id': d.product_id,
+            'product_name': nombres.get(d.product_id, f'#{d.product_id}'),
+            'lot': d.lot_number or 'N/A',
+            'quantity': float(d.quantity or 0),
+            'decision': 'APROBADO',
+            'motivo': '',
+            'evidence_url': d.evidence_url or '',
+            'stock_antes': cambio['stock_antes'],
+            'stock_despues': cambio['stock_despues'],
+        })
+    for d, reason in rechazar:
+        decisiones_audit.append({
+            'detail_id': d.id,
+            'product_id': d.product_id,
+            'product_name': nombres.get(d.product_id, f'#{d.product_id}'),
+            'lot': d.lot_number or 'N/A',
+            'quantity': float(d.quantity or 0),
+            'decision': 'RECHAZADO',
+            'motivo': reason or '',
+            'evidence_url': d.evidence_url or '',
+            'stock_antes': None,
+            'stock_despues': None,
+        })
+
+    motivos_rechazo = [reason for _d, reason in rechazar if reason and reason.strip()]
+
+    if finalizado:
+        event = EV_APROBAR if estado_final == 'APROBADO' else \
+            (EV_RECHAZAR if estado_final == 'RECHAZADO' else EV_PARCIAL)
+    else:
+        event = EV_DECISION
+    severity = 'ALERTA' if rechazar else 'NORMAL'
+
+    MermaApprovalsRepository.create_audit(
+        waste, user.id, event, severity,
+        {
+            'merma_id': waste.id,
+            'resolved_by': user.name,
+            'resolved_by_id': user.id,
+            'decisiones': decisiones_audit,
+            'descuentos_stock': cambios,
+            'productos': [
+                {
+                    'producto': x['product_name'],
+                    'lote': x['lot'],
+                    'cantidad': x['quantity'],
+                    'decision': x['decision'],
+                    'motivo': x['motivo'],
+                    'foto': x.get('evidence_url') or '',
+                }
+                for x in decisiones_audit
+            ],
+            **({'motivo_rechazo': ' | '.join(motivos_rechazo)} if motivos_rechazo else {}),
+            'decididas': sum(1 for x in decisiones_audit if x['decision'] == 'APROBADO'),
+            'rechazadas': sum(1 for x in decisiones_audit if x['decision'] == 'RECHAZADO'),
+            'total_quantity': float(waste.total_quantity or 0),
+            'finalizado': finalizado,
+        },
+    )
+
+    if finalizado:
+        _avisar_autor_final(waste, user, decisiones_audit)
+        db.session.commit()
+        resumen = {
+            'a': sum(1 for x in decisiones_audit if x['decision'] == 'APROBADO'),
+            'r': sum(1 for x in decisiones_audit if x['decision'] == 'RECHAZADO'),
+        }
+        if estado_final == 'APROBADO':
+            return {'success': True, 'message': f'Merma #{waste.id} aprobada y stock descontado.', 'finalizado': True}
+        if estado_final == 'RECHAZADO':
+            return {'success': True, 'message': f'Merma #{waste.id} rechazada (no se tocó el stock).', 'finalizado': True}
+        return {
+            'success': True,
+            'message': f'Merma #{waste.id} resuelta: {resumen["a"]} producto(s) aprobado(s) y {resumen["r"]} rechazado(s).',
+            'finalizado': True,
+        }
+
+    db.session.commit()
+    return {
+        'success': True,
+        'message': f'Decisión guardada ({len(decisiones_audit)} producto(s)). La merma sigue pendiente con {len(pendientes)} línea(s) por decidir.',
+        'finalizado': False,
+    }
+
+
 def approve_waste(waste_id, user_id):
-    """Admin aprueba una merma PENDIENTE: descuenta stock + audita + notifica."""
+    """Admin aprueba TODAS las líneas pendientes de una merma: descuenta stock."""
     user = _only_admin(user_id)
     waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
@@ -371,34 +587,15 @@ def approve_waste(waste_id, user_id):
             'success': False,
             'message': 'No puede aprobar una merma que usted mismo registró. Debe resolverla otro administrador.',
         }
-
-    try:
-        cambios = _descontar_stock(waste)
-    except Exception as exc:
-        db.session.rollback()
-        return {'success': False, 'message': str(exc)}
-
-    try:
-        MermaApprovalsRepository.mark_resolved(waste, user.id, 'APROBADO')
-        MermaApprovalsRepository.create_audit(
-            waste, user.id, EV_APROBAR, 'NORMAL',
-            {
-                'approved_by': user.name,
-                'approved_by_id': user.id,
-                'descuentos_stock': cambios,
-                'total_quantity': float(waste.total_quantity or 0),
-            },
-        )
-        _avisar_autor(waste, NOTIF_TIPO_APROBADA, 'aprobada', user)
-        db.session.commit()
-        return {'success': True, 'message': f'Merma #{waste.id} aprobada y stock descontado.'}
-    except Exception as exc:
-        db.session.rollback()
-        return {'success': False, 'message': f'Error al aprobar la merma: {str(exc)}'}
+    pendientes = [d for d in waste.details if (d.status or 'PENDIENTE') == 'PENDIENTE']
+    if not pendientes:
+        return {'success': False, 'message': 'No hay líneas pendientes por aprobar en esta merma.'}
+    decisiones = [{'detail_id': d.id, 'decision': 'aprobar'} for d in pendientes]
+    return decidir_lineas(waste_id, user_id, decisiones)
 
 
 def reject_waste(waste_id, user_id, reason):
-    """Admin rechaza una merma PENDIENTE: no toca stock + audita + notifica."""
+    """Admin rechaza TODAS las líneas pendientes de una merma: no toca stock."""
     user = _only_admin(user_id)
     waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
@@ -413,24 +610,11 @@ def reject_waste(waste_id, user_id, reason):
             'success': False,
             'message': 'No puede rechazar una merma que usted mismo registró. Debe resolverla otro administrador.',
         }
-
-    try:
-        MermaApprovalsRepository.mark_resolved(waste, user.id, 'RECHAZADO')
-        MermaApprovalsRepository.create_audit(
-            waste, user.id, EV_RECHAZAR, 'ALERTA',
-            {
-                'rejected_by': user.name,
-                'rejected_by_id': user.id,
-                'motivo_rechazo': (reason or '').strip(),
-                'total_quantity': float(waste.total_quantity or 0),
-            },
-        )
-        _avisar_autor(waste, NOTIF_TIPO_RECHAZADA, 'rechazada', user)
-        db.session.commit()
-        return {'success': True, 'message': f'Merma #{waste.id} rechazada (no se tocó el stock).'}
-    except Exception as exc:
-        db.session.rollback()
-        return {'success': False, 'message': f'Error al rechazar la merma: {str(exc)}'}
+    pendientes = [d for d in waste.details if (d.status or 'PENDIENTE') == 'PENDIENTE']
+    if not pendientes:
+        return {'success': False, 'message': 'No hay líneas pendientes por rechazar en esta merma.'}
+    decisiones = [{'detail_id': d.id, 'decision': 'rechazar', 'reason': reason} for d in pendientes]
+    return decidir_lineas(waste_id, user_id, decisiones)
 
 
 def cancel_waste(waste_id, user_id, reason):
@@ -438,7 +622,8 @@ def cancel_waste(waste_id, user_id, reason):
 
     Pueden: el Admin, el autor y los usuarios de la sede de la merma. No toca
     stock (la pendiente nunca lo descontó): pasa a CANCELADA, se audita con el
-    motivo y queda constancia en la Auditoría de Inventario.
+    motivo y queda constancia en la Auditoría de Inventario. Si ya hay líneas
+    decididas no se puede cancelar (parte del stock ya fue descontada).
     """
     user = MermaApprovalsRepository.get_user_by_id(user_id)
     if not user:
@@ -457,11 +642,19 @@ def cancel_waste(waste_id, user_id, reason):
             'message': 'Solo el Admin o usuarios de la sede de la merma pueden cancelarla.',
         }
 
+    decididas = [d for d in waste.details if (d.status or 'PENDIENTE') != 'PENDIENTE']
+    if decididas:
+        return {
+            'success': False,
+            'message': 'No se puede cancelar: ya hay producto(s) decidido(s) en esta merma.',
+        }
+
     try:
         MermaApprovalsRepository.mark_cancelled(waste, user.id, reason)
         MermaApprovalsRepository.create_audit(
             waste, user.id, EV_CANCELAR, 'ALERTA',
             {
+                'merma_id': waste.id,
                 'cancelled_by': user.name,
                 'cancelled_by_id': user.id,
                 'motivo_cancelacion': (reason or '').strip(),
@@ -475,11 +668,31 @@ def cancel_waste(waste_id, user_id, reason):
         return {'success': False, 'message': f'Error al cancelar la merma: {str(exc)}'}
 
 
-def _avisar_autor(waste, tipo, verbo, admin):
-    """Notifica al autor de la merma que su merma fue aprobada o rechazada."""
+def _avisar_autor_final(waste, admin, decisiones_audit):
+    """Notifica al autor UNA Vez cuando TODAS las líneas están decididas.
+
+    La notificación resume la decisión por producto: aprobadas/rechazadas.
+    """
     autor = MermaApprovalsRepository.get_user_by_id(waste.user_id)
     if not autor or autor.id == admin.id:
         return
+    # Cuenta REAL de la merma completa, no solo del batch actual: en una decisión
+    # parcial previa ya pudieron quedar líneas APROBADAS/RECHAZADAS.
+    todas = waste.details
+    aprobadas = sum(1 for x in todas if (x.status or '') == 'APROBADO')
+    rechazadas = sum(1 for x in todas if (x.status or '') == 'RECHAZADO')
+    if rechazadas == 0:
+        tipo = NOTIF_TIPO_APROBADA
+        mensaje = f'Tu merma #{waste.id} fue aprobada ({aprobadas} producto(s), stock descontado).'
+    elif aprobadas == 0:
+        tipo = NOTIF_TIPO_RECHAZADA
+        mensaje = f'Tu merma #{waste.id} fue rechazada ({rechazadas} producto(s)).'
+    else:
+        tipo = NOTIF_TIPO_PARCIAL
+        mensaje = (
+            f'Tu merma #{waste.id} fue resuelta parcialmente: '
+            f'{aprobadas} aprobado(s) y {rechazadas} rechazado(s).'
+        )
     if Notification.query.filter_by(
         user_id=autor.id, type=tipo, waste_id=waste.id, is_read=False
     ).first():
@@ -489,6 +702,6 @@ def _avisar_autor(waste, tipo, verbo, admin):
         location_id=waste.location_id,
         waste_id=waste.id,
         type=tipo,
-        message=f'Tu merma #{waste.id} fue {verbo} por el Administrador.',
+        message=mensaje,
         is_read=False,
     ))

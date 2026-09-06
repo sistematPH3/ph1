@@ -1,6 +1,7 @@
 from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
 from app.models import Location, Movement, PurchaseAuditLog, Product, WasteDetail
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
+from app.time_utils import current_ve_time, TZ_VENEZUELA
 from decimal import Decimal
 import json
 import re
@@ -160,10 +161,10 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
         return {'success': False, 'message': 'Operación denegada. El perfil de finanzas posee atributos de solo lectura.'}
 
     log_timestamp = original_log_tuple.timestamp
-    if log_timestamp.tzinfo is None:
-        log_timestamp = log_timestamp.replace(tzinfo=timezone.utc)
+    if log_timestamp is not None and log_timestamp.tzinfo is None:
+        log_timestamp = log_timestamp.replace(tzinfo=TZ_VENEZUELA)
     
-    now = datetime.now(timezone.utc)
+    now = datetime.now(TZ_VENEZUELA)
     diff_hours = (now - log_timestamp).total_seconds() / 3600
 
     if not is_admin:
@@ -367,7 +368,7 @@ def _entry_seed(row, sede, product, c, is_admin, read_only_role, now):
     ts = row.timestamp
     ts_aware = None
     if ts is not None:
-        ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=TZ_VENEZUELA)
 
     entry = {
         'id': row.id,
@@ -610,7 +611,7 @@ def _resolve_purchase_id(log, c, ts):
         .order_by(PurchaseAuditLog.timestamp.desc())
         .all()
     ):
-        if pa.timestamp and abs((_to_naive(pa.timestamp) - _to_naive(ts)).total_seconds()) <= 90:
+        if pa.timestamp and ts and abs((_to_naive(pa.timestamp) - (_to_naive(ts) + timedelta(hours=4))).total_seconds()) <= 90:
             return pa.purchase_id
     return None
 
@@ -727,7 +728,7 @@ def get_inventory_audit_entries(filters, user, is_admin):
         or bool(getattr(user, 'is_manager', False))
         or bool(getattr(user, 'is_finance', False))
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(TZ_VENEZUELA)
 
     rows = []
     for log in raw_logs:
@@ -779,6 +780,67 @@ def get_inventory_audit_entries(filters, user, is_admin):
                 wid = None
 
             detalles = merma_details.get(wid) or []
+
+            # --- Decisión POR PRODUCTO (payload nuevo): una fila por línea decidida.
+            #    Cubre MERMA_APROBADA / MERMA_RECHAZADA / MERMA_DECISION (parcial) /
+            #    MERMA_PARCIAL (final mixta). Cada producto lleva su propia decisión,
+            #    su motivo (si fue rechazado) y su efecto en stock (si fue aprobado).
+            decisiones = c.get('decisiones') or []
+            if decisiones:
+                admin_name = c.get('resolved_by') or c.get('approved_by') or c.get('rejected_by') or 'Administración'
+                for dec in decisiones:
+                    dia_decision = (dec.get('decision') or '').upper()
+                    esR = dia_decision == 'RECHAZADO'
+                    pid = dec.get('product_id')
+                    try:
+                        pid = int(pid) if pid is not None else None
+                    except (TypeError, ValueError):
+                        pid = None
+                    qty = float(dec.get('quantity') or 0)
+                    if esR:
+                        prev_qty = 0.0
+                        new_qty = 0.0
+                    else:
+                        prev_qty = float(dec.get('stock_antes') or 0)
+                        new_qty = float(dec.get('stock_despues') or 0)
+                    motivo_linea = str(dec.get('motivo') or '').strip()
+
+                    if esR:
+                        texto = (
+                            f"Merma RECHAZADA en el producto "
+                            f"{dec.get('product_name') or product_map.get(pid, 'N/D')}{(' #' + str(wid)) if wid else ''} "
+                            f"por {admin_name}. Sin descuento de stock."
+                            + (f" Motivo: {motivo_linea}" if motivo_linea else "")
+                        )
+                    else:
+                        texto = (
+                            f"Merma aprobada en el producto "
+                            f"{dec.get('product_name') or product_map.get(pid, 'N/D')}{(' #' + str(wid)) if wid else ''} "
+                            f"por {admin_name}. Stock: {prev_qty:.2f} → {new_qty:.2f}."
+                        )
+
+                    merma_row = dict(entry)
+                    merma_row.update({
+                        'event_type': 'inventory',
+                        'product': dec.get('product_name') or product_map.get(pid, f'Insumo #{pid}' if pid else 'N/A'),
+                        'sku': 'N/A',
+                        'lot': dec.get('lot') or 'N/A',
+                        'qty': -qty,
+                        'prev_qty': prev_qty,
+                        'new_qty': new_qty,
+                        'is_merma': True,
+                        'is_merma_rejected': esR,
+                        'is_merma_cancelled': False,
+                        'is_merma_edited': False,
+                        'is_merma_parcial': event in ('MERMA_DECISION', 'MERMA_PARCIAL'),
+                        'is_adjustment': False,
+                        'is_annulled': False,
+                        'can_manage': False,
+                        'notes': texto,
+                    })
+                    rows.append(merma_row)
+                continue
+
             stock_map = {}
             admin_name = 'Administración'
             motivo = ''

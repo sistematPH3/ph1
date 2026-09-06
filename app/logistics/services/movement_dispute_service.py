@@ -10,6 +10,7 @@
 # delegar en estas funciones y devolver respuestas.
 
 from datetime import datetime, timedelta
+from app.time_utils import current_ve_time
 from decimal import Decimal
 import json
 
@@ -560,7 +561,7 @@ def resolve_dispute(movement_id, payload, user_id):
             "resolution_summary": resolution_summary,
             "linked_return_movement_id": linked_return_movement_id,
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": current_ve_time().isoformat()
         }
     ))
 
