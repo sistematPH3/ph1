@@ -52,7 +52,7 @@ from app import create_app, db
 from app.models import (
     AuditLog, AppParameter, Inventory, Location, Movement, MovementDetail, Notification,
     Product, Purchase, PurchaseDetail, Role, Supplier, User, Waste,
-    WasteType,
+    WasteDetail, WasteDetailPhoto, WasteType,
 )
 from app.waste.services.register_waste_service import get_form_data, register_waste
 from app.waste.repositories.register_waste_repository import RegisterWasteRepository
@@ -719,6 +719,96 @@ class WasteRegisterTest(unittest.TestCase):
         waste = Waste.query.get(res["waste_id"])
         self.assertIsNone(waste.evidence_url)
 
+    def test_foto_opcional_por_item_se_guarda_en_linea(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 2.0,
+             "evidence_url": "https://i.imgbb.com/item1.jpg"}
+        ], evidence_url="https://i.imgbb.com/general.jpg")
+        self.assertTrue(res["success"])
+        waste = Waste.query.get(res["waste_id"])
+        self.assertEqual(waste.evidence_url, "https://i.imgbb.com/general.jpg")
+        detail = WasteDetail.query.filter_by(waste_id=waste.id).first()
+        self.assertEqual(detail.evidence_url, "https://i.imgbb.com/item1.jpg")
+
+    def test_foto_opcional_por_item_ausente_queda_nula(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 2.0}
+        ])
+        self.assertTrue(res["success"])
+        waste = Waste.query.get(res["waste_id"])
+        detail = WasteDetail.query.filter_by(waste_id=waste.id).first()
+        self.assertIsNone(detail.evidence_url)
+
+    def test_payload_item_con_evidencia_no_url_rechazado_por_validador(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        from app.waste.requests.register_waste_validators import validate_register_waste_payload
+        data = {
+            "location_id": env["location_id"],
+            "waste_type_id": env["waste_type"].id,
+            "notes": "Prueba",
+            "items": [
+                {"product_id": env["product_id"], "lot_number": "L-001",
+                 "quantity": 2.0, "evidence_url": 12345}
+            ],
+        }
+        res = validate_register_waste_payload(data)
+        self.assertFalse(res["is_valid"])
+        self.assertIn("item_0_evidence_url", res["errors"])
+
+    def test_fotos_multiple_por_item_se_guardan_en_tabla(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 2.0,
+             "evidence_urls": ["https://i.imgbb.com/f1.jpg",
+                               "https://i.imgbb.com/f2.jpg",
+                               "https://i.imgbb.com/f3.jpg"],
+             "evidence_url": "https://i.imgbb.com/f1.jpg"}
+        ], evidence_url="https://i.imgbb.com/general.jpg")
+        self.assertTrue(res["success"])
+        waste = Waste.query.get(res["waste_id"])
+        detail = WasteDetail.query.filter_by(waste_id=waste.id).first()
+        self.assertEqual(detail.evidence_url, "https://i.imgbb.com/f1.jpg")
+        photos = WasteDetailPhoto.query.filter_by(waste_detail_id=detail.id).all()
+        self.assertEqual(len(photos), 3)
+        self.assertEqual([p.photo_url for p in sorted(photos, key=lambda p: p.position)],
+                         ["https://i.imgbb.com/f1.jpg", "https://i.imgbb.com/f2.jpg",
+                          "https://i.imgbb.com/f3.jpg"])
+        self.assertEqual([p.position for p in sorted(photos, key=lambda p: p.position)], [1, 2, 3])
+
+    def test_fotos_multiple_sin_evidencia_no_crea_filas(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 2.0}
+        ])
+        self.assertTrue(res["success"])
+        waste = Waste.query.get(res["waste_id"])
+        detail = WasteDetail.query.filter_by(waste_id=waste.id).first()
+        self.assertIsNone(detail.evidence_url)
+        photos = WasteDetailPhoto.query.filter_by(waste_detail_id=detail.id).all()
+        self.assertEqual(len(photos), 0)
+
+    def test_payload_item_con_evidence_urls_invalidas_rechazado(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        from app.waste.requests.register_waste_validators import validate_register_waste_payload
+        data = {
+            "location_id": env["location_id"],
+            "waste_type_id": env["waste_type"].id,
+            "notes": "Prueba",
+            "items": [
+                {"product_id": env["product_id"], "lot_number": "L-001",
+                 "quantity": 2.0, "evidence_urls": "no-es-una-lista"}
+            ],
+        }
+        res = validate_register_waste_payload(data)
+        self.assertFalse(res["is_valid"])
+        self.assertIn("item_0_evidence_urls", res["errors"])
+        data["items"][0]["evidence_urls"] = ["https://i.imgbb.com/ok.jpg", 123]
+        res2 = validate_register_waste_payload(data)
+        self.assertFalse(res2["is_valid"])
+        self.assertIn("item_0_evidence_urls", res2["errors"])
+
     def test_evidence_rechaza_archivo_no_imagen(self):
         env = self._seed_env(stock=50.0, waste_limit=20.0)
         client = self.app.test_client()
@@ -805,8 +895,8 @@ class WasteRegisterTest(unittest.TestCase):
         types = []
         for name, code in catalog:
             t = WasteType(name=name, code=code, severity="MEDIA",
-                          requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
-                          applies_central=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
+requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
+            applies_central=code in ("VENCIDO", "TEMPERATURA", "ROBO_SOSPECHA"),
                           is_active=True)
             db.session.add(t)
             types.append(t)
@@ -1107,30 +1197,21 @@ class WasteRegisterTest(unittest.TestCase):
         self.assertFalse(res["success"])
         self.assertIn("no aplica a la Sede Central", res["message"])
 
-    def test_central_vencido_sin_parametro_rechaza_y_con_parametro_aprueba(self):
-        env = self._seed_central_env()
+    def test_central_vencido_permite_por_defecto(self):
+        env = self._seed_central_env(lot_expiration=date.today() - timedelta(days=30))
         env["waste_type"].applies_central = False
         db.session.commit()
-        v = env["waste_type"]
-        res_sin = register_waste(
-            user_id=env["user_id"], location_id=1, waste_type_id=v.id,
+        res = register_waste(
+            user_id=env["user_id"], location_id=1, waste_type_id=env["waste_type"].id,
             items=[{"product_id": env["product"].id, "lot_number": env["lot"],
                     "quantity": 3.0}],
             notes="Vencido",
         )
-        self.assertFalse(res_sin["success"])
-        self.assertIn("no aplica a la Sede Central", res_sin["message"])
+        self.assertTrue(res["success"])
+        self.assertNotIn("no aplica a la Sede Central", (res.get("message") or ""))
 
-        db.session.add(AppParameter(key="VENCIDO_APLICA_CENTRAL", value="true",
-                                    description="Permite VENCIDO en Central"))
-        db.session.commit()
-        res_con = register_waste(
-            user_id=env["user_id"], location_id=1, waste_type_id=v.id,
-            items=[{"product_id": env["product"].id, "lot_number": env["lot"],
-                    "quantity": 3.0}],
-            notes="Vencido",
-        )
-        self.assertTrue(res_con["success"])
+        vencidos = RegisterWasteRepository.get_expired_lots(1)
+        self.assertEqual(len(vencidos), 1)
 
     # ------------------------------------------------------------------
     # 7) VALIDADOR DE PAYLOAD
@@ -1291,7 +1372,7 @@ class WasteRegisterTest(unittest.TestCase):
         codes = [t["code"] for t in resp.get_json()["types"]]
         self.assertIn("VENCIDO", codes)
 
-    def test_vencido_central_se_omite_sin_parametro(self):
+    def test_vencido_central_aparece_por_defecto(self):
         env = self._seed_central_env()
         env["waste_type"].applies_central = False
         db.session.commit()
@@ -1300,7 +1381,9 @@ class WasteRegisterTest(unittest.TestCase):
             sess["_user_id"] = str(env["user_id"])
         central = client.get("/api/waste/locations/1/types").get_json()
         codes = [t["code"] for t in central["types"]]
-        self.assertNotIn("VENCIDO", codes)
+        self.assertIn("VENCIDO", codes)
+        for t in central["types"]:
+            self.assertNotIn("DANADO", t["code"])
 
     def test_vencido_central_aparece_con_parametro(self):
         env = self._seed_central_env()
@@ -1316,7 +1399,7 @@ class WasteRegisterTest(unittest.TestCase):
         codes = [t["code"] for t in central["types"]]
         self.assertIn("VENCIDO", codes)
 
-    def test_vencido_central_parametro_false_lo_omite(self):
+    def test_vencido_central_parametro_false_igual_aparece(self):
         env = self._seed_central_env()
         env["waste_type"].applies_central = False
         db.session.add(AppParameter(
@@ -1328,9 +1411,9 @@ class WasteRegisterTest(unittest.TestCase):
             sess["_user_id"] = str(env["user_id"])
         central = client.get("/api/waste/locations/1/types").get_json()
         codes = [t["code"] for t in central["types"]]
-        self.assertNotIn("VENCIDO", codes)
+        self.assertIn("VENCIDO", codes)
 
-    def test_banner_omite_central_sin_permiso(self):
+    def test_banner_incluye_central_por_defecto(self):
         env = self._seed_central_env(lot="L-CEN")
         env["waste_type"].applies_central = False
         db.session.commit()
@@ -1339,7 +1422,8 @@ class WasteRegisterTest(unittest.TestCase):
             sess["_user_id"] = str(env["user_id"])
         page = client.get("/waste/merma/new")
         self.assertEqual(page.status_code, 200)
-        self.assertNotIn("L-CEN", page.get_data(as_text=True))
+        self.assertIn("Almacén Central", page.get_data(as_text=True))
+        self.assertIn("L-CEN", page.get_data(as_text=True))
 
     def test_banner_incluye_central_con_parametro(self):
         env = self._seed_central_env(lot="L-CEN")
@@ -1567,6 +1651,129 @@ class WasteRegisterTest(unittest.TestCase):
         data = RegisterWasteRepository.get_time_rule_data(env["location_id"])
         self.assertGreaterEqual(data["days_since_last"], 19)
         self.assertLessEqual(data["days_since_last"], 22)
+
+    # ------------------------------------------------------------------
+    # 10) IDEMPOTENCIA (request_id)
+    # ------------------------------------------------------------------
+    def test_request_id_duplicado_no_crea_doble_merma(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0}]
+
+        res1 = register_waste(
+            user_id=env["user_id"],
+            location_id=env["location_id"],
+            waste_type_id=env["waste_type"].id,
+            items=items,
+            notes="Prueba idempotencia",
+            request_id="req-abc-123",
+        )
+        self.assertTrue(res1["success"])
+        self.assertEqual(res1["status"], "APROBADO")
+
+        res2 = register_waste(
+            user_id=env["user_id"],
+            location_id=env["location_id"],
+            waste_type_id=env["waste_type"].id,
+            items=items,
+            notes="Prueba idempotencia",
+            request_id="req-abc-123",
+        )
+        self.assertTrue(res2["success"])
+        self.assertTrue(res2.get("duplicate"))
+        self.assertEqual(res2["waste_id"], res1["waste_id"])
+
+        db.session.expunge_all()
+        self.assertEqual(
+            Waste.query.filter_by(request_id="req-abc-123").count(), 1
+        )
+        inv = Inventory.query.filter_by(
+            product_id=env["product_id"], location_id=env["location_id"]
+        ).first()
+        # El stock se desconta UNA sola vez (45.0), no 2 veces.
+        self.assertEqual(float(inv.current_quantity), 45.0)
+        self.assertEqual(
+            AuditLog.query.filter_by(affected_table="inventory", action="MERMA").count(), 1
+        )
+
+    def test_request_id_distinto_si_crea_nueva_merma(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0}]
+        res1 = register_waste(
+            user_id=env["user_id"], location_id=env["location_id"],
+            waste_type_id=env["waste_type"].id, items=items,
+            notes="Prueba 1", request_id="req-uno",
+        )
+        res2 = register_waste(
+            user_id=env["user_id"], location_id=env["location_id"],
+            waste_type_id=env["waste_type"].id, items=items,
+            notes="Prueba 2", request_id="req-dos",
+        )
+        self.assertTrue(res1["success"])
+        self.assertTrue(res2["success"])
+        self.assertNotEqual(res1["waste_id"], res2["waste_id"])
+        self.assertFalse(res2.get("duplicate"))
+
+    # ------------------------------------------------------------------
+    # 11) CONSUMO SIN LOTE ('N/A') — se descuenta FIFO sobre los lotes
+    # ------------------------------------------------------------------
+    def _seed_second_lot(self, env, lot_number, quantity, expiration):
+        mov = Movement(
+            type="TRASLADO",
+            origin_location_id=env["origin"].id,
+            destination_location_id=env["location_id"],
+            status="COMPLETED",
+            user_id=env["user_id"],
+        )
+        db.session.add(mov)
+        db.session.flush()
+        detail = MovementDetail(
+            movement_id=mov.id,
+            product_id=env["product_id"],
+            lot_number=lot_number,
+            quantity=quantity,
+            received_quantity=quantity,
+            missing_quantity=0.00,
+            expiration_date=expiration,
+        )
+        db.session.add(detail)
+        db.session.commit()
+
+    def test_consumo_sin_lote_se_descuenta_primero_del_lote_mas_vencido(self):
+        env = self._seed_env(stock=10.0, waste_limit=100.0)
+        self._seed_second_lot(env, "L-002", 10.0, date.today() + timedelta(days=60))
+
+        db.session.add(AuditLog(
+            affected_table="inventory",
+            action="GASTO_COCINA",
+            severity="NORMAL",
+            user_id=env["user_id"],
+            location_id=env["location_id"],
+            timestamp=datetime.utcnow(),
+            changed_data={
+                "product_id": env["product_id"],
+                "product_name": "Tomate",
+                "lot_number": "N/A",
+                "previous_quantity": 20.0,
+                "new_quantity": 16.0,
+                "quantity_changed": -4.0,
+                "notes": "Consumo sin lote",
+            },
+        ))
+        db.session.commit()
+
+        lots = RegisterWasteRepository.get_product_lots(
+            env["product_id"], env["location_id"]
+        )
+        by_lot = {lot["lot_number"]: lot["quantity"] for lot in lots}
+        # FIFO: el consumo sin lote descuenta primero del lote más viejo (L-001).
+        self.assertEqual(by_lot.get("L-001"), 6.0)
+        self.assertEqual(by_lot.get("L-002"), 10.0)
+
+        vencidos = RegisterWasteRepository.get_expired_lots(env["location_id"])
+        vencido = next((v for v in vencidos if v["product_id"] == env["product_id"]), None)
+        self.assertIsNotNone(vencido)
+        self.assertEqual(vencido["lot_number"], "L-001")
+        self.assertEqual(vencido["quantity"], 6.0)
 
 
 if __name__ == "__main__":

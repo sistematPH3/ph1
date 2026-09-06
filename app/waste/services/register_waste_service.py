@@ -1,7 +1,8 @@
 from decimal import Decimal
 from datetime import datetime
+import math
 from app.models.inventory_model import db
-from app.models.waste_model import Waste, WasteDetail
+from app.models.waste_model import Waste, WasteDetail, WasteDetailPhoto
 from app.waste.repositories.register_waste_repository import (
     RegisterWasteRepository,
     InsufficientStockError,
@@ -44,23 +45,6 @@ def get_product_lots(location_id, product_id):
     return RegisterWasteRepository.get_product_lots(product_id, location_id)
 
 def _evaluate_pending(waste_type, total_quantity, location_id, items):
-    """
-    Clasificador automático: una merma queda PENDIENTE (merma mayor) si
-    cumple CUALQUIERA de estas reglas:
-      1) CANTIDAD: total >= límite de merma de CADA producto (waste_limit).
-      2) TIPO: el tipo exige aprobación siempre (requires_approval).
-      3) TIEMPO: supera lo "esperado" según el historial de la sede.
-
-    Devuelve (pendiente, motivos) donde 'motivos' es un dict por producto
-    (product_id -> [códigos]) con las novedades de CADA producto:
-    'VENCIDO' (el lote ya pasó su vencimiento), 'LIMITE' (regla de cantidad),
-    'TIPO' (el tipo exige aprobación) y 'TIEMPO' (regla temporal). Así la
-    auditoría, las respuestas y cualquier bandeja de aprobaciones pueden mostrar
-    el motivo por cada producto, incluso varios en el mismo producto
-    (p. ej. cadena de frío + límite). La merma queda PENDIENTE con LIMITE/TIPO/
-    TIEMPO; el motivo VENCIDO es informativo (el tipo VENCIDO ya validó la
-    expiración del lote al registrar).
-    """
     motivos = {}
 
     def marcar(pid, motivo):
@@ -116,7 +100,6 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
     return False, motivos
 
 def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None, notes=None):
-
     if location_id is None:
         return {'success': False, 'message': 'La sede es obligatoria.'}
 
@@ -124,11 +107,9 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
     if not waste_type or not waste_type.is_active:
         return {'success': False, 'message': 'El tipo de merma seleccionado no es válido.'}
 
-    if int(location_id) == 1 and not waste_type.applies_central:
-        vencido_central = RegisterWasteRepository.get_boolean_parameter(
-            'VENCIDO_APLICA_CENTRAL', False)
-        if not (waste_type.code == 'VENCIDO' and vencido_central):
-            return {'success': False, 'message': 'Este tipo de merma no aplica a la Sede Central.'}
+    if int(location_id) == 1 and not waste_type.applies_central \
+            and waste_type.code != 'VENCIDO':
+        return {'success': False, 'message': 'Este tipo de merma no aplica a la Sede Central.'}
 
     user_row = RegisterWasteRepository.get_user_by_id(user_id)
     if not user_row:
@@ -136,6 +117,20 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
 
     if not user_can_access_location(user_id, location_id):
         return {'success': False, 'message': 'No tienes permisos para registrar merma en esta sede.'}
+
+    for item in items:
+        try:
+            q = item.get('quantity')
+            if isinstance(q, bool) or q is None or not isinstance(q, (int, float)):
+                raise ValueError
+            fq = float(q)
+            if not math.isfinite(fq) or fq <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            return {
+                'success': False,
+                'message': 'Cantidad inválida en uno de los productos (debe ser mayor a 0).'
+            }
 
     total_quantity = Decimal('0.00')
     total_cost = Decimal('0.00')
@@ -229,6 +224,16 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                         )
                     }
 
+            ev_raw = item.get('evidence_urls') or []
+            ev_urls = []
+            seen = set()
+            for u in ev_raw:
+                if isinstance(u, str) and u.strip() and u.strip() not in seen:
+                    seen.add(u.strip())
+                    ev_urls.append(u.strip())
+            fallback = (item.get('evidence_url') or '').strip() or None
+            first_evidence = ev_urls[0] if ev_urls else fallback
+
             details.append({
                 'product_id': product_id,
                 'product_name': name,
@@ -237,6 +242,8 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 'quantity': quantity,
                 'unit_cost': unit_cost,
                 'subtotal_cost': subtotal,
+                'evidence_url': first_evidence,
+                'evidence_urls': ev_urls,
             })
             total_quantity += quantity
             total_cost += subtotal
@@ -257,14 +264,18 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
         )
 
         for d in details:
-            waste.details.append(WasteDetail(
+            wd = WasteDetail(
                 product_id=d['product_id'],
                 lot_number=d['lot_number'],
                 expiration_date=d['expiration_date'],
                 quantity=d['quantity'],
                 unit_cost=d['unit_cost'],
                 subtotal_cost=d['subtotal_cost'],
-            ))
+                evidence_url=d['evidence_url'],
+            )
+            for pos, p_url in enumerate(d['evidence_urls'], start=1):
+                wd.photos.append(WasteDetailPhoto(photo_url=p_url, position=pos))
+            waste.details.append(wd)
 
         RegisterWasteRepository.persist_waste(
             waste=waste,

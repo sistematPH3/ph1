@@ -88,6 +88,28 @@ class WasteDetail(db.Model):
     resolved_at = db.Column(db.DateTime)
     resolution_reason = db.Column(db.Text)  # Motivo si la línea fue RECHAZADA
 
+    # Varias fotos por producto (opcional). La "foto principal" de la lista
+    # también se mantiene sincronizada en evidence_url por compatibilidad.
+    photos = db.relationship('WasteDetailPhoto', backref='detail', lazy=True,
+                             cascade='all, delete-orphan')
+
+
+class WasteDetailPhoto(db.Model):
+    """Cada fila = UNA foto de la evidencia del PRODUCTO (1 línea de waste_details).
+
+    Permite adjuntar varias fotos por producto además de la foto general de la merma:
+    una foto por fila (URL de ImgBB), con orden (position) para mostrarlas en secuencia.
+    """
+    __tablename__ = 'waste_detail_photos'
+    __table_args__ = (
+        db.Index('idx_waste_detail_photos_waste_detail_id', 'waste_detail_id'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    waste_detail_id = db.Column(db.Integer, db.ForeignKey('waste_details.id', ondelete='CASCADE'), nullable=False)
+    photo_url = db.Column(db.Text, nullable=False)  # URL de ImgBB de esa foto
+    position = db.Column(db.Integer, nullable=False, default=1)  # 1 = foto principal
+    created_at = db.Column(db.DateTime, default=current_ve_time)
+
 
 class AppParameter(db.Model):
     """Pizarra de reglas (app_parameters). Solo reglas de TIEMPO del control de mermas."""

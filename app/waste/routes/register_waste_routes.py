@@ -1,4 +1,5 @@
 import io
+import time
 from flask import Blueprint, request, jsonify, render_template, session
 from flask_login import login_required, current_user
 from app.decorators.roles import require_roles
@@ -15,6 +16,12 @@ from app.waste.services.register_waste_service import (
 register_waste_bp = Blueprint('register_waste', __name__)
 
 OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
+
+def _coerce_positive_int(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return value
 
 @register_waste_bp.route('/waste/merma/new', methods=['GET'])
 @login_required
@@ -69,15 +76,9 @@ def fetch_location_types(location_id):
 
     waste_types = RegisterWasteRepository.get_waste_types()
 
-    applies_central = location_id == 1
-    vencido_central = (
-        RegisterWasteRepository.get_boolean_parameter('VENCIDO_APLICA_CENTRAL', False)
-        if applies_central else False
-    )
     result = []
     for wt in waste_types:
-        if applies_central and not wt.applies_central \
-                and not (wt.code == 'VENCIDO' and vencido_central):
+        if location_id == 1 and not wt.applies_central and wt.code != 'VENCIDO':
             continue
         result.append({
             'id': wt.id,
@@ -110,6 +111,20 @@ def fetch_product_lots(location_id, product_id):
 
     lots = get_product_lots(location_id, product_id)
     return jsonify({'success': True, 'lots': lots}), 200
+
+@register_waste_bp.route('/api/waste/locations/<int:location_id>/vencidos', methods=['GET'])
+@login_required
+@require_roles(*OPERATIVE_ROLES)
+def fetch_location_vencidos(location_id):
+    user_id = session.get('user_id') or session.get('_user_id') or session.get('id') or getattr(current_user, 'id', None)
+    if not user_can_access_location(user_id, location_id):
+        return jsonify({'success': False, 'message': 'No tienes permisos para consultar los vencidos de esta sede.'}), 403
+
+    try:
+        vencidos = RegisterWasteRepository.get_expired_lots(location_id)
+    except Exception:
+        vencidos = []
+    return jsonify({'success': True, 'vencidos': vencidos}), 200
 
 @register_waste_bp.route('/api/waste/evidence', methods=['POST'])
 @login_required
@@ -144,6 +159,12 @@ def subir_foto():
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def crear_merma():
+    now = time.time()
+    last_submit = session.get('last_waste_submit_time', 0)
+    if now - last_submit < 3.0:
+        return jsonify({'success': False, 'message': 'Ya se está procesando un registro. Por favor, espere.'}), 429
+    session['last_waste_submit_time'] = now
+
     if request.is_json:
         data = request.get_json(silent=True) or {}
     else:
@@ -156,17 +177,17 @@ def crear_merma():
                 items = _json.loads(items_raw)
             except (_json.JSONDecodeError, TypeError):
                 items = []
+        location_id = form.get('location_id', type=int)
+        location_id = location_id if location_id is not None else form.get('location_id')
+        waste_type_id = form.get('waste_type_id', type=int)
+        waste_type_id = waste_type_id if waste_type_id is not None else form.get('waste_type_id')
         data = {
-            'location_id': form.get('location_id', type=int),
-            'waste_type_id': form.get('waste_type_id', type=int),
+            'location_id': _coerce_positive_int(location_id),
+            'waste_type_id': _coerce_positive_int(waste_type_id),
             'items': items,
             'evidence_url': form.get('evidence_url') or None,
             'notes': form.get('notes'),
         }
-        if data['location_id'] is None:
-            data['location_id'] = form.get('location_id')
-        if data['waste_type_id'] is None:
-            data['waste_type_id'] = form.get('waste_type_id')
 
     validation = validate_register_waste_payload(data)
     if not validation['is_valid']:

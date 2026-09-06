@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func
 from app.models.inventory_model import db, Inventory, Product
@@ -70,35 +70,39 @@ class RegisterWasteRepository:
         return Product.query.get(product_id)
 
     @staticmethod
-    def get_product_lots(product_id, location_id):
-        """Disponibilidad de lotes por producto y sede.
+    def _compute_lot_availability(loc_id, prod_ids):
+        """Disponibilidad por (producto, lote) en una sede, para varios productos.
 
-        Un mismo lote puede llegar en varias partidas con vencimientos distintos
-        (ej. 'Demo': 20 uds + 80 uds = 100). La derivación genérica agrupa por
-        (lote, vencimiento) y sobrescribe por lote, mostrando solo una partida.
-        Aquí se suma TODO el lote (y se muestra el vencimiento más próximo) para
-        que el registro y el selector de lotes reflejen la disponibilidad real.
+        Replica la derivación de get_product_lots en una sola pasada (evita N+1):
+        una consulta por conjunto de (entradas, salidas por traslado, consumos,
+        mermas aprobadas). Los consumos sin lote ('N/A') se descuentan de los
+        lotes del producto por orden de vencimiento (FIFO, vencidos primero).
         """
-        loc_id = int(location_id)
-        prod_id = int(product_id)
+        loc_id = int(loc_id)
+        prod_ids = [int(p) for p in prod_ids]
+        if not prod_ids:
+            return {}
 
-        entradas_por_lote = {}
-        salidas_traslados = {}
         moved_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE',
                           'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
 
+        entradas = {}
+
         if loc_id == 1:
             compras = db.session.query(
+                PurchaseDetail.product_id,
                 PurchaseDetail.lot_number,
                 func.min(PurchaseDetail.expiration_date).label('min_exp'),
                 func.sum(PurchaseDetail.quantity).label('total_qty')
             ).join(Purchase, PurchaseDetail.purchase_id == Purchase.id).filter(
                 func.upper(Purchase.status).in_(['COMPLETED', 'COMPLETADO']),
-                PurchaseDetail.product_id == prod_id,
+                PurchaseDetail.product_id.in_(prod_ids),
                 PurchaseDetail.lot_number.isnot(None),
                 PurchaseDetail.lot_number != ''
-            ).group_by(PurchaseDetail.lot_number).all()
+            ).group_by(PurchaseDetail.product_id, PurchaseDetail.lot_number).all()
+
             devoluciones = db.session.query(
+                MovementDetail.product_id,
                 MovementDetail.lot_number,
                 func.min(MovementDetail.expiration_date).label('min_exp'),
                 func.sum(func.coalesce(MovementDetail.received_quantity,
@@ -107,20 +111,22 @@ class RegisterWasteRepository:
                 func.upper(Movement.status).in_(moved_statuses),
                 Movement.destination_location_id == 1,
                 Movement.origin_location_id != 1,
-                MovementDetail.product_id == prod_id,
+                MovementDetail.product_id.in_(prod_ids),
                 MovementDetail.lot_number.isnot(None),
                 MovementDetail.lot_number != ''
-            ).group_by(MovementDetail.lot_number).all()
-            for r in list(compras) + list(devoluciones):
-                lot = r.lot_number.strip()
-                prev = entradas_por_lote.get(lot)
-                exps = [e for e in (prev['expiration_date'] if prev else None, r.min_exp) if e]
-                entradas_por_lote[lot] = {
+            ).group_by(MovementDetail.product_id, MovementDetail.lot_number).all()
+
+            for pid, lot, min_exp, total_qty in list(compras) + list(devoluciones):
+                key = (int(pid), lot.strip())
+                prev = entradas.get(key)
+                exps = [e for e in (prev['expiration_date'] if prev else None, min_exp) if e]
+                entradas[key] = {
                     'expiration_date': min(exps) if exps else None,
-                    'total_in': float(r.total_qty or 0.0) + (prev['total_in'] if prev else 0.0),
+                    'total_in': float(total_qty or 0.0) + (prev['total_in'] if prev else 0.0),
                 }
         else:
-            entradas = db.session.query(
+            entradas_rows = db.session.query(
+                MovementDetail.product_id,
                 MovementDetail.lot_number,
                 func.min(MovementDetail.expiration_date).label('min_exp'),
                 func.sum(func.coalesce(MovementDetail.received_quantity,
@@ -128,30 +134,31 @@ class RegisterWasteRepository:
             ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
                 func.upper(Movement.status).in_(moved_statuses),
                 Movement.destination_location_id == loc_id,
-                MovementDetail.product_id == prod_id,
+                MovementDetail.product_id.in_(prod_ids),
                 MovementDetail.lot_number.isnot(None),
                 MovementDetail.lot_number != ''
-            ).group_by(MovementDetail.lot_number).all()
-            for r in entradas:
-                lot = r.lot_number.strip()
-                entradas_por_lote[lot] = {
-                    'expiration_date': r.min_exp,
-                    'total_in': float(r.total_qty or 0.0),
+            ).group_by(MovementDetail.product_id, MovementDetail.lot_number).all()
+            for pid, lot, min_exp, total_qty in entradas_rows:
+                key = (int(pid), lot.strip())
+                entradas[key] = {
+                    'expiration_date': min_exp,
+                    'total_in': float(total_qty or 0.0),
                 }
 
-        salidas = db.session.query(
+        salidas_traslados = {}
+        salidas_rows = db.session.query(
+            MovementDetail.product_id,
             MovementDetail.lot_number,
             func.sum(MovementDetail.quantity).label('total_out')
         ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
             Movement.origin_location_id == loc_id,
             Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO', 'CANCELADO_EMISOR']),
-            MovementDetail.product_id == prod_id,
+            MovementDetail.product_id.in_(prod_ids),
             MovementDetail.lot_number.isnot(None)
-        ).group_by(MovementDetail.lot_number).all()
-        salidas_traslados = {
-            r.lot_number.strip(): float(r.total_out or 0.0)
-            for r in salidas if r.lot_number
-        }
+        ).group_by(MovementDetail.product_id, MovementDetail.lot_number).all()
+        for pid, lot, total_out in salidas_rows:
+            if lot:
+                salidas_traslados[(int(pid), lot.strip())] = float(total_out or 0.0)
 
         salidas_consumo = {}
         audit_records = db.session.query(AuditLog.changed_data).filter(
@@ -172,48 +179,95 @@ class RegisterWasteRepository:
                 p_id = int(c_data.get('product_id')) if c_data.get('product_id') is not None else None
             except (TypeError, ValueError):
                 p_id = None
+            if p_id not in prod_ids:
+                continue
             l_num = c_data.get('lot_number')
             try:
                 qty_change = float(c_data.get('quantity_changed', 0.0))
             except (TypeError, ValueError):
                 qty_change = 0.0
-            if p_id == prod_id and l_num and str(l_num).strip() != 'N/A':
-                l_num_clean = str(l_num).strip()
-                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(qty_change)
+            l_clean = str(l_num).strip() if l_num else 'N/A'
+            key = (p_id, l_clean)
+            salidas_consumo[key] = salidas_consumo.get(key, 0.0) + abs(qty_change)
 
         salidas_aprobadas = {}
-        aprobadas = db.session.query(
+        aprobadas_rows = db.session.query(
+            WasteDetail.product_id,
             WasteDetail.lot_number,
             func.sum(WasteDetail.quantity).label('total_mermado')
         ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
             Waste.status == 'APROBADO',
             Waste.cancelled_at.is_(None),
             Waste.location_id == loc_id,
-            WasteDetail.product_id == prod_id,
+            WasteDetail.product_id.in_(prod_ids),
             WasteDetail.lot_number.isnot(None),
-        ).group_by(WasteDetail.lot_number).all()
-        for r in aprobadas:
-            if r.lot_number and str(r.lot_number).strip() != 'N/A':
-                salidas_aprobadas[str(r.lot_number).strip()] = float(r.total_mermado or 0.0)
+        ).group_by(WasteDetail.product_id, WasteDetail.lot_number).all()
+        for pid, lot, total_mermado in aprobadas_rows:
+            if lot and str(lot).strip() and str(lot).strip() != 'N/A':
+                salidas_aprobadas[(int(pid), str(lot).strip())] = float(total_mermado or 0.0)
 
-        lots = []
-        for lot_num, data in entradas_por_lote.items():
-            disponible = (data['total_in']
-                          - salidas_traslados.get(lot_num, 0.0)
-                          - salidas_consumo.get(lot_num, 0.0)
-                          - salidas_aprobadas.get(lot_num, 0.0))
+        por_producto = {}
+        result = {}
+        for key, data in entradas.items():
+            pid, lot = key
+            disp = (data['total_in']
+                    - salidas_traslados.get(key, 0.0)
+                    - salidas_consumo.get(key, 0.0)
+                    - salidas_aprobadas.get(key, 0.0))
+            result[key] = {
+                'availability': disp,
+                'expiration_date': data['expiration_date'],
+            }
+            por_producto.setdefault(pid, []).append((lot, result[key]))
+
+        # Consumos registrados sin lote ('N/A'): se descuentan de los lotes del
+        # producto por orden de vencimiento (FIFO, vencidos primero).
+        for (pid, l_num), total_na in salidas_consumo.items():
+            if l_num != 'N/A':
+                continue
+            if total_na <= 0:
+                continue
+            lots = sorted(
+                por_producto.get(pid, []),
+                key=lambda kv: (kv[1]['expiration_date'] is None, kv[1]['expiration_date'])
+            )
+            pendiente = total_na
+            for lot, ldata in lots:
+                if pendiente <= 0:
+                    break
+                if ldata['availability'] <= 0.001:
+                    continue
+                usar = min(pendiente, ldata['availability'])
+                ldata['availability'] -= usar
+                pendiente -= usar
+
+        return result
+
+    @staticmethod
+    def get_product_lots(product_id, location_id):
+        """Disponibilidad de lotes por producto y sede.
+
+        Un mismo lote puede llegar en varias partidas con vencimientos distintos
+        (ej. 'Demo': 20 uds + 80 uds = 100). La derivación genérica agrupa por
+        (lote, vencimiento) y sobrescribe por lote, mostrando solo una partida.
+        Aquí se suma TODO el lote (y se muestra el vencimiento más próximo) para
+        que el registro y el selector de lotes reflejen la disponibilidad real.
+        """
+        avail = RegisterWasteRepository._compute_lot_availability(location_id, [product_id])
+
+        entries = []
+        for (pid, lot_num), data in avail.items():
+            disponible = data['availability']
             if disponible > 0.001:
-                lots.append({
-                    'lot_number': lot_num,
-                    'expiration_date': (data['expiration_date'].strftime('%d/%m/%Y')
-                                        if data['expiration_date'] else 'Sin vencimiento'),
-                    'exp_date_raw': data['expiration_date'],
-                    'quantity': round(float(disponible), 2),
-                })
+                entries.append((data['expiration_date'], lot_num, disponible))
 
-        lots.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
-        for l in lots:
-            l.pop('exp_date_raw', None)
+        entries.sort(key=lambda e: (e[0] is None, e[0] or date.max))
+
+        lots = [{
+            'lot_number': e[1],
+            'expiration_date': e[0].strftime('%d/%m/%Y') if e[0] else 'Sin vencimiento',
+            'quantity': round(float(e[2]), 2),
+        } for e in entries]
         return lots
 
     @staticmethod
@@ -230,6 +284,21 @@ class RegisterWasteRepository:
                 .first()
             if detail and detail.foreign_price is not None:
                 return Decimal(str(detail.foreign_price))
+        except Exception:
+            pass
+        # Si el lote exacto no aparece en una compra completada (ej. sucursal que
+        # recibió por traslado), se usa el último costo de compra del producto.
+        try:
+            fallback = PurchaseDetail.query \
+                .join(Purchase, PurchaseDetail.purchase_id == Purchase.id) \
+                .filter(
+                    func.upper(Purchase.status) == 'COMPLETED',
+                    PurchaseDetail.product_id == int(product_id)
+                ) \
+                .order_by(PurchaseDetail.id.desc()) \
+                .first()
+            if fallback and fallback.foreign_price is not None:
+                return Decimal(str(fallback.foreign_price))
         except Exception:
             pass
         return Decimal('0.00')
@@ -302,10 +371,7 @@ class RegisterWasteRepository:
 
     @staticmethod
     def vencido_permitido_en_central():
-        if RegisterWasteRepository.get_boolean_parameter('VENCIDO_APLICA_CENTRAL', False):
-            return True
-        vencido = WasteType.query.filter_by(code='VENCIDO', is_active=True).first()
-        return bool(vencido and vencido.applies_central)
+        return True
 
     @staticmethod
     def get_time_rule_data(location_id):
@@ -473,23 +539,31 @@ class RegisterWasteRepository:
     def get_expired_lots(location_id):
         loc_id = int(location_id)
         today = datetime.now().date()
-        vencidos = []
         products = RegisterWasteRepository.get_products_in_inventory(loc_id)
-        for product in products:
-            lots = RegisterWasteRepository.get_product_lots(product.id, loc_id)
-            for lot in lots:
-                exp = RegisterWasteRepository.get_lot_expiration_date(
-                    product.id, lot['lot_number'], loc_id)
-                if exp is None:
-                    continue
-                exp_date = exp.date() if hasattr(exp, 'date') else exp
-                if exp_date < today:
-                    vencidos.append({
-                        'product_id': product.id,
-                        'product_name': product.name,
-                        'lot_number': lot['lot_number'],
-                        'quantity': float(lot['quantity']),
-                        'expiration_date': exp_date.strftime('%d/%m/%Y'),
-                    })
+        if not products:
+            return []
+
+        prod_ids = [p.id for p in products]
+        name_by_id = {p.id: p.name for p in products}
+        avail = RegisterWasteRepository._compute_lot_availability(loc_id, prod_ids)
+
+        vencidos = []
+        for (pid, lot_num), data in avail.items():
+            exp = data['expiration_date']
+            if exp is None:
+                continue
+            exp_date = exp.date() if hasattr(exp, 'date') else exp
+            if exp_date >= today:
+                continue
+            disponible = data['availability']
+            if disponible <= 0.001:
+                continue
+            vencidos.append({
+                'product_id': pid,
+                'product_name': name_by_id.get(pid, f"ID {pid}"),
+                'lot_number': lot_num,
+                'quantity': round(float(disponible), 2),
+                'expiration_date': exp_date.strftime('%d/%m/%Y'),
+            })
         vencidos.sort(key=lambda v: (v['expiration_date'], v['product_name'], v['lot_number']))
         return vencidos
