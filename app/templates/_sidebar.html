@@ -130,6 +130,9 @@
                     </span>
                     {% endif %}
                 </a>
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('waste_config.configuracion') }}">Configuración de Mermas</a>
+                {% endif %}
             </div>
         </li>
         {% endif %}

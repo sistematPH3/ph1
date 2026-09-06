@@ -6,38 +6,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnIncrementTolerance = document.getElementById('btn-increment-tolerance');
     const previewPercentVal = document.getElementById('preview-percent-val');
     const previewResultVal = document.getElementById('preview-result-val');
+    const errorTolerance = document.getElementById('error-tolerance');
 
     const inputDays = document.getElementById('WASTE_BASE_PERIOD_DAYS');
     const sliderDays = document.getElementById('slider-days');
     const previewDaysVal = document.getElementById('preview-days-val');
+    const errorDays = document.getElementById('error-days');
 
     /* =========================================================================
-       1. VISTA PREVIA Y SIMULACIÓN DE TOLERANCIA
+       1. VISTA PREVIA Y SIMULACIÓN DE TOLERANCIA (sin unidades, sin tope)
        ========================================================================= */
     function updateToleranceSimulation(val) {
-        let marginVal = parseFloat(val);
-        if (isNaN(marginVal) || marginVal < 1.0) marginVal = 1.0;
-        if (marginVal > 3.0) marginVal = 3.0;
+        const raw = parseFloat(val);
+        const invalid = isNaN(raw) || raw < 1.0;
+        const marginVal = invalid ? 1.0 : raw;
 
         // Porcentaje adicional: Si es 1.50 -> +50% | Si es 1.00 -> +0%
         const percentExtra = Math.round((marginVal - 1.0) * 100);
-        
-        // Simulación con base de 10 kg: 10 * 1.50 = 15.0 kg
+
+        // Simulación relativa con base de 10: 10 * 1.50 = 15.0
         const resultVal = (10 * marginVal).toFixed(1);
 
         if (previewPercentVal) previewPercentVal.textContent = `+${percentExtra}%`;
-        if (previewResultVal) previewResultVal.textContent = `${resultVal} kg`;
+        if (previewResultVal) previewResultVal.textContent = `${resultVal}`;
+        if (errorTolerance) errorTolerance.classList.toggle('d-none', !invalid);
     }
 
     function updateDaysSimulation(val) {
-        const intVal = parseInt(val, 10) || 1;
-        if (previewDaysVal) previewDaysVal.textContent = intVal;
+        const intVal = parseInt(val, 10);
+        const invalid = isNaN(intVal) || intVal < 1 || intVal > 90;
+        if (!invalid && previewDaysVal) previewDaysVal.textContent = intVal;
+        if (errorDays) errorDays.classList.toggle('d-none', !invalid);
     }
 
     /* =========================================================================
-       2. CONTROL DE TOLERANCIA (MÍNIMO 1.00, MÁXIMO 3.00)
+       2. CONTROL DE TOLERANCIA (MÍNIMO 1.00, SIN MÁXIMO FIJO)
        ========================================================================= */
-    if (inputTolerance && sliderTolerance) {
+    if (inputTolerance) {
 
         // Bloquear caracteres de notación científica ('e', 'E', '+', '-')
         inputTolerance.addEventListener('keydown', (e) => {
@@ -64,44 +69,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            let val = parseFloat(valStr);
+            const val = parseFloat(valStr);
 
-            // Control de límites (Mínimo 1.00, Máximo 3.00)
-            if (val > 3.0) {
-                val = 3.0;
-                e.target.value = '3.00';
-            } else if (val < 1.0 || isNaN(val)) {
-                val = 1.0;
+            // No sobreescribimos el valor inválido mientras escribe:
+            // la simulación muestra la advertencia de inmediato.
+            if (sliderTolerance && !(isNaN(val) || val < 1.0)) {
+                sliderTolerance.value = val;
             }
-
-            sliderTolerance.value = val;
             updateToleranceSimulation(val);
         });
 
-        // Al perder el foco (blur), formatear a 2 decimales limpios dentro del rango
+        // Al perder el foco (blur), formatear a 2 decimales limpios
         inputTolerance.addEventListener('blur', (e) => {
             let val = parseFloat(e.target.value);
-            
+
             if (isNaN(val) || val < 1.0) val = 1.0;
-            if (val > 3.0) val = 3.0;
 
             e.target.value = val.toFixed(2);
-            sliderTolerance.value = val.toFixed(2);
+            if (sliderTolerance) sliderTolerance.value = val.toFixed(2);
             updateToleranceSimulation(val);
         });
 
-        sliderTolerance.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value) || 1.0;
-            inputTolerance.value = val.toFixed(2);
-            updateToleranceSimulation(val);
-        });
+        if (sliderTolerance) {
+            sliderTolerance.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value) || 1.0;
+                inputTolerance.value = val.toFixed(2);
+                updateToleranceSimulation(val);
+            });
+        }
 
         if (btnDecrementTolerance) {
             btnDecrementTolerance.addEventListener('click', () => {
                 let current = parseFloat(inputTolerance.value) || 1.0;
                 current = Math.max(1.00, current - 0.05);
                 inputTolerance.value = current.toFixed(2);
-                sliderTolerance.value = current.toFixed(2);
+                if (sliderTolerance) sliderTolerance.value = current.toFixed(2);
                 updateToleranceSimulation(current);
             });
         }
@@ -109,9 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnIncrementTolerance) {
             btnIncrementTolerance.addEventListener('click', () => {
                 let current = parseFloat(inputTolerance.value) || 1.0;
-                current = Math.min(3.00, current + 0.05); // Limitado a 3.00
+                current += 0.05; // Sin tope superior
                 inputTolerance.value = current.toFixed(2);
-                sliderTolerance.value = current.toFixed(2);
+                if (sliderTolerance) sliderTolerance.value = current.toFixed(2);
                 updateToleranceSimulation(current);
             });
         }
@@ -123,24 +125,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inputDays && sliderDays) {
 
         inputDays.addEventListener('input', (e) => {
-            let valStr = e.target.value;
+            const valStr = e.target.value;
 
             if (valStr === '') {
                 updateDaysSimulation(1);
                 return;
             }
 
-            let val = parseInt(valStr, 10);
+            const val = parseInt(valStr, 10);
+            const valid = !isNaN(val) && val >= 1 && val <= 90;
 
-            if (val > 90) {
-                e.target.value = 90;
-                val = 90;
-            } else if (val < 1 || isNaN(val)) {
-                e.target.value = 1;
-                val = 1;
-            }
-
-            sliderDays.value = val;
+            // No sobreescribimos el valor inválido mientras escribe:
+            // la simulación muestra la advertencia de inmediato.
+            if (valid && sliderDays) sliderDays.value = val;
             updateDaysSimulation(val);
         });
 

@@ -2,6 +2,16 @@ import re
 from app.inventory.repositories.products_repository import ProductRepository
 from app.models.inventory_model import Product
 
+
+def _clean_waste_limit(raw):
+    if raw is None or str(raw).strip() == '':
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 class ProductService:
 
     @staticmethod
@@ -31,7 +41,7 @@ class ProductService:
             product_type_id=data.get('product_type_id'),
             unit_of_measure=data.get('unit_of_measure', '').strip(),
             technical_description=data.get('technical_description', '').strip(),
-            waste_limit=data.get('waste_limit'),
+            waste_limit=_clean_waste_limit(data.get('waste_limit')),
             is_active=True
         )
 
@@ -61,7 +71,7 @@ class ProductService:
         product.unit_of_measure = unit_of_measure
         product.sku = cleaned_sku
         product.technical_description = tech_desc
-        product.waste_limit = data.get('waste_limit')
+        product.waste_limit = _clean_waste_limit(data.get('waste_limit'))
         
         if 'is_active' in data:
             product.is_active = data.get('is_active') in ['True', True, 1, '1']

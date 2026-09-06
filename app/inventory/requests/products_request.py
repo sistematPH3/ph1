@@ -45,16 +45,15 @@ def validate_product_form(data, current_product_id=None):
 
     technical_description = data.get('technical_description', '').strip()
 
-    # Validación del límite de merma (obligatorio, número >= 0)
+    # Validación del límite de merma (OPCIONAL: vacío = sin límite de cantidad;
+    # si se llena, debe ser un número mayor a 0 en la unidad del producto).
     raw_waste_limit = data.get('waste_limit', '').strip()
     waste_limit = None
-    if not raw_waste_limit:
-        errors['waste_limit'] = 'El límite de merma es obligatorio.'
-    else:
+    if raw_waste_limit:
         try:
             waste_limit = float(raw_waste_limit)
-            if waste_limit < 0:
-                errors['waste_limit'] = 'El límite de merma no puede ser negativo.'
+            if waste_limit <= 0:
+                errors['waste_limit'] = 'El límite de merma debe ser mayor a 0.'
         except ValueError:
             errors['waste_limit'] = 'El límite de merma debe ser un número válido.'
 

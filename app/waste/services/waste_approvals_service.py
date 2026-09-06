@@ -110,12 +110,22 @@ def _clasificar_novedad(waste_id, location_id, total_quantity, type_code, type_r
     dias = _dias_desde_ultima_merma(waste_id, location_id)
     tolerancia = _param_float('WASTE_TIME_TOLERANCE', 1.5)
     periodo_base = _param_float('WASTE_BASE_PERIOD_DAYS', 7)
-    if tasa > 0:
+
+    hoy = datetime.now()
+    desde_30 = hoy - timedelta(days=30)
+    fechas = [
+        h['date'] for h in MermaApprovalsRepository.get_merma_history(
+            location_id, desde_30)
+        if h.get('date')
+    ]
+    history_days = max(0, (hoy - min(fechas)).days) if fechas else 0
+
+    if tasa > 0 and history_days >= max(1.0, float(periodo_base)):
         esperado = round(tasa * dias, 2)
         umbral = round(esperado * tolerancia, 2)
         por_tiempo = registrado > umbral
     else:
-        # Sin historial previo no hay base estadística para la regla de tiempo
+        # Sin el período base de historial no hay base estadística para la regla de tiempo
         esperado = None
         umbral = None
         por_tiempo = False
@@ -138,6 +148,7 @@ def _clasificar_novedad(waste_id, location_id, total_quantity, type_code, type_r
         'umbral': umbral,
         'tasa_diaria': tasa,
         'dias_transcurridos': dias,
+        'history_days': history_days,
         'tolerancia': tolerancia,
         'periodo_base': periodo_base,
     }

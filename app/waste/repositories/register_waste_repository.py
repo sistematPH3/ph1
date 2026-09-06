@@ -386,6 +386,11 @@ class RegisterWasteRepository:
 
         total_normal = sum(float(w.total_quantity or 0) for w in normal_records)
 
+        history_days = 0
+        if normal_records:
+            oldest = min(w.date for w in normal_records)
+            history_days = max(0, (now - oldest).days)
+
         last_waste = Waste.query.filter(
             Waste.location_id == location_id,
             Waste.status.in_(['APROBADO', 'REVERTIDO']),
@@ -399,7 +404,8 @@ class RegisterWasteRepository:
 
         return {
             'total_normal': total_normal,
-            'days_since_last': days_since_last
+            'days_since_last': days_since_last,
+            'history_days': history_days
         }
 
     @staticmethod
