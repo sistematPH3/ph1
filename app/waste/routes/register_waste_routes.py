@@ -187,6 +187,7 @@ def crear_merma():
             'items': items,
             'evidence_url': form.get('evidence_url') or None,
             'notes': form.get('notes'),
+            'request_id': form.get('request_id'),
         }
 
     validation = validate_register_waste_payload(data)
@@ -207,6 +208,7 @@ def crear_merma():
         items=data['items'],
         evidence_url=data.get('evidence_url'),
         notes=data.get('notes'),
+        request_id=data.get('request_id'),
     )
 
     if result['success']:

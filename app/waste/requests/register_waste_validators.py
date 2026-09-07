@@ -36,6 +36,11 @@ def validate_register_waste_payload(data):
             elif quantity <= 0:
                 errors[f'item_{idx}_quantity'] = 'Cantidad inválida (debe ser mayor a 0).'
 
+            item_type = item.get('waste_type_id')
+            if 'waste_type_id' in item and item_type not in (None, ''):
+                if not isinstance(item_type, int) or item_type <= 0:
+                    errors[f'item_{idx}_waste_type_id'] = 'El tipo de merma del ítem es inválido.'
+
             item_evidence = item.get('evidence_url')
             if 'evidence_url' in item and item_evidence not in (None, ''):
                 if not isinstance(item_evidence, str) or not item_evidence.strip():

@@ -150,8 +150,8 @@ class MovementReceptionRepository:
 
             if not inv:
                 insert_sql = text("""
-                    INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity)
-                    VALUES (:location_id, :product_id, 0.00, 20.00, 0.00)
+                    INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity, reserved_quantity)
+                    VALUES (:location_id, :product_id, 0.00, 20.00, 0.00, 0.00)
                     RETURNING id, location_id, product_id, current_quantity, min_stock, transit_quantity
                 """)
                 inv = db.session.execute(insert_sql, {

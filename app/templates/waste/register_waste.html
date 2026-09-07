@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=4.5">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=4.6">
 {% endblock %}
 
 {% block content %}
@@ -138,6 +138,15 @@
                                     </div>
                                     <small class="merma-editor-note d-none" id="vencidoNote"></small>
                                 </div>
+                                <div class="col-12">
+                                    <label for="item_type_id" class="merma-label">Motivo de este insumo <small class="text-muted fw-normal">(si lo dejas en blanco, hereda el tipo del ticket)</small></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
+                                        <select class="form-select border-secondary" id="item_type_id" name="item_type_id" disabled>
+                                            <option value="" selected disabled>Esperando tipo del ticket...</option>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="col-12 col-md-7">
                                     <label for="lot_number" class="merma-label">Partida / Lote <span class="text-danger">*</span></label>
                                     <div class="input-group">
@@ -268,5 +277,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/register_waste.js') }}?v=4.5"></script>
+<script src="{{ url_for('static', filename='js/waste/register_waste.js') }}?v=4.6"></script>
 {% endblock %}

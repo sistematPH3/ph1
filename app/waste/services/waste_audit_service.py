@@ -154,6 +154,32 @@ class WasteAuditService:
             )
 
             normalized_products = []
+            before_state = changed_data.get('before')
+            after_state = changed_data.get('after')
+            is_edit_event = (
+                isinstance(before_state, dict)
+                and isinstance(after_state, dict)
+                and 'lines' in after_state
+            )
+            if is_edit_event:
+                # Edición: cada línea con su PRODUCTO, lote, cantidad y MOTIVO propio.
+                for item in after_state.get('lines') or []:
+                    if not isinstance(item, dict):
+                        continue
+                    p_id = item.get('product_id')
+                    p_name = resolve_product_name(p_id) or 'Producto'
+                    wt_id = (
+                        item.get('waste_type_id')
+                        or before_state.get('waste_type_id')
+                        or after_state.get('waste_type_id')
+                    )
+                    tipo_linea = resolve_waste_type_name(wt_id) or ''
+                    normalized_products.append({
+                        'producto': str(p_name),
+                        'lote': str(item.get('lot_number') or ''),
+                        'cantidad': item.get('quantity') or 0,
+                        'motivo_tipo': tipo_linea,
+                    })
             decisiones_raw = changed_data.get('decisiones')
             if isinstance(decisiones_raw, list) and decisiones_raw:
                 for item in decisiones_raw:

@@ -168,7 +168,8 @@ body {
 }
 
 .th-prod { width: 22%; text-align: left !important; padding-left: 1.25rem !important; }
-.th-lote { width: 44%; text-align: left !important; padding-left: 1rem !important; }
+.th-tipo { width: 18%; text-align: left !important; padding-left: 0.75rem !important; }
+.th-lote { width: 26%; text-align: left !important; padding-left: 1rem !important; }
 .th-venc { width: 14%; text-align: center !important; }
 .th-cant { width: 20%; text-align: center !important; }
 
@@ -184,9 +185,24 @@ body {
 }
 
 .td-prod { text-align: left; padding-left: 1.25rem !important; }
+.td-tipo { text-align: left; padding-left: 0.75rem !important; }
 .td-lote { text-align: left; padding-left: 1rem !important; }
 .td-venc { text-align: center; }
 .td-cant { text-align: center; }
+
+.ph-select-type {
+    font-size: 0.82rem;
+    min-width: 150px;
+}
+
+.ph-tag-limite {
+    background-color: #fdecea;
+    color: #b02a37;
+    border: 1px solid #f1aeb5;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+    margin-left: 0.35rem;
+}
 
 .ph-tag-sku {
     background-color: var(--ph-gray-bg);

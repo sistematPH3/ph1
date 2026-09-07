@@ -1,5 +1,14 @@
+import os
 import unittest
 from unittest.mock import MagicMock, patch
+
+# Usa SIEMPRE la base de pruebas (ph_test), nunca la base real (ph). Debe
+# fijarse ANTES de importar la app porque app crea el motor leyendo
+# config['SQLALCHEMY_DATABASE_URI'] en el arranque.
+os.environ["DATABASE_URL"] = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql://postgres:12345@localhost:5432/ph_test"
+)
 
 # Intentar importar la aplicación Flask según la estructura del proyecto
 try:

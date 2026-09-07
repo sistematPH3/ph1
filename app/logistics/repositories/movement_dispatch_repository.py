@@ -26,6 +26,9 @@ class MovementDispatchRepository:
         ).first()
 
         total_stock = float(inventory.current_quantity) if inventory else 0.0
+        # No se ofrece stock congelado por mermas pendientes de aprobación.
+        if inventory:
+            total_stock -= float(inventory.reserved_quantity or 0.0)
         if total_stock <= 0:
             return total_stock, []
 
@@ -273,9 +276,12 @@ class MovementDispatchRepository:
             # Saneamiento de variables nulas antes de operar con Decimal
             curr_qty = Decimal(str(inventory.current_quantity or '0.00'))
             trans_qty = Decimal(str(inventory.transit_quantity or '0.00'))
+            res_qty = Decimal(str(inventory.reserved_quantity or '0.00'))
 
-            if curr_qty < quantity:
-                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {curr_qty}, Solicitado: {quantity}")
+            disponible = curr_qty - res_qty
+
+            if disponible < quantity:
+                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {disponible}, Solicitado: {quantity}")
 
             # Validación del lote contra la disponibilidad real por partida.
             # No se usa dict `reserved` porque get_product_lots_available ya

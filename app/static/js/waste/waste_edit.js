@@ -81,55 +81,128 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("#editLinesTable tbody tr.line-row").forEach(setupRowLotAndQty);
 
     const btnSaveEdit = document.getElementById("btnSaveEdit");
-    if (btnSaveEdit) {
-        btnSaveEdit.addEventListener("click", async function () {
-            const wasteTypeId = document.getElementById("wasteTypeSelect").value;
-            const notes = document.getElementById("wasteNotesInput").value.trim();
-            const rows = document.querySelectorAll("#editLinesTable tbody tr.line-row");
+    const confirmModalEl = document.getElementById("confirmEditModal");
+    const confirmSummaryBox = document.getElementById("confirmEditSummary");
+    const btnConfirmSaveEdit = document.getElementById("btnConfirmSaveEdit");
 
-            const lines = [];
-            let hasError = false;
+    function phEscapeHtml(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+        });
+    }
 
-            rows.forEach(function (row) {
-                const productId = row.dataset.productId;
-                const lotSelect = row.querySelector(".ph-select-lot");
-                const lotNumber = lotSelect ? lotSelect.value.trim() : (row.dataset.lot || "").trim();
-                const expDate = row.dataset.exp || null;
-                const unitCost = row.dataset.unitCost || "0";
-                const maxStock = parseFloat(row.dataset.maxStock) || 0;
-                const qtyInput = row.querySelector(".line-qty");
-                const qty = parseFloat(qtyInput.value);
+    let pendingPayload = null;
 
-                if (!lotNumber) {
-                    if (lotSelect) lotSelect.classList.add("is-invalid");
-                    hasError = true;
-                } else if (lotSelect) {
-                    lotSelect.classList.remove("is-invalid");
-                }
+    function buildPendingPayload() {
+        const wasteTypeId = document.getElementById("wasteTypeSelect").value;
+        const notes = document.getElementById("wasteNotesInput").value.trim();
+        const rows = document.querySelectorAll("#editLinesTable tbody tr.line-row");
 
-                if (isNaN(qty) || qty <= 0 || (maxStock > 0 && qty > maxStock)) {
-                    qtyInput.classList.add("is-invalid");
-                    hasError = true;
-                } else {
-                    qtyInput.classList.remove("is-invalid");
-                }
+        const lines = [];
+        let hasError = false;
 
-                lines.push({
-                    product_id: parseInt(productId, 10),
-                    lot_number: lotNumber,
-                    expiration_date: expDate,
-                    unit_cost: parseFloat(unitCost),
-                    quantity: qty
-                });
-            });
+        rows.forEach(function (row) {
+            const productId = row.dataset.productId;
+            const lotSelect = row.querySelector(".ph-select-lot");
+            const lotNumber = lotSelect ? lotSelect.value.trim() : (row.dataset.lot || "").trim();
+            const expDate = row.dataset.exp || null;
+            const unitCost = row.dataset.unitCost || "0";
+            const maxStock = parseFloat(row.dataset.maxStock) || 0;
+            const qtyInput = row.querySelector(".line-qty");
+            const qty = parseFloat(qtyInput.value);
+            const typeSelect = row.querySelector(".ph-select-type");
+            const lineTypeId = typeSelect ? parseInt(typeSelect.value, 10) : null;
 
-            if (hasError) {
-                showAlert("Verifique las líneas: la cantidad debe ser mayor a cero y no puede superar el límite físico del lote.", true);
-                return;
+            if (!lotNumber) {
+                if (lotSelect) lotSelect.classList.add("is-invalid");
+                hasError = true;
+            } else if (lotSelect) {
+                lotSelect.classList.remove("is-invalid");
             }
 
-            btnSaveEdit.disabled = true;
-            btnSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+            if (isNaN(qty) || qty <= 0 || (maxStock > 0 && qty > maxStock)) {
+                qtyInput.classList.add("is-invalid");
+                hasError = true;
+            } else {
+                qtyInput.classList.remove("is-invalid");
+            }
+
+            lines.push({
+                product_id: parseInt(productId, 10),
+                lot_number: lotNumber,
+                expiration_date: expDate,
+                unit_cost: parseFloat(unitCost),
+                waste_type_id: lineTypeId,
+                quantity: qty
+            });
+        });
+
+        if (hasError) {
+            showAlert("Verifique las líneas: la cantidad debe ser mayor a cero y no puede superar el límite físico del lote.", true);
+            return null;
+        }
+
+        return { waste_type_id: wasteTypeId, notes: notes, lines: lines, rows: rows };
+    }
+
+    function renderConfirmSummary(payload) {
+        if (!confirmSummaryBox) return;
+        const typeSelect = document.getElementById("wasteTypeSelect");
+        const typeName = typeSelect && typeSelect.selectedIndex >= 0
+            ? typeSelect.options[typeSelect.selectedIndex].text
+            : "—";
+
+        let html = '<div class="mb-3">' +
+            '<span class="small fw-bold text-muted d-block">Tipo de merma general</span>' +
+            '<span class="badge bg-dark px-2 py-1">' + phEscapeHtml(typeName) + '</span></div>';
+
+        if (payload.notes) {
+            html += '<div class="mb-3">' +
+                '<span class="small fw-bold text-muted d-block">Motivo / Observaciones</span>' +
+                '<div class="p-2 rounded-3 bg-light border small">' + phEscapeHtml(payload.notes) + '</div></div>';
+        }
+
+        html += '<div class="table-responsive rounded-3 border">' +
+            '<table class="table table-sm align-middle mb-0">' +
+            '<thead class="text-uppercase small text-muted" style="background:#f8f9fa;">' +
+            '<tr><th>Producto</th><th>Lote</th><th class="text-center">Cantidad</th><th>Tipo de Merma</th></tr>' +
+            '</thead><tbody>';
+
+        payload.rows.forEach(function (row, idx) {
+            const line = payload.lines[idx];
+            const prodEl = row.querySelector(".td-prod .fw-bold");
+            const productName = prodEl ? prodEl.textContent.trim() : ("Producto #" + line.product_id);
+            const typeSel = row.querySelector(".ph-select-type");
+            const typeName = typeSel && typeSel.selectedIndex >= 0
+                ? typeSel.options[typeSel.selectedIndex].text
+                : "—";
+            html += '<tr>' +
+                '<td class="fw-bold">' + phEscapeHtml(productName) + '</td>' +
+                '<td>' + phEscapeHtml(line.lot_number) + '</td>' +
+                '<td class="text-center fw-bold">' + line.quantity + '</td>' +
+                '<td>' + phEscapeHtml(typeName) + '</td></tr>';
+        });
+
+        html += '</tbody></table></div>';
+        confirmSummaryBox.innerHTML = html;
+    }
+
+    if (btnSaveEdit && confirmModalEl && confirmSummaryBox && btnConfirmSaveEdit) {
+        btnSaveEdit.addEventListener("click", function () {
+            const payload = buildPendingPayload();
+            if (!payload) return;
+            pendingPayload = payload;
+            const wasteIdTitle = document.getElementById("confirmEditWasteId");
+            if (wasteIdTitle) wasteIdTitle.textContent = "#" + wasteId;
+            renderConfirmSummary(payload);
+            bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
+        });
+
+        btnConfirmSaveEdit.addEventListener("click", async function () {
+            if (!pendingPayload) return;
+            const payload = pendingPayload;
+            btnConfirmSaveEdit.disabled = true;
+            btnConfirmSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
 
             try {
                 const response = await fetch("/api/waste/merma/" + wasteId + "/edit", {
@@ -139,28 +212,34 @@ document.addEventListener("DOMContentLoaded", function () {
                         "X-Requested-With": "XMLHttpRequest"
                     },
                     body: JSON.stringify({
-                        waste_type_id: wasteTypeId,
-                        notes: notes,
-                        lines: lines
+                        waste_type_id: payload.waste_type_id,
+                        notes: payload.notes,
+                        lines: payload.lines
                     })
                 });
 
                 const data = await response.json();
+                if (bootstrap.Modal.getInstance(confirmModalEl)) {
+                    bootstrap.Modal.getInstance(confirmModalEl).hide();
+                }
                 if (response.ok && data.success) {
                     showAlert(data.message || "Merma actualizada correctamente.", false);
                     setTimeout(function () {
-                        window.location.href = "/waste/merma/pending";
-                    }, 1000);
+                        window.location.href = "/waste/merma/mis-pendientes";
+                    }, 1200);
                 } else {
                     const msg = data.message || (data.errors ? Object.values(data.errors)[0] : "Error al guardar cambios.");
                     showAlert(msg, true);
-                    btnSaveEdit.disabled = false;
-                    btnSaveEdit.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Guardar Modificaciones';
                 }
             } catch (err) {
+                if (bootstrap.Modal.getInstance(confirmModalEl)) {
+                    bootstrap.Modal.getInstance(confirmModalEl).hide();
+                }
                 showAlert("Error de comunicación con el servidor al actualizar la merma.", true);
-                btnSaveEdit.disabled = false;
-                btnSaveEdit.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Guardar Modificaciones';
+            } finally {
+                btnConfirmSaveEdit.disabled = false;
+                btnConfirmSaveEdit.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar y Guardar';
+                pendingPayload = null;
             }
         });
     }

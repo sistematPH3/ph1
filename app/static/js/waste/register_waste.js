@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const locationElement = document.getElementById('location_id');
     const wasteTypeSelect = document.getElementById('waste_type_id');
+    const itemTypeSelect = document.getElementById('item_type_id');
     const productSelect = document.getElementById('product_id');
     const lotSelect = document.getElementById('lot_number');
     const quantityInput = document.getElementById('quantity');
@@ -39,9 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentItemPhotoUrls = [];
     let currentVencidos = [];
     let lotsSeq = 0;
+    let pendingRequestId = null;
 
     const lockedTypeCode = (document.getElementById('locked_type_code') || {}).value || null;
     const wasteTypesByOption = {};
+    let wasteTypesData = [];
     const isSingleLocation = !locationElement || locationElement.tagName === 'INPUT';
 
     function escapeHtml(value) {
@@ -102,6 +105,39 @@ document.addEventListener('DOMContentLoaded', () => {
         return wasteTypesByOption[String(wasteTypeSelect.value)] || null;
     };
 
+    // Tipo de merma del insumo que se está editando (por defecto, el del ticket).
+    const itemTypeCode = () => {
+        if (!itemTypeSelect || !itemTypeSelect.value || !wasteTypesData.length) return null;
+        const found = wasteTypesData.find(t => String(t.id) === String(itemTypeSelect.value));
+        return found ? found.code : null;
+    };
+
+    // Modo "VENCIDO" efectivo: lo activa el tipo del ticket O el del insumo.
+    const effectiveVencidoMode = () =>
+        selectedTypeCode() === 'VENCIDO' || itemTypeCode() === 'VENCIDO';
+
+    const populateItemTypeSelect = () => {
+        if (!itemTypeSelect) return;
+        const headerVal = wasteTypeSelect ? wasteTypeSelect.value : '';
+        itemTypeSelect.innerHTML = '';
+        if (!headerVal || wasteTypesData.length === 0) {
+            itemTypeSelect.innerHTML = '<option value="" selected disabled>Esperando tipo del ticket...</option>';
+            itemTypeSelect.disabled = true;
+            return;
+        }
+        wasteTypesData.forEach(t => {
+            const option = document.createElement('option');
+            option.value = t.id;
+            option.textContent = t.name + (t.requires_approval ? ' (requiere aprobación)' : '');
+            itemTypeSelect.appendChild(option);
+        });
+        const stillValid = wasteTypesData.some(t => String(t.id) === String(itemTypeSelect.value));
+        if (!stillValid) {
+            itemTypeSelect.value = headerVal;
+        }
+        itemTypeSelect.disabled = false;
+    };
+
     const hasExpiredDate = (expirationDateText) => {
         if (!expirationDateText) return false;
         const parts = String(expirationDateText).split('/');
@@ -122,10 +158,15 @@ document.addEventListener('DOMContentLoaded', () => {
         wasteTypeSelect.innerHTML = '<option value="" selected disabled>Cargando tipos...</option>';
         wasteTypeSelect.disabled = true;
         Object.keys(wasteTypesByOption).forEach(k => delete wasteTypesByOption[k]);
+        if (itemTypeSelect) {
+            itemTypeSelect.innerHTML = '<option value="" selected disabled>Esperando tipo del ticket...</option>';
+            itemTypeSelect.disabled = true;
+        }
         try {
             const response = await fetch(`/api/waste/locations/${locationId}/types`);
             const result = await response.json();
             if (response.ok && result.success) {
+                wasteTypesData = Array.isArray(result.types) ? result.types : [];
                 wasteTypeSelect.innerHTML = '<option value="" selected disabled>Seleccione el tipo de merma...</option>';
                 let foundLocked = false;
                 result.types.forEach(t => {
@@ -150,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     wasteTypeSelect.disabled = false;
                 }
+                populateItemTypeSelect();
                 updateSteps();
             }
         } catch (e) {
@@ -241,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const refreshProducts = (locationId) => {
         if (!locationId) return;
-        if (selectedTypeCode() === 'VENCIDO') {
+        if (effectiveVencidoMode()) {
             loadVencidos(locationId).then(() => loadProducts(locationId, true));
         } else {
             loadProducts(locationId, false);
@@ -260,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (seq !== lotsSeq) return;
             if (response.ok && result.success) {
                 currentLotsData = Array.isArray(result.lots) ? result.lots : [];
-                if (selectedTypeCode() === 'VENCIDO') {
+                if (effectiveVencidoMode()) {
                     currentLotsData = currentLotsData.filter(l =>
                         hasExpiredDate(l.expiration_date));
                 }
@@ -443,6 +485,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle">${photos.length} fotos</span>`
                 : '';
             const expired = hasExpiredDate(item.expiration_date);
+            let tipoBadge = '';
+            if (item.waste_type_id && wasteTypesData.length) {
+                const t = wasteTypesData.find(x => String(x.id) === String(item.waste_type_id));
+                if (t) tipoBadge = '<span class="badge rounded-pill bg-light text-dark border"><i class="bi bi-tag me-1"></i>' + escapeHtml(t.name) + '</span>';
+            }
             card.innerHTML = `
                 <button type="button" class="merma-card-remove" title="Quitar este insumo" onclick="removeMermaItem(${index})">
                     <i class="bi bi-x-lg"></i>
@@ -451,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="merma-card-body">
                     <div class="merma-card-name">${escapeHtml(item.product_name)}</div>
                     <div class="merma-card-badges">
+                        ${tipoBadge}
                         <span class="badge rounded-pill bg-light text-dark border font-monospace">Lote ${escapeHtml(item.lot_number)}</span>
                         <span class="badge rounded-pill ${expired ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-muted border'}" title="Vencimiento">
                             Vence: ${escapeHtml(item.expiration_date || '—')}
@@ -537,6 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const itemTypeId = (itemTypeSelect && itemTypeSelect.value) ? +itemTypeSelect.value : null;
         const lotObj = currentLotsData.find(l => l.lot_number === lotVal);
 
         cartItems.push({
@@ -544,6 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
             product_name: productName,
             lot_number: lotVal,
             quantity: qty,
+            waste_type_id: itemTypeId,
             expiration_date: (lotObj && lotObj.expiration_date) ? lotObj.expiration_date : null,
             evidence_urls: currentItemPhotoUrls.slice(),
             evidence_url: currentItemPhotoUrls[0] || null
@@ -801,6 +851,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const locId = currentLocationId();
             resetEditor();
             updateSteps();
+            populateItemTypeSelect();
+            refreshProducts(locId);
+        });
+    }
+
+    if (itemTypeSelect) {
+        itemTypeSelect.addEventListener('change', () => {
+            const locId = currentLocationId();
+            resetEditor();
             refreshProducts(locId);
         });
     }
@@ -832,15 +891,21 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSubmitMerma.disabled = true;
         btnSubmitMerma.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Procesando...';
 
+        if (!pendingRequestId) {
+            pendingRequestId = 'waste-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        }
+
         const payload = {
             location_id: parseInt(locId),
             waste_type_id: wasteTypeId,
             notes: notes,
+            request_id: pendingRequestId,
             evidence_url: evidenceUrlInput.value || null,
             items: cartItems.map(item => ({
                 product_id: item.product_id,
                 lot_number: item.lot_number,
                 quantity: item.quantity,
+                waste_type_id: (item.waste_type_id != null) ? item.waste_type_id : null,
                 evidence_urls: (item.evidence_urls && item.evidence_urls.length) ? item.evidence_urls : null,
                 evidence_url: item.evidence_url || null
             }))
@@ -856,6 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok && result.success) {
                 cartItems = [];
+                pendingRequestId = null;
                 resetEditor();
                 renderCards();
                 notesInput.value = '';

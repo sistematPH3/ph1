@@ -24,10 +24,20 @@ def validar_suficiencia_inventario(inventario_actual, cantidad_anterior, nueva_c
     """
     Verifica que la sede tenga stock suficiente para cubrir el ajuste.
     Si se gastó más de lo reportado originalmente, hay que restar la diferencia.
+    Usa el stock DISPONIBLE (físico menos tránsito y mermas pendientes congeladas).
     """
     diferencia = nueva_cantidad - cantidad_anterior
-    
+
     if diferencia > 0:
-        if not inventario_actual or inventario_actual.current_quantity < diferencia:
-            stock_disponible = inventario_actual.current_quantity if inventario_actual else 0
-            raise ValueError(f"Inventario insuficiente: Quedan {stock_disponible} unidades, no cubre la diferencia de {diferencia}.")
+        if not inventario_actual:
+            raise ValueError(f"Inventario insuficiente: no hay stock registrado para este insumo.")
+        disponible = (
+            float(inventario_actual.current_quantity or 0)
+            - float(inventario_actual.transit_quantity or 0)
+            - float(inventario_actual.reserved_quantity or 0)
+        )
+        if disponible < diferencia:
+            raise ValueError(
+                f"Inventario insuficiente: Quedan {disponible:.2f} unidades disponibles, "
+                f"no cubren la diferencia de {diferencia:.2f}."
+            )

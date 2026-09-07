@@ -2,7 +2,7 @@ from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import text
 from app.extensions import db
-from app.models.waste_model import Waste, WasteDetail, WasteType, AuditLog
+from app.models.waste_model import Waste, WasteDetail, WasteType, WasteDetailPhoto, AuditLog
 from app.models.inventory_model import Inventory, Product
 
 class WasteEditRepository:
@@ -109,6 +109,14 @@ class WasteEditRepository:
 
     @staticmethod
     def save_pending_edit(waste, clean_data, user_id):
+        # Líneas que YA tienen decisión (aprobadas/rechazadas) NO se tocan:
+        # su stock ya pudo ser descontado o su resolución fue registrada.
+        # Solo se reemplazan las líneas PENDIENTES.
+        decididas = [
+            d for d in waste.details
+            if d.status and d.status != "PENDIENTE"
+        ]
+
         before_state = {
             "waste_type_id": waste.waste_type_id,
             "notes": waste.notes,
@@ -117,17 +125,24 @@ class WasteEditRepository:
                 {
                     "product_id": d.product_id,
                     "lot_number": d.lot_number,
-                    "quantity": float(d.quantity)
+                    "quantity": float(d.quantity),
+                    "waste_type_id": d.waste_type_id,
+                    "status": d.status or "PENDIENTE",
+                    "photos": [p.photo_url for p in d.photos],
                 }
                 for d in waste.details
             ]
         }
 
+        for d in list(waste.details):
+            if not d.status or d.status == "PENDIENTE":
+                waste.details.remove(d)
+        db.session.flush()
+
         waste.waste_type_id = clean_data["waste_type_id"]
         waste.notes = clean_data["notes"]
-
-        waste.details.clear()
-        db.session.flush()
+        if "evidence_url" in clean_data:
+            waste.evidence_url = clean_data.get("evidence_url") or None
 
         total_qty = Decimal("0.00")
         total_cost = Decimal("0.00")
@@ -140,14 +155,22 @@ class WasteEditRepository:
                 expiration_date=line["expiration_date"],
                 quantity=line["quantity"],
                 unit_cost=line["unit_cost"],
-                subtotal_cost=line["subtotal_cost"]
+                subtotal_cost=line["subtotal_cost"],
+                waste_type_id=line.get("waste_type_id"),
+                evidence_url=(line.get("evidence_urls") or [None])[0],
             )
-            db.session.add(detail)
+            for pos, p_url in enumerate(line.get("evidence_urls") or [], start=1):
+                detail.photos.append(WasteDetailPhoto(photo_url=p_url, position=pos))
+            waste.details.append(detail)
             total_qty += line["quantity"]
             total_cost += line["subtotal_cost"]
 
-        waste.total_quantity = total_qty
-        waste.total_cost = total_cost
+        for d in decididas:
+            total_qty += d.quantity
+            total_cost += d.subtotal_cost
+
+        waste.total_quantity = total_qty.quantize(Decimal("0.01"))
+        waste.total_cost = total_cost.quantize(Decimal("0.01"))
 
         after_state = {
             "waste_type_id": waste.waste_type_id,
@@ -155,11 +178,14 @@ class WasteEditRepository:
             "total_quantity": float(waste.total_quantity),
             "lines": [
                 {
-                    "product_id": line["product_id"],
-                    "lot_number": line["lot_number"],
-                    "quantity": float(line["quantity"])
+                    "product_id": d.product_id,
+                    "lot_number": d.lot_number,
+                    "quantity": float(d.quantity),
+                    "waste_type_id": d.waste_type_id,
+                    "status": d.status or "PENDIENTE",
+                    "photos": [p.photo_url for p in d.photos],
                 }
-                for line in clean_data["lines"]
+                for d in waste.details
             ]
         }
 
@@ -174,7 +200,10 @@ class WasteEditRepository:
                 "event": "MERMA_EDITADA",
                 "waste_id": waste.id,
                 "before": before_state,
-                "after": after_state
+                "after": after_state,
+                "cantidad_antes": float(before_state["total_quantity"]),
+                "cantidad_despues": float(after_state["total_quantity"]),
+                "motivo_edicion": (clean_data.get("notes") or "").strip(),
             }
         )
         db.session.add(audit)
@@ -212,6 +241,7 @@ class WasteEditRepository:
                     product_id=detail.product_id,
                     current_quantity=detail.quantity,
                     transit_quantity=Decimal("0.00"),
+                    reserved_quantity=Decimal("0.00"),
                     min_stock=Decimal("0.00")
                 )
                 db.session.add(inv)

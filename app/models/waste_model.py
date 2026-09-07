@@ -30,6 +30,7 @@ class Waste(db.Model):
     waste_type_id = db.Column(db.Integer, db.ForeignKey('waste_types.id'))
     evidence_url = db.Column(db.Text) # Foto de la merma (siempre opcional)
     notes = db.Column(db.Text)
+    request_id = db.Column(db.String(100)) # Idempotencia: ID de solicitud del cliente (opcional)
     date = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id')) # Autor (se conserva)
 
@@ -75,6 +76,10 @@ class WasteDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     waste_id = db.Column(db.Integer, db.ForeignKey('waste.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    # Motivo de merma de ESTE producto. NULL => hereda el tipo de la cabecera
+    # (Waste.waste_type_id), de modo que los tickets antiguos siguen funcionando.
+    waste_type_id = db.Column(db.Integer, db.ForeignKey('waste_types.id'))
+    waste_type = db.relationship('WasteType')
     lot_number = db.Column(db.String(50), nullable=False)
     expiration_date = db.Column(db.Date)
     quantity = db.Column(db.Numeric(10, 2), nullable=False)

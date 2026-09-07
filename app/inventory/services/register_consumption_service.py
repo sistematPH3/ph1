@@ -54,10 +54,17 @@ def register_consumption(location_id, items, user_id):
                 return {'success': False, 'message': f'No existe registro de inventario para el insumo ID {product_id}.'}
 
             stock_actual = float(inventory_item.current_quantity)
-            if stock_actual < quantity_to_consume:
+            # Disponible = físico menos lo en tránsito y lo CONGELADO por mermas
+            # pendientes: no se puede gastar stock que aún espera decisión.
+            disponible = (
+                stock_actual
+                - float(inventory_item.transit_quantity or 0)
+                - float(inventory_item.reserved_quantity or 0)
+            )
+            if disponible < quantity_to_consume:
                 db.session.rollback()
                 name = inventory_item.product.name if hasattr(inventory_item, 'product') else f"ID {product_id}"
-                return {'success': False, 'message': f'Stock insuficiente para {name}. Stock disponible: {stock_actual:.2f}.'}
+                return {'success': False, 'message': f'Stock insuficiente para {name}. Stock disponible: {disponible:.2f}.'}
 
             available_lots = RegisterConsumptionRepository.get_product_lots(product_id, location_id)
 

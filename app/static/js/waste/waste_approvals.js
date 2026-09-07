@@ -314,7 +314,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
                 rowsHtml += '<tr>' +
-                    '<td>' + esc(l.product_name) + '</td>' +
+                    '<td>' + esc(l.product_name) +
+                        (l.waste_type_name
+                            ? '<div class="small text-muted fst-italic mt-1"><i class="bi bi-tag me-1"></i>' + esc(l.waste_type_name) + '</div>'
+                            : '') + '</td>' +
                     '<td><span class="badge bg-light text-dark border font-monospace">' + esc(l.lot_number || 'N/A') + '</span></td>' +
                     '<td class="text-muted small">' + esc(l.expiration_date) + '</td>' +
                     '<td class="fw-bold text-dark">' + l.quantity + ' <span class="text-muted small fw-normal">' + esc(l.unit || '') + '</span></td>' +

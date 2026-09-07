@@ -1,3 +1,4 @@
+from decimal import Decimal
 from app.extensions import db
 
 class Category(db.Model):
@@ -67,5 +68,14 @@ class Inventory(db.Model):
     current_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     # CAMPO AÑADIDO: Saldo retenido en tránsito para custodias físicas
     transit_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    # CAMPO AÑADIDO: Stock congelado por mermas PENDIENTES de aprobación.
+    # No se resta de current_quantity: se compromete para que cocina/traslados/
+    # ediciones no lo consuman hasta que el Admin decida.
+    reserved_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00, server_default='0.00')
     # CAMPO AÑADIDO: Necesario para que el trigger sepa cuándo lanzar la alerta
     min_stock = db.Column(db.Numeric(10, 2), nullable=False, default=20.00)
+
+    def available_quantity(self):
+        """Stock realmente disponible para gastar/mover: físico menos lo que
+        ya está en tránsito y lo congelado por mermas pendientes."""
+        return Decimal(str(self.current_quantity or 0)) - Decimal(str(self.transit_quantity or 0)) - Decimal(str(self.reserved_quantity or 0))

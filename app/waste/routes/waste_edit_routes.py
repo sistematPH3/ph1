@@ -25,12 +25,24 @@ def editar_merma(waste_id):
         is_admin=is_admin
     )
 
-@waste_edit_bp.route("/api/waste/merma/<int:waste_id>/edit", methods=["POST"])
+@waste_edit_bp.route("/api/waste/merma/<int:waste_id>/edit", methods=["GET", "POST"])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def guardar_edicion(waste_id):
     user_id = session.get("user_id") or session.get("_user_id") or getattr(current_user, "id", None)
     is_admin = bool(getattr(current_user, "is_admin", False) or getattr(current_user, "role_id", None) == 1)
+
+    if request.method == "GET":
+        data, error = WasteEditService.get_waste_for_edit(waste_id, user_id, is_admin)
+        if error:
+            code = 404 if "existe" in error else 403
+            return jsonify({"success": False, "message": error}), code
+        if not data["can_edit"]:
+            return jsonify({
+                "success": False,
+                "message": "Esta merma ya no es editable: no tiene permisos o la ventana de tiempo expiró."
+            }), 403
+        return jsonify({"success": True, "waste": data}), 200
 
     payload = request.get_json(silent=True) or {}
     response_data, status_code = WasteEditService.edit_pending_waste(waste_id, payload, user_id, is_admin)

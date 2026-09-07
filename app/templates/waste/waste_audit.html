@@ -187,6 +187,7 @@
                                                                     <div class="text-break me-2" style="max-width: 55%;">
                                                                         <strong class="text-dark d-block text-wrap">{{ p.producto or 'Producto' }}</strong>
                                                                         {% if p.lote %}<span class="badge bg-light text-dark border">Lote: {{ p.lote }}</span>{% endif %}
+                                                                        {% if p.motivo_tipo %}<span class="badge bg-light text-dark border">Motivo: {{ p.motivo_tipo }}</span>{% endif %}
                                                                         {% if p.decision %}
                                                                             <span class="badge {% if p.decision == 'APROBADO' %}bg-success{% elif p.decision == 'RECHAZADO' %}bg-secondary{% else %}bg-dark{% endif %} mt-1">{{ p.decision }}</span>
                                                                         {% endif %}

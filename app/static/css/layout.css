@@ -112,6 +112,18 @@ html, body {
     transform: rotate(180deg);
 }
 
+/* Cuando se abre un modal de Bootstrap (z-index 1055) la pestaña y la barra
+   lateral deben quedar POR DEBAJO del backdrop (1050) para no tapar el modal. */
+body.modal-open .toggle-sidebar-btn {
+    z-index: 1020;
+}
+
+@media (max-width: 1024px) {
+    body.modal-open .sidebar {
+        z-index: 1020 !important;
+    }
+}
+
 /* =========================================================
    BUSCADOR OVALADO
    ========================================================= */

@@ -296,6 +296,7 @@ def get_waste_detail(waste_id, user_id):
         stock_disponible = _stock_disponible(waste.location_id, d.product_id)
         qty = float(d.quantity)
         limite = prods.get(d.product_id, {}).get('waste_limit')
+        d_type = d.waste_type or (getattr(d, 'waste', None) and d.waste.waste_type) or None
         lines.append({
             'detail_id': d.id,
             'product_id': d.product_id,
@@ -307,6 +308,9 @@ def get_waste_detail(waste_id, user_id):
             'subtotal_cost': float(d.subtotal_cost or 0),
             'stock_en_lote': stock_disponible,
             'waste_limit': limite,
+            'waste_type_id': d.waste_type_id or waste.waste_type_id,
+            'waste_type_name': d_type.name if d_type else row.type_name,
+            'waste_type_code': getattr(d_type, 'code', None) or row.type_code,
             'unit': prods.get(d.product_id, {}).get('unit', ''),
             'excede_limite': (limite is not None) and (qty > limite),
             'status': d.status or 'PENDIENTE',
@@ -354,15 +358,22 @@ def _stock_disponible(location_id, product_id):
     inv = MermaApprovalsRepository.get_inventory_item(location_id, product_id)
     if inv is None:
         return 0.0
-    return float(inv.current_quantity or 0)
+    disponible = (
+        float(inv.current_quantity or 0)
+        - float(inv.transit_quantity or 0)
+        - float(inv.reserved_quantity or 0)
+    )
+    return round(disponible, 2)
 
 
 def _descontar_stock_lines(waste, details):
     """Descuenta current_quantity por producto/sede por cada línea a aprobar.
 
-    Valida que el stock alcance ANTES de descontar (de forma acumulada cuando
-    varias líneas de la misma sede apuntan al mismo insumo). Si algún producto
-    no tiene suficiente stock se aborta: nada se descuenta.
+    Valida que el stock disponible (current - transit - reserved) alcance ANTES
+    de descontar (de forma acumulada cuando varias líneas de la misma sede
+    apuntan al mismo insumo). Si algún producto no tiene suficiente stock se
+    aborta: nada se descuenta. Al aprobar se LIBERA la reserva correspondiente
+    (el stock congelado que la merma pendiente había apartado).
     """
     cambios = []
     saldos = {}
@@ -372,26 +383,33 @@ def _descontar_stock_lines(waste, details):
             raise ValueError(
                 f'No existe inventario para el insumo #{d.product_id} en la sede #{waste.location_id}.'
             )
-        stock = float(inv.current_quantity or 0)
-        disponible = saldos.get(d.product_id, stock)
+        disponible = (
+            float(inv.current_quantity or 0)
+            - float(inv.transit_quantity or 0)
+            - float(inv.reserved_quantity or 0)
+        )
+        saldo = saldos.get(d.product_id, disponible)
         qty = float(d.quantity or 0)
-        if disponible < qty:
+        if saldo < qty:
             prod = Product.query.get(d.product_id)
             nombre = prod.name if prod else f'#{d.product_id}'
             raise ValueError(
-                f'Stock insuficiente para {nombre}: disponible {disponible:.2f}, merma {qty:.2f}.'
+                f'Stock insuficiente para {nombre}: disponible {saldo:.2f}, merma {qty:.2f}.'
             )
-        saldos[d.product_id] = disponible - qty
+        saldos[d.product_id] = saldo - qty
         cambios.append({
             'product_id': d.product_id,
             'quantity': qty,
-            'stock_antes': disponible,
-            'stock_despues': disponible - qty,
+            'stock_antes': saldo,
+            'stock_despues': saldo - qty,
         })
-    # Aplicar los descuentos una vez validado todo.
+    # Aplicar los descuentos una vez validado todo y liberar la reserva.
     for d in details:
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         inv.current_quantity = round(float(inv.current_quantity or 0) - float(d.quantity or 0), 2)
+        inv.reserved_quantity = round(
+            max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+        )
     return cambios
 
 
@@ -470,6 +488,16 @@ def decidir_lineas(waste_id, user_id, decisiones):
     except Exception as exc:
         db.session.rollback()
         return {'success': False, 'message': str(exc)}
+
+    # Al RECHAZAR una línea pendiente se libera su reserva: el stock congelado
+    # por esta merma vuelve a estar disponible (current_quantity no se descuenta).
+    for d, _reason in rechazar:
+        inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+        if inv is None:
+            continue
+        inv.reserved_quantity = round(
+            max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+        )
 
     for d in aprobar:
         MermaApprovalsRepository.mark_line_resolved(d, user.id, 'aprobar')
@@ -631,8 +659,9 @@ def reject_waste(waste_id, user_id, reason):
 def cancel_waste(waste_id, user_id, reason):
     """Retira una merma PENDIENTE antes de la respuesta del Admin.
 
-    Pueden: el Admin, el autor y los usuarios de la sede de la merma. No toca
-    stock (la pendiente nunca lo descontó): pasa a CANCELADA, se audita con el
+    Pueden: el Admin, el autor y los usuarios de la sede de la merma. No
+    descuenta current_quantity (la pendiente nunca lo descontó): libera la
+    reserva congelada (reserved_quantity), pasa a CANCELADA, se audita con el
     motivo y queda constancia en la Auditoría de Inventario. Si ya hay líneas
     decididas no se puede cancelar (parte del stock ya fue descontada).
     """
@@ -661,6 +690,15 @@ def cancel_waste(waste_id, user_id, reason):
         }
 
     try:
+        # Se libera la reserva congelada por las líneas pendientes: el stock
+        # vuelve a estar disponible (current_quantity no se descuenta).
+        for d in waste.details:
+            inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+            if inv is None:
+                continue
+            inv.reserved_quantity = round(
+                max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+            )
         MermaApprovalsRepository.mark_cancelled(waste, user.id, reason)
         MermaApprovalsRepository.create_audit(
             waste, user.id, EV_CANCELAR, 'ALERTA',

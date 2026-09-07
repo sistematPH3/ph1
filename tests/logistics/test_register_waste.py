@@ -963,6 +963,63 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
                                         location_id=env["location_id"]).first()
         self.assertEqual(float(inv.current_quantity), 45.0)
 
+    def test_e2e_http_request_id_duplicado_no_crea_doble_merma(self):
+        env = self._seed_env(stock=50.0, waste_limit=20.0)
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess["_user_id"] = str(env["user_id"])
+
+        payload = {
+            "location_id": env["location_id"],
+            "waste_type_id": env["waste_type"].id,
+            "items": [{"product_id": env["product_id"], "lot_number": "L-001",
+                       "quantity": 5.0}],
+            "notes": "Con request_id",
+            "request_id": "req-http-abc",
+        }
+
+        def reset_submit_lock():
+            with client.session_transaction() as sess:
+                sess["last_waste_submit_time"] = 0
+
+        reset_submit_lock()
+        r1 = client.post("/waste/merma/new", json=payload)
+        self.assertEqual(r1.status_code, 200)
+        d1 = r1.get_json()
+        self.assertTrue(d1["success"])
+        self.assertFalse(d1.get("duplicate"))
+
+        reset_submit_lock()
+        r2 = client.post("/waste/merma/new", json=payload)
+        self.assertEqual(r2.status_code, 200)
+        d2 = r2.get_json()
+        self.assertTrue(d2["success"])
+        self.assertTrue(d2.get("duplicate"))
+        self.assertEqual(d2["waste_id"], d1["waste_id"])
+
+        db.session.expunge_all()
+        self.assertEqual(
+            Waste.query.filter_by(request_id="req-http-abc").count(), 1
+        )
+        inv = Inventory.query.filter_by(product_id=env["product_id"],
+                                        location_id=env["location_id"]).first()
+        # El stock se descuenta UNA sola vez (45.0), no por cada reintento.
+        self.assertEqual(float(inv.current_quantity), 45.0)
+        self.assertEqual(
+            AuditLog.query.filter_by(affected_table="inventory",
+                                     action="MERMA").count(), 1
+        )
+
+        # Un request_id distinto SÍ crea una merma nueva (sin interferencias).
+        payload2 = dict(payload, request_id="req-http-xyz")
+        reset_submit_lock()
+        r3 = client.post("/waste/merma/new", json=payload2)
+        self.assertEqual(r3.status_code, 200)
+        d3 = r3.get_json()
+        self.assertTrue(d3["success"])
+        self.assertFalse(d3.get("duplicate"))
+        self.assertNotEqual(d3["waste_id"], d1["waste_id"])
+
     def test_e2e_http_validacion_devuelve_400(self):
         env = self._seed_env(stock=50.0, waste_limit=20.0)
         client = self.app.test_client()

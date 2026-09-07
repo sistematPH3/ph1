@@ -55,13 +55,17 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
 
     Devuelve (pendiente, motivos) donde 'motivos' es un dict por producto
     (product_id -> [códigos]) con las novedades de CADA producto:
-    'VENCIDO' (el lote ya pasó su vencimiento), 'LIMITE' (regla de cantidad),
+    'VENCIDO' (un lote ya pasó su vencimiento), 'LIMITE' (regla de cantidad),
     'TIPO' (el tipo exige aprobación) y 'TIEMPO' (regla temporal). Así la
     auditoría, las respuestas y cualquier bandeja de aprobaciones pueden mostrar
     el motivo por cada producto, incluso varios en el mismo producto
     (p. ej. cadena de frío + límite). La merma queda PENDIENTE con LIMITE/TIPO/
     TIEMPO; el motivo VENCIDO es informativo (el tipo VENCIDO ya validó la
     expiración del lote al registrar).
+
+    Cada ÍTEM puede traer su PROPIO tipo de merma (item['_waste_type']) para
+    soportar tickets con motivos distintos por producto. Si un ítem no lo trae,
+    hereda el tipo de la cabecera (waste_type).
     """
     motivos = {}
 
@@ -71,12 +75,15 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
             motivos[pid].append(motivo)
 
     por_producto = {}
+    tipos_por_producto = {}
     for item in items:
         pid = item['product_id']
         por_producto[pid] = por_producto.get(pid, Decimal('0.00')) + Decimal(str(item['quantity']))
+        t = item.get('_waste_type') or waste_type
+        tipos_por_producto.setdefault(pid, []).append(t)
 
-    if waste_type and waste_type.code == 'VENCIDO':
-        for pid in por_producto:
+    for pid, tipos in tipos_por_producto.items():
+        if any(getattr(t, 'code', None) == 'VENCIDO' for t in tipos):
             marcar(pid, 'VENCIDO')
 
     cantidad_excede = False
@@ -93,6 +100,15 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
     if waste_type and waste_type.requires_approval:
         for pid in por_producto:
             marcar(pid, 'TIPO')
+        return True, motivos
+
+    # Soporte por ítem: aunque la cabecera no exija aprobación, un producto
+    # puede tener un tipo propio que sí la exija (p. ej. TEMPERATURA).
+    if any(getattr(t, 'requires_approval', False)
+           for tipos in tipos_por_producto.values() for t in tipos):
+        for pid, tipos in tipos_por_producto.items():
+            if any(getattr(t, 'requires_approval', False) for t in tipos):
+                marcar(pid, 'TIPO')
         return True, motivos
 
     if cantidad_excede:
@@ -119,7 +135,22 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
 
     return False, motivos
 
-def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None, notes=None):
+def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None, notes=None, request_id=None):
+    request_id = (request_id or '').strip() or None
+    if request_id:
+        existing = RegisterWasteRepository.get_waste_by_request_id(request_id)
+        if existing:
+            return {
+                'success': True,
+                'waste_id': existing.id,
+                'status': existing.status,
+                'duplicate': True,
+                'message': (
+                    'Ya existe una merma registrada con este identificador de '
+                    'solicitud. No se creó un registro duplicado.'
+                ),
+            }
+
     if location_id is None:
         return {'success': False, 'message': 'La sede es obligatoria.'}
 
@@ -130,6 +161,30 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
     if int(location_id) == 1 and not waste_type.applies_central \
             and waste_type.code != 'VENCIDO':
         return {'success': False, 'message': 'Este tipo de merma no aplica a la Sede Central.'}
+
+    # Cada ítem puede llevar SU PROPIO tipo de merma. Sin él, hereda el de la
+    # cabecera. Resolvemos y validamos aquí para usarlo en el bucle de líneas.
+    for item in items:
+        item_type_id = item.get('waste_type_id')
+        if item_type_id in (None, ''):
+            item['_waste_type'] = waste_type
+            continue
+        item_type = RegisterWasteRepository.get_waste_type_by_id(int(item_type_id))
+        if not item_type or not item_type.is_active:
+            return {
+                'success': False,
+                'message': 'El tipo de merma elegido para uno de los productos no es válido.'
+            }
+        if int(location_id) == 1 and not item_type.applies_central \
+                and item_type.code != 'VENCIDO':
+            return {
+                'success': False,
+                'message': (
+                    f'El tipo de merma "{item_type.name}" de uno de los '
+                    'productos no aplica a la Sede Central.'
+                )
+            }
+        item['_waste_type'] = item_type
 
     user_row = RegisterWasteRepository.get_user_by_id(user_id)
     if not user_row:
@@ -170,18 +225,21 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 return {'success': False, 'message': f'No existe inventario para el producto ID {product_id} en esta sede.'}
 
             stock = float(inventory_item.current_quantity)
+            transit = float(inventory_item.transit_quantity or 0)
+            reservado = float(inventory_item.reserved_quantity or 0)
+            disponible = stock - transit - reservado
             name = inventory_item.product.name if inventory_item.product else f"ID {product_id}"
-            if stock < invq:
-                return {'success': False, 'message': f'Stock insuficiente para {name}. Disponible: {stock:.2f}.'}
+            if disponible < invq:
+                return {'success': False, 'message': f'Stock insuficiente para {name}. Disponible: {disponible:.2f}.'}
 
             acum_producto = used_by_product.get(product_id, 0.0) + invq
-            if acum_producto > stock + 1e-9:
+            if acum_producto > disponible + 1e-9:
                 return {
                     'success': False,
                     'message': (
                         f'Stock insuficiente para {name}: se acumulan '
                         f'{acum_producto:.2f} en este ticket (disponible: '
-                        f'{stock:.2f}).'
+                        f'{disponible:.2f}).'
                     )
                 }
             used_by_product[product_id] = acum_producto
@@ -195,7 +253,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                     'message': (
                         f'El lote {lot_number} de {name} solo dispone de '
                         f'{lot_disp:.2f} unidades (disponible total en la sede: '
-                        f'{stock:.2f}). Cantidad solicitada: {quantity}.'
+                        f'{disponible:.2f}). Cantidad solicitada: {quantity}.'
                     )
                 }
 
@@ -220,7 +278,8 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 product_id, lot_number, location_id
             )
 
-            if waste_type.code == 'VENCIDO':
+            item_type = item.get('_waste_type') or waste_type
+            if item_type.code == 'VENCIDO':
                 if expiration_date is None:
                     return {
                         'success': False,
@@ -262,6 +321,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 'quantity': quantity,
                 'unit_cost': unit_cost,
                 'subtotal_cost': subtotal,
+                'waste_type_id': item_type.id,
                 'evidence_url': first_evidence,
                 'evidence_urls': ev_urls,
             })
@@ -275,6 +335,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
             waste_type_id=waste_type.id,
             evidence_url=evidence_url or None,
             notes=(notes or '').strip() or None,
+            request_id=request_id,
             date=datetime.utcnow(),
             user_id=user_id,
             status='PENDIENTE' if pending else 'APROBADO',
@@ -291,6 +352,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 quantity=d['quantity'],
                 unit_cost=d['unit_cost'],
                 subtotal_cost=d['subtotal_cost'],
+                waste_type_id=d.get('waste_type_id'),
                 evidence_url=d['evidence_url'],
             )
             for pos, p_url in enumerate(d['evidence_urls'], start=1):

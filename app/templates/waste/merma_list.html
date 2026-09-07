@@ -118,11 +118,12 @@
                             <td class="text-end acciones-cell">
                                 {% if p['puede_editar'] or p['puede_cancelar'] %}
                                 {% if p['puede_editar'] %}
-                                <a class="btn btn-sm btn-outline-primary rounded-pill px-3 me-2"
-                                   href="/waste/merma/{{ p['id'] }}/edit"
-                                   title="Editar esta merma mientras siga pendiente">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary rounded-pill px-3 me-2 btn-edit-merma"
+                                        data-id="{{ p['id'] }}"
+                                        title="Editar esta merma mientras siga pendiente">
                                     <i class="bi bi-pencil me-1"></i>Editar
-                                </a>
+                                </button>
                                 {% endif %}
                                 {% if p['puede_cancelar'] %}
                                 <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 btn-cancel-merma"
@@ -190,10 +191,196 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de edición de merma pendiente -->
+<div class="modal fade" id="editMermaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 1rem; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #af1515 0%, #d23a3a 100%);">
+                <h5 class="modal-title fw-bold">
+                    <span class="rounded-circle bg-white bg-opacity-25 d-inline-flex align-items-center justify-content-center me-2"
+                          style="width: 34px; height: 34px;">
+                        <i class="bi bi-pencil-square"></i>
+                    </span>
+                    Editar Merma Pendiente
+                    <span class="badge bg-white text-danger ms-2 align-middle">#<span id="editWasteIdTitle"></span></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                <div id="editMermaAlerts" class="mb-2"></div>
+
+                <!-- Ficha de cabecera -->
+                <div class="row g-2 mb-4">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center gap-3 bg-white border rounded-4 p-3 shadow-sm">
+                            <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center" style="width:44px;height:44px;background:#fde8e8;color:#af1515;">
+                                <i class="bi bi-geo-alt-fill"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-muted small fw-semibold">Sede</div>
+                                <div class="fw-bold text-truncate" id="editWasteLocation"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center gap-3 bg-white border rounded-4 p-3 shadow-sm">
+                            <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center" style="width:44px;height:44px;background:#eef2ff;color:#4f46e5;">
+                                <i class="bi bi-calendar-event"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-muted small fw-semibold">Fecha de reporte</div>
+                                <div class="fw-bold text-truncate" id="editWasteDate"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center gap-3 bg-white border rounded-4 p-3 shadow-sm">
+                            <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center" style="width:44px;height:44px;background:#f0fdf4;color:#16a34a;">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-muted small fw-semibold">Registrado por</div>
+                                <div class="fw-bold text-truncate" id="editWasteAuthor"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulario principal -->
+                <div class="row g-4">
+                    <div class="col-lg-7">
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small text-muted" for="editWasteTypeSelect">
+                                    Tipo de merma <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-tag-fill text-muted"></i></span>
+                                    <select class="form-select" id="editWasteTypeSelect" required></select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small text-muted">Cantidad total</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-box-seam-fill text-muted"></i></span>
+                                    <span class="form-control fw-bold bg-light" style="border-left:none;" id="editWasteTotal">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning border-0 small rounded-3 d-none my-3" id="editVencidoBanner">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            Modo <b>vencido</b>: solo se listan los insumos y lotes <b>vencidos</b> de esta sede.
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold small text-muted" for="editWasteNotes">Motivo / Observaciones</label>
+                            <textarea class="form-control" id="editWasteNotes" rows="2"
+                                      placeholder="Indique las observaciones correspondientes..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Evidencia general -->
+                    <div class="col-lg-5">
+                        <div class="bg-white border rounded-4 p-3 h-100 shadow-sm">
+                            <label class="form-label fw-semibold small text-muted d-flex align-items-center">
+                                <i class="bi bi-camera-fill me-1 text-muted"></i> Evidencia general
+                            </label>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="position-relative flex-shrink-0" style="width:96px;height:96px;">
+                                    <img id="editHeaderPhoto" class="d-none position-absolute top-0 start-0 w-100 h-100 rounded-3"
+                                         style="object-fit:cover;cursor:pointer;"
+                                         alt="Evidencia general" title="Ver foto en tamaño completo">
+                                    <div id="editHeaderPhotoPlaceholder"
+                                         class="d-flex flex-column align-items-center justify-content-center w-100 h-100 rounded-3 bg-light border text-muted"
+                                         style="border-style:dashed !important;border-width:2px !important;">
+                                        <i class="bi bi-image fs-3 opacity-25"></i>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-column flex-wrap gap-2">
+                                    <input type="file" id="editHeaderPhotoInput" accept="image/*" class="d-none">
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="btnEditHeaderPhotoAdd">
+                                        <i class="bi bi-upload me-1"></i>Subir foto
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" id="btnEditHeaderPhotoRemove">
+                                        <i class="bi bi-trash me-1"></i>Quitar foto
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text small mt-2">Una sola foto para todos los productos mermados (opcional).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Líneas de productos -->
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold small text-muted text-uppercase">
+                            <i class="bi bi-list-ul me-1"></i>Productos y lotes
+                        </span>
+                    </div>
+
+                    <div class="table-responsive rounded-3 border">
+                        <table class="table align-middle mb-0" id="editMermaTable" style="background:#fff;">
+                            <thead>
+                                <tr class="text-uppercase small text-muted" style="background:#f8f9fa;">
+                                    <th class="px-3">Producto <span class="text-danger">*</span></th>
+                                    <th>Tipo de merma</th>
+                                    <th>Lote <span class="text-danger">*</span></th>
+                                    <th>Vencimiento</th>
+                                    <th>Cantidad <span class="text-danger">*</span></th>
+                                    <th>Fotos</th>
+                                    <th class="text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="editMermaLinesBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="background:#f8f9fa;border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-light border rounded-pill px-4" data-bs-dismiss="modal">Volver</button>
+                <button type="button" class="btn btn-danger rounded-pill px-4" id="btnSaveEditMerma">
+                    <i class="bi bi-check2-circle me-1"></i>Guardar Modificaciones
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmación de guardado -->
+<div class="modal fade" id="confirmEditMermaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header" style="background:#b02a37;color:#fff;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Confirmar Cambios de la Merma <span id="confirmEditMermaWasteId">#0</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning border-0 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>Atención:</strong> revisa el resumen antes de confirmar. Al guardar, el inventario reservado y las auditorías (inventario y mermas) se ajustan según las cantidades y motivos indicados.
+                </div>
+                <div id="confirmEditMermaSummary"></div>
+            </div>
+            <div class="modal-footer" style="background:#f8f9fa;border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-light border rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger rounded-pill px-4" id="btnConfirmSaveEditMerma">
+                    <i class="bi bi-check2-circle me-1"></i>Confirmar y Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/waste/merma_list.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_edit_modal.js') }}?v=7"></script>
 {% endblock %}
 
 

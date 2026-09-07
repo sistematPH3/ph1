@@ -49,6 +49,17 @@ def validate_edit_payload(data):
         raw_qty = item.get("quantity")
         raw_unit_cost = item.get("unit_cost", 0)
         exp_date = item.get("expiration_date") or None
+        line_type_id = item.get("waste_type_id")
+
+        if line_type_id not in (None, ""):
+            try:
+                line_type_id = int(line_type_id)
+                if line_type_id <= 0:
+                    errors[f"line_{idx}_waste_type_id"] = "Tipo de merma de la línea no válido."
+                    line_type_id = None
+            except (ValueError, TypeError):
+                errors[f"line_{idx}_waste_type_id"] = "Tipo de merma de la línea no válido."
+                line_type_id = None
 
         if not product_id:
             errors[f"line_{idx}_product"] = "Producto no especificado."
@@ -72,13 +83,29 @@ def validate_edit_payload(data):
 
         subtotal_cost = (qty * unit_cost).quantize(Decimal("0.01"))
 
+        evidence_urls_raw = item.get("evidence_urls") or item.get("photos") or []
+        evidence_urls = []
+        seen = set()
+        if not isinstance(evidence_urls_raw, list):
+            errors[f"line_{idx}_evidence_urls"] = "Las fotos de la línea deben venir como una lista."
+            evidence_urls_raw = []
+        for u in evidence_urls_raw:
+            if isinstance(u, str) and u.strip() and u.strip() not in seen:
+                seen.add(u.strip())
+                evidence_urls.append(u.strip())
+        if len(evidence_urls) > 10:
+            errors[f"line_{idx}_evidence_urls"] = "Máximo 10 fotos por producto."
+            evidence_urls = evidence_urls[:10]
+
         cleaned_lines.append({
             "product_id": int(product_id) if product_id else None,
             "lot_number": lot_number,
             "expiration_date": exp_date,
             "quantity": qty,
             "unit_cost": unit_cost,
-            "subtotal_cost": subtotal_cost
+            "subtotal_cost": subtotal_cost,
+            "waste_type_id": line_type_id,
+            "evidence_urls": evidence_urls
         })
 
     if errors:
