@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 rowsHtml += '<tr>' +
                     '<td>' + esc(l.product_name) +
                         (l.waste_type_name
-                            ? '<div class="small text-muted fst-italic mt-1"><i class="bi bi-tag me-1"></i>' + esc(l.waste_type_name) + '</div>'
+                            ? '<div class="small text-muted fst-italic mt-1"><i class="bi bi-tag me-1"></i>Motivo del insumo: ' + esc(l.waste_type_name) + '</div>'
                             : '') + '</td>' +
                     '<td><span class="badge bg-light text-dark border font-monospace">' + esc(l.lot_number || 'N/A') + '</span></td>' +
                     '<td class="text-muted small">' + esc(l.expiration_date) + '</td>' +
@@ -344,8 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
         modalBody.innerHTML =
             fotoHtml +
             '<div class="row g-3 mb-3">' +
-            '<div class="col-md-6"><div class="border rounded p-2"><span class="text-muted small">Sede</span><div class="fw-bold">' + esc(w.location_name) + '</div></div></div>' +
-            '<div class="col-md-6"><div class="border rounded p-2"><span class="text-muted small">Tipo de merma</span><div class="fw-bold">' + esc(w.type_name) + '</div></div></div>' +
+            '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Sede</span><div class="fw-bold">' + esc(w.location_name) + '</div></div></div>' +
             '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Registrado por</span><div class="fw-bold">' + esc(w.author_name) + '</div></div></div>' +
             '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Fecha</span><div class="fw-bold">' + formatFecha(w.date) + '</div></div></div>' +
             '<div class="col-md-4"><div class="border rounded p-2"><span class="text-muted small">Cantidad total</span><div class="fw-bold text-danger">' + w.total_quantity + ' uds.</div></div></div>' +

@@ -181,10 +181,15 @@ class WasteRegisterTest(unittest.TestCase):
     def _register(self, env, items, waste_type_id=None, notes="Prueba",
                   evidence_url=None, user_id=None, location_id=None):
         """Envuelve el servicio de registro con defaults del escenario."""
+        default_type_id = waste_type_id or env["waste_type"].id
+        items = [
+            dict(item, **({"waste_type_id": default_type_id}
+                          if item.get("waste_type_id") is None else {}))
+            for item in items
+        ]
         return register_waste(
             user_id=user_id or env["user_id"],
             location_id=location_id or env["location_id"],
-            waste_type_id=waste_type_id or env["waste_type"].id,
             items=items,
             evidence_url=evidence_url,
             notes=notes,
@@ -244,6 +249,26 @@ class WasteRegisterTest(unittest.TestCase):
         lots = RegisterWasteRepository.get_product_lots(env["product_id"], env["location_id"])
         self.assertEqual(float(lots[0]["quantity"]), 70.0)
 
+    def test_merma_aprobada_parcial_resta_solo_lineas_aprobadas(self):
+        # APROBADO_PARCIAL: solo la línea con status APROBADO descuenta del lote;
+        # antes este estado no se contaba y la disponibilidad quedaba inflada.
+        env = self._seed_env(stock=100.0)
+        res = self._register(env, [
+            {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 30.0}
+        ])
+        self.assertTrue(res["success"])
+        db.session.expunge_all()
+
+        waste = Waste.query.get(res["waste_id"])
+        waste.status = "APROBADO_PARCIAL"
+        detail = WasteDetail.query.filter_by(waste_id=waste.id).first()
+        detail.status = "APROBADO"
+        db.session.commit()
+        db.session.expunge_all()
+
+        lots = RegisterWasteRepository.get_product_lots(env["product_id"], env["location_id"])
+        self.assertEqual(float(lots[0]["quantity"]), 70.0)
+
     # ------------------------------------------------------------------
     # 2) MERMA PENDIENTE
     # ------------------------------------------------------------------
@@ -269,6 +294,7 @@ class WasteRegisterTest(unittest.TestCase):
         self.assertEqual(audit.severity, "ALERTA")
         notif = Notification.query.filter_by(type="MERMA_PENDIENTE").first()
         self.assertIsNotNone(notif)
+        self.assertEqual(notif.waste_id, waste.id)
         self.assertIn(str(waste.id), notif.message)
 
     def test_merma_pendiente_por_cantidad_alcanza_waste_limit(self):
@@ -948,9 +974,8 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
 
         payload = {
             "location_id": env["location_id"],
-            "waste_type_id": env["waste_type"].id,
             "items": [{"product_id": env["product_id"], "lot_number": "L-001",
-                       "quantity": 5.0}],
+                       "quantity": 5.0, "waste_type_id": env["waste_type"].id}],
             "notes": "Vencido",
         }
         resp = client.post("/waste/merma/new", json=payload)
@@ -971,9 +996,8 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
 
         payload = {
             "location_id": env["location_id"],
-            "waste_type_id": env["waste_type"].id,
             "items": [{"product_id": env["product_id"], "lot_number": "L-001",
-                       "quantity": 5.0}],
+                       "quantity": 5.0, "waste_type_id": env["waste_type"].id}],
             "notes": "Con request_id",
             "request_id": "req-http-abc",
         }
@@ -1146,9 +1170,8 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
             sess["_user_id"] = str(env["user_id"])
         resp = client.post("/waste/merma/new", json={
             "location_id": env["location_id"],
-            "waste_type_id": env["waste_type"].id,
             "items": [{"product_id": env["product_id"], "lot_number": "L-001",
-                       "quantity": 5.0}],
+                       "quantity": 5.0, "waste_type_id": env["waste_type"].id}],
             "notes": "Vencido",
         })
         self.assertEqual(resp.status_code, 400)
@@ -1241,8 +1264,9 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         db.session.commit()
 
         res = register_waste(
-            user_id=user.id, location_id=1, waste_type_id=env_type.id,
-            items=[{"product_id": product.id, "lot_number": "L-CEN", "quantity": 3.0}],
+            user_id=user.id, location_id=1,
+            items=[{"product_id": product.id, "lot_number": "L-CEN", "quantity": 3.0,
+                    "waste_type_id": env_type.id}],
             notes="Cadena de frio",
         )
         self.assertTrue(res["success"])
@@ -1260,9 +1284,9 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         db.session.commit()
         tipo = WasteType.query.filter_by(code="DANADO").first()
         res = register_waste(
-            user_id=env["user_id"], location_id=1, waste_type_id=tipo.id,
+            user_id=env["user_id"], location_id=1,
             items=[{"product_id": env["product"].id, "lot_number": env["lot"],
-                    "quantity": 3.0}],
+                    "quantity": 3.0, "waste_type_id": tipo.id}],
             notes="Dañado",
         )
         self.assertFalse(res["success"])
@@ -1273,9 +1297,9 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         env["waste_type"].applies_central = False
         db.session.commit()
         res = register_waste(
-            user_id=env["user_id"], location_id=1, waste_type_id=env["waste_type"].id,
+            user_id=env["user_id"], location_id=1,
             items=[{"product_id": env["product"].id, "lot_number": env["lot"],
-                    "quantity": 3.0}],
+                    "quantity": 3.0, "waste_type_id": env["waste_type"].id}],
             notes="Vencido",
         )
         self.assertTrue(res["success"])
@@ -1646,16 +1670,15 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
     # ------------------------------------------------------------------
     # 8.11) DEEP-LINK: /waste/merma/new?type=VENCIDO (audio 9)
     # ------------------------------------------------------------------
-    def test_deep_link_type_vencido_entrega_formulario_bloqueado(self):
+    def test_deep_link_type_vencido_no_bloquea_nada(self):
         env = self._seed_central_env(code="VENCIDO")
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
+        # El tipo ya no es parte de la cabecera: el ?type= es inocuo.
         resp = client.get("/waste/merma/new?type=VENCIDO")
         self.assertEqual(resp.status_code, 200)
-        html = resp.get_data(as_text=True)
-        self.assertIn('id="locked_type_code"', html)
-        self.assertIn('value="VENCIDO"', html)
+        self.assertNotIn("locked_type_code", resp.get_data(as_text=True))
 
     def test_deep_link_tipo_inexistente_no_bloquea_nada(self):
         env = self._seed_central_env(code="VENCIDO")
@@ -1699,7 +1722,8 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         html = resp.get_data(as_text=True)
         self.assertIn("Productos vencidos detectados", html)
         self.assertIn("L-001", html)
-        self.assertIn("/waste/merma/new?type=VENCIDO", html)
+        self.assertIn("/waste/merma/new", html)
+        self.assertIn("Registrar merma de vencido", html)
 
     # ------------------------------------------------------------------
     # 8.12) REGLA DE TIEMPO: solo cuentan mermas decisivas (historial)
@@ -1728,12 +1752,12 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
     # ------------------------------------------------------------------
     def test_request_id_duplicado_no_crea_doble_merma(self):
         env = self._seed_env(stock=50.0, waste_limit=20.0)
-        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0}]
+        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0,
+                  "waste_type_id": env["waste_type"].id}]
 
         res1 = register_waste(
             user_id=env["user_id"],
             location_id=env["location_id"],
-            waste_type_id=env["waste_type"].id,
             items=items,
             notes="Prueba idempotencia",
             request_id="req-abc-123",
@@ -1744,7 +1768,6 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         res2 = register_waste(
             user_id=env["user_id"],
             location_id=env["location_id"],
-            waste_type_id=env["waste_type"].id,
             items=items,
             notes="Prueba idempotencia",
             request_id="req-abc-123",
@@ -1768,15 +1791,16 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
 
     def test_request_id_distinto_si_crea_nueva_merma(self):
         env = self._seed_env(stock=50.0, waste_limit=20.0)
-        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0}]
+        items = [{"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0,
+                  "waste_type_id": env["waste_type"].id}]
         res1 = register_waste(
             user_id=env["user_id"], location_id=env["location_id"],
-            waste_type_id=env["waste_type"].id, items=items,
+            items=items,
             notes="Prueba 1", request_id="req-uno",
         )
         res2 = register_waste(
             user_id=env["user_id"], location_id=env["location_id"],
-            waste_type_id=env["waste_type"].id, items=items,
+            items=items,
             notes="Prueba 2", request_id="req-dos",
         )
         self.assertTrue(res1["success"])

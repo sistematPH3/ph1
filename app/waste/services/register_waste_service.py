@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 import math
+from sqlalchemy import text
 from app.models.inventory_model import db
 from app.models.waste_model import Waste, WasteDetail, WasteDetailPhoto
 from app.waste.repositories.register_waste_repository import (
@@ -44,7 +45,26 @@ def get_location_products(location_id):
 def get_product_lots(location_id, product_id):
     return RegisterWasteRepository.get_product_lots(product_id, location_id)
 
-def _evaluate_pending(waste_type, total_quantity, location_id, items):
+
+def _advisory_lock(request_id):
+    """Serializa por request_id SIN migrar el esquema (lock de transacción).
+
+    En PostgreSQL, pg_advisory_xact_lock bloquea el request en curso frente a
+    otra petición con el mismo request_id hasta que la transacción termina.
+    Es "best effort": si el motor no soporta advisory locks, se sigue adelante
+    (el único caso no cubierto es una carrera real de doble envío simultáneo).
+    """
+    if not request_id:
+        return
+    try:
+        db.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:k)::bigint)"),
+            {'k': 'waste_req:' + str(request_id)},
+        )
+    except Exception:
+        pass
+
+def _evaluate_pending(total_quantity, location_id, items):
     """
     Clasificador automático: una merma queda PENDIENTE (merma mayor) si
     cumple CUALQUIERA de estas reglas:
@@ -63,9 +83,8 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
     TIEMPO; el motivo VENCIDO es informativo (el tipo VENCIDO ya validó la
     expiración del lote al registrar).
 
-    Cada ÍTEM puede traer su PROPIO tipo de merma (item['_waste_type']) para
-    soportar tickets con motivos distintos por producto. Si un ítem no lo trae,
-    hereda el tipo de la cabecera (waste_type).
+    Cada ÍTEM trae SU PROPIO tipo de merma (item['_waste_type']), con
+    motivos distintos por producto dentro del mismo ticket.
     """
     motivos = {}
 
@@ -79,7 +98,7 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
     for item in items:
         pid = item['product_id']
         por_producto[pid] = por_producto.get(pid, Decimal('0.00')) + Decimal(str(item['quantity']))
-        t = item.get('_waste_type') or waste_type
+        t = item['_waste_type']
         tipos_por_producto.setdefault(pid, []).append(t)
 
     for pid, tipos in tipos_por_producto.items():
@@ -87,8 +106,9 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
             marcar(pid, 'VENCIDO')
 
     cantidad_excede = False
+    products = RegisterWasteRepository.get_products_by_ids(list(por_producto.keys()))
     for pid, total in por_producto.items():
-        product = RegisterWasteRepository.get_product_by_id(pid)
+        product = products.get(pid)
         if product and product.waste_limit is not None:
             try:
                 if total >= Decimal(str(product.waste_limit)):
@@ -97,13 +117,8 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
             except Exception:
                 continue
 
-    if waste_type and waste_type.requires_approval:
-        for pid in por_producto:
-            marcar(pid, 'TIPO')
-        return True, motivos
-
-    # Soporte por ítem: aunque la cabecera no exija aprobación, un producto
-    # puede tener un tipo propio que sí la exija (p. ej. TEMPERATURA).
+    # Soporte por ítem: un producto puede tener un tipo propio que sí exija
+    # aprobación (p. ej. TEMPERATURA).
     if any(getattr(t, 'requires_approval', False)
            for tipos in tipos_por_producto.values() for t in tipos):
         for pid, tipos in tipos_por_producto.items():
@@ -135,7 +150,7 @@ def _evaluate_pending(waste_type, total_quantity, location_id, items):
 
     return False, motivos
 
-def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None, notes=None, request_id=None):
+def register_waste(user_id, location_id, items, evidence_url=None, notes=None, request_id=None):
     request_id = (request_id or '').strip() or None
     if request_id:
         existing = RegisterWasteRepository.get_waste_by_request_id(request_id)
@@ -154,37 +169,36 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
     if location_id is None:
         return {'success': False, 'message': 'La sede es obligatoria.'}
 
-    waste_type = RegisterWasteRepository.get_waste_type_by_id(waste_type_id)
-    if not waste_type or not waste_type.is_active:
-        return {'success': False, 'message': 'El tipo de merma seleccionado no es válido.'}
-
-    if int(location_id) == 1 and not waste_type.applies_central \
-            and waste_type.code != 'VENCIDO':
-        return {'success': False, 'message': 'Este tipo de merma no aplica a la Sede Central.'}
-
-    # Cada ítem puede llevar SU PROPIO tipo de merma. Sin él, hereda el de la
-    # cabecera. Resolvemos y validamos aquí para usarlo en el bucle de líneas.
+    # Cada ítem lleva SU PROPIO tipo de merma (obligatorio). Resolvemos y
+    # validamos aquí para usarlo en el bucle de líneas.
     for item in items:
         item_type_id = item.get('waste_type_id')
         if item_type_id in (None, ''):
-            item['_waste_type'] = waste_type
-            continue
+            return {
+                'success': False,
+                'message': 'El motivo de merma de cada producto es obligatorio.'
+            }
         item_type = RegisterWasteRepository.get_waste_type_by_id(int(item_type_id))
         if not item_type or not item_type.is_active:
             return {
                 'success': False,
                 'message': 'El tipo de merma elegido para uno de los productos no es válido.'
             }
-        if int(location_id) == 1 and not item_type.applies_central \
-                and item_type.code != 'VENCIDO':
+        item['_waste_type'] = item_type
+        resolved = item['_waste_type']
+        if int(location_id) == 1 and not resolved.applies_central \
+                and resolved.code != 'VENCIDO':
             return {
                 'success': False,
                 'message': (
-                    f'El tipo de merma "{item_type.name}" de uno de los '
+                    f'El tipo de merma "{resolved.name}" de uno de los '
                     'productos no aplica a la Sede Central.'
                 )
             }
-        item['_waste_type'] = item_type
+
+    # El tipo del TICKET se deriva del primer producto: la ficha nunca
+    # contradice a los insumos (es un dato de compatibilidad, no de entrada).
+    ticket_waste_type = items[0]['_waste_type']
 
     user_row = RegisterWasteRepository.get_user_by_id(user_id)
     if not user_row:
@@ -211,6 +225,11 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
     total_cost = Decimal('0.00')
     details = []
 
+    # Mapas prefetheados (evitan N+1): inventario y lotes de todos los productos del ticket.
+    ticket_product_ids = sorted({int(i['product_id']) for i in items})
+    inv_map = RegisterWasteRepository.get_inventory_map(location_id, ticket_product_ids)
+    lots_map = RegisterWasteRepository.get_lots_map(location_id, ticket_product_ids)
+
     try:
         used_by_product = {}
         used_by_lot = {}
@@ -220,7 +239,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
             quantity = Decimal(str(item['quantity']))
             invq = float(quantity)
 
-            inventory_item = RegisterWasteRepository.get_inventory_item(product_id, location_id)
+            inventory_item = inv_map.get(product_id)
             if not inventory_item:
                 return {'success': False, 'message': f'No existe inventario para el producto ID {product_id} en esta sede.'}
 
@@ -244,7 +263,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 }
             used_by_product[product_id] = acum_producto
 
-            available_lots = RegisterWasteRepository.get_product_lots(product_id, location_id)
+            available_lots = lots_map.get(product_id, [])
             matching_lot = next((l for l in available_lots if l['lot_number'] == lot_number), None)
             if not matching_lot or float(matching_lot['quantity']) + 1e-9 < invq:
                 lot_disp = float(matching_lot['quantity']) if matching_lot else 0.0
@@ -278,7 +297,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
                 product_id, lot_number, location_id
             )
 
-            item_type = item.get('_waste_type') or waste_type
+            item_type = item['_waste_type']
             if item_type.code == 'VENCIDO':
                 if expiration_date is None:
                     return {
@@ -328,15 +347,32 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
             total_quantity += quantity
             total_cost += subtotal
 
-        pending, motivos = _evaluate_pending(waste_type, total_quantity, location_id, items)
+        pending, motivos = _evaluate_pending(total_quantity, location_id, items)
+
+        # Idempotencia atómica: con el lock de transacción re-verificamos que
+        # ninguna otra petición registrara esta solicitud mientras validábamos
+        # (curso: doble envío simultáneo que cruzó el chequeo temprano).
+        if request_id:
+            _advisory_lock(request_id)
+            existing_dup = RegisterWasteRepository.get_waste_by_request_id(request_id)
+            if existing_dup:
+                db.session.rollback()
+                return {
+                    'success': True,
+                    'waste_id': existing_dup.id,
+                    'status': existing_dup.status,
+                    'duplicate': True,
+                    'novedades': {},
+                    'message': 'Esta solicitud ya fue registrada (envío duplicado ignorado).',
+                }
 
         waste = Waste(
             location_id=location_id,
-            waste_type_id=waste_type.id,
+            waste_type_id=ticket_waste_type.id,
             evidence_url=evidence_url or None,
             notes=(notes or '').strip() or None,
             request_id=request_id,
-            date=datetime.utcnow(),
+            date=datetime.now(),
             user_id=user_id,
             status='PENDIENTE' if pending else 'APROBADO',
             total_quantity=total_quantity.quantize(Decimal('0.01')),
@@ -363,7 +399,7 @@ def register_waste(user_id, location_id, waste_type_id, items, evidence_url=None
             waste=waste,
             details=details,
             user_id=user_id,
-            waste_type=waste_type,
+            waste_type=ticket_waste_type,
             pending=pending,
             motivos=motivos,
         )

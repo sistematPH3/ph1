@@ -139,7 +139,10 @@ class WasteEditRepository:
                 waste.details.remove(d)
         db.session.flush()
 
-        waste.waste_type_id = clean_data["waste_type_id"]
+        # El tipo del TICKET se preserva/deriva de la primera línea pendiente
+        # (ya resuelto en el servicio), para que coincida con los insumos.
+        first_line_type = clean_data["lines"][0].get("waste_type_id")
+        waste.waste_type_id = first_line_type or clean_data["waste_type_id"]
         waste.notes = clean_data["notes"]
         if "evidence_url" in clean_data:
             waste.evidence_url = clean_data.get("evidence_url") or None

@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=4.6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=6.1">
 {% endblock %}
 
 {% block content %}
@@ -40,7 +40,7 @@
                         </li>
                         {% endfor %}
                     </ul>
-                    <a href="/waste/merma/new?type=VENCIDO">Registrar merma de vencido</a>
+                    <a href="/waste/merma/new">Registrar merma de vencido</a>
                 </div>
             </div>
         </div>
@@ -49,13 +49,13 @@
         <!-- ===== Progreso ===== -->
         <nav class="merma-steps" aria-label="Progreso">
             <div class="merma-step is-active" data-step="1">
-                <span class="step-num"><i class="bi bi-check2"></i></span> Datos de la merma
+                <span class="step-num"><i class="bi bi-check2"></i></span> Selección de sede
             </div>
             <div class="merma-step" data-step="2">
                 <span class="step-num"><i class="bi bi-check2"></i></span> Insumo de la merma y fotos opcionales de prueba
             </div>
             <div class="merma-step" data-step="3">
-                <span class="step-num"><i class="bi bi-check2"></i></span> Motivos de la merma
+                <span class="step-num"><i class="bi bi-check2"></i></span> Observaciones de la merma
             </div>
         </nav>
 
@@ -68,7 +68,7 @@
                         <div class="merma-panel-head">
                             <div>
                                 <div class="merma-eyebrow">Paso 1</div>
-                                <h2 class="merma-panel-title mb-0">Datos de la merma</h2>
+                                <h2 class="merma-panel-title mb-0">Selección de sede</h2>
                             </div>
                         </div>
                         <div class="row g-3">
@@ -101,18 +101,6 @@
                                     <i class="bi bi-lock me-1"></i>Retira los insumos añadidos para cambiar de sede.
                                 </small>
                             </div>
-                            <div class="col-12">
-                                <label for="waste_type_id" class="merma-label">Tipo de merma <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
-                                    <select class="form-select border-secondary" id="waste_type_id" name="waste_type_id" required disabled>
-                                        <option value="" selected disabled>Primero seleccione la sede...</option>
-                                    </select>
-                                    {% if locked_type_code %}
-                                    <input type="hidden" id="locked_type_code" value="{{ locked_type_code }}">
-                                    {% endif %}
-                                </div>
-                            </div>
                         </div>
                     </section>
 
@@ -129,6 +117,16 @@
                         <div class="merma-editor" id="itemEditor">
                             <div class="row g-3">
                                 <div class="col-12">
+                                    <label for="item_type_id" class="merma-label">Motivo de este insumo <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
+                                        <select class="form-select border-secondary" id="item_type_id" name="item_type_id" disabled>
+                                            <option value="" selected disabled>Seleccione una sede...</option>
+                                        </select>
+                                    </div>
+                                    <small class="merma-editor-note text-muted"><i class="bi bi-info-circle me-1"></i>Cada insumo lleva su propio motivo de merma.</small>
+                                </div>
+                                <div class="col-12">
                                     <label for="product_id" class="merma-label">Producto <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light border-secondary"><i class="bi bi-box-seam"></i></span>
@@ -137,15 +135,6 @@
                                         </select>
                                     </div>
                                     <small class="merma-editor-note d-none" id="vencidoNote"></small>
-                                </div>
-                                <div class="col-12">
-                                    <label for="item_type_id" class="merma-label">Motivo de este insumo <small class="text-muted fw-normal">(si lo dejas en blanco, hereda el tipo del ticket)</small></label>
-                                    <div class="input-group">
-                                        <span class="input-group-text bg-light border-secondary"><i class="bi bi-tag"></i></span>
-                                        <select class="form-select border-secondary" id="item_type_id" name="item_type_id" disabled>
-                                            <option value="" selected disabled>Esperando tipo del ticket...</option>
-                                        </select>
-                                    </div>
                                 </div>
                                 <div class="col-12 col-md-7">
                                     <label for="lot_number" class="merma-label">Partida / Lote <span class="text-danger">*</span></label>
@@ -220,17 +209,17 @@
                         </div>
                     </section>
 
-                    <!-- PASO 3 · Motivos -->
+                    <!-- PASO 3 · Observaciones -->
                     <section class="merma-panel">
                         <div class="merma-panel-head">
                             <div>
                                 <div class="merma-eyebrow">Paso 3</div>
-                                <h2 class="merma-panel-title mb-0">Motivos de la merma</h2>
+                                <h2 class="merma-panel-title mb-0">Observaciones de la merma</h2>
                             </div>
                         </div>
                         <div class="row g-3 align-items-start">
                             <div class="col-12">
-                                <label for="notes" class="merma-label">Motivo de la merma <span class="text-danger">*</span></label>
+                                <label for="notes" class="merma-label">Observaciones de la merma <span class="text-danger">*</span></label>
                                 <textarea class="form-control border-secondary merma-textarea" id="notes" name="notes" rows="4" placeholder="Explica el motivo de la pérdida (obligatorio)"></textarea>
                             </div>
                         </div>
@@ -248,6 +237,8 @@
                         </div>
 
                         <div class="merma-ticket-body" id="cardsGrid"></div>
+
+                        <div class="merma-motivos-resumen d-none" id="motivosResumen"></div>
 
                         <div class="merma-ticket-empty d-none" id="ticketEmpty">
                             <div class="merma-ticket-empty-icon"><i class="bi bi-box-seam"></i></div>
@@ -277,5 +268,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/register_waste.js') }}?v=4.6"></script>
+<script src="{{ url_for('static', filename='js/waste/register_waste.js') }}?v=6.1"></script>
 {% endblock %}

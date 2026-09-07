@@ -140,11 +140,11 @@ class ReservaStockTest(unittest.TestCase):
         return register_waste(
             user_id=user_id,
             location_id=env["sede_a"].id,
-            waste_type_id=env["waste_type"].id,
             items=[{
                 "product_id": env["product"].id,
                 "lot_number": "L-001",
                 "quantity": qty,
+                "waste_type_id": env["waste_type"].id,
             }],
             evidence_url=None,
             notes="Merma de prueba",
@@ -215,10 +215,11 @@ class ReservaStockTest(unittest.TestCase):
         res = register_waste(
             user_id=env["admin1"].id,
             location_id=env["sede_a"].id,
-            waste_type_id=env["waste_type"].id,
             items=[
-                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 10.0},
-                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0},
+                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 10.0,
+                 "waste_type_id": env["waste_type"].id},
+                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0,
+                 "waste_type_id": env["waste_type"].id},
             ],
             evidence_url=None,
             notes="Merma de prueba",
@@ -324,10 +325,11 @@ class ReservaStockTest(unittest.TestCase):
         res = register_waste(
             user_id=env["admin1"].id,
             location_id=env["sede_a"].id,
-            waste_type_id=env["waste_type"].id,
             items=[
-                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0},
-                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 7.0},
+                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 5.0,
+                 "waste_type_id": env["waste_type"].id},
+                {"product_id": env["product"].id, "lot_number": "L-001", "quantity": 7.0,
+                 "waste_type_id": env["waste_type"].id},
             ],
             evidence_url=None,
             notes="Merma de prueba",

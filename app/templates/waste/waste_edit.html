@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_edit.css') }}?v=14">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_edit.css') }}?v=15">
 {% endblock %}
 
 {% block content %}
@@ -63,17 +63,6 @@
 
                 {% if waste.can_edit %}
                 <form id="wasteEditForm">
-                    <div class="mb-3">
-                        <label for="wasteTypeSelect" class="form-label ph-input-label">Tipo de Merma <span class="text-danger">*</span></label>
-                        <select class="form-select ph-select-ctrl" id="wasteTypeSelect" required>
-                            {% for wt in waste.waste_types %}
-                            <option value="{{ wt.id }}" {% if wt.id == waste.waste_type_id %}selected{% endif %}>
-                                {{ wt.name }} (Gravedad: {{ wt.severity }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
                     <div class="mb-4">
                         <label for="wasteNotesInput" class="form-label ph-input-label">Motivo / Observaciones</label>
                         <textarea class="form-control ph-textarea-ctrl" id="wasteNotesInput" rows="3" placeholder="Indique las observaciones correspondientes...">{{ waste.notes }}</textarea>
@@ -89,7 +78,7 @@
                             <thead>
                                 <tr>
                                     <th class="th-prod">PRODUCTO</th>
-                                    <th class="th-tipo">TIPO DE MERMA</th>
+                                    <th class="th-tipo">MOTIVO DEL INSUMO</th>
                                     <th class="th-lote"><i class="bi bi-pencil-square me-1"></i>LOTE (EDITABLE)</th>
                                     <th class="th-venc">VENCIMIENTO</th>
                                     <th class="th-cant"><i class="bi bi-pencil-square me-1"></i>CANTIDAD</th>
@@ -160,11 +149,6 @@
                     </div>
                 </form>
                 {% else %}
-                <div class="mb-3">
-                    <span class="ph-input-label d-block mb-1">Tipo de Merma</span>
-                    <span class="fw-bold text-dark fs-6">{{ waste.waste_type_name }}</span>
-                </div>
-
                 <div class="mb-4">
                     <span class="ph-input-label d-block mb-1">Motivo / Observaciones</span>
                     <div class="ph-readonly-box">{{ waste.notes if waste.notes else 'Sin observaciones registradas.' }}</div>
@@ -175,7 +159,7 @@
                         <thead>
                             <tr>
                                 <th class="th-prod">PRODUCTO</th>
-                                <th class="th-tipo">TIPO DE MERMA</th>
+                                <th class="th-tipo">MOTIVO DEL INSUMO</th>
                                 <th class="th-lote">LOTE</th>
                                 <th class="th-venc">VENCIMIENTO</th>
                                 <th class="th-cant">CANTIDAD</th>
@@ -317,5 +301,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/waste_edit.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_edit.js') }}?v=15"></script>
 {% endblock %}

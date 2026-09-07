@@ -216,6 +216,29 @@ class MermaApprovalsTest(unittest.TestCase):
         ).first()
         self.assertIsNotNone(notif)
 
+    def test_aprobar_audita_saldo_contable_real_no_disponible(self):
+        # Merma PENDIENTE había CONGELADO 10 ud como reserva. Al aprobar, la
+        # auditoría debe registrar el saldo físicamente contable (100 -> 90),
+        # NO el "disponible" (que restaría la reserva congelada: 90 -> 80).
+        env = self._seed(stock=100.0, qty=10.0)
+        env["inventory"].reserved_quantity = 10.0
+        db.session.commit()
+
+        res = svc.approve_waste(env["waste"].id, env["admin"].id)
+        self.assertTrue(res["success"], res)
+
+        db.session.refresh(env["inventory"])
+        self.assertEqual(float(env["inventory"].current_quantity), 90.0)
+        self.assertEqual(float(env["inventory"].reserved_quantity), 0.0)
+
+        audit = AuditLog.query.filter_by(
+            affected_table="waste", action="MERMA"
+        ).first()
+        changed = json.loads(audit.changed_data) if isinstance(audit.changed_data, str) else audit.changed_data
+        self.assertEqual(changed.get("event"), "MERMA_APROBADA")
+        self.assertEqual(changed["descuentos_stock"][0]["stock_antes"], 100.0)
+        self.assertEqual(changed["descuentos_stock"][0]["stock_despues"], 90.0)
+
     # =========================================================================
     # CASO 2: NO-ADMIN NO PUEDE APROBAR
     # =========================================================================

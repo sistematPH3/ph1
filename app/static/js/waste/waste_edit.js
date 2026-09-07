@@ -94,7 +94,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let pendingPayload = null;
 
     function buildPendingPayload() {
-        const wasteTypeId = document.getElementById("wasteTypeSelect").value;
         const notes = document.getElementById("wasteNotesInput").value.trim();
         const rows = document.querySelectorAll("#editLinesTable tbody tr.line-row");
 
@@ -142,19 +141,13 @@ document.addEventListener("DOMContentLoaded", function () {
             return null;
         }
 
-        return { waste_type_id: wasteTypeId, notes: notes, lines: lines, rows: rows };
+        return { notes: notes, lines: lines, rows: rows };
     }
 
     function renderConfirmSummary(payload) {
         if (!confirmSummaryBox) return;
-        const typeSelect = document.getElementById("wasteTypeSelect");
-        const typeName = typeSelect && typeSelect.selectedIndex >= 0
-            ? typeSelect.options[typeSelect.selectedIndex].text
-            : "—";
 
-        let html = '<div class="mb-3">' +
-            '<span class="small fw-bold text-muted d-block">Tipo de merma general</span>' +
-            '<span class="badge bg-dark px-2 py-1">' + phEscapeHtml(typeName) + '</span></div>';
+        let html = '';
 
         if (payload.notes) {
             html += '<div class="mb-3">' +
@@ -212,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         "X-Requested-With": "XMLHttpRequest"
                     },
                     body: JSON.stringify({
-                        waste_type_id: payload.waste_type_id,
                         notes: payload.notes,
                         lines: payload.lines
                     })

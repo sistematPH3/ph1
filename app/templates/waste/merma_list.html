@@ -61,7 +61,7 @@
                         <th style="background-color: #af1515 !important;">AUTOR</th>
                         <th style="background-color: #af1515 !important;">CANTIDAD</th>
                         <th style="background-color: #af1515 !important;">FECHA</th>
-                        <th style="background-color: #af1515 !important;">MOTIVO</th>
+                        <th style="background-color: #af1515 !important;">OBSERVACIONES</th>
                         <th style="background-color: #af1515 !important;">ESTADO</th>
                         <th style="background-color: #af1515 !important; text-align: right !important;">ACCIONES</th>
                     </tr>
@@ -254,15 +254,6 @@
 
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold small text-muted" for="editWasteTypeSelect">
-                                    Tipo de merma <span class="text-danger">*</span>
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white"><i class="bi bi-tag-fill text-muted"></i></span>
-                                    <select class="form-select" id="editWasteTypeSelect" required></select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
                                 <label class="form-label fw-semibold small text-muted">Cantidad total</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-white"><i class="bi bi-box-seam-fill text-muted"></i></span>
@@ -328,7 +319,7 @@
                             <thead>
                                 <tr class="text-uppercase small text-muted" style="background:#f8f9fa;">
                                     <th class="px-3">Producto <span class="text-danger">*</span></th>
-                                    <th>Tipo de merma</th>
+                                    <th>Motivo del insumo</th>
                                     <th>Lote <span class="text-danger">*</span></th>
                                     <th>Vencimiento</th>
                                     <th>Cantidad <span class="text-danger">*</span></th>
@@ -380,7 +371,7 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/waste/merma_list.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/waste/waste_edit_modal.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_edit_modal.js') }}?v=9"></script>
 {% endblock %}
 
 

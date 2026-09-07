@@ -24,7 +24,6 @@
         const pageAlertBox = document.getElementById("cancelAlerts");
         const editModal = bootstrap.Modal.getOrCreateInstance(modalEl);
         const body = document.getElementById("editMermaLinesBody");
-        const typeSelect = document.getElementById("editWasteTypeSelect");
         const notesInput = document.getElementById("editWasteNotes");
         const vencidoBanner = document.getElementById("editVencidoBanner");
         const alertsBox = document.getElementById("editMermaAlerts");
@@ -85,16 +84,24 @@
             });
         }
 
-        function tipoSeleccionadoEsVencido() {
-            const sel = typeSelect.options[typeSelect.selectedIndex];
-            return !!sel && sel.dataset.code === "VENCIDO";
+        function anyLineVencidoSelect() {
+            let any = false;
+            body.querySelectorAll(".edit-tipo-select").forEach(function (s) {
+                if (!any) {
+                    const opt = s.options[s.selectedIndex];
+                    if (opt && opt.dataset.code === "VENCIDO") any = true;
+                }
+            });
+            return any;
+        }
+
+        function updateVencidoBanner() {
+            if (!vencidoBanner) return;
+            vencidoBanner.classList.toggle("d-none", !anyLineVencidoSelect());
         }
 
         function productsDisponibles() {
-            if (!tipoSeleccionadoEsVencido()) return productsCache;
-            return productsCache.filter(function (p) {
-                return vencidosByProduct[p.id] && vencidosByProduct[p.id].length > 0;
-            });
+            return productsCache;
         }
 
         async function loadVencidos(locationId) {
@@ -374,7 +381,6 @@
             }
 
             function lineEsVencido() {
-                if (tipoSeleccionadoEsVencido()) return true;
                 const tipoSel = tr.querySelector(".edit-tipo-select");
                 const opt = tipoSel ? tipoSel.options[tipoSel.selectedIndex] : null;
                 return !!opt && opt.dataset.code === "VENCIDO";
@@ -462,6 +468,7 @@
                 const keep = lotSel.value;
                 lotSel.innerHTML = "";
                 update();
+                updateVencidoBanner();
                 if (lineEsVencido() && Object.keys(vencidosByProduct).length === 0) {
                     loadVencidos(current.location_id)
                         .then(function () { fetchLots(parseInt(prodSel.value, 10), keep); })
@@ -566,12 +573,6 @@
             if (headerPhotoInput) headerPhotoInput.value = "";
             syncHeaderPhotoUI();
 
-            typeSelect.innerHTML = (current.waste_types || []).map(function (t) {
-                return '<option value="' + t.id + '" data-code="' + esc(t.code || "") + '"' +
-                    (String(t.id) === String(current.waste_type_id) ? " selected" : "") + ">" +
-                    esc(t.name) + " (Gravedad: " + esc(t.severity) + ")</option>";
-            }).join("");
-
             try {
                 const pdata = await fetchJSON("/api/waste/locations/" + current.location_id + "/products");
                 productsCache = (pdata.products || []);
@@ -582,12 +583,12 @@
             const anyLineVencido = (current.lines || []).some(function (l) {
                 return String(l.waste_type_code) === "VENCIDO";
             });
-            if (tipoSeleccionadoEsVencido() || current.is_vencido || anyLineVencido) {
+            if (current.is_vencido || anyLineVencido) {
                 await loadVencidos(current.location_id);
             }
-            vencidoBanner.classList.toggle("d-none", !tipoSeleccionadoEsVencido());
 
             reRenderLines();
+            updateVencidoBanner();
             editModal.show();
         }
 
@@ -599,16 +600,6 @@
         });
 
         bindHeaderPhotoEvents();
-
-        // --- Cambio de tipo: re-filtra productos/lotes (modo vencido) ---
-        typeSelect.addEventListener("change", function () {
-            vencidoBanner.classList.toggle("d-none", !tipoSeleccionadoEsVencido());
-            if (tipoSeleccionadoEsVencido() && Object.keys(vencidosByProduct).length === 0) {
-                loadVencidos(current.location_id).then(reRenderLines).catch(reRenderLines);
-            } else {
-                reRenderLines();
-            }
-        });
 
         // --- Guardar ---
         btnSave.addEventListener("click", async function () {
@@ -672,7 +663,6 @@
             }
 
             pendingSave = {
-                waste_type_id: parseInt(typeSelect.value, 10),
                 notes: notesInput.value.trim(),
                 evidence_url: headerPhotoUrl,
                 lines: lines
@@ -687,13 +677,7 @@
 
         function renderConfirmMermaSummary(payload) {
             if (!confirmMermaSummary) return;
-            const typeName = (typeSelect && typeSelect.selectedIndex >= 0)
-                ? typeSelect.options[typeSelect.selectedIndex].text
-                : "—";
-
-            let html = '<div class="mb-3">' +
-                '<span class="small fw-bold text-muted d-block">Tipo de merma general</span>' +
-                '<span class="badge bg-dark px-2 py-1">' + esc(typeName) + '</span></div>';
+            let html = '';
 
             if (payload.notes) {
                 html += '<div class="mb-3">' +
@@ -704,7 +688,7 @@
             html += '<div class="table-responsive rounded-3 border">' +
                 '<table class="table table-sm align-middle mb-0">' +
                 '<thead class="text-uppercase small text-muted" style="background:#f8f9fa;">' +
-                '<tr><th>Producto</th><th>Lote</th><th class="text-center">Cantidad</th><th>Tipo de Merma</th></tr>' +
+                '<tr><th>Producto</th><th>Lote</th><th class="text-center">Cantidad</th><th>Motivo del insumo</th></tr>' +
                 '</thead><tbody>';
 
             const editableRows = [];

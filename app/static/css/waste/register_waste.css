@@ -394,6 +394,10 @@
 
 .merma-card-badges .badge { font-size: 0.66rem; font-weight: 600; padding: 0.35em 0.6em; }
 
+.merma-motive-specific { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+
+.merma-motive-inherit { font-size: 0.66rem; color: #8a93a3; font-style: italic; }
+
 .merma-card-qty { font-size: 0.8rem; color: var(--waste-muted); }
 
 .merma-card-qty strong { color: var(--waste-red); font-weight: 800; font-size: 0.95rem; }
@@ -423,6 +427,20 @@
 
 /* Estado vacío del ticket */
 .merma-ticket-empty { padding: 2.4rem 1.2rem; text-align: center; }
+
+/* Resumen de motivos del ticket (paso 2) */
+.merma-motivos-resumen {
+    padding: 0.5rem 1.3rem 0.6rem; font-size: 0.74rem;
+    border-top: 1px dashed #e2e7ef; color: #5b6779;
+}
+
+.merma-motivos-resumen .badge { font-size: 0.66rem; font-weight: 600; padding: 0.35em 0.6em; }
+
+.merma-motivos-headline { font-size: 0.78rem; font-weight: 600; color: #3f4656; }
+
+.merma-motivos-headline strong { color: var(--waste-red); }
+
+.merma-motivos-chips { font-size: 0.8rem; }
 
 .merma-ticket-empty-icon {
     width: 64px; height: 64px; margin: 0 auto 0.9rem; border-radius: 18px;

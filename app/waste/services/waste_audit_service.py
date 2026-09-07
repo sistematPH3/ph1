@@ -233,7 +233,21 @@ class WasteAuditService:
 
                         p_lote = item.get('lote') or item.get('lot_number') or item.get('lot') or ''
                         p_cant = item.get('cantidad') or item.get('quantity') or item.get('qty') or 0
-                        normalized_products.append({'producto': str(p_name), 'lote': str(p_lote), 'cantidad': p_cant})
+                        wt_id = item.get('waste_type_id') or item.get('motivo_id') or item.get('tipo_id')
+                        motivo_tipo = (
+                            item.get('motivo_tipo') or
+                            item.get('waste_type_name') or
+                            item.get('tipo_merma') or
+                            ''
+                        )
+                        if not motivo_tipo and wt_id:
+                            motivo_tipo = resolve_waste_type_name(wt_id) or ''
+                        normalized_products.append({
+                            'producto': str(p_name),
+                            'lote': str(p_lote),
+                            'cantidad': p_cant,
+                            'motivo_tipo': motivo_tipo or '',
+                        })
                     elif isinstance(item, str):
                         normalized_products.append({'producto': item, 'lote': '', 'cantidad': 1})
 
@@ -294,10 +308,14 @@ class WasteAuditService:
                         if not normalized_products and hasattr(waste_obj, 'details') and waste_obj.details:
                             for d in waste_obj.details:
                                 prod_name = resolve_product_name(d.product_id) or 'Producto'
+                                motivo_tipo = ''
+                                if getattr(d, 'waste_type_id', None):
+                                    motivo_tipo = resolve_waste_type_name(d.waste_type_id) or ''
                                 normalized_products.append({
                                     'producto': prod_name,
                                     'lote': getattr(d, 'lot_number', '') or '',
-                                    'cantidad': float(d.quantity) if getattr(d, 'quantity', None) else 0
+                                    'cantidad': float(d.quantity) if getattr(d, 'quantity', None) else 0,
+                                    'motivo_tipo': motivo_tipo,
                                 })
 
                         if not motivo:

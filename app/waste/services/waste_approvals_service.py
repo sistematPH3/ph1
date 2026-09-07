@@ -374,6 +374,10 @@ def _descontar_stock_lines(waste, details):
     apuntan al mismo insumo). Si algún producto no tiene suficiente stock se
     aborta: nada se descuenta. Al aprobar se LIBERA la reserva correspondiente
     (el stock congelado que la merma pendiente había apartado).
+
+    La auditoría registra el saldo físicamente contable (current_quantity)
+    ANTES y DESPUÉS del descuento, no el "disponible", para que el historial
+    muestre la transición real del inventario.
     """
     cambios = []
     saldos = {}
@@ -400,16 +404,28 @@ def _descontar_stock_lines(waste, details):
         cambios.append({
             'product_id': d.product_id,
             'quantity': qty,
-            'stock_antes': saldo,
-            'stock_despues': saldo - qty,
+            'stock_antes': None,
+            'stock_despues': None,
         })
-    # Aplicar los descuentos una vez validado todo y liberar la reserva.
+    # Aplicar los descuentos una vez validado todo y liberar la reserva,
+    # registrando por línea el stock contable real antes/después.
     for d in details:
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
-        inv.current_quantity = round(float(inv.current_quantity or 0) - float(d.quantity or 0), 2)
+        antes = float(inv.current_quantity or 0)
+        qty = float(d.quantity or 0)
+        inv.current_quantity = round(antes - qty, 2)
         inv.reserved_quantity = round(
-            max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+            max(0.0, float(inv.reserved_quantity or 0) - qty), 2
         )
+        for c in cambios:
+            if (
+                c['product_id'] == d.product_id
+                and c['quantity'] == qty
+                and c['stock_antes'] is None
+            ):
+                c['stock_antes'] = antes
+                c['stock_despues'] = round(antes - qty, 2)
+                break
     return cambios
 
 
@@ -753,4 +769,5 @@ def _avisar_autor_final(waste, admin, decisiones_audit):
         type=tipo,
         message=mensaje,
         is_read=False,
+        created_at=datetime.now(),
     ))

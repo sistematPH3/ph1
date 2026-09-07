@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     const locationElement = document.getElementById('location_id');
-    const wasteTypeSelect = document.getElementById('waste_type_id');
     const itemTypeSelect = document.getElementById('item_type_id');
     const productSelect = document.getElementById('product_id');
     const lotSelect = document.getElementById('lot_number');
@@ -31,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemPhotoInput = document.getElementById('itemPhotoInput');
     const itemPhotosList = document.getElementById('itemPhotosList');
     const ticketEmpty = document.getElementById('ticketEmpty');
+    const motivosResumen = document.getElementById('motivosResumen');
     const qtyMinus = document.getElementById('qtyMinus');
     const qtyPlus = document.getElementById('qtyPlus');
 
@@ -42,8 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let lotsSeq = 0;
     let pendingRequestId = null;
 
-    const lockedTypeCode = (document.getElementById('locked_type_code') || {}).value || null;
-    const wasteTypesByOption = {};
     let wasteTypesData = [];
     const isSingleLocation = !locationElement || locationElement.tagName === 'INPUT';
 
@@ -100,40 +98,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return locationElement.value;
     }
 
-    const selectedTypeCode = () => {
-        if (!wasteTypeSelect || !wasteTypeSelect.value) return null;
-        return wasteTypesByOption[String(wasteTypeSelect.value)] || null;
-    };
-
-    // Tipo de merma del insumo que se está editando (por defecto, el del ticket).
+    // Tipo de merma del insumo que se está editando (por producto).
     const itemTypeCode = () => {
         if (!itemTypeSelect || !itemTypeSelect.value || !wasteTypesData.length) return null;
         const found = wasteTypesData.find(t => String(t.id) === String(itemTypeSelect.value));
         return found ? found.code : null;
     };
 
-    // Modo "VENCIDO" efectivo: lo activa el tipo del ticket O el del insumo.
+    // Modo "VENCIDO" efectivo: lo activa el motivo del propio insumo.
     const effectiveVencidoMode = () =>
-        selectedTypeCode() === 'VENCIDO' || itemTypeCode() === 'VENCIDO';
+        itemTypeCode() === 'VENCIDO';
 
     const populateItemTypeSelect = () => {
         if (!itemTypeSelect) return;
-        const headerVal = wasteTypeSelect ? wasteTypeSelect.value : '';
+        const current = itemTypeSelect.value;
         itemTypeSelect.innerHTML = '';
-        if (!headerVal || wasteTypesData.length === 0) {
-            itemTypeSelect.innerHTML = '<option value="" selected disabled>Esperando tipo del ticket...</option>';
+        if (!wasteTypesData.length) {
+            itemTypeSelect.innerHTML = '<option value="" selected disabled>Sin motivos disponibles...</option>';
             itemTypeSelect.disabled = true;
             return;
         }
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Seleccione el motivo de este insumo...';
+        placeholder.selected = true;
+        placeholder.disabled = true;
+        itemTypeSelect.appendChild(placeholder);
         wasteTypesData.forEach(t => {
             const option = document.createElement('option');
             option.value = t.id;
             option.textContent = t.name + (t.requires_approval ? ' (requiere aprobación)' : '');
             itemTypeSelect.appendChild(option);
         });
-        const stillValid = wasteTypesData.some(t => String(t.id) === String(itemTypeSelect.value));
-        if (!stillValid) {
-            itemTypeSelect.value = headerVal;
+        if (wasteTypesData.some(t => String(t.id) === String(current))) {
+            itemTypeSelect.value = current;
         }
         itemTypeSelect.disabled = false;
     };
@@ -154,12 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const loadWasteTypes = async (locationId) => {
-        if (!wasteTypeSelect) return;
-        wasteTypeSelect.innerHTML = '<option value="" selected disabled>Cargando tipos...</option>';
-        wasteTypeSelect.disabled = true;
-        Object.keys(wasteTypesByOption).forEach(k => delete wasteTypesByOption[k]);
         if (itemTypeSelect) {
-            itemTypeSelect.innerHTML = '<option value="" selected disabled>Esperando tipo del ticket...</option>';
+            itemTypeSelect.innerHTML = '<option value="" selected disabled>Cargando motivos...</option>';
             itemTypeSelect.disabled = true;
         }
         try {
@@ -167,35 +161,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (response.ok && result.success) {
                 wasteTypesData = Array.isArray(result.types) ? result.types : [];
-                wasteTypeSelect.innerHTML = '<option value="" selected disabled>Seleccione el tipo de merma...</option>';
-                let foundLocked = false;
-                result.types.forEach(t => {
-                    const option = document.createElement('option');
-                    option.value = t.id;
-                    const reqLabel = (t.requires_approval) ? ' (requiere aprobación)' : '';
-                    option.textContent = `${t.name}${reqLabel}`;
-                    wasteTypeSelect.appendChild(option);
-                    wasteTypesByOption[String(t.id)] = t.code;
-                    if (lockedTypeCode && t.code === lockedTypeCode) {
-                        wasteTypeSelect.value = String(t.id);
-                        foundLocked = true;
-                    }
-                });
-                if (lockedTypeCode) {
-                    if (foundLocked) {
-                        wasteTypeSelect.disabled = true;
-                    } else {
-                        showAlert('warning', `El tipo "${lockedTypeCode}" no aplica para esta sede.`);
-                        wasteTypeSelect.disabled = false;
-                    }
-                } else {
-                    wasteTypeSelect.disabled = false;
-                }
                 populateItemTypeSelect();
                 updateSteps();
+            } else if (itemTypeSelect) {
+                itemTypeSelect.innerHTML = '<option value="" selected disabled>Error al cargar motivos</option>';
             }
         } catch (e) {
-            wasteTypeSelect.innerHTML = '<option value="" selected disabled>Error al cargar tipos</option>';
+            if (itemTypeSelect) {
+                itemTypeSelect.innerHTML = '<option value="" selected disabled>Error al cargar motivos</option>';
+            }
         }
     };
 
@@ -362,9 +336,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const avail = lotVal ? availableQtyForLot(lotVal) : null;
         if (avail != null && avail > 0 && v > avail) {
             quantityInput.value = String(parseFloat(avail.toFixed(2)));
-            quantityHint.classList.remove('text-danger');
+            quantityHint.classList.add('text-danger');
             quantityInput.classList.remove('is-invalid');
-            quantityHint.textContent = `Se ajustó al saldo del lote (${avail.toFixed(2)}).`;
+            quantityHint.textContent = `El saldo del lote es ${avail.toFixed(2)}; la cantidad se ajustó automáticamente.`;
             return;
         }
         validateQuantity();
@@ -435,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateSteps = () => {
         const steps = document.querySelectorAll('.merma-step');
         if (!steps.length) return;
-        const step1Done = !!(currentLocationId() && wasteTypeSelect && wasteTypeSelect.value);
+        const step1Done = !!currentLocationId();
         const step2Done = cartItems.length > 0;
         const step3Done = !!(notesInput && notesInput.value.trim());
         const active = !step1Done ? 1 : (!step2Done ? 2 : (!step3Done ? 3 : 3));
@@ -485,10 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle">${photos.length} fotos</span>`
                 : '';
             const expired = hasExpiredDate(item.expiration_date);
-            let tipoBadge = '';
+            let motiveBadge = '';
             if (item.waste_type_id && wasteTypesData.length) {
                 const t = wasteTypesData.find(x => String(x.id) === String(item.waste_type_id));
-                if (t) tipoBadge = '<span class="badge rounded-pill bg-light text-dark border"><i class="bi bi-tag me-1"></i>' + escapeHtml(t.name) + '</span>';
+                if (t) motiveBadge = '<span class="badge rounded-pill merma-motive-specific" title="Motivo de este insumo"><i class="bi bi-tag me-1"></i>Motivo del insumo: ' + escapeHtml(t.name) + '</span>';
             }
             card.innerHTML = `
                 <button type="button" class="merma-card-remove" title="Quitar este insumo" onclick="removeMermaItem(${index})">
@@ -498,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="merma-card-body">
                     <div class="merma-card-name">${escapeHtml(item.product_name)}</div>
                     <div class="merma-card-badges">
-                        ${tipoBadge}
+                        ${motiveBadge}
                         <span class="badge rounded-pill bg-light text-dark border font-monospace">Lote ${escapeHtml(item.lot_number)}</span>
                         <span class="badge rounded-pill ${expired ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-muted border'}" title="Vencimiento">
                             Vence: ${escapeHtml(item.expiration_date || '—')}
@@ -511,6 +485,30 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             cardsGrid.appendChild(card);
         });
+
+        if (motivosResumen) {
+            const eff = cartItems.map(item => {
+                if (!item.waste_type_id || !wasteTypesData.length) return null;
+                const t = wasteTypesData.find(x => String(x.id) === String(item.waste_type_id));
+                return t ? t.name : null;
+            }).filter(Boolean);
+            if (total === 0 || eff.length === 0) {
+                motivosResumen.classList.add('d-none');
+                motivosResumen.innerHTML = '';
+            } else {
+                const counts = {};
+                eff.forEach(name => { counts[name] = (counts[name] || 0) + 1; });
+                const labels = Object.keys(counts);
+                const chips = labels.map(label =>
+                    `<span class="badge rounded-pill bg-light text-dark border me-1 mb-1">${escapeHtml(label)}${counts[label] > 1 ? ` ×${counts[label]}` : ''}</span>`
+                ).join('');
+                const headline = '<i class="bi bi-tags me-1 text-danger"></i>Motivos por insumo';
+                motivosResumen.innerHTML =
+                    `<div class="merma-motivos-headline">${headline}</div>` +
+                    `<div class="merma-motivos-chips mt-1">${chips}</div>`;
+                motivosResumen.classList.remove('d-none');
+            }
+        }
 
         updateLocationLock();
         updateSteps();
@@ -529,7 +527,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (locationLockHint) locationLockHint.classList.toggle('d-none', !blocked);
     };
 
-    const resetEditor = () => {
+    // Vuelve el motivo del insumo a su opción vacía (placeholder).
+    const resetItemTypeToHeader = () => {
+        if (!itemTypeSelect) return;
+        itemTypeSelect.value = '';
+    };
+
+    // Limpia productos/lote/cantidad/fotos del editor PERO conserva el motivo
+    // del insumo elegido (se usa al cambiar el motivo para no borrarlo).
+    const resetItemEditor = () => {
         productSelect.value = '';
         lotSelect.innerHTML = '<option value="" selected disabled>Esperando producto...</option>';
         lotSelect.disabled = true;
@@ -542,6 +548,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAddToList.disabled = true;
         resetItemPhoto();
         currentLotsData = [];
+    };
+
+    const resetEditor = () => {
+        resetItemTypeToHeader();
+        resetItemEditor();
     };
 
     const flashFeedback = () => {
@@ -561,14 +572,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editorAlert) editorAlert.innerHTML = '';
 
         const locId = currentLocationId();
-        const wasteTypeId = +wasteTypeSelect.value;
         const productId = +productSelect.value;
         const productName = productSelect.options[productSelect.selectedIndex]?.text;
         const lotVal = lotSelect ? lotSelect.value : '';
         const qty = parseFloat(quantityInput.value);
+        const itemTypeId = (itemTypeSelect && itemTypeSelect.value) ? +itemTypeSelect.value : null;
 
         if (!locId) { showEditorAlert('warning', 'Debe seleccionar la sede en el paso 1.'); return; }
-        if (!wasteTypeId) { showEditorAlert('warning', 'Debe seleccionar el tipo de merma en el paso 1.'); return; }
+        if (!itemTypeId) { showEditorAlert('warning', 'Debe seleccionar el motivo de este insumo en el paso 2.'); return; }
         if (isNaN(productId) || isNaN(qty) || qty <= 0) {
             showEditorAlert('warning', 'Debe seleccionar un producto y una cantidad mayor a 0.');
             return;
@@ -585,7 +596,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const itemTypeId = (itemTypeSelect && itemTypeSelect.value) ? +itemTypeSelect.value : null;
         const lotObj = currentLotsData.find(l => l.lot_number === lotVal);
 
         cartItems.push({
@@ -758,11 +768,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 photoState.classList.add('text-success');
             } else {
                 photoState.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>No se pudo subir';
-                showAlert('warning', 'La foto general no se pudo cargar, pero puede continuar sin ella.');
+                showAlert('warning', 'La foto general no se pudo cargar, pero puede continuar sin ella o reintentar.');
+                resetPhotoDropzone();
             }
         } catch (e) {
             photoState.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Error de conexión';
-            showAlert('warning', 'Error al subir la foto general; puede continuar sin ella.');
+            showAlert('warning', 'Error al subir la foto general; puede continuar sin ella o reintentar.');
+            resetPhotoDropzone();
         }
     };
 
@@ -846,20 +858,12 @@ document.addEventListener('DOMContentLoaded', () => {
         qtyPlus.addEventListener('click', () => stepQuantity(0.5));
     }
 
-    if (wasteTypeSelect) {
-        wasteTypeSelect.addEventListener('change', () => {
-            const locId = currentLocationId();
-            resetEditor();
-            updateSteps();
-            populateItemTypeSelect();
-            refreshProducts(locId);
-        });
-    }
-
     if (itemTypeSelect) {
         itemTypeSelect.addEventListener('change', () => {
             const locId = currentLocationId();
-            resetEditor();
+            // NO usar resetEditor(): borraría el motivo recién elegido. Solo se
+            // limpia el editor y se recargan los productos filtrados por el motivo.
+            resetItemEditor();
             refreshProducts(locId);
         });
     }
@@ -881,10 +885,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const locId = currentLocationId();
-        const wasteTypeId = +wasteTypeSelect.value;
         const notes = notesInput.value.trim();
 
-        if (!wasteTypeId) { showSubmitAlert('warning', 'Debe seleccionar el tipo de merma en el paso 1.'); return; }
         if (!notes) { showSubmitAlert('warning', 'Falta el motivo de la merma: complétalo en el paso 3.'); return; }
 
         const originalHtml = btnSubmitMerma.innerHTML;
@@ -897,7 +899,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             location_id: parseInt(locId),
-            waste_type_id: wasteTypeId,
             notes: notes,
             request_id: pendingRequestId,
             evidence_url: evidenceUrlInput.value || null,
@@ -917,7 +918,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const result = await response.json();
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseErr) {
+                result = { success: false, message: 'El servidor respondió con un error inesperado. Revisa los registros del sistema.' };
+            }
 
             if (response.ok && result.success) {
                 cartItems = [];
@@ -929,13 +935,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetPhotoDropzone();
                 if (photoInput) photoInput.value = '';
                 showSubmitAlert('success', result.message);
-                if (locationElement && locationElement.tagName === 'SELECT') {
-                    refreshProducts(locationElement.value);
-                    loadWasteTypes(locationElement.value);
-                } else {
-                    refreshProducts(currentLocationId());
-                    loadWasteTypes(currentLocationId());
-                }
+                const reloadForNextTicket = () => {
+                    const lid = currentLocationId();
+                    if (!lid) return;
+                    // No hay motivo "general" que conservar: cada insumo define el suyo.
+                    refreshProducts(lid);
+                };
+                reloadForNextTicket();
             } else {
                 let errorText = result.message || 'Error al registrar la merma.';
                 if (result.errors) {

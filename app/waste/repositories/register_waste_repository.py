@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.models.inventory_model import db, Inventory, Product
 from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
 from app.models.waste_model import Waste, WasteType, WasteDetail, AppParameter, AuditLog
@@ -63,6 +63,18 @@ class RegisterWasteRepository:
         ).first()
 
     @staticmethod
+    def get_inventory_map(location_id, product_ids):
+        """Mapa {product_id: Inventory} para varios productos de una sede (evita N+1)."""
+        ids = [int(p) for p in product_ids]
+        if not ids:
+            return {}
+        invs = Inventory.query.filter(
+            Inventory.location_id == int(location_id),
+            Inventory.product_id.in_(ids)
+        ).all()
+        return {i.product_id: i for i in invs}
+
+    @staticmethod
     def get_inventory_item_for_update(product_id, location_id):
         return db.session.query(Inventory).filter_by(
             product_id=product_id,
@@ -72,6 +84,14 @@ class RegisterWasteRepository:
     @staticmethod
     def get_product_by_id(product_id):
         return Product.query.get(product_id)
+
+    @staticmethod
+    def get_products_by_ids(ids):
+        ids = [int(p) for p in ids]
+        if not ids:
+            return {}
+        prods = Product.query.filter(Product.id.in_(ids)).all()
+        return {p.id: p for p in prods}
 
     @staticmethod
     def _compute_lot_availability(loc_id, prod_ids):
@@ -200,7 +220,11 @@ class RegisterWasteRepository:
             WasteDetail.lot_number,
             func.sum(WasteDetail.quantity).label('total_mermado')
         ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
-            Waste.status == 'APROBADO',
+            or_(
+                Waste.status == 'APROBADO',
+                # En una merma APROBADO_PARCIAL solo cuentan las líneas aprobadas.
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status == 'APROBADO'),
+            ),
             Waste.cancelled_at.is_(None),
             Waste.location_id == loc_id,
             WasteDetail.product_id.in_(prod_ids),
@@ -273,6 +297,32 @@ class RegisterWasteRepository:
             'quantity': round(float(e[2]), 2),
         } for e in entries]
         return lots
+
+    @staticmethod
+    def get_lots_map(location_id, product_ids):
+        """Mapa {product_id: [lotes]} con la misma derivación que get_product_lots
+        pero para varios productos a la vez (evita N+1 en tickets multi-línea)."""
+        ids = [int(p) for p in product_ids]
+        if not ids:
+            return {}
+        avail = RegisterWasteRepository._compute_lot_availability(int(location_id), ids)
+        result = {}
+        for (pid, lot_num), data in avail.items():
+            disponible = data['availability']
+            if disponible <= 0.001:
+                continue
+            exp = data['expiration_date']
+            result.setdefault(pid, []).append({
+                'lot_number': lot_num,
+                'expiration_date': exp.strftime('%d/%m/%Y') if exp else 'Sin vencimiento',
+                'quantity': round(float(disponible), 2),
+                '_exp': exp,
+            })
+        for pid in result:
+            result[pid].sort(key=lambda e: (e['_exp'] is None, e['_exp'] or date.max))
+            for e in result[pid]:
+                e.pop('_exp', None)
+        return result
 
     @staticmethod
     def get_unit_cost(product_id, lot_number):
@@ -397,7 +447,7 @@ class RegisterWasteRepository:
 
         last_waste = Waste.query.filter(
             Waste.location_id == location_id,
-            Waste.status.in_(['APROBADO', 'REVERTIDO']),
+            Waste.status == 'APROBADO',
             Waste.date != None
         ).order_by(Waste.date.desc()).first()
 
@@ -445,6 +495,17 @@ class RegisterWasteRepository:
 
     @staticmethod
     def audit_waste_creation(waste, waste_type, user_id, pending, motivos=None):
+        # Cada producto se audita con SU PROPIO motivo de merma, no solo con el
+        # tipo de la cabecera (que deriva del primer producto).
+        productos = []
+        for d in (waste.details or []):
+            productos.append({
+                'product_id': d.product_id,
+                'lote': d.lot_number or '',
+                'cantidad': float(d.quantity or 0),
+                'waste_type_id': d.waste_type_id,
+            })
+
         changed_data = {
             'event': 'creada',
             'waste_id': waste.id,
@@ -456,6 +517,7 @@ class RegisterWasteRepository:
             'status': waste.status,
             'requiere_aprobacion': pending,
             'motivos': motivos or {},
+            'productos': productos,
         }
         try:
             user_id_final = int(user_id) if user_id is not None else 1
@@ -485,10 +547,11 @@ class RegisterWasteRepository:
             db.session.add(Notification(
                 user_id=admin.id,
                 location_id=location_id,
+                waste_id=waste_id,
                 type='MERMA_PENDIENTE',
                 message=message[:255],
                 is_read=False,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(),
             ))
 
     @staticmethod

@@ -51,17 +51,11 @@ def nueva_merma():
     if not is_admin and len(locations) == 1:
         single_location = locations[0]
 
-    locked_type_code = (request.args.get('type') or '').strip().upper() or None
-    if locked_type_code:
-        if locked_type_code not in {wt.code for wt in waste_types}:
-            locked_type_code = None
-
     return render_template(
         'waste/register_waste.html',
         locations=locations,
         is_admin=is_admin,
         single_location=single_location,
-        locked_type_code=locked_type_code,
         vencidos=vencidos,
     )
 
@@ -179,11 +173,8 @@ def crear_merma():
                 items = []
         location_id = form.get('location_id', type=int)
         location_id = location_id if location_id is not None else form.get('location_id')
-        waste_type_id = form.get('waste_type_id', type=int)
-        waste_type_id = waste_type_id if waste_type_id is not None else form.get('waste_type_id')
         data = {
             'location_id': _coerce_positive_int(location_id),
-            'waste_type_id': _coerce_positive_int(waste_type_id),
             'items': items,
             'evidence_url': form.get('evidence_url') or None,
             'notes': form.get('notes'),
@@ -204,7 +195,6 @@ def crear_merma():
     result = register_waste(
         user_id=user_id,
         location_id=data['location_id'],
-        waste_type_id=data['waste_type_id'],
         items=data['items'],
         evidence_url=data.get('evidence_url'),
         notes=data.get('notes'),

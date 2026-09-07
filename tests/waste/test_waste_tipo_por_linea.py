@@ -3,13 +3,13 @@ Motivo de merma POR PRODUCTO (waste_details.waste_type_id).
 
 Qué verifica:
   1) Registro: dos productos en el mismo ticket con MOTIVOS DISTINTOS; cada
-     línea guarda su propio waste_type_id y la que no trae tipo hereda el de
-     la cabecera. La merma queda PENDIENTE porque UN producto trae un tipo que
-     exige aprobación, y la novedad TIPO se marca SOLO para ese producto.
+     línea guarda su PROPIO waste_type_id (obligatorio por producto). La merma
+     queda PENDIENTE porque UN producto trae un tipo que exige aprobación, y la
+     novedad TIPO se marca SOLO para ese producto.
   2) Edición (GET): el expediente expone por línea el tipo efectivo, su nombre
      y si la cantidad supera el límite de merma del producto (excede_limite).
   3) Edición (POST): cambiar el motivo de UNA línea la persiste en su detalle
-     sin tocar el tipo de las demás ni el de la cabecera.
+     sin tocar el tipo de las demás.
   4) Resolución (GET): cada línea informa su propio waste_type_name.
 
 Uso:
@@ -137,18 +137,18 @@ class MotivoPorLineaTest(unittest.TestCase):
         return register_waste(
             user_id=env["admin1"].id,
             location_id=env["sede_a"].id,
-            waste_type_id=env["base"].id,
             items=[
                 {
                     "product_id": env["p1"].id,
                     "lot_number": "L-001",
                     "quantity": 8.0,
-                    "waste_type_id": env["temp"].id if temp_on_first else None,
+                    "waste_type_id": env["temp"].id if temp_on_first else env["base"].id,
                 },
                 {
                     "product_id": env["p2"].id,
                     "lot_number": "L-002",
                     "quantity": 3.0,
+                    "waste_type_id": env["base"].id,
                 },
             ],
             evidence_url=None,
@@ -165,11 +165,11 @@ class MotivoPorLineaTest(unittest.TestCase):
 
         waste = Waste.query.get(res["waste_id"])
         details_by_pid = {d.product_id: d for d in waste.details}
-        # La línea 1 trae su propio tipo (TEMPERATURA), la 2 hereda la cabecera.
+        # La línea 1 trae su propio tipo (TEMPERATURA), la 2 también (OPERACIÓN).
         self.assertEqual(details_by_pid[env["p1"].id].waste_type_id, env["temp"].id)
         self.assertEqual(details_by_pid[env["p2"].id].waste_type_id, env["base"].id)
-        # La cabecera conserva el tipo del ticket.
-        self.assertEqual(waste.waste_type_id, env["base"].id)
+        # El tipo del TICKET se deriva de la primera línea (TEMPERATURA).
+        self.assertEqual(waste.waste_type_id, env["temp"].id)
 
         # La novedad TIPO se marca SOLO para el producto con el tipo que exige
         # aprobación (TEMPERATURA), no para el que heredó OPERACIÓN.
@@ -193,7 +193,7 @@ class MotivoPorLineaTest(unittest.TestCase):
         self.assertEqual(l1["waste_type_name"], "Temperatura")
         self.assertEqual(l1["waste_limit"], 5.0)
         self.assertTrue(l1["excede_limite"])
-        # p2: hereda cabecera OPERACIÓN, sin límite configurado.
+        # p2: motivo propio OPERACIÓN, sin límite configurado.
         l2 = lines_by_pid[env["p2"].id]
         self.assertEqual(l2["waste_type_id"], env["base"].id)
         self.assertEqual(l2["waste_type_name"], "Operación")
@@ -239,9 +239,10 @@ class MotivoPorLineaTest(unittest.TestCase):
         waste = Waste.query.get(res["waste_id"])
         details_by_pid = {d.product_id: d for d in waste.details}
         self.assertEqual(details_by_pid[env["p1"].id].waste_type_id, env["dano"].id)
-        # La línea 2 quedó intacta, heredando la cabecera.
+        # La línea 2 quedó intacta, con su motivo OPERACIÓN.
         self.assertEqual(details_by_pid[env["p2"].id].waste_type_id, env["base"].id)
-        self.assertEqual(waste.waste_type_id, env["base"].id)
+        # El tipo del TICKET se re-deriva de la primera línea (ahora DANADO).
+        self.assertEqual(waste.waste_type_id, env["dano"].id)
 
         # Resolver (GET) ahora muestra el nuevo motivo por línea.
         detail_data, error = get_waste_detail(res["waste_id"], env["admin2"].id)
@@ -367,12 +368,12 @@ class MotivoPorLineaTest(unittest.TestCase):
         return register_waste(
             user_id=env["admin1"].id,
             location_id=env["sede_a"].id,
-            waste_type_id=env["temp"].id,
             items=[
                 {
                     "product_id": env["p1"].id,
                     "lot_number": "L-001",
                     "quantity": 3.0,
+                    "waste_type_id": env["temp"].id,
                 },
             ],
             evidence_url=None,

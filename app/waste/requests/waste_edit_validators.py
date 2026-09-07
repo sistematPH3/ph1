@@ -21,13 +21,11 @@ def validate_edit_payload(data):
 
     errors = {}
     waste_type_id = data.get("waste_type_id")
-    if not waste_type_id:
-        errors["waste_type_id"] = "Debe seleccionar un tipo de merma."
-    else:
+    if waste_type_id not in (None, ""):
         try:
             waste_type_id = int(waste_type_id)
         except (ValueError, TypeError):
-            errors["waste_type_id"] = "Tipo de merma no válido."
+            waste_type_id = None
 
     notes = str(data.get("notes") or "").strip()
     evidence_url = data.get("evidence_url")

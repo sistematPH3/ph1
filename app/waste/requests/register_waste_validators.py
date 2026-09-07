@@ -5,13 +5,8 @@ def validate_register_waste_payload(data):
 
     if 'location_id' not in data:
         errors['location_id'] = 'La sede es obligatoria.'
-    elif not isinstance(data['location_id'], int) or data['location_id'] <= 0:
+    elif isinstance(data['location_id'], bool) or not isinstance(data['location_id'], int) or data['location_id'] <= 0:
         errors['location_id'] = 'La sede es inválida.'
-
-    if 'waste_type_id' not in data:
-        errors['waste_type_id'] = 'El tipo de merma es obligatorio.'
-    elif not isinstance(data['waste_type_id'], int) or data['waste_type_id'] <= 0:
-        errors['waste_type_id'] = 'El tipo de merma es inválido.'
 
     if 'items' not in data:
         errors['items'] = 'Debe agregar al menos un producto a la merma.'
@@ -37,14 +32,17 @@ def validate_register_waste_payload(data):
                 errors[f'item_{idx}_quantity'] = 'Cantidad inválida (debe ser mayor a 0).'
 
             item_type = item.get('waste_type_id')
-            if 'waste_type_id' in item and item_type not in (None, ''):
-                if not isinstance(item_type, int) or item_type <= 0:
-                    errors[f'item_{idx}_waste_type_id'] = 'El tipo de merma del ítem es inválido.'
+            if item_type in (None, ''):
+                errors[f'item_{idx}_waste_type_id'] = 'Debe seleccionar un motivo de merma para este producto.'
+            elif isinstance(item_type, bool) or not isinstance(item_type, int) or item_type <= 0:
+                errors[f'item_{idx}_waste_type_id'] = 'El motivo de merma del producto es inválido.'
 
             item_evidence = item.get('evidence_url')
             if 'evidence_url' in item and item_evidence not in (None, ''):
                 if not isinstance(item_evidence, str) or not item_evidence.strip():
                     errors[f'item_{idx}_evidence_url'] = 'La evidencia del ítem debe ser una URL válida.'
+                elif len(item_evidence.strip()) > 2000:
+                    errors[f'item_{idx}_evidence_url'] = 'La URL de la evidencia del ítem es demasiado larga.'
             elif item_evidence is not None and not isinstance(item_evidence, str):
                 errors[f'item_{idx}_evidence_url'] = 'La evidencia del ítem debe ser una URL válida.'
 
@@ -61,12 +59,19 @@ def validate_register_waste_payload(data):
                                 f'La foto {p_idx + 1} del ítem debe ser una URL válida.'
                             )
                             break
+                        if len(photo.strip()) > 2000:
+                            errors[f'item_{idx}_evidence_urls'] = (
+                                f'La foto {p_idx + 1} del ítem tiene una URL demasiado larga.'
+                            )
+                            break
 
     notes = data.get('notes')
     if notes is None or (isinstance(notes, str) and not notes.strip()):
         errors['notes'] = 'El motivo de la merma es obligatorio.'
     elif not isinstance(notes, str):
         errors['notes'] = 'El motivo debe ser un texto válido.'
+    elif len(notes.strip()) > 4000:
+        errors['notes'] = 'El motivo no puede exceder los 4000 caracteres.'
 
     return {
         'is_valid': len(errors) == 0,
