@@ -234,6 +234,30 @@ class RegisterWasteRepository:
             if lot and str(lot).strip() and str(lot).strip() != 'N/A':
                 salidas_aprobadas[(int(pid), str(lot).strip())] = float(total_mermado or 0.0)
 
+        # Mermas PENDIENTES (en proceso): el stock físico no se descuenta todavía,
+        # pero la cantidad ya está comprometida. Se resta de la disponibilidad del
+        # lote para que la suma de mermas (pendientes + nuevas) jamás supere el
+        # inventario físico. En APROBADO_PARCIAL, las líneas aún sin decidir
+        # también se restan (las RECHAZADAS no comprometen stock).
+        salidas_pendientes = {}
+        pendientes_rows = db.session.query(
+            WasteDetail.product_id,
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_pend')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            or_(
+                Waste.status == 'PENDIENTE',
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status != 'APROBADO'),
+            ),
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id.in_(prod_ids),
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.product_id, WasteDetail.lot_number).all()
+        for pid, lot, total_pend in pendientes_rows:
+            if lot and str(lot).strip() and str(lot).strip() != 'N/A':
+                salidas_pendientes[(int(pid), str(lot).strip())] = float(total_pend or 0.0)
+
         por_producto = {}
         result = {}
         for key, data in entradas.items():
@@ -241,7 +265,8 @@ class RegisterWasteRepository:
             disp = (data['total_in']
                     - salidas_traslados.get(key, 0.0)
                     - salidas_consumo.get(key, 0.0)
-                    - salidas_aprobadas.get(key, 0.0))
+                    - salidas_aprobadas.get(key, 0.0)
+                    - salidas_pendientes.get(key, 0.0))
             result[key] = {
                 'availability': disp,
                 'expiration_date': data['expiration_date'],

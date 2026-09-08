@@ -235,8 +235,8 @@ def get_pending_wastes_for_view(user_id):
     """Mermas PENDIENTES visibles en el listado de corrección/retiro.
 
     Alcance: el Administrador ve todas las sedes; los demás roles ven solo sus
-    sedes asignadas. Pueden editar/cancelar: los Admins, el autor de la merma y
-    los usuarios que pertenecen a su sede.
+    sedes asignadas. Solo el Administrador puede corregir/cancelar mermas; los
+    demás roles ven el listado en modo lectura.
     """
     user = MermaApprovalsRepository.get_user_by_id(user_id)
     if not user:
@@ -263,7 +263,8 @@ def get_pending_wastes_for_view(user_id):
         r['fecha_display'] = fecha.strftime('%d/%m/%Y %H:%M') if fecha else '—'
         es_autor = (r.get('created_by') == user.id)
         r['es_autor'] = es_autor
-        puede = es_autor or is_admin or (r.get('location_id') in allowed)
+        # Solo el Administrador decide/corrige/cancela mermas; el resto solo lee.
+        puede = is_admin
         r['puede_editar'] = puede
         r['puede_cancelar'] = puede
     return rows, is_admin

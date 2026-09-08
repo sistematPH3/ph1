@@ -5,7 +5,9 @@
 #   1) Merma APROBADA: descuenta stock del producto, deja trazabilidad (AuditLog)
 #      y reduce la disponibilidad del lote.
 #   2) Merma PENDIENTE (tipo sensible o cantidad >= waste_limit):
-#      NO descuenta stock, notifica a administradores y deja trazabilidad ALERTA.
+#      NO descuenta el stock físico, notifica a administradores y deja
+#      trazabilidad ALERTA; aunque reduce la disponibilidad (reserva) del
+#      lote porque esa cantidad ya está "en proceso".
 #   3) Anti doble-cargo: dos líneas del mismo producto o del mismo lote que
 #      superan el stock/saldo del lote en UN ticket son rechazadas.
 #   4) Validaciones: lote insuficiente, lote inexistente, producto sin inventario,
@@ -230,6 +232,9 @@ class WasteRegisterTest(unittest.TestCase):
     def test_merma_aprobada_por_aprobador_resta_del_lote(self):
         # Flujo PENDIENTE -> APROBADO (aprobación): el audit de aprobación no
         # lleva lot_number, pero el lote igual debe restar la cantidad aprobada.
+        # Además, desde que queda PENDIENTE la cantidad ya reduce la
+        # disponibilidad del lote (está "en proceso"); al aprobar se conserva
+        # el mismo saldo (no descuenta dos veces).
         env = self._seed_env(stock=100.0, waste_limit=20.0, waste_type=WasteType(
             name="Ruptura de cadena de frio", code="TEMPERATURA",
             severity="CRITICA", requires_approval=True,
@@ -240,7 +245,7 @@ class WasteRegisterTest(unittest.TestCase):
         self.assertTrue(res["success"])
         self.assertEqual(res["status"], "PENDIENTE")
         lots = RegisterWasteRepository.get_product_lots(env["product"].id, env["location"].id)
-        self.assertEqual(float(lots[0]["quantity"]), 100.0)
+        self.assertEqual(float(lots[0]["quantity"]), 70.0)
 
         waste = Waste.query.get(res["waste_id"])
         waste.status = "APROBADO"
@@ -701,11 +706,15 @@ class WasteRegisterTest(unittest.TestCase):
                                         location_id=env["location_id"]).first()
         self.assertEqual(float(inv.current_quantity), 45.0)
         lots = RegisterWasteRepository.get_product_lots(env["product_id"], env["location_id"])
-        self.assertEqual(float(lots[0]["quantity"]), 45.0)
+        # r1 (5 aprobada) + r2 (5 pendiente) comprometen 10 del lote: 50 - 10 = 40.
+        self.assertEqual(float(lots[0]["quantity"]), 40.0)
         audit = AuditLog.query.filter_by(affected_table="inventory", action="MERMA").count()
         self.assertEqual(audit, 1)  # solo la primera descuenta stock
 
-    def test_merma_pendiente_no_consume_disponibilidad_del_lote(self):
+    def test_merma_pendiente_si_consume_disponibilidad_del_lote(self):
+        # Regla de "en proceso": aunque la merma PENDIENTE no descuenta el stock
+        # físico, sí reduce la disponibilidad del lote (100 - 2 = 98) para que
+        # no se puedan registrar nuevas mermas sobre lo ya comprometido.
         env = self._seed_env(stock=100.0, waste_type=WasteType(
             name="Ruptura de cadena de frio", code="TEMPERATURA",
             severity="CRITICA", requires_approval=True,
@@ -715,7 +724,7 @@ class WasteRegisterTest(unittest.TestCase):
         ])
         self.assertEqual(res["status"], "PENDIENTE")
         lots = RegisterWasteRepository.get_product_lots(env["product_id"], env["location_id"])
-        self.assertEqual(float(lots[0]["quantity"]), 100.0)
+        self.assertEqual(float(lots[0]["quantity"]), 98.0)
 
     def test_merma_misma_linea_repetida_en_el_ticket_se_suma(self):
         # El validador tolera la misma línea repetida (se acumula) siempre que

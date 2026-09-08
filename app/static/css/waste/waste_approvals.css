@@ -25,15 +25,17 @@ body {
 }
 
 .ph-icon-box {
-    width: 50px;
-    height: 50px;
+    width: 60px;
+    height: 60px;
     background-color: var(--ph-red);
     color: #ffffff;
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.75rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(175, 21, 21, 0.2);
 }
 
 /* Título principal (Negro con sombra roja, tipo de letra del sistema) */
@@ -360,9 +362,10 @@ input#searchApprovalInput:focus {
     }
 
     .ph-icon-box {
-        width: 42px;
-        height: 42px;
-        font-size: 1.2rem;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        font-size: 1.35rem;
     }
 
     .ph-title {
@@ -443,6 +446,11 @@ input#searchApprovalInput:focus {
 
     /* Celda 6 (Motivo): ocupa el ancho completo bajo los pares */
     .ph-table tbody td:nth-child(6) {
+        grid-column: 1 / -1;
+    }
+
+    /* Celda 7 (Estado / Novedad): ancho completo junto al motivo */
+    .ph-table tbody td:nth-child(7) {
         grid-column: 1 / -1;
     }
 
@@ -569,4 +577,81 @@ body.ph-confirm-blur .wrapper {
 
 #cancelAlerts:empty {
     display: none;
+}
+
+/* =========================================================
+   RESPONSIVE: LISTADO "MIS MERMAS PENDIENTES"
+   ========================================================= */
+@media (max-width: 575.98px) {
+    /* Cabecera: badge de pendientes alineado a la izquierda, título compacto */
+    #mermaPendingHeader {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
+    #mermaPendingHeader .ph-title {
+        font-size: 1.15rem;
+    }
+    #pendingCountBadge {
+        align-self: flex-start;
+    }
+
+    /* Barra de búsqueda: input ancho completo */
+    .ph-filter-bar .input-group {
+        max-width: 100% !important;
+        width: 100%;
+    }
+
+    /* Acciones: botones apilados full-width */
+    .ph-table tbody td.acciones-cell {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    .ph-table tbody td.acciones-cell .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Tarjeta fila: más compacta */
+    .ph-table tbody tr {
+        padding: 0.85rem 0.9rem;
+        gap: 0.5rem;
+    }
+    .ph-table tbody td {
+        font-size: 0.85rem;
+    }
+
+    /* ID + Tipo: el círculo y el texto se alinean mejor */
+    .ph-table tbody td:nth-child(1) .d-flex {
+        gap: 0.55rem;
+    }
+    .ph-table tbody td:nth-child(1) .rounded-circle {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 0.9rem;
+    }
+
+    /* Celdas de par: mantienen su etiqueta en móvil */
+    .ph-table tbody td::before {
+        font-size: 0.6rem;
+    }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+    /* Tablet pequeña/vertical: acciones en fila pero compactas */
+    .ph-table tbody td.acciones-cell .btn {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+}
+
+/* El pie de acciones de la aprobación también ocupa ancho completo */
+@media (max-width: 991.98px) {
+    .ph-table tbody td.acciones-cell {
+        display: flex;
+    }
+    .ph-table tbody td.acciones-cell::before {
+        display: none !important;
+    }
 }

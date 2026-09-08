@@ -105,7 +105,7 @@
                             </div>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1">
-                            <span class="ph-qty-badge ph-qty-ingreso">+{{ '%.2f' | format(e.qty) }}</span>
+                            <span class="ph-qty-badge ph-qty-ingreso">+{{ e.qty | ph_qty }}</span>
                             <span>
                                 <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
                             </span>
@@ -118,7 +118,7 @@
                         <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
                         <div>
                             <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
-                            <span class="text-dark">Faltante: {{ '%.2f' | format(e.missing_qty) }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                            <span class="text-dark">Faltante: {{ e.missing_qty | ph_qty }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
                         </div>
                     </div>
                     {% endif %}
@@ -138,7 +138,7 @@
                             {% if e.event_type == 'despacho' %}
                                 <div class="small text-muted mb-2"><i class="bi bi-truck me-1"></i>Salida física en origen, mercancía congelada en tránsito.</div>
                                 <div class="d-flex gap-3 mb-2 small text-muted flex-wrap">
-                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ '%.2f' | format(e.dispatched_qty) }}</span>
+                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ e.dispatched_qty | ph_qty }}</span>
                                 </div>
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-despacho">
@@ -151,7 +151,7 @@
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
                                                 <td>{{ e.expiration }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.dispatched_qty | ph_qty }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -165,7 +165,7 @@
                                         <span class="text-dark">{{ e.reason or '—' }}</span>
                                     </div>
                                 </div>
-                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ '%.2f' | format(e.qty) }}</span>
+                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ e.qty | ph_qty }}</span>
 
                             {% elif e.event_type == 'recepcion' %}
                                 {% if e.notes %}
@@ -186,9 +186,9 @@
                                             <tr>
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
-                                                <td class="text-center">{{ '%.2f' | format(e.dispatched_qty) }}</td>
-                                                <td class="text-center text-success fw-bold">{{ '%.2f' | format(e.received_qty) }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.missing_qty) if e.missing_qty > 0 else '-' }}</td>
+                                                <td class="text-center">{{ e.dispatched_qty | ph_qty }}</td>
+                                                <td class="text-center text-success fw-bold">{{ e.received_qty | ph_qty }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.missing_qty | ph_qty if e.missing_qty > 0 else '-' }}</td>
                                                 <td>{{ e.novelty | replace('_', ' ') | title }}</td>
                                             </tr>
                                         </tbody>
@@ -215,9 +215,9 @@
                                             <tr>
                                                 <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
                                                 <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
-                                                <td class="text-center text-success">{{ '%.2f' | format(item.get('credited_qty', 0)) }}</td>
-                                                <td class="text-center ph-text-warning">{{ '%.2f' | format(item.get('return_qty', 0)) }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
+                                                <td class="text-center text-success">{{ item.get('credited_qty', 0) | ph_qty }}</td>
+                                                <td class="text-center ph-text-warning">{{ item.get('return_qty', 0) | ph_qty }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ item.get('lost_qty', 0) | ph_qty if item.get('lost_qty', 0) > 0 else '-' }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
@@ -230,6 +230,8 @@
                                     <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>Merma cancelada</span>
                                     {% elif e.is_merma_edited %}
                                     <span class="badge bg-warning text-dark"><i class="bi bi-pencil me-1"></i>Merma editada</span>
+                                    {% elif e.is_merma_pending %}
+                                    <span class="badge bg-warning text-dark border"><i class="bi bi-hourglass-split me-1"></i>Merma en espera de aprobación</span>
                                     {% elif e.is_merma_parcial %}
                                     <span class="badge bg-info text-white"><i class="bi bi-ui-checks me-1"></i>Merma con decisión por producto</span>
                                     {% elif e.is_merma_rejected %}
@@ -244,11 +246,76 @@
                                     <i class="bi bi-x-octagon-fill me-2 flex-shrink-0"></i>
                                     Merma cancelada por el autor antes de la respuesta del administrador. Sin descuento de stock.
                                 </div>
+                                {% elif e.is_merma_pending %}
+                                <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
+                                    <i class="bi bi-hourglass-split me-2 flex-shrink-0"></i>
+                                    Merma registrada. En espera de aprobación. Sin descuento de stock.
+                                </div>
+                                {% if e.merma_lines %}
+                                <div class="table-responsive rounded border mb-3">
+                                    <table class="table table-sm align-middle mb-0 bg-white">
+                                        <thead class="table-light text-muted small">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th>Lote</th>
+                                                <th>Motivo</th>
+                                                <th class="text-center">Cantidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for ln in e.merma_lines %}
+                                            <tr>
+                                                <td class="fw-bold">{{ ln.product }}</td>
+                                                <td><code>{{ ln.lot }}</code></td>
+                                                <td>{{ ln.motivo_after }}</td>
+                                                <td class="text-center">{{ ln.qty_after | ph_qty }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
                                 {% elif e.is_merma_edited %}
                                 <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
                                     <i class="bi bi-pencil-square me-2 flex-shrink-0"></i>
                                     Edición de una merma pendiente. Sin descuento de stock.
                                 </div>
+                                {% if e.merma_lines %}
+                                <div class="table-responsive rounded border mb-3">
+                                    <table class="table table-sm align-middle mb-0 bg-white">
+                                        <thead class="table-light text-muted small">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th>Lote</th>
+                                                <th>Motivo (antes → después)</th>
+                                                <th class="text-center">Cantidad (antes → después)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for ln in e.merma_lines %}
+                                            <tr>
+                                                <td class="fw-bold">{{ ln.product }}</td>
+                                                <td><code>{{ ln.lot }}</code></td>
+                                                <td>
+                                                    {% if ln.changed and ln.motivo_before != ln.motivo_after %}
+                                                    {{ ln.motivo_before }} <i class="bi bi-arrow-right"></i> {{ ln.motivo_after }}
+                                                    {% else %}
+                                                    {{ ln.motivo_after }}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center">
+                                                    {% if ln.changed and ln.qty_before != ln.qty_after %}
+                                                    {{ ln.qty_before | ph_qty }} <i class="bi bi-arrow-right"></i> {{ ln.qty_after | ph_qty }}
+                                                    {% else %}
+                                                    {{ ln.qty_after | ph_qty }}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
                                 {% elif e.is_merma_rejected %}
                                 <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
                                     <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
@@ -260,8 +327,8 @@
                                     <div class="col-6">Nuevo Stock</div>
                                 </div>
                                 <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
-                                    <div class="col-6">{{ '%.2f' | format(e.prev_qty) }}</div>
-                                    <div class="col-6">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-6">{{ e.prev_qty | ph_qty }}</div>
+                                    <div class="col-6">{{ e.new_qty | ph_qty }}</div>
                                 </div>
                                 {% endif %}
                                 <div class="pt-2 border-top">
@@ -278,8 +345,8 @@
                                     <div class="col-4">ID Log</div>
                                 </div>
                                 <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
-                                    <div class="col-4">{{ '%.2f' | format(e.prev_qty) }}</div>
-                                    <div class="col-4">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-4">{{ e.prev_qty | ph_qty }}</div>
+                                    <div class="col-4">{{ e.new_qty | ph_qty }}</div>
                                     <div class="col-4 text-muted">#{{ e.id }}</div>
                                 </div>
                                 <div class="pt-2 border-top">
@@ -348,7 +415,7 @@
                             </div>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1">
-                            <span class="ph-qty-badge ph-qty-egreso">{% if e.is_merma_cancelled or e.is_merma_edited %}—{% else %}{{ '%.2f' | format((e.qty | abs) if e.is_merma_rejected else e.qty) }}{% endif %}</span>
+                            <span class="ph-qty-badge ph-qty-egreso">{% if e.is_merma_cancelled or e.is_merma_edited or e.is_merma_pending %}—{% else %}{{ ((e.qty | abs) if e.is_merma_rejected else e.qty) | ph_qty }}{% endif %}</span>
                             <span>
                                 <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
                             </span>
@@ -361,7 +428,7 @@
                         <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
                         <div>
                             <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
-                            <span class="text-dark">Faltante: {{ '%.2f' | format(e.missing_qty) }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                            <span class="text-dark">Faltante: {{ e.missing_qty | ph_qty }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
                         </div>
                     </div>
                     {% endif %}
@@ -376,7 +443,7 @@
                             {% if e.event_type == 'despacho' %}
                                 <div class="small text-muted mb-2"><i class="bi bi-truck me-1"></i>Salida física en origen, mercancía congelada en tránsito.</div>
                                 <div class="d-flex gap-3 mb-2 small text-muted flex-wrap">
-                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ '%.2f' | format(e.dispatched_qty) }}</span>
+                                    <span class="badge bg-light text-danger">Cantidad despachada: {{ e.dispatched_qty | ph_qty }}</span>
                                 </div>
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-despacho">
@@ -389,7 +456,7 @@
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
                                                 <td>{{ e.expiration }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.dispatched_qty) }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.dispatched_qty | ph_qty }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -403,7 +470,7 @@
                                         <span class="text-dark">{{ e.reason or '—' }}</span>
                                     </div>
                                 </div>
-                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ '%.2f' | format(e.qty) }}</span>
+                                <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ e.qty | ph_qty }}</span>
 
                             {% elif e.event_type == 'recepcion' %}
                                 {% if e.notes %}
@@ -424,9 +491,9 @@
                                             <tr>
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
-                                                <td class="text-center">{{ '%.2f' | format(e.dispatched_qty) }}</td>
-                                                <td class="text-center text-success fw-bold">{{ '%.2f' | format(e.received_qty) }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(e.missing_qty) if e.missing_qty > 0 else '-' }}</td>
+                                                <td class="text-center">{{ e.dispatched_qty | ph_qty }}</td>
+                                                <td class="text-center text-success fw-bold">{{ e.received_qty | ph_qty }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.missing_qty | ph_qty if e.missing_qty > 0 else '-' }}</td>
                                                 <td>{{ e.novelty | replace('_', ' ') | title }}</td>
                                             </tr>
                                         </tbody>
@@ -453,9 +520,9 @@
                                             <tr>
                                                 <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
                                                 <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
-                                                <td class="text-center text-success">{{ '%.2f' | format(item.get('credited_qty', 0)) }}</td>
-                                                <td class="text-center ph-text-warning">{{ '%.2f' | format(item.get('return_qty', 0)) }}</td>
-                                                <td class="text-center text-danger fw-bold">{{ '%.2f' | format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
+                                                <td class="text-center text-success">{{ item.get('credited_qty', 0) | ph_qty }}</td>
+                                                <td class="text-center ph-text-warning">{{ item.get('return_qty', 0) | ph_qty }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ item.get('lost_qty', 0) | ph_qty if item.get('lost_qty', 0) > 0 else '-' }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
@@ -468,6 +535,8 @@
                                     <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>Merma cancelada</span>
                                     {% elif e.is_merma_edited %}
                                     <span class="badge bg-warning text-dark"><i class="bi bi-pencil me-1"></i>Merma editada</span>
+                                    {% elif e.is_merma_pending %}
+                                    <span class="badge bg-warning text-dark border"><i class="bi bi-hourglass-split me-1"></i>Merma en espera de aprobación</span>
                                     {% elif e.is_merma_parcial %}
                                     <span class="badge bg-info text-white"><i class="bi bi-ui-checks me-1"></i>Merma con decisión por producto</span>
                                     {% elif e.is_merma_rejected %}
@@ -482,11 +551,76 @@
                                     <i class="bi bi-x-octagon-fill me-2 flex-shrink-0"></i>
                                     Merma cancelada por el autor antes de la respuesta del administrador. Sin descuento de stock.
                                 </div>
+                                {% elif e.is_merma_pending %}
+                                <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
+                                    <i class="bi bi-hourglass-split me-2 flex-shrink-0"></i>
+                                    Merma registrada. En espera de aprobación. Sin descuento de stock.
+                                </div>
+                                {% if e.merma_lines %}
+                                <div class="table-responsive rounded border mb-3">
+                                    <table class="table table-sm align-middle mb-0 bg-white">
+                                        <thead class="table-light text-muted small">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th>Lote</th>
+                                                <th>Motivo</th>
+                                                <th class="text-center">Cantidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for ln in e.merma_lines %}
+                                            <tr>
+                                                <td class="fw-bold">{{ ln.product }}</td>
+                                                <td><code>{{ ln.lot }}</code></td>
+                                                <td>{{ ln.motivo_after }}</td>
+                                                <td class="text-center">{{ ln.qty_after | ph_qty }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
                                 {% elif e.is_merma_edited %}
                                 <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
                                     <i class="bi bi-pencil-square me-2 flex-shrink-0"></i>
                                     Edición de una merma pendiente. Sin descuento de stock.
                                 </div>
+                                {% if e.merma_lines %}
+                                <div class="table-responsive rounded border mb-3">
+                                    <table class="table table-sm align-middle mb-0 bg-white">
+                                        <thead class="table-light text-muted small">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th>Lote</th>
+                                                <th>Motivo (antes → después)</th>
+                                                <th class="text-center">Cantidad (antes → después)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="small">
+                                            {% for ln in e.merma_lines %}
+                                            <tr>
+                                                <td class="fw-bold">{{ ln.product }}</td>
+                                                <td><code>{{ ln.lot }}</code></td>
+                                                <td>
+                                                    {% if ln.changed and ln.motivo_before != ln.motivo_after %}
+                                                    {{ ln.motivo_before }} <i class="bi bi-arrow-right"></i> {{ ln.motivo_after }}
+                                                    {% else %}
+                                                    {{ ln.motivo_after }}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center">
+                                                    {% if ln.changed and ln.qty_before != ln.qty_after %}
+                                                    {{ ln.qty_before | ph_qty }} <i class="bi bi-arrow-right"></i> {{ ln.qty_after | ph_qty }}
+                                                    {% else %}
+                                                    {{ ln.qty_after | ph_qty }}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
                                 {% elif e.is_merma_rejected %}
                                 <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
                                     <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
@@ -498,8 +632,8 @@
                                     <div class="col-6">Nuevo Stock</div>
                                 </div>
                                 <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
-                                    <div class="col-6">{{ '%.2f' | format(e.prev_qty) }}</div>
-                                    <div class="col-6">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-6">{{ e.prev_qty | ph_qty }}</div>
+                                    <div class="col-6">{{ e.new_qty | ph_qty }}</div>
                                 </div>
                                 {% endif %}
                                 <div class="pt-2 border-top">
@@ -516,8 +650,8 @@
                                     <div class="col-4">ID Log</div>
                                 </div>
                                 <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
-                                    <div class="col-4">{{ '%.2f' | format(e.prev_qty) }}</div>
-                                    <div class="col-4">{{ '%.2f' | format(e.new_qty) }}</div>
+                                    <div class="col-4">{{ e.prev_qty | ph_qty }}</div>
+                                    <div class="col-4">{{ e.new_qty | ph_qty }}</div>
                                     <div class="col-4 text-muted">#{{ e.id }}</div>
                                 </div>
                                 <div class="pt-2 border-top">

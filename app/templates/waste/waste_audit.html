@@ -102,6 +102,18 @@
                                 {% endfor %}
                             {% endif %}
 
+                            {% set ns_motivos = namespace(lista=[]) %}
+                            {% set ns_motivos_vistos = namespace(set=[]) %}
+                            {% if data.productos %}
+                                {% for p in data.productos %}
+                                    {% set _m = (p.motivo_tipo or p.motivo_after or '')|string|trim %}
+                                    {% if _m and _m not in ns_motivos_vistos.set %}
+                                        {% set ns_motivos_vistos.set = ns_motivos_vistos.set + [_m] %}
+                                        {% set ns_motivos.lista = ns_motivos.lista + [_m] %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+
                             <tr class="audit-row" 
                                 data-log-id="{{ log.id }}"
                                 data-user="{{ user_name|lower }}" 
@@ -139,7 +151,15 @@
 
                                 <!-- Tipo de Merma -->
                                 <td class="text-center" data-label="Tipo de Merma">
-                                    <span class="badge bg-dark px-2 py-1">{{ tipo_merma }}</span>
+                                    {% if ns_motivos.lista %}
+                                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                                            {% for m in ns_motivos.lista %}
+                                                <span class="badge bg-dark px-2 py-1">{{ m }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-dark px-2 py-1">{{ tipo_merma }}</span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-center" data-label="Estado">
                                     <span class="ph-badge {% if log.status == 'PENDIENTE' %}ph-badge-warning{% elif log.status == 'RECHAZADO' %}ph-badge-secondary{% elif log.status == 'REVERTIDO' or log.status == 'CANCELADO' %}ph-badge-danger{% elif log.status == 'APROBADO_PARCIAL' %}ph-badge-info{% else %}ph-badge-success{% endif %}">
@@ -169,7 +189,7 @@
                                     {% set photo_url = data.foto_evidencia_url %}
                                     {% set fotos = data.fotos or [] %}
                                     <div class="row align-items-center">
-                                        <div class="col-md-{% if fotos|length > 0 %}8{% else %}12{% endif %}">
+                                        <div class="col-md-12">
                                             <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Detalles del Registro de Auditoría:</h6>
                                             
                                             <div class="row g-3">
@@ -183,17 +203,29 @@
                                                         </div>
                                                         <div class="list-group list-group-flush">
                                                             {% for p in data.productos %}
+                                                                {% set p_unidad = {'UN': 'und', 'KG': 'kg'}.get((p.unidad or '').upper(), (p.unidad or 'und/kg')) %}
                                                                 <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-white flex-wrap gap-2">
                                                                     <div class="text-break me-2" style="max-width: 55%;">
                                                                         <strong class="text-dark d-block text-wrap">{{ p.producto or 'Producto' }}</strong>
                                                                         {% if p.lote %}<span class="badge bg-light text-dark border">Lote: {{ p.lote }}</span>{% endif %}
-                                                                        {% if p.motivo_tipo %}<span class="badge bg-light text-dark border">Motivo: {{ p.motivo_tipo }}</span>{% endif %}
+                                                                        {% if p.motivo_tipo %}
+                                                                            <span class="badge bg-light text-dark border">
+                                                                                Motivo: {% if p.cambio_motivo %}{{ p.motivo_tipo_antes }} <i class="bi bi-arrow-right"></i> {% endif %}{{ p.motivo_tipo }}
+                                                                            </span>
+                                                                        {% endif %}
                                                                         {% if p.decision %}
                                                                             <span class="badge {% if p.decision == 'APROBADO' %}bg-success{% elif p.decision == 'RECHAZADO' %}bg-secondary{% else %}bg-dark{% endif %} mt-1">{{ p.decision }}</span>
                                                                         {% endif %}
+                                                                        {% if p.foto %}
+                                                                            <a href="{{ p.foto }}" target="_blank" class="small text-primary d-inline-block mt-1"><i class="bi bi-image me-1"></i>Foto</a>
+                                                                        {% endif %}
                                                                     </div>
                                                                     <div class="text-end flex-shrink-0">
-                                                                        <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ p.cantidad }} und/kg</span>
+                                                                        {% if p.cambio_cantidad %}
+                                                                        <span class="badge bg-warning text-dark rounded-pill px-3 py-2 fw-bold">{{ p.cantidad_antes | ph_qty }} → {{ p.cantidad | ph_qty }} {{ p_unidad }}</span>
+                                                                        {% else %}
+                                                                        <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ p.cantidad | ph_qty }} {{ p_unidad }}</span>
+                                                                        {% endif %}
                                                                         {% if p.motivo %}<small class="d-block text-danger mt-1" style="max-width: 240px;">{{ p.motivo }}</small>{% endif %}
                                                                     </div>
                                                                 </div>
@@ -273,8 +305,9 @@
                                                                         {% if data.productos and data.productos|length > 0 %}
                                                                         <ul class="list-unstyled mb-0">
                                                                             {% for p in data.productos %}
+                                                                            {% set p_unidad = {'UN': 'und', 'KG': 'kg'}.get((p.unidad or '').upper(), (p.unidad or 'und/kg')) %}
                                                                             <li class="d-flex justify-content-between align-items-center py-1 border-bottom flex-wrap gap-2">
-                                                                                <span class="fw-semibold text-dark">{{ p.producto or 'Producto' }} <small class="text-muted">({{ p.cantidad }} und/kg)</small></span>
+                                                                                <span class="fw-semibold text-dark">{{ p.producto or 'Producto' }} <small class="text-muted">({{ p.cantidad | ph_qty }} {{ p_unidad }})</small></span>
                                                                                 <span class="d-flex align-items-center gap-2">
                                                                                     <span class="badge {% if p.decision == 'APROBADO' %}bg-success{% elif p.decision == 'RECHAZADO' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ p.decision or 'PENDIENTE' }}</span>
                                                                                     {% if p.motivo %}<small class="text-danger">{{ p.motivo }}</small>{% endif %}
@@ -359,6 +392,44 @@
                                                     </div>
                                                 </div>
 
+                                                {% elif data.es_edicion or evento == 'MERMA_EDITADA' %}
+                                                <div class="col-12">
+                                                    <div class="card ph-detail-card border-start border-4 border-warning bg-light">
+                                                        <div class="card-body p-3">
+                                                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                                <span class="fw-bold text-warning"><i class="bi bi-pencil-fill me-1"></i> Edición de Merma</span>
+                                                                <span class="badge bg-warning text-dark">Merma #{{ data.waste_id or data.merma_id or 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="row g-2">
+                                                                <div class="col-6 col-lg-3">
+                                                                    <small class="text-muted d-block fw-semibold">Tipo de Merma:</small>
+                                                                    <span class="badge bg-dark mt-1 text-wrap text-start">{{ tipo_merma }}</span>
+                                                                </div>
+                                                                <div class="col-6 col-lg-3">
+                                                                    <small class="text-muted d-block fw-semibold">Editado por:</small>
+                                                                    <span class="text-dark fw-bold">{{ data.editado_por or data.aprobado_por or user_name }}</span>
+                                                                </div>
+                                                                <div class="col-6 col-lg-3">
+                                                                    <small class="text-muted d-block fw-semibold">Sede / Ubicación:</small>
+                                                                    <span class="text-dark fw-bold">{{ log.location }}</span>
+                                                                </div>
+                                                                <div class="col-6 col-lg-3">
+                                                                    <small class="text-muted d-block fw-semibold">Fecha y Hora:</small>
+                                                                    <span class="text-dark fw-bold">{{ log.timestamp }}</span>
+                                                                </div>
+                                                                <div class="col-12 mt-2">
+                                                                    <small class="text-muted d-block fw-semibold">Impacto en Inventario:</small>
+                                                                    <span class="badge bg-warning text-dark">Sin descuento de stock (merma pendiente)</span>
+                                                                </div>
+                                                                <div class="col-12 mt-2">
+                                                                    <small class="text-muted d-block fw-semibold">Motivo de la Edición:</small>
+                                                                    <div class="p-2 bg-white rounded border text-dark mt-1">{{ data.motivo_edicion or data.motivo_registro }}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 {% else %}
                                                 <div class="col-12">
                                                     <div class="card ph-detail-card border-start border-4 border-warning bg-light">
@@ -390,21 +461,12 @@
                                             </div>
                                         </div>
 
-                                        <!-- Evidencia Fotográfica -->
-                                        {% if fotos|length > 0 %}
-                                        <div class="col-md-4 text-center border-start ps-3">
+                                        <!-- Evidencia general (solo si no está en línea) -->
+                                        {% if photo_url and not (data.productos and data.productos|selectattr('foto')|list) %}
+                                        <div class="mt-3">
                                             <h6 class="fw-bold text-dark mb-2">Evidencia Fotográfica:</h6>
-                                            {% for f in fotos %}
-                                                <a href="{{ f.url }}" target="_blank" class="d-block mb-2" title="{{ f.label }}">
-                                                    <img src="{{ f.url }}" class="img-fluid img-thumbnail rounded-3 shadow-sm" style="max-height: {% if fotos|length > 1 %}100px{% else %}200px{% endif %}; object-fit: cover;" alt="{{ f.label }}">
-                                                </a>
-                                            {% endfor %}
-                                        </div>
-                                        {% elif photo_url %}
-                                        <div class="col-md-4 text-center border-start ps-3">
-                                            <h6 class="fw-bold text-dark mb-2">Evidencia Fotográfica:</h6>
-                                            <a href="{{ photo_url }}" target="_blank">
-                                                <img src="{{ photo_url }}" class="img-fluid img-thumbnail rounded-3 shadow-sm" style="max-height: 200px; object-fit: cover;" alt="Evidencia de Merma">
+                                            <a href="{{ photo_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-image me-1"></i>Ver foto de evidencia
                                             </a>
                                         </div>
                                         {% endif %}

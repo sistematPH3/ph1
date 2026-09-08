@@ -1,10 +1,21 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+
 from app.waste.repositories.waste_edit_repository import WasteEditRepository
 from app.waste.repositories.register_waste_repository import RegisterWasteRepository
 from app.waste.requests.waste_edit_validators import validate_edit_payload, validate_reversal_payload
 from app.waste.services.register_waste_service import user_can_access_location
 
+
+def _fmt_quantity(value):
+    """Formatea cantidades quitando ceros decimales sobrantes (2.00 -> 2)."""
+    try:
+        d = Decimal(str(value))
+    except Exception:
+        return value
+    if d == d.to_integral_value():
+        return int(d)
+    return float(d.quantize(Decimal("0.01")))
 class WasteEditService:
 
     @staticmethod
@@ -89,8 +100,8 @@ class WasteEditService:
                 "lot_number": d.lot_number,
                 "expiration_date": cur_exp,
                 "available_lots": lots,
-                "current_max_stock": current_max_stock,
-                "quantity": float(d.quantity),
+                "current_max_stock": _fmt_quantity(current_max_stock),
+                "quantity": _fmt_quantity(d.quantity),
                 "unit_cost": float(d.unit_cost),
                 "subtotal_cost": float(d.subtotal_cost),
                 "waste_type_id": line_type_id,
@@ -118,6 +129,7 @@ class WasteEditService:
             "waste_type_name": waste_type_name,
             "waste_type_code": getattr(waste.waste_type, "code", None) or "",
             "is_vencido": bool(getattr(waste.waste_type, "code", None) == "VENCIDO"),
+            "total_quantity": _fmt_quantity(waste.total_quantity),
             "notes": waste.notes or "",
             "date": waste.date.strftime("%d/%m/%Y %H:%M") if waste.date else "",
             "evidence_url": waste.evidence_url or "",
@@ -161,7 +173,10 @@ class WasteEditService:
             if not d.status or d.status == "PENDIENTE":
                 old_pending[d.product_id] = old_pending.get(d.product_id, 0.0) + float(d.quantity or 0)
 
-        new_type = RegisterWasteRepository.get_waste_type_by_id(validation["data"]["waste_type_id"])
+        header_type_id = validation["data"]["waste_type_id"]
+        if not header_type_id and validation["data"]["lines"]:
+            header_type_id = validation["data"]["lines"][0].get("waste_type_id")
+        new_type = RegisterWasteRepository.get_waste_type_by_id(header_type_id)
         if not new_type or not new_type.is_active:
             return {"success": False, "message": "El tipo de merma seleccionado no es válido."}, 400
         if int(waste.location_id) == 1 and not new_type.applies_central \

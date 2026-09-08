@@ -1,10 +1,10 @@
-{% extends 'layout.html' %}
+﻿﻿{% extends 'layout.html' %}
 
 {% block extra_css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=6.1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/register_waste.css') }}?v=6.2">
 {% endblock %}
 
 {% block content %}
@@ -34,7 +34,7 @@
                     <ul class="mb-1 mt-1 ps-3">
                         {% for v in vencidos %}
                         <li>
-                            {{ v.location_name }} — <strong>{{ v.product_name }}</strong>
+                            {{ v.location_name }} â€” <strong>{{ v.product_name }}</strong>
                             (lote {{ v.lot_number }}, {{ '%.2f'|format(v.quantity) }} restantes,
                             venció el {{ v.expiration_date }})
                         </li>
@@ -63,7 +63,7 @@
             <div class="row g-4 merma-body">
                 <!-- ===== Columna principal ===== -->
                 <div class="col-12 col-lg-7">
-                    <!-- PASO 1 · Datos -->
+                    <!-- PASO 1 Â· Datos -->
                     <section class="merma-panel">
                         <div class="merma-panel-head">
                             <div>
@@ -104,7 +104,7 @@
                         </div>
                     </section>
 
-                    <!-- PASO 2 · Insumo + fotos -->
+                    <!-- PASO 2 Â· Insumo + fotos -->
                     <section class="merma-panel">
                         <div class="merma-panel-head">
                             <div>
@@ -166,7 +166,7 @@
                                             <div class="merma-dropzone-inner merma-itemphoto-inner">
                                                 <i class="bi bi-images merma-itemphoto-icon"></i>
                                                 <span class="merma-itemphoto-text">Adjunta fotos de este ítem</span>
-                                                <span class="merma-dropzone-hint">JPG / PNG · varias</span>
+                                                <span class="merma-dropzone-hint">JPG / PNG Â· varias</span>
                                             </div>
                                         </button>
                                         <div class="merma-itemphotos" id="itemPhotosList"></div>
@@ -182,7 +182,7 @@
                                         <div class="merma-dropzone-inner" id="dropzoneInner">
                                             <i class="bi bi-camera merma-dropzone-icon"></i>
                                             <span class="merma-dropzone-text">Haz clic o arrastra la foto general aquí</span>
-                                            <span class="merma-dropzone-hint">JPG / PNG · opcional</span>
+                                            <span class="merma-dropzone-hint">JPG / PNG Â· opcional</span>
                                         </div>
                                     </div>
                                     <div class="merma-photo-preview d-none" id="photoPreviewWrap">
@@ -209,7 +209,7 @@
                         </div>
                     </section>
 
-                    <!-- PASO 3 · Observaciones -->
+                    <!-- PASO 3 Â· Observaciones -->
                     <section class="merma-panel">
                         <div class="merma-panel-head">
                             <div>

@@ -5,7 +5,7 @@ from app.waste.services.waste_edit_service import WasteEditService
 
 waste_edit_bp = Blueprint("waste_edit", __name__)
 
-OPERATIVE_ROLES = ("admin", "management", "manager", "assistant_manager", "operations")
+OPERATIVE_ROLES = ("admin",)
 
 @waste_edit_bp.route("/waste/merma/<int:waste_id>/edit", methods=["GET"])
 @login_required

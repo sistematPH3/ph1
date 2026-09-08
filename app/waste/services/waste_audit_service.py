@@ -4,7 +4,7 @@ from app.models.waste_model import Waste, WasteType, WasteDetail
 from app.models.inventory_model import Product
 
 class WasteAuditService:
-    
+
     @staticmethod
     def get_formatted_audit_trail(user, filters):
         """Procesa la lógica de negocio y aplica las restricciones por rol."""
@@ -36,6 +36,19 @@ class WasteAuditService:
         # Caché local para optimizar consultas de BD
         product_cache = {}
         waste_type_cache = {}
+        product_unit_cache = {}
+
+        def resolve_product_unit(product_id):
+            if not product_id:
+                return None
+            try:
+                pid = int(product_id)
+                if pid not in product_unit_cache:
+                    p = Product.query.get(pid)
+                    product_unit_cache[pid] = getattr(p, 'unit_of_measure', None) if p else None
+                return product_unit_cache[pid]
+            except Exception:
+                return None
 
         def resolve_product_name(product_id):
             if not product_id:
@@ -61,6 +74,24 @@ class WasteAuditService:
             except Exception:
                 return None
 
+        def _resolve_decision_motivo(item):
+            # Las decisiones de aprobación/rechazo guardan detail_id (id de la
+            # línea WasteDetail); de ahí sale el motivo real de cada línea.
+            if not isinstance(item, dict):
+                return ''
+            mt = str(item.get('motivo_tipo') or item.get('waste_type_name') or '').strip()
+            if mt:
+                return mt
+            did = item.get('detail_id')
+            if did:
+                try:
+                    det = WasteDetail.query.get(int(did))
+                except (TypeError, ValueError):
+                    det = None
+                if det and getattr(det, 'waste_type_id', None):
+                    return resolve_waste_type_name(det.waste_type_id) or ''
+            return ''
+
         # Acciones para mapear cada evento
         REVERT_ACTIONS = {'REVERSION', 'REVERTIDO', 'REVERTIDA', 'ANULACION', 'ANULADO', 'REVERTIR', 'REVERT', 'CANCELADO', 'CANCELAR', 'MERMA_CANCELADA'}
         REJECT_ACTIONS = {'RECHAZO', 'RECHAZADO', 'RECHAZADA', 'RECHAZAR', 'REJECT', 'REJECTED', 'MERMA_RECHAZADA'}
@@ -68,7 +99,8 @@ class WasteAuditService:
         MERMA_PARTIAL_ACTIONS = {'MERMA_PARCIAL', 'MERMA_DECISION', 'APROBADO_PARCIAL'}
         PENDING_ACTIONS = {
             'CREACION', 'CREAR', 'CREADO', 'NUEVO', 'REGISTRO', 'REGISTRADO', 'CREATE', 'INSERT',
-            'EDICION', 'EDITADO', 'EDITADA', 'CORRECCION', 'CORREGIDO', 'EDIT', 'UPDATE', 'ACTUALIZADO', 'ACTUALIZACION', 'PENDIENTE'
+            'EDICION', 'EDITADO', 'EDITADA', 'CORRECCION', 'CORREGIDO', 'EDIT', 'UPDATE', 'ACTUALIZADO', 'ACTUALIZACION', 'PENDIENTE',
+            'MERMA_EDITADA', 'MERMA_EDITADO'
         }
 
         formatted_logs = []
@@ -162,24 +194,69 @@ class WasteAuditService:
                 and 'lines' in after_state
             )
             if is_edit_event:
-                # Edición: cada línea con su PRODUCTO, lote, cantidad y MOTIVO propio.
-                for item in after_state.get('lines') or []:
-                    if not isinstance(item, dict):
-                        continue
+                # Edición: cada línea del DESPUÉS con su antes → después
+                # (producto, lote, cantidad y motivo) para evidenciar el cambio real.
+                # Las líneas PENDIENTES se emparejan por orden (la edición las
+                # reemplaza en el mismo orden); las ya decididas se conservan iguales.
+                before_lines = (before_state.get('lines') or []) if isinstance(before_state, dict) else []
+                after_lines = (after_state.get('lines') or []) if isinstance(after_state, dict) else []
+
+                def _st(line):
+                    st = line.get('status')
+                    return ('' if st is None else str(st) or 'PENDIENTE').upper()
+
+                before_pending = [b for b in before_lines if isinstance(b, dict) and _st(b) == 'PENDIENTE']
+                after_pending = [a for a in after_lines if isinstance(a, dict) and _st(a) == 'PENDIENTE']
+                after_decididas = [a for a in after_lines if isinstance(a, dict) and _st(a) != 'PENDIENTE']
+
+                combined = []
+                for idx, item in enumerate(after_pending):
+                    before_item = before_pending[idx] if idx < len(before_pending) else {}
+                    combined.append((item, before_item))
+                for item in after_decididas:
+                    combined.append((item, dict(item)))
+
+                for item, before_item in combined:
                     p_id = item.get('product_id')
                     p_name = resolve_product_name(p_id) or 'Producto'
-                    wt_id = (
+                    wt_after = (
                         item.get('waste_type_id')
                         or before_state.get('waste_type_id')
                         or after_state.get('waste_type_id')
                     )
-                    tipo_linea = resolve_waste_type_name(wt_id) or ''
+                    tipo_after = resolve_waste_type_name(wt_after) or ''
+
+                    wt_before = before_item.get('waste_type_id')
+                    tipo_before = resolve_waste_type_name(wt_before) or tipo_after
+
+                    qty_after = item.get('quantity') or 0
+                    qty_before = before_item.get('quantity')
+
+                    cambio_motivo = bool(wt_before and wt_after and wt_before != wt_after)
+                    cambio_cantidad = False
+                    if qty_before is not None:
+                        try:
+                            cambio_cantidad = float(qty_before) != float(qty_after)
+                        except (TypeError, ValueError):
+                            cambio_cantidad = False
+
                     normalized_products.append({
                         'producto': str(p_name),
                         'lote': str(item.get('lot_number') or ''),
-                        'cantidad': item.get('quantity') or 0,
-                        'motivo_tipo': tipo_linea,
+                        'cantidad': qty_after,
+                        'cantidad_antes': qty_before,
+                        'cambio_cantidad': cambio_cantidad,
+                        'motivo_tipo': tipo_after,
+                        'motivo_tipo_antes': tipo_before,
+                        'cambio_motivo': cambio_motivo,
+                        'unidad': resolve_product_unit(p_id),
                     })
+
+            if is_edit_event:
+                changed_data['es_edicion'] = True
+                changed_data['evento'] = 'MERMA_EDITADA'
+                changed_data['editado_por'] = user_display
+
             decisiones_raw = changed_data.get('decisiones')
             if isinstance(decisiones_raw, list) and decisiones_raw:
                 for item in decisiones_raw:
@@ -203,8 +280,10 @@ class WasteAuditService:
                         'lote': str(item.get('lot') or item.get('lote') or item.get('lot_number') or ''),
                         'cantidad': item.get('quantity') or item.get('cantidad') or 0,
                         'decision': item.get('decision') or '',
+                        'motivo_tipo': _resolve_decision_motivo(item),
                         'motivo': item.get('motivo') or '',
                         'foto': item.get('evidence_url') or '',
+                        'unidad': resolve_product_unit(p_id) or resolve_product_unit(item.get('producto_id')),
                     })
             elif isinstance(raw_products, list):
                 for item in raw_products:
@@ -247,10 +326,14 @@ class WasteAuditService:
                             'lote': str(p_lote),
                             'cantidad': p_cant,
                             'motivo_tipo': motivo_tipo or '',
+                            'foto': item.get('evidence_url') or item.get('foto') or item.get('photo_url') or '',
+                            'unidad': resolve_product_unit(p_id),
                         })
                     elif isinstance(item, str):
                         normalized_products.append({'producto': item, 'lote': '', 'cantidad': 1})
 
+            # Fallback: si el log no trae detalle por línea, intentar fuente única
+            used_generic_fallback = False
             if not normalized_products:
                 p_id = changed_data.get('product_id') or changed_data.get('producto_id')
                 p_name = changed_data.get('producto') or changed_data.get('product_name') or changed_data.get('nombre_producto')
@@ -260,13 +343,20 @@ class WasteAuditService:
 
                 if p_name:
                     p_lote = changed_data.get('lote') or changed_data.get('lot_number') or ''
-                    p_cant = changed_data.get('cantidad') or changed_data.get('quantity') or changed_data.get('total_quantity') or 1
-                    normalized_products.append({'producto': str(p_name), 'lote': str(p_lote), 'cantidad': p_cant})
+                    p_cant = changed_data.get('cantidad') or changed_data.get('quantity') or changed_data.get('total_quantity')
+                    used_generic_fallback = p_cant is None
+                    normalized_products.append({
+                        'producto': str(p_name),
+                        'lote': str(p_lote),
+                        'cantidad': p_cant if p_cant is not None else 1,
+                        'unidad': resolve_product_unit(p_id),
+                    })
 
             # Motivo de Registro
             motivo = (
                 changed_data.get('motivo_registro') or 
                 changed_data.get('motivo') or 
+                changed_data.get('motivo_edicion') or 
                 changed_data.get('notes') or 
                 changed_data.get('observacion') or 
                 changed_data.get('observaciones') or 
@@ -305,7 +395,8 @@ class WasteAuditService:
                         if (not tipo_merma or tipo_merma == 'No especificado') and hasattr(waste_obj, 'waste_type_id') and waste_obj.waste_type_id:
                             tipo_merma = resolve_waste_type_name(waste_obj.waste_type_id)
                         
-                        if not normalized_products and hasattr(waste_obj, 'details') and waste_obj.details:
+                        if (used_generic_fallback or not normalized_products) and hasattr(waste_obj, 'details') and waste_obj.details:
+                            normalized_products = []
                             for d in waste_obj.details:
                                 prod_name = resolve_product_name(d.product_id) or 'Producto'
                                 motivo_tipo = ''
@@ -316,6 +407,7 @@ class WasteAuditService:
                                     'lote': getattr(d, 'lot_number', '') or '',
                                     'cantidad': float(d.quantity) if getattr(d, 'quantity', None) else 0,
                                     'motivo_tipo': motivo_tipo,
+                                    'unidad': resolve_product_unit(d.product_id),
                                 })
 
                         if not motivo:
@@ -398,6 +490,11 @@ class WasteAuditService:
                 foto_url = str(foto_url).strip()
                 if foto_url and not foto_url.startswith(('http://', 'https://', '/')):
                     foto_url = '/' + foto_url
+
+            # Cuando la evidencia es única (p. ej. una merma de una sola línea),
+            # se adjunta a esa línea para que tenga su enlace de foto propio.
+            if foto_url and len(normalized_products) == 1 and not normalized_products[0].get('foto'):
+                normalized_products[0]['foto'] = foto_url
 
             formatted_time = log.timestamp.strftime('%Y-%m-%d %I:%M:%S %p') if getattr(log, 'timestamp', None) else 'N/A'
 

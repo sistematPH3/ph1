@@ -86,8 +86,8 @@ class WasteEditTest(unittest.TestCase):
     def _seed(self, sede_asignada=False):
         """Admin + rol operativo (Ops) + una merma PENDIENTE en Sede A.
 
-        La merma la registra `author` (Operaciones) sin sede asignada, para
-        probar que Ops edita POR SEDE y no porque sea el autor.
+        La rema la registra `author` (Operaciones). Solo el administrador puede
+        editarla/cancelarla; los roles no-admin (Ops/Operations) quedan fuera.
         """
         role_admin = Role(name="Administrator")
         role_ops = Role(name="Operations")
@@ -292,37 +292,28 @@ class WasteEditTest(unittest.TestCase):
         self.assertEqual(w["lines"][0]["product_id"], env["product"].id)
 
     # ------------------------------------------------------------------
-    # CASO 2: Permisos por SEDE
+    # CASO 2: Solo el ADMIN edita/cancela mermas (los roles no-admin quedan fuera)
     # ------------------------------------------------------------------
-    def test_get_edit_ops_sin_sede_bloqueado(self):
-        env = self._seed()
-        self._login(env["ops"].id)
-        resp = self.client.get("/api/waste/merma/{}/edit".format(env["waste"].id))
-        self.assertEqual(resp.status_code, 403)
-        self.assertFalse(resp.get_json()["success"])
-
-    def test_get_edit_ops_con_sede_edita_sin_ser_autor(self):
+    def test_get_edit_ops_bloqueado(self):
         env = self._seed(sede_asignada=True)
         self._login(env["ops"].id)
         resp = self.client.get("/api/waste/merma/{}/edit".format(env["waste"].id))
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.get_json()["success"])
-        self.assertTrue(resp.get_json()["waste"]["can_edit"])
+        self.assertEqual(resp.status_code, 302)  # redirigido por require_roles
 
-    def test_post_edit_ops_sin_sede_bloqueado(self):
-        env = self._seed()
+    def test_post_edit_ops_bloqueado(self):
+        env = self._seed(sede_asignada=True)
         self._login(env["ops"].id)
         resp = self.client.post(
             "/api/waste/merma/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
-                "notes": "Intento sin permisos",
+                "notes": "Intento sin permisos de admin",
                 "lines": [{"product_id": env["product"].id,
                            "lot_number": "L-AAA", "quantity": 8}],
             }),
             content_type="application/json",
         )
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 302)  # redirigido por require_roles
 
     # ------------------------------------------------------------------
     # CASO 3: POST editar -> Admin actualiza y persiste

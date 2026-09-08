@@ -35,7 +35,7 @@ def mis_pendientes():
 
 @merma_list_bp.route('/api/waste/merma/<int:waste_id>/cancel', methods=['POST'])
 @login_required
-@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
+@require_roles('admin')
 def cancelar_merma(waste_id):
     """El autor retira su merma PENDIENTE (confirmación previa en el cliente)."""
     data = request.get_json(silent=True) or {}

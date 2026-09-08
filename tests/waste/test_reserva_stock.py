@@ -303,7 +303,8 @@ class ReservaStockTest(unittest.TestCase):
         self.assertTrue(ok2["success"])
         self.assertEqual(float(self._inv(env["sede_a"], env["product"]).reserved_quantity), 67.0)
 
-        # Subir la primera por encima del físico disponible (100-55=45) -> 400.
+        # Subir la primera por encima del disponible del lote (100 físico menos
+        # 55+12 ya comprometidos = 33) -> 400.
         payload3 = {
             "waste_type_id": env["waste_type"].id,
             "notes": "Corrección 3",
@@ -316,7 +317,7 @@ class ReservaStockTest(unittest.TestCase):
         }
         fail, status3 = WasteEditService.edit_pending_waste(r1["waste_id"], payload3, env["admin1"].id, True)
         self.assertEqual(status3, 400)
-        self.assertIn("Stock insuficiente", fail.get("message", ""))
+        self.assertIn("saldo disponible", fail.get("message", ""))
         self.assertEqual(float(self._inv(env["sede_a"], env["product"]).reserved_quantity), 67.0)
 
     def test_editar_eliminando_una_linea_libera_la_reserva(self):
