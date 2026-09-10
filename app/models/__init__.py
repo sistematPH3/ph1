@@ -4,3 +4,4 @@ from .inventory_model import Product, Inventory, Category, ProductType
 from .logistics_model import Location, Supplier, Purchase, PurchaseDetail, Movement, MovementDetail, ExchangeRateHistory, PurchaseAuditLog
 from .security_model import Role, User, Notification, PasswordRecovery, LoginAudit, user_locations, UserAudit
 from .waste_model import WasteType, Waste, WasteDetail, WasteDetailPhoto, AppParameter, AuditLog
+from .statistics_model import StatisticsSnapshot, SnapshotMetric, SnapshotPeriodType
