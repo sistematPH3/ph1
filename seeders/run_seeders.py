@@ -58,7 +58,7 @@ def seed_database():
             admin = User(
                 name='Mariuska Admin',
                 email=email_admin,
-                password_hash=generate_password_hash('ph12345'),
+                password_hash=generate_password_hash('Ph12345.'),
                 role_id=1,
                 is_active=True
             )

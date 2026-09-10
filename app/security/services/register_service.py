@@ -21,6 +21,12 @@ class RegisterService:
         if len(password) > 12:
             return {"success": False, "message": "La contraseña debe tener máximo 12 caracteres."}
 
+        if not re.search(r"[^A-Za-z0-9]", password):
+            return {"success": False, "message": "Esta contraseña debe incluir caracteres especiales."}
+
+        if not re.search(r"[A-Z]", password):
+            return {"success": False, "message": "Esta contraseña debe incluir al menos una letra mayúscula."}
+
         chequeo_custom = validar_datos_registro(name, email)
         if not chequeo_custom["valido"]:
             return {"success": False, "message": "Este usuario ya existe."}
