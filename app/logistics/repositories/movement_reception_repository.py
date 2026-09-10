@@ -3,6 +3,7 @@ from datetime import datetime
 from threading import Lock
 from sqlalchemy import text
 from app import db
+from app.models.inventory_model import Product
 
 
 # Candado en proceso que serializa "buscar + crear" en get_or_create_inventory.
@@ -149,14 +150,19 @@ class MovementReceptionRepository:
             }).mappings().first()
 
             if not inv:
+                _min = Decimal('20.00')
+                _prod = db.session.get(Product, product_id)
+                if _prod is not None and _prod.min_stock is not None:
+                    _min = Decimal(str(_prod.min_stock))
                 insert_sql = text("""
                     INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity, reserved_quantity)
-                    VALUES (:location_id, :product_id, 0.00, 20.00, 0.00, 0.00)
+                    VALUES (:location_id, :product_id, 0.00, :min_stock, 0.00, 0.00)
                     RETURNING id, location_id, product_id, current_quantity, min_stock, transit_quantity
                 """)
                 inv = db.session.execute(insert_sql, {
                     "location_id": location_id,
-                    "product_id": product_id
+                    "product_id": product_id,
+                    "min_stock": _min
                 }).mappings().first()
 
         return inv

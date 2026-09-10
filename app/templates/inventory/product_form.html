@@ -95,6 +95,13 @@
         </div>
 
         <div class="form-group">
+            <label for="min_stock">Mínimo de Stock <small class="text-muted">(opcional)</small></label>
+            <input type="number" id="min_stock" name="min_stock" value="{{ data.get('min_stock', '') }}" placeholder="Ej. 15" min="0" step="0.01">
+            <small class="text-muted" style="font-size: 0.8rem;">Vacío = usa 20 por defecto. Se interpreta en la unidad del producto: si esta mide en KG, 15 = 15 kilogramos; si en LT, 15 = 15 litros; si en GRAMOS, 15 = 15 gramos.</small>
+            {% if errors and errors.get('min_stock') %}<span class="error-text">{{ errors.min_stock }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
             <label for="sku">SKU</label>
             <input type="text" id="sku" name="sku" value="{{ data.get('sku', '') }}" placeholder="Ingrese el SKU del producto" maxlength="50" required>
             <span id="sku-realtime-error" class="error-text" style="display: none;">Este SKU ya se encuentra registrado.</span>

@@ -59,7 +59,9 @@ def edit_product(product_id):
         'product_type_id': product.product_type_id,
         'unit_of_measure': product.unit_of_measure,
         'sku': product.sku,
-        'technical_description': product.technical_description
+        'technical_description': product.technical_description,
+        'waste_limit': product.waste_limit,
+        'min_stock': product.min_stock
     }
 
     return render_template('inventory/product_form.html', product=product, data=data, errors={}, product_types=product_types)

@@ -192,6 +192,29 @@ class ReservaStockTest(unittest.TestCase):
         self.assertEqual(float(inv.current_quantity), 90.0)
         self.assertEqual(float(inv.reserved_quantity), 0.0)
 
+    def test_aprobar_merma_cuyo_reserva_deja_apisparable_menor_a_la_merma(self):
+        # Regresión: aprobar una merma cuya PROPIA reserva deja
+        # (current - transit - reserved) < quantity. Esa reserva es la que se
+        # consume al aprobar, así que debe poder aprobarse (ej: 40 físicos en la
+        # sede y la merma pendiente congeló 30 -> aprobar los 30 debe funcionar).
+        env = self._seed(stock=40.0)
+        res = self._register(env, 30.0, env["admin1"].id, "REQ-80")
+        self.assertEqual(res["status"], "PENDIENTE")
+        inv = self._inv(env["sede_a"], env["product"])
+        self.assertEqual(float(inv.current_quantity), 40.0)
+        self.assertEqual(float(inv.reserved_quantity), 30.0)
+
+        waste = Waste.query.get(res["waste_id"])
+        d = self._detail(waste)
+        r = decidir_lineas(
+            waste.id, env["admin2"].id,
+            [{"detail_id": d.id, "decision": "aprobar"}],
+        )
+        self.assertTrue(r["success"], r)
+        inv = self._inv(env["sede_a"], env["product"])
+        self.assertEqual(float(inv.current_quantity), 10.0)
+        self.assertEqual(float(inv.reserved_quantity), 0.0)
+
     def test_merma_rechazada_libera_reserva_sin_descontar(self):
         env = self._seed()
         res = self._register(env, 10.0, env["admin1"].id, "REQ-31")

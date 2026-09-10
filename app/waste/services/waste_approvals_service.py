@@ -382,6 +382,16 @@ def _descontar_stock_lines(waste, details):
     """
     cambios = []
     saldos = {}
+    # Reservas congeladas por las PROPIAS líneas que se aprueban en este batch.
+    # Esa reserva se libera al aprobar (se consume con la merma), así que no
+    # debe contar contra el stock disponible de sí misma: si no, una merma
+    # pendiente jamás podría aprobarse (disponible = current - reserved - qty).
+    reservas_propias = {}
+    for d in details:
+        reservas_propias[d.product_id] = (
+            reservas_propias.get(d.product_id, 0.0) + float(d.quantity or 0)
+        )
+
     for d in details:
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         if inv is None:
@@ -392,6 +402,13 @@ def _descontar_stock_lines(waste, details):
             float(inv.current_quantity or 0)
             - float(inv.transit_quantity or 0)
             - float(inv.reserved_quantity or 0)
+            # Solo se liberan las reservas que EXISTEN de las líneas que se
+            # aprueban (la merma pendiente congeló esa cantidad al crearse;
+            # mermas creadas sin reserva no obtienen crédito extra).
+            + min(
+                reservas_propias.get(d.product_id, 0.0),
+                float(inv.reserved_quantity or 0),
+            )
         )
         saldo = saldos.get(d.product_id, disponible)
         qty = float(d.quantity or 0)

@@ -99,11 +99,13 @@ class PurchaseService:
                     inventory_record.current_quantity = prev_qty + quantity
                 else:
                     prev_qty = Decimal('0.00')
+                    # min_stock lo define el insumo (producto) o 20 por defecto.
+                    _min = producto_obj.min_stock_efectivo if producto_obj else Decimal('20.00')
                     new_inv = Inventory(
                         location_id=1, 
                         product_id=product_id, 
                         current_quantity=quantity,
-                        min_stock=Decimal('20.00'),
+                        min_stock=_min,
                         transit_quantity=Decimal('0.00')
                     )
                     db.session.add(new_inv)

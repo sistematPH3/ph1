@@ -215,11 +215,13 @@ class PurchaseManagementRepository:
                         if inventory_record:
                             inventory_record.current_quantity += qty_diff
                         elif qty_diff > Decimal('0.00'):
+                            _prod = self.db.session.query(Product).get(detail.product_id)
+                            _min = _prod.min_stock_efectivo if _prod else Decimal('20.00')
                             new_inv = Inventory(
                                 location_id=1, 
                                 product_id=detail.product_id, 
                                 current_quantity=qty_diff,
-                                min_stock=Decimal('20.00'),
+                                min_stock=_min,
                                 transit_quantity=Decimal('0.00')
                             )
                             self.db.session.add(new_inv)
@@ -345,11 +347,13 @@ class PurchaseManagementRepository:
                         inventory_record.current_quantity = inv_prev + new_qty
                     else:
                         inv_prev = Decimal('0.00')
+                        _prod = self.db.session.query(Product).get(product_id)
+                        _min = _prod.min_stock_efectivo if _prod else Decimal('20.00')
                         new_inv = Inventory(
                             location_id=1, 
                             product_id=product_id, 
                             current_quantity=new_qty,
-                            min_stock=Decimal('20.00'),
+                            min_stock=_min,
                             transit_quantity=Decimal('0.00')
                         )
                         self.db.session.add(new_inv)

@@ -239,13 +239,15 @@ class WasteEditRepository:
                 inv.current_quantity += detail.quantity
                 stock_after = float(inv.current_quantity)
             else:
+                _prod = Product.query.get(detail.product_id)
+                _min = _prod.min_stock_efectivo if _prod else Decimal("0.00")
                 inv = Inventory(
                     location_id=waste.location_id,
                     product_id=detail.product_id,
                     current_quantity=detail.quantity,
                     transit_quantity=Decimal("0.00"),
                     reserved_quantity=Decimal("0.00"),
-                    min_stock=Decimal("0.00")
+                    min_stock=_min
                 )
                 db.session.add(inv)
                 stock_after = float(detail.quantity)

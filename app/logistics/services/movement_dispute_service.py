@@ -15,7 +15,7 @@ from decimal import Decimal
 import json
 
 from app.extensions import db
-from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Notification, Role, User
+from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Notification, Product, Role, User
 
 # ---------------------------------------------------------------------------
 # CATÁLOGO DE DECISIONES CONTABLES
@@ -96,9 +96,11 @@ def _get_or_create_inventory(location_id, product_id):
     """Obtiene el registro de inventario de una sede/producto o lo crea en ceros."""
     inv = Inventory.query.filter_by(location_id=location_id, product_id=product_id).first()
     if not inv:
+        _prod = Product.query.get(product_id)
+        _min = _prod.min_stock_efectivo if _prod else Decimal('20.00')
         inv = Inventory(
             location_id=location_id, product_id=product_id,
-            current_quantity=Decimal('0.00'), transit_quantity=Decimal('0.00'), min_stock=Decimal('20.00')
+            current_quantity=Decimal('0.00'), transit_quantity=Decimal('0.00'), min_stock=_min
         )
         db.session.add(inv)
     return inv

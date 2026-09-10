@@ -49,10 +49,20 @@ class Product(db.Model):
     unit_of_measure = db.Column(db.String(20))
     # CAMPO AÑADIDO: Límite de merma en la unidad del producto (se configura en product_form)
     waste_limit = db.Column(db.Numeric(10, 2))
+    # CAMPO AÑADIDO: Mínimo de stock en la unidad del producto (se configura en
+    # product_form; NULL = usar el valor por defecto 20.00 al auto-crear inventario).
+    min_stock = db.Column(db.Numeric(10, 2), nullable=True)
     technical_description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
     inventories = db.relationship('Inventory', backref='product', lazy=True)
+
+    @property
+    def min_stock_efectivo(self):
+        """Mínimo de stock efectivo del producto: el configurado, o 20 por defecto."""
+        if self.min_stock is None:
+            return Decimal('20.00')
+        return Decimal(str(self.min_stock))
 
 
 class Inventory(db.Model):
