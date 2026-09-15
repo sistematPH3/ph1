@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app.decorators.roles import (
     management_required,
@@ -10,8 +10,44 @@ from app.decorators.roles import (
 )
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
 from app.dashboard.dashboard_service import get_subgerente_context
+from app.models import Location
+from app.analytics.services.snapshots_service import (
+    evaluar_alarmas,
+    leer_configuracion,
+    obtener_comparativo,
+    obtener_costo_operativo,
+    obtener_grafico_evolucion,
+    obtener_mermas_por_tipo,
+    obtener_pendientes,
+    PERIOD_TYPES,
+)
+from app.analytics.requests.statistics_validators import (
+    validate_moneda,
+    validate_period_type,
+)
+from app.models.statistics_model import SnapshotPeriodType
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+def _contexto_estadisticas(period_type, moneda='USD', location_ids=None):
+    """Contexto del cajón sin tumbar el dashboard si algo falla (tabla vacía, etc.)."""
+    try:
+        alertas_estadisticas = evaluar_alarmas(period_type, location_ids=location_ids)
+    except Exception:
+        alertas_estadisticas = []
+    try:
+        datos_grafico = obtener_grafico_evolucion(period_type, moneda=moneda, location_ids=location_ids)
+    except Exception:
+        datos_grafico = {
+            'period_type': period_type,
+            'moneda': moneda,
+            'periods': [],
+            'metrics': {
+                'PURCHASES': [], 'KITCHEN_CONSUMPTION': [],
+                'WASTE': [], 'TRANSFERS': [],
+            },
+        }
+    return alertas_estadisticas, datos_grafico
 
 @dashboard_bp.route('/')
 @login_required
@@ -60,14 +96,69 @@ def assistant_manager_dashboard():
 @admin_required
 def admin_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/admin_dashboard.html', alarmas=alarmas)
+    period_type = validate_period_type(request.args.get('period'))
+    default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
+    moneda = validate_moneda(request.args.get('moneda'), default=default_moneda)
+    sedes = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    sede_id = request.args.get('sede', type=int)
+    if sede_id is not None and not any(s.id == sede_id for s in sedes):
+        sede_id = None
+    location_ids = [sede_id] if sede_id is not None else None
+    alertas_estadisticas, datos_grafico = _contexto_estadisticas(
+        period_type, moneda=moneda, location_ids=location_ids,
+    )
+    try:
+        pendientes = obtener_pendientes()
+    except Exception:
+        pendientes = {'mermas_pendientes': 0, 'traslados_en_transito': 0, 'disputas_pendientes': 0}
+    try:
+        costo_operativo = obtener_costo_operativo(
+            period_type, moneda=moneda, location_ids=location_ids,
+        )
+    except Exception:
+        costo_operativo = {'total': '0.00', 'moneda': moneda}
+    try:
+        comparativo = obtener_comparativo(
+            period_type, moneda=moneda, location_ids=location_ids,
+        )
+    except Exception:
+        comparativo = {'metricas': {}}
+    try:
+        mermas_por_tipo = obtener_mermas_por_tipo(period_type, location_ids=location_ids)
+    except Exception:
+        mermas_por_tipo = {'tipos': []}
+    return render_template(
+        'dashboard/admin_dashboard.html',
+        alarmas=alarmas,
+        alertas_estadisticas=alertas_estadisticas,
+        datos_grafico=datos_grafico,
+        costo_operativo=costo_operativo,
+        comparativo=comparativo,
+        mermas_por_tipo=mermas_por_tipo,
+        period_type=period_type,
+        moneda=moneda,
+        pendientes=pendientes,
+        sedes=sedes,
+        sede_seleccionada=sede_id,
+    )
 
 @dashboard_bp.route('/finance')
 @login_required
 @finance_required
 def finance_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas)
+    location_ids = None
+    if not current_user.is_admin:
+        location_ids = [loc.id for loc in current_user.locations]
+    alertas_estadisticas, datos_grafico = _contexto_estadisticas(
+        SnapshotPeriodType.MONTHLY, location_ids=location_ids
+    )
+    return render_template(
+        'dashboard/finance_dashboard.html',
+        alarmas=alarmas,
+        alertas_estadisticas=alertas_estadisticas,
+        datos_grafico=datos_grafico,
+    )
 
 @dashboard_bp.route('/operations')
 @login_required

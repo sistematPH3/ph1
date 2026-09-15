@@ -188,6 +188,10 @@ def create_app():
         from app.waste.routes.waste_config_routes import waste_config_bp
         app.register_blueprint(waste_config_bp)
 
+        # --- CAJÓN DE ESTADÍSTICAS (RÁPIDO 1 - MÓDULO 8) ---
+        from app.analytics import analytics_bp
+        app.register_blueprint(analytics_bp)
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model

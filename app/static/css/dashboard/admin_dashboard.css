@@ -1,223 +1,924 @@
+/* =========================================================
+   Dashboard del Admin (Módulo 8 - Rápido 1)
+   Panel con más color, consistente con el cajón de estadísticas.
+   ========================================================= */
 :root {
-    --bg-color: #f8f9fa;
-    --card-bg: #ffffff;
-    --text-main: #1e293b;
-    --text-muted: #64748b;
-    --primary-red: #ce1126;
-    --primary-red-hover: #b00e1e;
-    --border-color: #e2e8f0;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --ph-red: #ce1126;
+    --ph-red-hover: #b00e1e;
+    --ph-red-soft: rgba(206, 17, 38, 0.08);
+    --ph-card: #ffffff;
+    --ph-border: #e7e9ee;
+    --ph-text: #1e293b;
+    --ph-text-strong: #111827;
+    --ph-muted: #64748b;
+    --ph-radius: 18px;
+    --ph-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -12px rgba(16, 24, 40, 0.14);
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+/* Fondo del panel (este CSS solo aplica en el dashboard Admin): más color,
+   menos blanco, manteniendo la lectura cómoda. */
+.content {
+    background:
+        radial-gradient(1000px 520px at 88% -12%, rgba(206, 17, 38, 0.07), rgba(206, 17, 38, 0) 60%),
+        radial-gradient(900px 480px at -8% 8%, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0) 55%),
+        radial-gradient(820px 460px at 100% 100%, rgba(124, 58, 237, 0.05), rgba(124, 58, 237, 0) 55%),
+        linear-gradient(180deg, #fbf6f7 0%, #f2f5fb 55%, #edf1f8 100%);
 }
 
-body {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    padding: 0;
+/* Banner de cabecera ------------------------------------------
+   El título del dashboard es un BANNER corporativo. Cuando Mariuska
+   suba la imagen del banner, se coloca aquí como fondo:
+     .dash-banner { background-image: url(...); background-size: cover; }
+   Para no tener que tocar CSS el día que llegue: se declara un
+   custom-property --ph-banner-img; el primer "layer" del fondo lo usa
+   con fallback al degradado de la marca. Basta con definirla (en línea
+   o desde admin_dashboard.html) para que el banner muestre la imagen. */
+.dash-banner {
+    --ph-banner-img: linear-gradient(
+        135deg, #9c0e1d 0%, #ce1126 48%, #e03443 100%
+    );
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    flex-wrap: wrap;
+    padding: 24px 28px;
+    margin-bottom: 22px;
+    border-radius: 22px;
+    color: #ffffff;
+    background-image: var(--ph-banner-img);
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 14px 30px -16px rgba(206, 17, 38, 0.55);
 }
 
-/* Estilos de Cabecera Homologados */
-.dashboard-header { 
-    margin-bottom: 30px; 
-    margin-top: 30px;
-    margin-left: 30px;
-    margin-right: 30px;
+.dash-banner::after {
+    content: "";
+    position: absolute;
+    right: -70px;
+    top: -70px;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    border: 26px solid rgba(255, 255, 255, 0.06);
+    pointer-events: none;
 }
 
-.dashboard-header h1 { 
-    color: #202124; 
-    font-weight: 800; 
-    font-size: 2.2rem;
+.dash-banner-main {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    flex: 1 1 320px;
+}
+
+.dash-banner-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.dash-banner-brand > div { min-width: 0; }
+
+.dash-banner-avatar {
+    flex: 0 0 auto;
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--ph-red, #ce1126);
+    background: #ffffff;
+    box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.35);
+    user-select: none;
+}
+
+.dash-banner-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.82);
     margin-bottom: 5px;
 }
 
-.dashboard-header p {
-    color: #5f6368;
-    font-size: 0.95rem;
-}
-
-.dashboard-header strong {
-    color: #202124;
+.dash-banner-title {
+    font-size: 1.9rem;
     font-weight: 800;
+    letter-spacing: -0.6px;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.08;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.18);
 }
 
-/* El resto de tus componentes e indicadores se mantienen intactos */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 25px;
-    margin-bottom: 30px;
-    margin-left: 30px;
-    margin-right: 30px;
+.dash-banner-sub {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.94rem;
+    margin: 10px 0 0;
+    overflow-wrap: anywhere;
 }
 
-.metric-card {
-    background-color: var(--card-bg);
-    border: none;
-    border-radius: 14px;
-    padding: 25px;
+.dash-banner-sub strong {
+    color: #ffffff;
+}
+
+.dash-banner-actions {
+    position: relative;
+    z-index: 1;
+}
+
+/* El selector período/moneda vive dentro del banner (fondo blanco). */
+.dash-selector {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    box-shadow: var(--shadow);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dash-selector-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.4);
+}
+
+/* CTA "Gráficos y estadísticas" del banner: visible.
+   La página /estadisticas la rehace Mariuska (con sus filtros); el CTA
+   apunta hoy a nuestra ruta mientras ella define/entrega la URL final,
+   y luego solo se cambia el `url_for` del template. */
+.btn-stats-banner {
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    color: var(--ph-red, #ce1126);
+}
+
+.btn-stats-banner:hover {
+    background: #fff3f4;
+    border-color: #ffffff;
+    color: var(--ph-red-hover, #b00e1e);
+    box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.4);
+}
+
+/* Botón secundario del banner ("Configurar alarmas"): estilo ghost que
+   combina con el banner rojo, sin competir con el CTA blanco. */
+.btn-stats-banner-ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    color: #ffffff;
+}
+
+.btn-stats-banner-ghost:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #ffffff;
+    color: #ffffff;
+}
+
+.dash-session-chip {
+    display: none;
+}
+
+.btn-stats {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
     cursor: pointer;
-    text-align: left;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    width: 100%;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    line-height: 1;
+    background: var(--ph-card);
+    border: 1px solid var(--ph-border);
+    color: var(--ph-text);
 }
 
-.metric-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+.btn-stats:hover {
+    border-color: var(--ph-red);
+    color: var(--ph-red);
 }
 
-.metric-info h3 {
-    font-size: 0.85rem;
+.btn-stats-primary {
+    background: var(--ph-red);
+    border-color: var(--ph-red);
+    color: #ffffff;
+}
+
+.btn-stats-primary:hover {
+    background: var(--ph-red-hover);
+    border-color: var(--ph-red-hover);
+    color: #ffffff;
+    box-shadow: 0 8px 18px -8px rgba(206, 17, 38, 0.6);
+}
+
+/* KPIs del último período ----------------------------------- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.kpi-card {
+    background: var(--ph-card);
+    border: 1px solid var(--ph-border);
+    border-radius: var(--ph-radius);
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--ph-shadow);
+}
+
+.kpi-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.kpi-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.kpi-label {
+    font-size: 0.74rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 10px;
+    color: var(--ph-muted);
+    margin-bottom: 5px;
 }
 
-.metric-info .number {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: var(--text-main);
-}
-
-.metric-icon {
-    background-color: rgba(206, 17, 38, 0.05);
-    color: var(--primary-red);
-    width: 55px;
-    height: 55px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.kpi-value {
     font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--ph-text-strong);
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.dashboard-content {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 25px;
-    margin-left: 30px;
-    margin-right: 30px;
-    margin-bottom: 30px;
+.kpi-qty {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ph-muted);
+    margin-top: 3px;
 }
 
-.panel {
-    background-color: var(--card-bg);
-    border-radius: 14px;
-    padding: 25px;
-    box-shadow: var(--shadow);
+/* Banner horizontal de costo operativo (evita el cuadro sobrante) */
+.kpi-costo {
     display: flex;
-    flex-direction: column;
-}
-
-.panel-header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-}
-
-.panel-header h2 {
-    font-size: 1.15rem;
-    font-weight: 700;
-}
-
-.panel-link {
-    color: var(--primary-red);
+    gap: 18px;
+    margin-bottom: 22px;
+    padding: 18px 22px;
+    border-radius: var(--ph-radius);
+    background: linear-gradient(120deg, rgba(15, 118, 110, 0.10) 0%, #ffffff 55%);
+    border: 1px solid rgba(15, 118, 110, 0.25);
+    border-left: 6px solid #0f766e;
+    box-shadow: var(--ph-shadow);
     text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    transition: color 0.2s;
+    transition: transform 0.18s ease, box-shadow 0.2s ease;
 }
 
-.panel-link:hover {
-    text-decoration: underline;
-    color: var(--primary-red-hover);
+.kpi-costo:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -12px rgba(15, 118, 110, 0.35);
 }
 
-.slider-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.kpi-costo-icon {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: 1.3rem;
 }
 
-.slider-btn {
-    background: none;
-    border: 1px solid var(--border-color);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.slider-btn:hover {
-    background-color: var(--primary-red);
-    color: white;
-    border-color: var(--primary-red);
-}
-
-.chart-wrapper {
-    flex-grow: 1;
-    position: relative;
-    min-height: 280px;
-    cursor: pointer;
-}
-
-.log-list {
-    list-style: none;
+.kpi-costo-body {
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 2px;
 }
 
-.log-item {
+.kpi-costo-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #0f766e;
+}
+
+.kpi-costo-value {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #0f766e;
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+}
+
+.kpi-costo-sub {
+    margin-left: auto;
+    max-width: 340px;
+    font-size: 0.82rem;
+    color: var(--ph-muted);
+    text-align: right;
+    line-height: 1.5;
+}
+
+.kpi-costo-arrow {
+    color: #0f766e;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+/* Pendientes por atender (tarjetas de color) ----------------- */
+.pend-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.pend-card {
+    background: var(--ph-card);
+    border: 1px solid var(--ph-border);
+    border-radius: var(--ph-radius);
+    padding: 20px;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--ph-shadow);
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.18s ease, box-shadow 0.2s ease;
 }
 
-.log-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
+.pend-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -12px rgba(16, 24, 40, 0.22);
 }
 
-.log-time {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    min-width: 50px;
+.pend-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
 }
 
-.log-details h4 {
-    font-size: 0.9rem;
-    font-weight: 600;
+.pend-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.pend-label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ph-muted);
     margin-bottom: 3px;
 }
 
-.log-details p {
-    font-size: 0.8rem;
-    color: var(--text-muted);
+.pend-number {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--ph-text-strong);
+    letter-spacing: -0.4px;
+    line-height: 1;
 }
 
-@media (max-width: 1024px) {
-    .dashboard-content {
+.pend-sub {
+    font-size: 0.78rem;
+    color: var(--ph-muted);
+    margin-top: 5px;
+}
+
+.pend-arrow {
+    color: #cbd5e1;
+    font-size: 1rem;
+    flex-shrink: 0;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.pend-card:hover .pend-arrow {
+    color: var(--ph-red);
+}
+
+/* Banda única de indicadores (un solo bloque en vez de cinco cajas) */
+.dash-stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    margin-bottom: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+    border: 1px solid var(--ph-border);
+    border-radius: var(--ph-radius);
+    box-shadow: var(--ph-shadow);
+    overflow: hidden;
+}
+
+.dash-stat {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 18px 20px;
+    min-width: 0;
+}
+
+.dash-stat-icon {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: 1.2rem;
+    color: #ffffff;
+    box-shadow: 0 6px 14px -8px var(--stat-clr);
+    flex-shrink: 0;
+}
+
+.dash-stat-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dash-stat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ph-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-stat-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--stat-clr);
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-stat-comp {
+    margin-top: 2px;
+}
+
+.dash-stat-comp .kpi-comp-badge {
+    font-size: 0.68rem;
+    padding: 2px 8px;
+}
+
+.dash-stat-hint {
+    font-size: 0.68rem;
+    color: var(--ph-muted);
+    white-space: normal;
+    line-height: 1.35;
+}
+
+/* Panel de "Atención requerida" (una sola caja con filas) */
+.atend-panel {
+    margin-bottom: 22px;
+}
+
+.atend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.atend-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    border: 1px solid #eef0f5;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.2s ease;
+}
+
+.atend-row:hover {
+    transform: translateX(3px);
+    box-shadow: 0 8px 18px -10px rgba(16, 24, 40, 0.25);
+}
+
+.atend-icon {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    color: #ffffff;
+    background: var(--at-clr);
+    flex-shrink: 0;
+}
+
+.atend-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+    font-weight: 700;
+    color: var(--ph-text-strong);
+    font-size: 0.92rem;
+}
+
+.atend-sub {
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--ph-muted);
+}
+
+.atend-count {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--at-clr);
+    letter-spacing: -0.4px;
+    flex-shrink: 0;
+}
+
+.atend-arrow {
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+/* Rejilla principal (gráfico + resumen) ---------------------- */
+.dash-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+}
+
+.dash-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+    border: 1px solid var(--ph-red);
+    border-top: 4px solid var(--ph-red);
+    border-radius: var(--ph-radius);
+    padding: 24px;
+    box-shadow: var(--ph-shadow);
+}
+
+.dash-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.dash-panel-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--ph-text-strong);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.dash-panel-title .panel-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--ph-red-soft);
+    color: var(--ph-red);
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
+}
+
+.dash-subtitle {
+    color: var(--ph-muted);
+    font-size: 0.84rem;
+    margin: 0 0 16px;
+}
+
+/* Tabs de métricas */
+.metric-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.metric-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border: 1px solid var(--ph-border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ph-muted);
+    background: var(--ph-card);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.18s ease;
+}
+
+.metric-tab .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.metric-tab:hover {
+    color: var(--ph-text);
+    border-color: #cbd5e1;
+}
+
+.metric-tab.active {
+    color: #ffffff;
+}
+
+/* Gráfico */
+.dash-chart {
+    position: relative;
+    height: 340px;
+}
+
+.dash-empty {
+    padding: 70px 20px;
+    text-align: center;
+    color: var(--ph-muted);
+    display: none;
+}
+
+.dash-empty i {
+    font-size: 2rem;
+    opacity: 0.4;
+    display: block;
+    margin-bottom: 12px;
+}
+
+/* Resumen del período */
+.resumen-title {
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ph-muted);
+    margin: 0 0 12px;
+}
+
+.resumen-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.resumen-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: linear-gradient(90deg, #fdf1f2 0%, #f8fafc 55%);
+    border: 1px solid #f0d9db;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.resumen-row .r-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--ph-text);
+}
+
+.resumen-row .r-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.resumen-row .r-value {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--ph-text-strong);
+}
+
+.resumen-cta {
+    margin-top: 14px;
+}
+
+.resumen-cta .btn-stats {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Responsivo ------------------------------------------------- */
+@media (max-width: 1180px) {
+    .kpi-grid, .pend-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-stat {
+        border-top: 1px solid #eef0f5;
+    }
+    .dash-stat:nth-child(-n + 2) {
+        border-top: 0;
+    }
+    .dash-stat:nth-child(5) {
+        grid-column: span 2;
+    }
+    .dash-content {
         grid-template-columns: 1fr;
     }
+}
+
+@media (max-width: 700px) {
+    .kpi-grid, .pend-grid {
+        grid-template-columns: 1fr;
+    }
+    .dash-stats {
+        grid-template-columns: 1fr;
+    }
+    .dash-stat:nth-child(5) {
+        grid-column: auto;
+    }
+    .dash-stat {
+        border-top: 1px solid #eef0f5;
+        border-radius: 0;
+    }
+    .dash-stat:first-child {
+        border-top: 0;
+    }
+    .kpi-costo {
+        flex-wrap: wrap;
+    }
+    .kpi-costo-sub {
+        margin-left: 0;
+        text-align: left;
+    }
+    .dash-chart {
+        height: 280px;
+    }
+}
+
+/* Selector período / moneda en la cabecera -------------------- */
+.dash-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dash-selector-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: var(--ph-card);
+    border: 1px solid var(--ph-border);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: var(--ph-shadow);
+}
+
+.dash-selector-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ph-muted);
+}
+
+.dash-selector-form select {
+    appearance: none;
+    border: 1px solid var(--ph-border);
+    border-radius: 10px;
+    padding: 7px 28px 7px 11px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--ph-text);
+    background: var(--ph-card)
+        url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")
+        no-repeat right 10px center;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dash-selector-form select:focus {
+    outline: none;
+    border-color: var(--ph-red);
+    box-shadow: 0 0 0 3px var(--ph-red-soft);
+}
+
+/* Comparativo dentro de los KPIs ------------------------------ */
+.kpi-comp {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+    flex-wrap: wrap;
+}
+
+.kpi-comp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 3px 10px;
+}
+
+.kpi-comp-badge.up {
+    color: #15803d;
+    background: rgba(22, 163, 74, 0.10);
+}
+
+.kpi-comp-badge.down {
+    color: var(--ph-red);
+    background: var(--ph-red-soft);
+}
+
+.kpi-comp-badge.flat {
+    color: var(--ph-muted);
+    background: #f1f5f9;
+}
+
+.kpi-comp-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ph-muted);
+}
+
+/* Mermas por tipo --------------------------------------------- */
+.mermas-tipos-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.merma-tipo-chip {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 12px;
+    border: 1px solid var(--ph-border);
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--ph-muted);
+    background: #f8fafc;
+    white-space: nowrap;
+}
+
+.merma-tipo-chip strong {
+    color: var(--ph-text);
 }

@@ -1,7 +1,8 @@
 import json
-from datetime import datetime
 from sqlalchemy import func
-from app.models.inventory_model import db, Inventory, Product
+from app.extensions import db
+from app.time_utils import current_ve_time
+from app.models.inventory_model import Inventory, Product
 from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
 from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.security_model import User, user_locations
@@ -234,7 +235,7 @@ class RegisterConsumptionRepository:
             location_id=inventory_item.location_id,
             action='GASTO_COCINA',
             severity=severidad,
-            timestamp=datetime.now(),
+            timestamp=current_ve_time(),
             changed_data=changed_data
         )
         db.session.add(audit_entry)

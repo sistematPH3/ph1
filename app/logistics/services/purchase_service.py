@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 import json
 from sqlalchemy import text
@@ -6,17 +5,24 @@ from app.extensions import db
 from app.models.logistics_model import Purchase, PurchaseDetail
 from app.models import PurchaseAuditLog, Inventory
 from app.models.inventory_model import Product
+from app.time_utils import current_ve_time
 
 class PurchaseService:
     @staticmethod
     def register_purchase(data):
         try:
-            purchase_date = datetime.utcnow()
+            currency = str(data.get('currency', 'USD')).strip().upper()
+            if currency not in ('USD', 'EUR'):
+                return {
+                    'success': False,
+                    'message': 'Moneda no soportada. Debe ser USD o EUR.',
+                }
+            purchase_date = current_ve_time()
             new_purchase = Purchase(
                 supplier_id=data['supplier_id'],
                 purchase_date=purchase_date,
                 total_amount=Decimal('0.00'),
-                currency=str(data['currency']).upper(),
+                currency=currency,
                 exchange_rate=Decimal(str(data['exchange_rate'])),
                 user_id=data['user_id'],
                 invoice_url=data.get('invoice_url'), 
@@ -133,7 +139,7 @@ class PurchaseService:
                     'uid': data['user_id'],
                     'sev': severity,
                     'cdata': json.dumps(changed_data),
-                    'ts': datetime.now()
+                    'ts': current_ve_time()
                 })
 
             new_purchase.total_amount = calculated_total

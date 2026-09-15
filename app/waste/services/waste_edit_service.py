@@ -5,6 +5,7 @@ from app.waste.repositories.waste_edit_repository import WasteEditRepository
 from app.waste.repositories.register_waste_repository import RegisterWasteRepository
 from app.waste.requests.waste_edit_validators import validate_edit_payload, validate_reversal_payload
 from app.waste.services.register_waste_service import user_can_access_location
+from app.inventory.services.product_cost_service import obtener_costo_unitario
 
 
 def _fmt_quantity(value):
@@ -289,7 +290,13 @@ class WasteEditService:
                 }, 400
             used_by_lot[(pid, lot)] = acumulado_lote
 
-            unit_cost = RegisterWasteRepository.get_unit_cost(pid, lot)
+            unit_cost = obtener_costo_unitario(
+                int(pid),
+                fecha=datetime.utcnow(),
+                moneda="USD",
+                metodo="lote",
+                lote=str(lot).strip(),
+            )
             line["unit_cost"] = unit_cost
             line["subtotal_cost"] = (line["quantity"] * unit_cost).quantize(Decimal("0.01"))
             line["expiration_date"] = RegisterWasteRepository.get_lot_expiration_date(pid, lot, waste.location_id)

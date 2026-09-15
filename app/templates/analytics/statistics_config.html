@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/statistics.css') }}?v=5">
+{% endblock %}
+
+{% block content %}
+<div class="cfg-wrapper">
+    <div class="stats-header">
+        <h1>Configuración de Alarmas de Estadísticas</h1>
+        <p>Ajusta la regla de irregularidad y la moneda con la que abren los reportes.
+           Cada sede genera una alarma cuando su valor del período supera el factor
+           por su promedio histórico de 3 períodos.</p>
+    </div>
+
+    <div class="cfg-info-banner">
+        <div class="cfg-info-icon"><i class="bi bi-info-circle-fill"></i></div>
+        <div class="cfg-info-body">
+            <strong>Qué se configura aquí:</strong>
+            <ul>
+                <li><b>Factor de disparo</b>: cuántas veces debe superar el promedio histórico para disparar alarmas.</li>
+                <li><b>Mínimo en USD</b>: si el monto del período no alcanza este valor, no se genera alarma (evita ruido).</li>
+                <li><b>Moneda por defecto</b>: con qué moneda abren las estadísticas y los reportes.</li>
+            </ul>
+            <strong>Qué se puede configurar:</strong>
+            <p class="mb-0">Las alarmas se evalúan automáticamente por separado en cada sede y para cada tipo de
+            movimiento (compras, consumo de cocina, mermas y traslados), usando el promedio de los
+            3 períodos anteriores. Desde aquí sólo se ajustan los parámetros globales; los alarmas por
+            sede se activan de forma automática al superar el umbral.</p>
+        </div>
+    </div>
+
+    <form id="form-statistics-config" novalidate>
+        <div class="cfg-grid">
+            <div class="cfg-card">
+                <div class="cfg-icon"><i class="bi bi-percent"></i></div>
+                <div class="flex-grow-1">
+                    <h2 class="cfg-card-title">Factor de disparo <span class="cfg-unit-badge">multiplicador</span></h2>
+                    <p class="cfg-card-desc">Multiplica el promedio de los 3 períodos anteriores como umbral.
+                       Ejemplo: 2.0 = se alerta cuando el valor duplica el promedio.</p>
+                    <div style="max-width:160px">
+                        <input type="number" class="cfg-input" id="ESTADISTICAS_FACTOR"
+                               name="ESTADISTICAS_FACTOR" step="0.1" min="0.1"
+                               value="{{ configs.ESTADISTICAS_FACTOR }}">
+                        <div class="invalid-feedback" id="error-factor">El factor debe ser un número mayor que 0.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cfg-card">
+                <div class="cfg-icon"><i class="bi bi-cash-stack"></i></div>
+                <div class="flex-grow-1">
+                    <h2 class="cfg-card-title">Mínimo en USD <span class="cfg-unit-badge">USD</span></h2>
+                    <p class="cfg-card-desc">Valor mínimo que debe alcanzar el período para que
+                       el disparador sea considerado una alarma (evita ruido con cifras pequeñas).</p>
+                    <div style="max-width:160px">
+                        <input type="number" class="cfg-input" id="ESTADISTICAS_MINIMO_USD"
+                               name="ESTADISTICAS_MINIMO_USD" step="0.01" min="0"
+                               value="{{ configs.ESTADISTICAS_MINIMO_USD }}">
+                        <div class="invalid-feedback" id="error-minimo">El mínimo debe ser un número mayor o igual que 0.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cfg-card">
+                <div class="cfg-icon"><i class="bi bi-currency-dollar"></i></div>
+                <div class="flex-grow-1">
+                    <h2 class="cfg-card-title">Moneda por defecto <span class="cfg-unit-badge">reportes</span></h2>
+                    <p class="cfg-card-desc">Con qué moneda abren las estadísticas (y el dashboard del Admin).
+                       El usuario siempre puede cambiarla desde el selector.</p>
+                    <div style="max-width:160px">
+                        <select class="cfg-input" id="ESTADISTICAS_MONEDA" name="ESTADISTICAS_MONEDA">
+                            {% for m in ['USD', 'EUR', 'BS'] %}
+                            <option value="{{ m }}" {% if m == configs.ESTADISTICAS_MONEDA %}selected{% endif %}>{{ m }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback" id="error-moneda">Moneda no válida (use USD, EUR o BS).</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cfg-preview">
+            <i class="bi bi-lightbulb"></i>
+            Una sede genera alarma cuando el valor del período supera <strong>{{ configs.ESTADISTICAS_FACTOR }}×</strong>
+            el promedio de los 3 períodos anteriores y alcanza al menos
+            <strong>${{ configs.ESTADISTICAS_MINIMO_USD }}</strong>.
+            La regla se evalúa por separado para compras, consumo de cocina, mermas y traslados, en cada sede activa.
+        </div>
+
+        <div class="invalid-feedback d-block" id="cfgError" style="display:none;"></div>
+
+        <div class="cfg-actions mt-3">
+            {# TODO(mariuska): repuntar 'Volver' a su pantalla de gráficos cuando
+               la suba. El endpoint 'dashboard.admin_dashboard' fue eliminado. #}
+            <a href="{{ url_for('dashboard.admin_dashboard') }}" class="btn-stats btn-stats-ghost">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+            <button type="submit" class="btn-stats btn-stats-primary" id="btn-save-statistics-config">
+                <i class="bi bi-check-lg"></i> Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="toast-stats-success toast align-items-center border-0" id="successToast"
+     role="status" aria-live="polite" aria-atomic="true"
+     style="position:fixed;bottom:26px;right:26px;z-index:2500;">
+    <div class="d-flex align-items-center">
+        <div class="toast-body"><i class="bi bi-check-circle-fill"></i> Parámetros guardados correctamente.</div>
+        <button type="button" class="btn-close btn-close-white me-3 ms-2" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const form = document.getElementById('form-statistics-config');
+    if (!form) return;
+
+    const factorInput = form.querySelector('#ESTADISTICAS_FACTOR');
+    const minimoInput = form.querySelector('#ESTADISTICAS_MINIMO_USD');
+
+    function marcarError(input, idError, ok) {
+        const el = document.getElementById(idError);
+        input.classList.toggle('is-invalid', !ok);
+        if (el) el.classList.toggle('show', !ok);
+        return ok;
+    }
+
+    function ocultarErrorGlobal() {
+        const err = document.getElementById('cfgError');
+        err.style.display = 'none';
+    }
+
+    function mostrarErrorGlobal(texto) {
+        const err = document.getElementById('cfgError');
+        err.textContent = texto;
+        err.style.display = 'block';
+    }
+
+    form.addEventListener('submit', async function (ev) {
+        ev.preventDefault();
+        ocultarErrorGlobal();
+
+        const factor = factorInput.value;
+        const minimo = minimoInput.value;
+        const moneda = form.querySelector('#ESTADISTICAS_MONEDA').value;
+        let valido = true;
+        valido = marcarError(factorInput, 'error-factor',
+                             !isNaN(parseFloat(factor)) && parseFloat(factor) > 0) && valido;
+        valido = marcarError(minimoInput, 'error-minimo',
+                             !isNaN(parseFloat(minimo)) && parseFloat(minimo) >= 0) && valido;
+        if (!valido) return;
+
+        try {
+            const resp = await fetch("{{ url_for('analytics.config_estadisticas') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    'ESTADISTICAS_FACTOR': factor,
+                    'ESTADISTICAS_MINIMO_USD': minimo,
+                    'ESTADISTICAS_MONEDA': moneda
+                })
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                const toast = new bootstrap.Toast(document.getElementById('successToast'), {delay: 2500});
+                toast.show();
+                setTimeout(function () { window.location.href = "{{ url_for('dashboard.admin_dashboard') }}"; }, 1400);
+            } else {
+                mostrarErrorGlobal(data.message || 'No se pudieron guardar los parámetros.');
+            }
+        } catch (e) {
+            mostrarErrorGlobal('Error de red al guardar los parámetros.');
+        }
+    });
+})();
+</script>
+{% endblock %}
