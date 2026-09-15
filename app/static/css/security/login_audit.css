@@ -216,7 +216,7 @@
 
     #locationFilter, 
     #dateFilter, 
-    .time-filter-container {
+    #hourFilter {
         width: 100% !important;
     }
 

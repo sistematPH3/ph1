@@ -4,7 +4,15 @@ from app.models import db, UserAudit, user_locations
 
 class AuditUserRepository:
     @staticmethod
-    def get_user_audits(current_user=None):
+    def get_user_audits(current_user=None, filtros=None):
+        """Historial de auditoría de personal.
+
+        Filtros opcionales (dict): 'sede' (id de sede: solo auditorías cuyo
+        usuario afectado pertenece a esa sede) y 'desde'/'hasta' (datetimes)
+        para acotar por fecha.
+        """
+        filtros = filtros or {}
+
         # 1. Consulta base con carga optimizada
         query = UserAudit.query.options(
             joinedload(UserAudit.responsible_user),
@@ -12,7 +20,19 @@ class AuditUserRepository:
             joinedload(UserAudit.role)
         )
 
-        # 2. Evaluación de permisos para el rol Finanzas
+        # 2. Filtro de sede (optativo): usuario afectado asignado a esa sede
+        if filtros.get('sede'):
+            allowed_user_ids = db.session.query(user_locations.c.user_id)\
+                .filter(user_locations.c.location_id == filtros['sede'])
+            query = query.filter(UserAudit.target_user_id.in_(allowed_user_ids))
+
+        # 3. Filtro por rango de fechas (optativo)
+        if filtros.get('desde'):
+            query = query.filter(UserAudit.timestamp >= filtros['desde'])
+        if filtros.get('hasta'):
+            query = query.filter(UserAudit.timestamp <= filtros['hasta'])
+
+        # 4. Evaluación de permisos para el rol Finanzas
         if current_user:
             user_role_name = current_user.role.name.lower().strip() if (hasattr(current_user, 'role') and current_user.role) else ''
             user_location_ids = [loc.id for loc in current_user.locations] if hasattr(current_user, 'locations') else []

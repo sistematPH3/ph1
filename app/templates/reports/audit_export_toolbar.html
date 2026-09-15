@@ -1,0 +1,27 @@
+{% set sedes = sedes|default(locations|default([])) %}
+<div class="d-flex gap-2 align-items-center flex-wrap" id="auditExportToolbar"
+     data-export-url="{{ export_base_url }}">
+    {% if not export_sin_fechas|default(False) %}
+    <input type="date" id="exportDesde" class="form-control rounded-pill bg-light border-0 py-2 text-muted"
+           style="width: 150px; font-size: 0.88rem;" title="Desde">
+    <input type="date" id="exportHasta" class="form-control rounded-pill bg-light border-0 py-2 text-muted"
+           style="width: 150px; font-size: 0.88rem;" title="Hasta">
+    {% if current_user.is_admin %}
+        <select id="exportSede" class="form-select rounded-pill bg-light border-0 py-2 text-muted"
+                style="width: 170px; font-size: 0.88rem;" title="Sede">
+            <option value="">Todas las sedes</option>
+            {% for sede in sedes|default([]) %}
+                <option value="{{ sede.id }}">{{ sede.name }}</option>
+            {% endfor %}
+        </select>
+    {% endif %}
+    {% endif %}
+    <a href="#" class="btn btn-sm rounded-pill text-white d-flex align-items-center gap-1 px-3"
+       style="background-color: #d61c2c;" data-export-format="pdf" title="Descargar PDF de auditoría">
+        <i class="bi bi-file-earmark-pdf"></i> PDF
+    </a>
+    <a href="#" class="btn btn-sm rounded-pill text-white d-flex align-items-center gap-1 px-3"
+       style="background-color: #198754;" data-export-format="excel" title="Descargar Excel de auditoría">
+        <i class="bi bi-file-earmark-excel"></i> Excel
+    </a>
+</div>

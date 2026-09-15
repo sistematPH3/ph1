@@ -52,6 +52,7 @@ class Purchase(db.Model):
     status = db.Column(db.String(20), default='COMPLETED', nullable=False)
     
     details = db.relationship('PurchaseDetail', backref='purchase', lazy=True)
+    supplier = db.relationship('Supplier', backref='purchases')
 
 class PurchaseDetail(db.Model):
     __tablename__ = 'purchase_details'

@@ -1,5 +1,10 @@
 from datetime import datetime
 
+# La sede Central (id fijo 1) es la única que compra y despacha a las sedes.
+# Las demás sedes SOLO RECIBEN: únicamente se permite que devuelvan mercancía
+# al Almacén Central (regla de negocio).
+CENTRAL_LOCATION_ID = 1
+
 class MovementDispatchValidator:
 
     @staticmethod
@@ -23,6 +28,17 @@ class MovementDispatchValidator:
                 and str(origin_id).isdigit() and str(destination_id).isdigit()
                 and int(origin_id) == int(destination_id)):
             errors.append("La sede de origen y la sede de destino no pueden ser la misma.")
+
+        # REGLA DE NEGOCIO: solo la Central despacha. Una sede común no puede
+        # enviar a otra sede; solo está permitida la devolución hacia el Central.
+        if (not errors and origin_id and destination_id
+                and str(origin_id).isdigit() and str(destination_id).isdigit()):
+            origin_int = int(origin_id)
+            destination_int = int(destination_id)
+            if origin_int != CENTRAL_LOCATION_ID and destination_int != CENTRAL_LOCATION_ID:
+                errors.append(
+                    "Solo el Almacén Central despacha mercancía entre sedes. "
+                    "Una sede solamente puede devolver productos al Almacén Central.")
 
         # Campo opcional: si el despacho se genera como reposición complementaria
         # desde una disputa, debe venir un identificador numérico válido.

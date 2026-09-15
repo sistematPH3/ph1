@@ -1,8 +1,44 @@
 let productOptionsHtml = '';
 
 function parseNum(value) {
-    if (typeof value !== 'string' && typeof value !== 'number') return NaN;
-    return parseFloat(String(value).trim().replace(',', '.'));
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return NaN;
+    let s = String(value).trim().replace(/\s+/g, '');
+    if (!s) return NaN;
+    let sign = '';
+    if (s[0] === '-') { sign = '-'; s = s.slice(1); }
+    let norm;
+    if (s.indexOf(',') !== -1) {
+        // La coma es el separador decimal; los puntos son separadores de miles.
+        norm = s.replace(/\./g, '').replace(',', '.');
+    } else {
+        // Punto como separador de miles: punto seguido de exactamente 3 dígitos.
+        norm = s.replace(/\.(?=\d{3}(?!\d))/g, '');
+    }
+    return parseFloat(sign + norm);
+}
+
+function numeroLimpio(value) {
+    const n = parseNum(value);
+    if (isNaN(n)) return '';
+    return String(n);
+}
+
+function updateSummary() {
+    // El total se muestra en la confirmación del servidor; aquí solo se
+    // evita un error si el bloque de resumen no está presente.
+}
+
+function updateRateLabel(currency) {
+    const rateLabel = document.getElementById('rateLabel');
+    if (!rateLabel) return;
+    if (currency === 'BS') {
+        rateLabel.innerText = 'Tasa de Referencia BCV (Bs por $)';
+    } else if (currency === 'EUR') {
+        rateLabel.innerText = 'Tasa de Cambio (BCV) — Bs por EUR';
+    } else {
+        rateLabel.innerText = 'Tasa de Cambio (BCV) — Bs por USD';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,7 +77,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchExchangeRate() {
         const selectedCurrency = currencySelect.value;
-        
+
+        if (selectedCurrency === 'BS') {
+            // En Bs el precio ya es bolívares; la tasa solo es de referencia
+            // (BCV Bs por $) y se ingresa manualmente.
+            rateInput.removeAttribute('readonly');
+            rateInput.setAttribute('placeholder', 'Ingrese tasa BCV (Bs por $)');
+            rateInput.classList.replace('text-muted', 'text-dark');
+            return;
+        }
+
         rateInput.value = '';
         rateInput.setAttribute('placeholder', 'Consultando...');
         rateInput.setAttribute('readonly', true);
@@ -98,9 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!rateInput.value) {
         fetchExchangeRate();
+    } else {
+        updateRateLabel(currencySelect.value);
     }
 
     currencySelect.addEventListener('change', () => {
+        updateRateLabel(currencySelect.value);
         saveDraft();
         fetchExchangeRate();
     });
@@ -385,8 +433,8 @@ function attachRowValidationListeners(row) {
                 setFieldError(prodPrice, 'El precio es obligatorio.');
             } else if (val < 0.01) {
                 setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.');
-            } else if (val > 999999.99) {
-                setFieldError(prodPrice, 'Máximo 999,999.99');
+            } else if (val > 999999999.99) {
+                setFieldError(prodPrice, 'Máximo 999,999,999.99');
             } else {
                 clearFieldError(prodPrice);
             }
@@ -412,7 +460,7 @@ function createProductRowElement() {
         <td>
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
-                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" required>
+                    <input type="text" inputmode="decimal" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" required>
                 </div>
             </div>
         </td>
@@ -434,7 +482,7 @@ function createProductRowElement() {
             <div class="table-field-wrapper">
                 <div class="input-group search-input-group">
                     <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                    <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="0.00" required>
+                    <input type="text" inputmode="decimal" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="Total línea" required>
                 </div>
             </div>
         </td>
@@ -468,7 +516,7 @@ function validateFormBeforeSubmit() {
     if (!user.value) { setFieldError(user, 'Debes seleccionar un usuario comprador.'); isValid = false; }
     if (!currency.value) { setFieldError(currency, 'Debes seleccionar una moneda.'); isValid = false; }
     
-    const rateVal = parseFloat(exchangeRate.value);
+    const rateVal = parseNum(exchangeRate.value);
     if (!exchangeRate.value || isNaN(rateVal) || rateVal < 0.01) { 
         setFieldError(exchangeRate, 'La tasa de cambio debe ser un número mayor o igual a 0.01.'); 
         isValid = false; 
@@ -507,7 +555,7 @@ function validateFormBeforeSubmit() {
 
         if (!prodId.value) { setFieldError(prodId, 'Selecciona producto.'); isValid = false; }
         
-        const qtyVal = parseFloat(prodQty.value);
+        const qtyVal = parseNum(prodQty.value);
         if (!prodQty.value || isNaN(qtyVal)) { 
             setFieldError(prodQty, 'La cantidad es obligatoria.'); 
             isValid = false; 
@@ -519,15 +567,15 @@ function validateFormBeforeSubmit() {
             isValid = false;
         }
         
-        const priceVal = parseFloat(prodPrice.value);
+        const priceVal = parseNum(prodPrice.value);
         if (!prodPrice.value || isNaN(priceVal)) { 
             setFieldError(prodPrice, 'El precio es obligatorio.'); 
             isValid = false; 
         } else if (priceVal < 0.01) { 
             setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.'); 
             isValid = false; 
-        } else if (priceVal > 999999.99) {
-            setFieldError(prodPrice, 'Máximo 999,999.99');
+        } else if (priceVal > 999999999.99) {
+            setFieldError(prodPrice, 'Máximo 999,999,999.99');
             isValid = false;
         }
     });
@@ -549,7 +597,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     const formData = new FormData();
     formData.append('supplier_id', document.getElementById('supplier_id').value);
     formData.append('currency', document.getElementById('currency').value);
-    formData.append('exchange_rate', document.getElementById('exchange_rate').value);
+    formData.append('exchange_rate', numeroLimpio(document.getElementById('exchange_rate').value));
     formData.append('user_id', document.getElementById('user_id').value);
     
     const photoFile = document.getElementById('invoice_photo').files[0];
@@ -558,10 +606,10 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
     rows.forEach(row => {
         const prodIdVal = row.querySelector('.prod-id').value;
-        const qtyVal = row.querySelector('.prod-qty').value;
+        const qtyVal = numeroLimpio(row.querySelector('.prod-qty').value);
         const lotVal = row.querySelector('.prod-lot') ? row.querySelector('.prod-lot').value : '';
         const expVal = row.querySelector('.prod-exp').value;
-        const priceVal = row.querySelector('.prod-price').value;
+        const priceVal = numeroLimpio(row.querySelector('.prod-price').value);
 
         if (prodIdVal) {
             formData.append('product_id[]', prodIdVal);

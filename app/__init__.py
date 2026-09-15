@@ -151,6 +151,21 @@ def create_app():
         from app.dashboard.dashboard_routes import dashboard_bp
         app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
 
+        # ==========================================================
+        # MÓDULO 8 (Rápido 2): REPORTES DE ESTADÍSTICA (KPIs, comparativos,
+        # ranking entre sedes). Pantalla y API. Los resúmenes se leen del cajón
+        # statistics_snapshots que llena Rápido 1.
+        # ==========================================================
+        from app.analytics.routes.analysis_reports_routes import analysis_reports_bp
+        app.register_blueprint(analysis_reports_bp)
+
+        from app.reports.routes.export_routes import exports_bp
+        app.register_blueprint(exports_bp)
+
+        from app.reports.routes.audit_export_routes import audit_exports_bp
+        app.register_blueprint(audit_exports_bp)
+        # ==========================================================
+
        # ==========================================================
         # MÓDULO: PERSONAL (STAFF)
         # ==========================================================

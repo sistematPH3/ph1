@@ -6,15 +6,21 @@ from app.models.inventory_model import Product
 class WasteAuditService:
 
     @staticmethod
-    def get_formatted_audit_trail(user, filters):
-        """Procesa la lógica de negocio y aplica las restricciones por rol."""
+    def get_formatted_audit_trail(user, filters, location_ids_override=None):
+        """Procesa la lógica de negocio y aplica las restricciones por rol.
+
+        location_ids_override permite forzar las sedes a incluir (lo usan las
+        descargas de auditoría cuando un Administrador filtra por sede).
+        """
         location_ids = None
         
         is_admin = getattr(user, 'is_admin', False)
         is_management = getattr(user, 'is_management', False)
         is_finance = getattr(user, 'is_finance', False)
         
-        if not (is_admin or is_management or is_finance):
+        if location_ids_override is not None:
+            location_ids = location_ids_override
+        elif not (is_admin or is_management or is_finance):
             if hasattr(user, 'locations') and user.locations:
                 location_ids = [loc.id for loc in user.locations]
             else:
@@ -526,3 +532,21 @@ class WasteAuditService:
             })
             
         return formatted_logs
+
+    @staticmethod
+    def get_merma_audit_date_range(user):
+        """Rango (min, max) de fechas donde existen mermas, según el alcance
+        del rol (mismo criterio que get_formatted_audit_trail)."""
+        is_admin = getattr(user, 'is_admin', False)
+        is_management = getattr(user, 'is_management', False)
+        is_finance = getattr(user, 'is_finance', False)
+
+        if is_admin or is_management or is_finance:
+            location_ids = None
+        elif hasattr(user, 'locations') and user.locations:
+            location_ids = [loc.id for loc in user.locations]
+        else:
+            return None, None
+
+        return WasteAuditRepository.get_merma_audit_date_range(
+            location_ids=location_ids)

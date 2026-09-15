@@ -641,3 +641,23 @@ tr.audit-details-row:hover > td {
         white-space: nowrap !important;
     }
 }
+
+/* Cintillo de mermas: una sola fila en escritorio, apilado en móvil */
+.ph-filters-cintillo .filters-responsive-wrapper {
+    width: auto;
+}
+
+@media (max-width: 767.98px) {
+    .ph-filters-cintillo .filters-responsive-wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+    }
+    .ph-filters-cintillo .filters-responsive-wrapper > * {
+        width: 100% !important;
+    }
+    .ph-filters-cintillo .filters-responsive-wrapper .form-control,
+    .ph-filters-cintillo .filters-responsive-wrapper .form-select {
+        width: 100% !important;
+    }
+}

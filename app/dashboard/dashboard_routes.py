@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from datetime import datetime as datetime_cls
+
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app.decorators.roles import (
     management_required,
@@ -9,7 +11,10 @@ from app.decorators.roles import (
     operations_required
 )
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
-from app.dashboard.dashboard_service import get_subgerente_context
+from app.dashboard.dashboard_service import (
+    get_subgerente_context,
+    get_finance_dashboard_context,
+)
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -67,7 +72,19 @@ def admin_dashboard():
 @finance_required
 def finance_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas)
+    sede_raw = request.args.get('sede', '')
+    sede_id = int(sede_raw) if sede_raw.isdigit() else None
+    periodo_raw = request.args.get('periodo', '')
+    periodo = None
+    if periodo_raw:
+        try:
+            periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
+        except ValueError:
+            periodo = None
+    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas,
+                           **get_finance_dashboard_context(
+                               current_user, sede_id=sede_id,
+                               period_start=periodo, alarmas=alarmas))
 
 @dashboard_bp.route('/operations')
 @login_required

@@ -2,6 +2,9 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import current_user
 from sqlalchemy import func
 from decimal import ROUND_HALF_UP, Decimal
+from datetime import datetime
+from io import BytesIO
+from flask import send_file
 from app.extensions import db
 from app.models import Supplier  
 from app.models.inventory_model import Product
@@ -62,6 +65,44 @@ def index():
     except Exception as e:
         flash(f"Error interno en el sistema: {str(e)}", "error")
         return render_template('logistics/purchase_management.html', purchases=[], suppliers=[], products=[])
+
+@purchase_management_bp.route('/purchases/management/export', methods=['GET'])
+@require_roles('admin', 'management', 'manager')
+def exportar_listado():
+    try:
+        from app.reports.services import audit_export_service
+        from app.reports.services.audit_export_generators import (
+            generar_excel_auditoria, generar_pdf_auditoria)
+
+        formato = request.args.get('formato', 'pdf')
+        if formato not in ('pdf', 'excel'):
+            return "Formato inválido.", 400
+
+        filtros = {
+            'formato': formato,
+            'q': request.args.get('q', ''),
+            'supplier': request.args.get('supplier', ''),
+            'date': request.args.get('date', ''),
+        }
+        documento = audit_export_service.construir_listado_compras(current_user, filtros)
+
+        buffer = BytesIO()
+        painter = generar_pdf_auditoria if formato == 'pdf' else generar_excel_auditoria
+        archivo = painter(documento['header'], documento['detalle_tablas'])
+        buffer.write(archivo.getvalue())
+        buffer.seek(0)
+
+        ext = 'pdf' if formato == 'pdf' else 'xlsx'
+        mimetype = ('application/pdf' if formato == 'pdf'
+                    else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        nombre = f"listado-compras-{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+
+        # PDF en linea (visor) para evitar gestores externos como IDM.
+        return send_file(buffer, as_attachment=(formato != 'pdf'),
+                         download_name=nombre, mimetype=mimetype)
+    except Exception as e:
+        flash(f"Error generando la exportación: {str(e)}", "error")
+        return redirect(url_for('purchase_management.index'))
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/details', methods=['GET'])
 @require_roles('admin', 'management', 'manager')
