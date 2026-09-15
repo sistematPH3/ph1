@@ -1,0 +1,715 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/analysis_reports.css') }}?v=17">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
+    {% if error %}
+    <div class="alert alert-danger d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+            <strong>No se pudo generar el reporte.</strong>
+            {% if error is mapping %}
+            <ul class="mb-0 mt-1">
+                {% for campo, mensaje in error.items() %}
+                <li>Código del error: {{ campo }} — {{ mensaje }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <span>{{ error }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if reporte %}
+    <div class="ph-card reports-card">
+        <!-- Cabecera -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Reporte de Estadística</h2>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-calendar-range me-1"></i>{{ reporte.period.label }}
+                        <span class="mx-1 text-secondary">·</span>
+                        <span class="reports-badge-periodo"><i class="bi bi-cash-coin me-1"></i>{{ monedas[filtros.moneda] }}</span>
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex gap-2 export-actions">
+                <a id="btnExportPdf" class="btn btn-export-pdf btn-sm"
+                   href="{{ export_url_pdf }}">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </a>
+                <a id="btnExportExcel" class="btn btn-export-excel btn-sm"
+                   href="{{ export_url_excel }}">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </a>
+            </div>
+        </div>
+
+        <!-- Selector de filtros -->
+        <form id="reportFilters" class="reports-filter mb-4" method="get"
+              action="{{ url_for('analysis_reports.reports_page') }}">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6 col-xl-3">
+                    <div class="report-field">
+                        <label for="fMetric" class="form-label small fw-semibold">Reporte</label>
+                        <select id="fMetric" name="metric" class="form-select form-select-sm">
+                            {% for valor, etiqueta in metricas_opciones %}
+                            <option value="{{ valor }}" {% if filtros.metric == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <div class="report-field">
+                        <label for="fPeriodType" class="form-label small fw-semibold">Período</label>
+                        <select id="fPeriodType" name="period_type" class="form-select form-select-sm">
+                            {% for valor in periodos_opciones %}
+                            <option value="{{ valor }}" {% if filtros.period_type == valor %}selected{% endif %}>{{ periodos_etiquetas[valor] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <div class="report-field">
+                        <label for="fPeriodStart" class="form-label small fw-semibold">Ancla</label>
+                        <select id="fPeriodStart" name="period_start" class="form-select form-select-sm">
+                            <option value="">Reciente</option>
+                            {% for ancla in anclas %}
+                            <option value="{{ ancla }}" {% if filtros.period_start|string == ancla|string %}selected{% endif %}>{{ ancla }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <div class="report-field">
+                        <label for="fMoneda" class="form-label small fw-semibold">Moneda</label>
+                        <select id="fMoneda" name="moneda" class="form-select form-select-sm">
+                            <option value="USD" {% if filtros.moneda == 'USD' %}selected{% endif %}>USD $</option>
+                            <option value="BS" {% if filtros.moneda == 'BS' %}selected{% endif %}>Bs</option>
+                            <option value="EUR" {% if filtros.moneda == 'EUR' %}selected{% endif %}>EUR €</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <div class="report-field">
+                        <label for="fSede" class="form-label small fw-semibold">Sede</label>
+                        <select id="fSede" name="location_id" class="form-select form-select-sm">
+                            <option value="">Todas mis sedes</option>
+                            {% for sede in sedes %}
+                            <option value="{{ sede.id }}" {% if filtros.location_id|string == sede.id|string %}selected{% endif %}>{{ sede.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-8 col-xl-7 mt-3 pt-2 border-top border-light-subtle">
+                    {% if fechas_disponibles %}
+                    <div class="report-field">
+                        <label class="form-label small fw-semibold">Rango (desde → hasta)</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <select id="fDesde" name="desde"
+                                    class="form-select form-select-sm calendar-date"
+                                    title="Solo fechas con estadísticas ({{ fechas_disponibles | length }})">
+                                <option value="">— Sin límite —</option>
+                                {% for f in fechas_disponibles %}
+                                <option value="{{ f.isoformat() }}" {% if filtros.desde and filtros.desde.isoformat() == f.isoformat() %}selected{% endif %}>
+                                    Desde {{ f.strftime('%d/%m/%Y') }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <span class="calendar-to text-muted">→</span>
+                            <select id="fHasta" name="hasta"
+                                    class="form-select form-select-sm calendar-date"
+                                    title="Solo fechas con estadísticas ({{ fechas_disponibles | length }})">
+                                <option value="">— Sin límite —</option>
+                                {% for f in fechas_disponibles %}
+                                <option value="{{ f.isoformat() }}" {% if filtros.hasta and filtros.hasta.isoformat() == f.isoformat() %}selected{% endif %}>
+                                    Hasta {{ f.strftime('%d/%m/%Y') }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-text text-muted small mt-1">
+                            <i class="bi bi-check2-circle me-1"></i>Solo fechas con estadísticas disponibles
+                            ({{ fechas_disponibles | length }}).
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="report-field">
+                        <label class="form-label small fw-semibold">Rango (desde → hasta)</label>
+                        <input type="text" class="form-control form-control-sm"
+                               value="Sin estadísticas disponibles para este filtro" disabled>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-12 col-lg-4 col-xl-5 mt-3 pt-2 border-top border-light-subtle text-lg-end">
+                    <button type="submit" class="btn btn-filter btn-sm w-100 w-lg-auto">
+                        <i class="bi bi-funnel me-1"></i> Aplicar
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Tarjetas KPI -->
+        <div class="row g-3 mb-4" id="kpiRow">
+            {% for clave in kpis_orden %}
+            {% set kpi = kpis.kpis[clave] %}
+            <div class="col-6 col-lg">
+                <div class="kpi-card">
+                    <div class="kpi-label">{{ kpi.label }}</div>
+                    <div class="kpi-value">{{ kpi.actual | ph_amount }}<span class="kpi-unit">{{ 'Bs' if kpis.moneda == 'BS' else kpis.moneda }}</span></div>
+                    <div class="kpi-trend trend-{{ kpi.direccion }}">
+                        {% if kpi.pct is not none %}
+                        {{ '+' if kpi.diferencia > 0 else '' }}{{ kpi.pct | ph_amount }}%
+                        <span class="trend-arrow">{{ '▲' if kpi.direccion == 'up' else ('▼' if kpi.direccion == 'down' else '—') }}</span>
+                        {% else %}—{% endif %}
+                        <span class="trend-note">vs {{ kpis.period.previous_label }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-xl-7">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-graph-up me-2"></i>Evolución del indicador
+                        {% if graficos and graficos.evolucion %}
+                        <span class="reports-panel-note">{% if graficos.metric == 'TRANSFERS' %}cant. de movimientos{% else %}monto ({{ graficos.moneda }}){% endif %} · últimos períodos</span>
+                        {% endif %}
+                    </h4>
+                    <div class="chart-box"><canvas id="chartEvolucion"></canvas></div>
+                </div>
+            </div>
+            {% if graficos and graficos.detalle %}
+            <div class="col-12 col-xl-5">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-pie-chart me-2"></i>{{ graficos.detalle.titulo }}
+                        {% if graficos.detalle.tipo == 'bar' %}
+                        <span class="reports-panel-note">monto ({{ graficos.detalle.unidad or graficos.moneda }})</span>
+                        {% endif %}
+                    </h4>
+                    <div class="chart-box"><canvas id="chartDetalle"></canvas></div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if ver_compras and graficos and graficos.gasto and graficos.gasto.series %}
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-pie-chart-fill me-2"></i>Compras por categoría contable
+                        <span class="reports-panel-note">compras convertidas a {{ graficos.gasto.moneda }} (tasa BCV) · {{ graficos.gasto.labels|length }} períodos comparados</span>
+                    </h4>
+                    <div class="chart-box chart-box-tall"><canvas id="chartGasto"></canvas></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if filtros.metric == 'CONSOLIDATED' and reporte.detail and reporte.detail.consolidado %}
+        {% set cons = reporte.detail.consolidado %}
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-calculator-fill me-2"></i>Consolidado financiero — cuánto se gastó, en qué y dónde
+                        <span class="reports-panel-note">{% if ver_compras %}compras con la tasa del día de cada compra; {% endif %}consumo/mermas/pérdidas con la última tasa BCV del período</span>
+                    </h4>
+                    <p class="text-muted small mb-3">
+                        {% if ver_compras %}
+                        Compras − consumo de cocina − mermas − pérdidas en traslado.
+                        Las compras no tienen sede: su entrega entra a la <strong>Central</strong>.
+                        {% else %}
+                        El costo operativo de estas sedes se mide por el flujo de traslados:
+                        −(consumo de cocina + mermas + pérdidas en traslado). Las compras son
+                        exclusivas de la sede <strong>Central</strong> y no aplican aquí.
+                        {% endif %}
+                    </p>
+                    <div class="row g-4">
+                        <div class="col-12 col-lg-6">
+                            <h6 class="reports-panel-subtitle">Por concepto</h6>
+                            <div class="table-responsive">
+                                <table class="table align-middle reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Concepto</th>
+                                            <th class="text-end">$ (USD)</th>
+                                            <th class="text-end">Bs</th>
+                                            <th class="text-end">EUR (€)</th>
+                                            <th class="text-end">Monto ({{ cons.moneda }})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for fila in cons.por_concepto %}
+                                        <tr>
+                                            <td>{{ fila.concepto }}</td>
+                                            <td class="text-end">{{ fila.buckets.USD | ph_amount }}</td>
+                                            <td class="text-end">{{ fila.buckets.BS | ph_amount }}</td>
+                                            <td class="text-end">{{ fila.buckets.EUR | ph_amount }}</td>
+                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos reales en el período.</td></tr>
+                                        {% endfor %}
+                                        <tr class="fw-bold">
+                                            <td colspan="4">Resultado del período</td>
+                                            <td class="text-end">{{ cons.resultado | ph_amount(0 if cons.resultado == cons.resultado|int else 2) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% if ver_compras %}
+                        <div class="col-12 col-lg-6">
+                            <h6 class="reports-panel-subtitle">Por categoría contable (compras)</h6>
+                            <div class="table-responsive">
+                                <table class="table align-middle reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Categoría</th>
+                                            <th class="text-end">Monto ({{ cons.moneda }})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for fila in cons.por_categoria %}
+                                        <tr>
+                                            <td>{{ fila.category }}</td>
+                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="2" class="text-center text-muted py-4">Sin compras en el período.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-12">
+                            <h6 class="reports-panel-subtitle">Por sede</h6>
+                            <div class="table-responsive">
+                                <table class="table align-middle reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sede</th>
+                                            <th class="text-end">Monto ({{ cons.moneda }})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for fila in cons.por_sede %}
+                                        <tr>
+                                            <td>{{ fila.sede }}</td>
+                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="2" class="text-center text-muted py-4">Sin movimientos por sede en el período.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% if ver_compras %}
+                        <div class="col-12">
+                            <h6 class="reports-panel-subtitle">Compras por moneda — en qué moneda se compró más</h6>
+                            <p class="text-muted small mb-2">
+                                Cada compra se registró en su propia moneda; el equivalente usa la tasa
+                                del día de cada compra (la que el sistema guardó al registrarla en
+                                <code>price_bs</code>). La moneda $ es dólar (USD), Bs es bolívar y EUR es euro.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table align-middle reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Moneda</th>
+                                            <th class="text-end">Gastado (en su moneda)</th>
+                                            <th class="text-end">Compras</th>
+                                            <th class="text-end">Equivalente ({{ cons.moneda }})</th>
+                                            <th class="text-end">% del total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for fila in cons.por_moneda.filas %}
+                                        <tr>
+                                            <td>{% if fila.currency == 'USD' %}$ (USD){% elif fila.currency == 'BS' %}Bs{% else %}EUR (€){% endif %}</td>
+                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                            <td class="text-end">{{ fila.compras }}</td>
+                                            <td class="text-end">{{ fila.equivalente | ph_amount(0 if fila.equivalente == fila.equivalente|int else 2) }}</td>
+                                            <td class="text-end">{{ fila.pct | ph_amount(2) }}%</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="text-center text-muted py-4">Sin compras en el período.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row g-4">
+            <!-- Comparativo + detalle -->
+            <div class="col-12 col-xl-7">
+                <div class="reports-panel mb-4">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-arrow-left-right me-2"></i>Comparativo con el período anterior
+                    </h4>
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Métrica</th>
+                                    <th class="text-end">Actual</th>
+                                    <th class="text-end">Anterior</th>
+                                    <th class="text-end">Diferencia</th>
+                                    <th class="text-end">Variación</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for clave in kpis_orden %}
+                                {% set kpi = kpis.kpis[clave] %}
+                                <tr>
+                                    <td class="fw-semibold">{{ kpi.label }}</td>
+                                    <td class="text-end">{{ kpi.actual | ph_amount }}</td>
+                                    <td class="text-end text-muted">{{ kpi.anterior | ph_amount }}</td>
+                                    <td class="text-end trend-{{ kpi.direccion }}">
+                                        {{ '+' if kpi.diferencia > 0 else '' }}{{ kpi.diferencia | ph_amount }}
+                                    </td>
+                                    <td class="text-end trend-{{ kpi.direccion }}">
+                                        {{ (kpi.pct | ph_amount) ~ '%' if kpi.pct is not none else '—' }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-table me-2"></i>Detalle del reporte
+                    </h4>
+                    {% if filtros.metric == 'PURCHASES' %}
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Proveedor</th>
+                                    <th>Mes</th>
+                                    <th class="text-end"># Compras</th>
+                                    <th class="text-end">Monto ({{ filtros.moneda }})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fila in reporte.detail.por_proveedor %}
+                                <tr>
+                                    <td>{{ fila.supplier_name }}</td>
+                                    <td>{{ fila.month }}</td>
+                                    <td class="text-end">{{ fila.purchase_count }}</td>
+                                    <td class="text-end">{{ fila.monto | ph_amount }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-center text-muted py-4">Sin compras en el período.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% elif filtros.metric == 'KITCHEN_CONSUMPTION' %}
+                    <p class="text-muted small mb-1">
+                        <i class="bi bi-fire me-1"></i>Registros de consumo de cocina del período.
+                    </p>
+                    <div class="d-flex align-items-center gap-3 py-2">
+                        <span class="fs-4 fw-bold">{{ reporte.detail.registros }}</span>
+                        <span class="text-muted small">registros registrados (valorización por último precio según el contrato de costo).</span>
+                    </div>
+
+                    {% elif filtros.metric == 'WASTE' %}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-trash3 me-1"></i>Cada merma aprobada real del período, con su costo convertido a {{ filtros.moneda }}
+                        (la merma se registró con su propio costo; al cambiar la moneda se convierte con la tasa BCV).
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Sede</th>
+                                    <th>Tipo</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Costo ({{ filtros.moneda }})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fila in reporte.detail.mermas %}
+                                <tr>
+                                    <td>{{ fila.date.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ fila.sede }}</td>
+                                    <td>{{ fila.waste_type or 'Sin tipo' }}{% if fila.notes %}
+                                        <span class="text-muted small">· {{ fila.notes }}</span>{% endif %}</td>
+                                    <td class="text-end">{{ fila.quantity | ph_qty }}</td>
+                                    <td class="text-end">{{ fila.cost | ph_amount(0 if fila.cost == fila.cost|int else 2) }}
+                                        {{ fila.currency }}<br>
+                                        <span class="text-muted small">orig. {{ fila.cost_original | ph_amount(0 if fila.cost_original == fila.cost_original|int else 2) }} {{ fila.origin_currency }}</span></td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="5" class="text-center text-muted py-4">Sin mermas aprobadas en el período.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% elif filtros.metric == 'TRANSFERS' %}
+                    <h6 class="reports-panel-subtitle">
+                        <i class="bi bi-clipboard-data me-2"></i>Resumen del período
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table">
+                            <tbody>
+                                {% if reporte.detail.tiene_enviados %}
+                                <tr><td class="fw-semibold w-50"><i class="bi bi-arrow-up-circle text-primary me-2"></i>Enviados</td><td class="text-end fw-semibold">{{ reporte.detail.enviados }}</td></tr>
+                                {% else %}
+                                <tr><td class="fw-semibold w-50"><i class="bi bi-arrow-counterclockwise text-warning me-2"></i>Devueltos</td><td class="text-end fw-semibold">{{ reporte.detail.devueltos }}</td></tr>
+                                {% endif %}
+                                <tr><td class="fw-semibold"><i class="bi bi-arrow-down-circle text-success me-2"></i>Recibidos</td><td class="text-end fw-semibold">{{ reporte.detail.recibidos }}</td></tr>
+                                <tr><td class="fw-semibold"><i class="bi bi-arrow-repeat me-2"></i>Reposiciones (complementos)</td><td class="text-end">{{ reporte.detail.reposiciones }}</td></tr>
+                                <tr><td class="fw-semibold"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Disputas / novedades</td><td class="text-end">{{ reporte.detail.disputas }}</td></tr>
+                                <tr><td class="fw-semibold">Extravíos (cantidad)</td><td class="text-end">{{ reporte.detail.extravios_quantity | ph_qty }}</td></tr>
+                                <tr>
+                                    <td class="fw-semibold">Pérdidas valorizadas</td>
+                                    <td class="text-end">{{ reporte.detail.perdidas_valorizadas | ph_amount }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if reporte.detail.recibido_por_insumo %}
+                    <h6 class="reports-panel-subtitle mt-4">
+                        <i class="bi bi-box-seam me-2"></i>Mercancía recibida — qué insumo llegó
+                        <span class="reports-panel-note">insumos más trasladados del período</span>
+                    </h6>
+                    {% set recibido_top = reporte.detail.recibido_por_insumo.top %}
+                    {% if recibido_top %}
+                    <div class="ranking-list mb-3">
+                        {% for fila in recibido_top %}
+                        <div class="ranking-item">
+                            <div class="ranking-pos">{{ loop.index }}</div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ fila.product_name }}</div>
+                                <div class="text-muted small">Insumo recibido</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold reporte-qty">{{ fila.quantity | ph_qty }}</div>
+                                <div class="text-muted small">cantidad</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-3">Sin mercancía recibida en el período.</p>
+                    {% endif %}
+                    {% set recibido_detalle = reporte.detail.recibido_por_insumo.detalle %}
+                    {% if recibido_detalle %}
+                    <div class="reports-inner-title">
+                        <i class="bi bi-diagram-3 me-2"></i>Por sede recibida
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Sede</th>
+                                    <th>Insumo</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Lotes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fila in recibido_detalle %}
+                                <tr>
+                                    <td>{{ fila.sede_name }}</td>
+                                    <td>{{ fila.product_name }}</td>
+                                    <td class="text-end fw-semibold">{{ fila.quantity | ph_qty }}</td>
+                                    <td class="text-end">{{ fila.lots }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if reporte.detail.direccional %}
+                    {% set dir_iconos = {'enviados': 'bi-arrow-up-circle',
+                                         'devueltos': 'bi-arrow-counterclockwise',
+                                         'recibidos': 'bi-arrow-down-circle'} %}
+                    {% set dir_orden = ['devueltos', 'recibidos'] if not reporte.detail.tiene_enviados else ['recibidos', 'enviados'] %}
+                    <h6 class="reports-panel-subtitle mt-4">
+                        <i class="bi bi-arrow-left-right me-2"></i>Flujo direccional
+                        <span class="reports-panel-note">mercancía y costo al último costo de compra ({{ reporte.detail.direccional.moneda }})</span>
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table align-middle reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Dirección</th>
+                                    <th class="text-end"># Traslados</th>
+                                    <th class="text-end">Mercancía</th>
+                                    <th class="text-end">Costo ({{ reporte.detail.direccional.moneda }})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in dir_orden %}
+                                {% set dd = reporte.detail.direccional[d] %}
+                                {% set dir_nombre = {'devueltos': 'Devueltos', 'recibidos': 'Recibidos',
+                                                     'enviados': 'Enviados'}[d] %}
+                                {% set dir_clase = 'dir-badge--recibido' if d == 'recibidos'
+                                                   else ('dir-badge--enviado' if d == 'enviados'
+                                                         else 'dir-badge--devuelto') %}
+                                <tr>
+                                    <td>
+                                        <span class="dir-badge {{ dir_clase }}">
+                                            <i class="bi {{ dir_iconos[d] }} me-1"></i>{{ dir_nombre }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ dd.conteo }}</td>
+                                    <td class="text-end">{{ dd.quantity | ph_qty }}</td>
+                                    <td class="text-end">{{ dd.cost | ph_amount }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="reports-total-row">
+                                    <td class="fw-semibold"><i class="bi bi-collection me-2"></i>Total</td>
+                                    <td class="text-end fw-semibold">{{ reporte.detail.direccional.total.conteo }}</td>
+                                    <td class="text-end fw-semibold">{{ reporte.detail.direccional.total.quantity | ph_qty }}</td>
+                                    <td class="text-end fw-semibold">{{ reporte.detail.direccional.total.cost | ph_amount }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if reporte.detail.movimientos %}
+                    <p class="text-muted small mb-2 mt-3">
+                        <i class="bi bi-truck me-1"></i>Movimientos del período.
+                    </p>
+                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                        <table class="table align-middle reports-table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Estado</th>
+                                    <th>Origen</th>
+                                    <th>Destino</th>
+                                    <th>Dirección</th>
+                                    <th class="text-end">Mercancía</th>
+                                    <th class="text-end">Costo ({{ reporte.detail.direccional.moneda }})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mv in reporte.detail.movimientos %}
+                                {% set mv_clase = 'dir-badge--recibido' if mv.direccion == 'recibidos'
+                                                  else ('dir-badge--enviado' if mv.direccion == 'enviados'
+                                                        else 'dir-badge--devuelto') %}
+                                <tr>
+                                    <td>{{ mv.date.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ mv.type }}</td>
+                                    <td>{{ mv.status }}</td>
+                                    <td>{{ mv.origin_name }}</td>
+                                    <td>{{ mv.destination_name }}</td>
+                                    <td><span class="dir-badge {{ mv_clase }}">{{ mv.direccion }}</span></td>
+                                    <td class="text-end">{{ mv.quantity | ph_qty }}</td>
+                                    <td class="text-end">{{ mv.cost | ph_amount }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="8" class="text-center text-muted py-4">Sin movimientos en el período.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% elif filtros.metric == 'CONSOLIDATED' %}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-calculator me-1"></i>Desglose completo (qué y dónde, en Bs/USD/EUR) en el panel
+                        <strong>Consolidado financiero</strong> de esta página.
+                    </p>
+                    {% if reporte.detail and reporte.detail.consolidado %}
+                    {% set cons = reporte.detail.consolidado %}
+                    <div class="d-flex align-items-center gap-3 py-2">
+                        <div>
+                            <div class="text-muted small">{{ cons.moneda }}</div>
+                            <div class="fs-5 fw-bold">{{ cons.resultado | ph_amount(0 if cons.resultado == cons.resultado|int else 2) }}</div>
+                        </div>
+                        <div class="text-muted small ms-1">= resultado del período (en la moneda seleccionada, tasa BCV) — {% if ver_compras %}compras {% endif %}− consumo − mermas − pérdidas en traslados</div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ranking entre sedes -->
+            <div class="col-12 col-xl-5">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-trophy me-2"></i>Ranking entre sedes
+                    </h4>
+                    {% if ranking %}
+                    <div class="ranking-list">
+                        {% for renglon in ranking %}
+                        <div class="ranking-item">
+                            <div class="ranking-pos">{{ loop.index }}</div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ renglon.location_name }}</div>
+                                <div class="text-muted small">
+                                    Ant. {{ renglon.anterior | ph_amount }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">{{ renglon.total_base | ph_amount }}</div>
+                                <div class="small trend-{{ 'up' if renglon.pct and renglon.pct > 0 else ('down' if renglon.pct and renglon.pct < 0 else 'flat') }}">
+                                    {% if renglon.pct is not none %}
+                                    {{ '+' if renglon.pct > 0 else '' }}{{ renglon.pct | ph_amount }}%
+                                    {% else %}—{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small py-3">Aún no hay resúmenes en el cajón para este período.</p>
+                    {% endif %}
+                    {% if graficos and graficos.ranking %}
+                    <div class="chart-box chart-box-ranking mt-3">
+                        <canvas id="chartRanking"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    window.REPORT_FILTERS = {{ filtros | tojson }};
+    window.RECORTES = {{ graficos | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/analytics/analysis_reports.js') }}?v=10"></script>
+{% endblock %}

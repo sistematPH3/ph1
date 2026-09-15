@@ -1,6 +1,6 @@
 import threading
 import io
-from flask import Blueprint, request, jsonify, render_template, current_app, flash, redirect, url_for
+from flask import Blueprint, request, jsonify, render_template, current_app, flash, redirect, url_for, send_file
 from flask_login import current_user
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -168,6 +168,44 @@ def view_purchase_details(purchase_id):
         edit_logs=edit_logs
     )
 
+@purchase_bp.route('/purchases/<int:purchase_id>/export', methods=['GET'])
+@require_roles('admin', 'management', 'manager', 'finance')
+def export_purchase_detail(purchase_id):
+    if not Purchase.query.get(purchase_id):
+        flash('La compra solicitada no existe.', 'error')
+        return redirect(url_for('purchase_routes.view_purchase_details',
+                                purchase_id=purchase_id))
+
+    formato = request.args.get('formato', 'pdf')
+    if formato not in ('pdf', 'excel'):
+        return 'Formato inválido.', 400
+
+    from app.reports.services import audit_export_service
+    from app.reports.services.audit_export_generators import (
+        generar_excel_auditoria, generar_pdf_auditoria)
+
+    documento = audit_export_service.construir_detalle_compra(
+        current_user, purchase_id, {'formato': formato})
+    if documento.get('error'):
+        flash(documento['error'], 'error')
+        return redirect(url_for('purchase_routes.view_purchase_details',
+                                purchase_id=purchase_id))
+
+    painter = (generar_pdf_auditoria if formato == 'pdf'
+               else generar_excel_auditoria)
+    buffer = painter(documento['header'], documento['detalle_tablas'])
+    buffer.seek(0)
+
+    ext = 'pdf' if formato == 'pdf' else 'xlsx'
+    mimetype = ('application/pdf' if formato == 'pdf'
+                else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    nombre = (f"detalle-compra-{purchase_id}-"
+              f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}")
+    # PDF en linea (visor) para evitar gestores externos como IDM.
+    return send_file(buffer, as_attachment=(formato != 'pdf'),
+                     download_name=nombre, mimetype=mimetype)
+
+
 @purchase_bp.route('/purchases', methods=['POST'])
 @require_roles('admin', 'management', 'manager')
 def create_purchase():
@@ -258,15 +296,21 @@ def create_purchase():
         purchase_id = result.get("purchase_id")
 
         try:
-            historial_tasa = ExchangeRateHistory(
-                currency=data['currency'],
-                rate=data['exchange_rate'],
-                source='COMPRA REGISTRADA',
-                timestamp=datetime.now(),
-                user_id=data['user_id']
-            )
-            db.session.add(historial_tasa)
-            db.session.commit()
+            moneda_historial = (str(data['currency']) or 'USD').upper()
+            if moneda_historial in ('VES', 'BS.', 'BSS'):
+                moneda_historial = 'BS'
+            # La tasa registrada de una compra en Bs es la referencia BCV (Bs por $);
+            # no tiene sentido archivarla como tasa de la propia moneda Bs.
+            if moneda_historial not in ('BS',):
+                historial_tasa = ExchangeRateHistory(
+                    currency=moneda_historial,
+                    rate=data['exchange_rate'],
+                    source='COMPRA REGISTRADA',
+                    timestamp=datetime.now(),
+                    user_id=data['user_id']
+                )
+                db.session.add(historial_tasa)
+                db.session.commit()
         except Exception as e:
             db.session.rollback()
             

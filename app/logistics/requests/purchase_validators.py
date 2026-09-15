@@ -1,4 +1,16 @@
 from decimal import Decimal, InvalidOperation
+import re
+
+
+def normalizar_numero(valor):
+    """Normaliza formatos de miles (2.000.000) y coma decimal (2,50) a punto."""
+    s = str(valor or '').strip().replace(' ', '')
+    if not s:
+        return s
+    if ',' in s:
+        return s.replace('.', '').replace(',', '.')
+    return re.sub(r'\.(?=\d{3}(?!\d))', '', s)
+
 
 class PurchaseValidator:
     @staticmethod
@@ -16,15 +28,15 @@ class PurchaseValidator:
                 errors['supplier_id'] = "El proveedor debe ser un identificador numérico."
 
         currency = str(data.get('currency', '')).strip().upper()
-        if not currency or currency not in ('USD', 'EUR'):
-            errors['currency'] = "La moneda debe ser obligatoriamente USD o EUR."
+        if currency not in ('USD', 'EUR', 'BS', 'VES', 'BS.', 'BSS'):
+            errors['currency'] = "La moneda debe ser obligatoriamente USD, EUR o BS."
 
         exchange_rate_raw = data.get('exchange_rate')
         if exchange_rate_raw is None or str(exchange_rate_raw).strip() == '':
             errors['exchange_rate'] = "La tasa de cambio es obligatoria."
         else:
             try:
-                rate = Decimal(str(exchange_rate_raw))
+                rate = Decimal(normalizar_numero(exchange_rate_raw))
                 if rate <= Decimal('0.00'):
                     errors['exchange_rate'] = "La tasa de cambio debe ser un número mayor a cero."
                 elif rate > Decimal('999999.99'):
@@ -57,7 +69,7 @@ class PurchaseValidator:
 
             qty_raw = item.get('quantity')
             try:
-                qty = Decimal(str(qty_raw))
+                qty = Decimal(normalizar_numero(qty_raw))
                 if qty < Decimal('0.01'):
                     errors[f'item_{index}_quantity'] = "La cantidad mínima es 0.01."
                 elif qty > Decimal('999999.99'):
@@ -67,11 +79,11 @@ class PurchaseValidator:
 
             price_raw = item.get('foreign_price')
             try:
-                price = Decimal(str(price_raw))
+                price = Decimal(normalizar_numero(price_raw))
                 if price < Decimal('0.01'):
-                    errors[f'item_{index}_foreign_price'] = "El precio mínimo es 0.01."
-                elif price > Decimal('999999.99'):
-                    errors[f'item_{index}_foreign_price'] = "El precio excede el límite permitido (máx 999,999.99)."
+                    errors[f'item_{index}_foreign_price'] = "El total de la línea mínimo es 0.01."
+                elif price > Decimal('999999999.99'):
+                    errors[f'item_{index}_foreign_price'] = "El total de la línea excede el límite permitido (máx 999,999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
                 errors[f'item_{index}_foreign_price'] = "Precio numérico inválido."
                 
@@ -102,7 +114,7 @@ class PurchaseValidator:
 
             qty_raw = item.get('quantity')
             try:
-                qty = Decimal(str(qty_raw))
+                qty = Decimal(normalizar_numero(qty_raw))
                 if qty < Decimal('0.01'):
                     errors[f'item_{index}_quantity'] = "La cantidad mínima es 0.01."
                 elif qty > Decimal('999999.99'):
@@ -112,11 +124,11 @@ class PurchaseValidator:
 
             price_raw = item.get('foreign_price')
             try:
-                price = Decimal(str(price_raw))
+                price = Decimal(normalizar_numero(price_raw))
                 if price < Decimal('0.01'):
-                    errors[f'item_{index}_foreign_price'] = "El precio mínimo es 0.01."
-                elif price > Decimal('999999.99'):
-                    errors[f'item_{index}_foreign_price'] = "El precio excede el límite permitido (máx 999,999.99)."
+                    errors[f'item_{index}_foreign_price'] = "El total de la línea mínimo es 0.01."
+                elif price > Decimal('999999999.99'):
+                    errors[f'item_{index}_foreign_price'] = "El total de la línea excede el límite permitido (máx 999,999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
                 errors[f'item_{index}_foreign_price'] = "Precio numérico inválido."
 

@@ -56,6 +56,15 @@
                 </div>
             </div>
         </div>
+
+        <div class="d-flex gap-2 justify-content-end mt-3">
+            <a href="{{ url_for('purchase_management.exportar_listado') }}" data-export-listado="pdf" class="btn btn-sm rounded-pill text-white d-flex align-items-center gap-1 px-3" style="background-color: #d61c2c;" title="Descargar PDF con los filtros aplicados">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('purchase_management.exportar_listado') }}" data-export-listado="excel" class="btn btn-sm rounded-pill text-white d-flex align-items-center gap-1 px-3" style="background-color: #198754;" title="Descargar Excel con los filtros aplicados">
+                <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+        </div>
     </div>
 
     <div class="card card-custom overflow-hidden" id="purchases-main-container">

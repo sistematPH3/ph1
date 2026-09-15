@@ -25,6 +25,12 @@ def ver_auditoria():
     # Obtener el historial completo
     raw_audit_trail = WasteAuditService.get_formatted_audit_trail(current_user, {})
 
+    # Rango de fechas donde existen mermas, para limitar el calendario
+    # (mismas reglas que la auditoría de Traslados).
+    min_ts, max_ts = WasteAuditService.get_merma_audit_date_range(current_user)
+    date_min = min_ts.strftime('%Y-%m-%d') if min_ts else None
+    date_max = max_ts.strftime('%Y-%m-%d') if max_ts else None
+
     # Normalizar los datos para evitar fallos si 'changed_data' o 'details' llegaron como string
     audit_trail = []
     for item in raw_audit_trail:
@@ -44,7 +50,9 @@ def ver_auditoria():
     return render_template(
         'waste/waste_audit.html', 
         audit_trail=audit_trail, 
-        locations=locations_list
+        locations=locations_list,
+        date_min=date_min,
+        date_max=date_max
     )
 
 @waste_audit_bp.route('/api/audit', methods=['GET'])

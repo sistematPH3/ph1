@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from datetime import datetime, timedelta
 from sqlalchemy import text
 import json
+from app.logistics.requests.purchase_validators import normalizar_numero
 
 class PurchaseManagementRepository:
     def __init__(self, db_connection):
@@ -189,6 +190,7 @@ class PurchaseManagementRepository:
 
             new_total_amount = Decimal('0.00')
             purchase_exchange_rate = Decimal(str(purchase.exchange_rate))
+            es_bs = str(purchase.currency or '').upper() in ('BS', 'VES', 'BS.', 'BSS')
             kept_detail_ids = {
                 str(item['id']) for item in new_items
                 if not str(item['id']).startswith('new_')
@@ -198,8 +200,9 @@ class PurchaseManagementRepository:
                 matching_new = next((item for item in new_items if str(item['id']) == str(detail.id)), None)
 
                 if matching_new:
-                    new_qty = Decimal(str(matching_new['quantity']))
-                    new_price = Decimal(str(matching_new['foreign_price']))
+                    new_qty = Decimal(normalizar_numero(matching_new['quantity']))
+                    new_price = (Decimal(normalizar_numero(matching_new['foreign_price'])) / new_qty).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP)
                     old_qty = Decimal(str(detail.quantity))
                     old_price = Decimal(str(detail.foreign_price)) if detail.foreign_price is not None else Decimal('0.00')
                     old_exp = str(detail.expiration_date) if detail.expiration_date else None
@@ -236,7 +239,7 @@ class PurchaseManagementRepository:
 
                     detail.quantity = new_qty
                     detail.foreign_price = new_price
-                    detail.price_bs = new_price * purchase_exchange_rate
+                    detail.price_bs = new_price if es_bs else new_price * purchase_exchange_rate
                     detail.expiration_date = new_exp
                     detail.lot_number = new_lot
 
@@ -290,8 +293,9 @@ class PurchaseManagementRepository:
                     if not item.get('product_id'):
                         continue
                         
-                    new_qty = Decimal(str(item['quantity']))
-                    new_price = Decimal(str(item['foreign_price']))
+                    new_qty = Decimal(normalizar_numero(item['quantity']))
+                    new_price = (Decimal(normalizar_numero(item['foreign_price'])) / new_qty).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP)
                     product_id = int(item['product_id'])
                     
                     exp_date_obj = None
@@ -331,7 +335,7 @@ class PurchaseManagementRepository:
                         product_id=product_id,
                         quantity=new_qty,
                         foreign_price=new_price,
-                        price_bs=new_price * purchase_exchange_rate,
+                        price_bs=new_price if es_bs else new_price * purchase_exchange_rate,
                         expiration_date=exp_date_obj,
                         lot_number=lot_val
                     )

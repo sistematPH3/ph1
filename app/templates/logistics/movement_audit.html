@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
@@ -16,11 +16,15 @@
                     <i class="bi bi-shield-lock"></i>
                 </div>
                 <div>
-                    <h2 class="ph-title mb-1">Bitácora de Auditoría Forense</h2>
+                    <h2 class="ph-title mb-1">Auditoría de Traslados</h2>
                     <p class="text-muted mb-0"> Reconstruye la historia completa de cada traslado a partir de los eventos registrados.</p>
                 </div>
             </div>
         </div>
+
+    {% set export_base_url = url_for('audit_exports.descargar_movimientos', _external=False) %}
+    {% set export_sin_fechas = True %}
+    {% include 'reports/audit_export_toolbar.html' %}
 
         <!-- Filtros dentro del cintillo rojo -->
         <div class="ph-filters-cintillo mt-3">
@@ -32,7 +36,7 @@
             </div>
             <div>
                 <form method="GET" action="{{ url_for('logistics_audit.view_movement_audit') }}" class="d-flex gap-2 align-items-center">
-                    <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                    <select name="severity" id="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
                         <option value="">Todas las severidades</option>
                         <option value="NORMAL" {% if filters.get('severity') == 'NORMAL' %}selected{% endif %}>NORMAL</option>
                         <option value="ALERTA" {% if filters.get('severity') == 'ALERTA' %}selected{% endif %}>ALERTA</option>
@@ -448,5 +452,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/logistics/movement_audit.js') }}?v=1"></script>
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/audit/audit_export.js') }}?v=1"></script>
+    <script src="{{ url_for('static', filename='js/logistics/movement_audit.js') }}?v=1"></script>
 {% endblock %}

@@ -38,6 +38,14 @@ def ver_auditoria_accesos():
     # 3. Finalizamos construyendo el ordenamiento y ejecutando la consulta
     historial = query.order_by(LoginAudit.timestamp.desc()).all()
         
-    sedes = Location.query.order_by(Location.name.asc()).all()
+    # 4. Sede institucional (Almacén Central) nunca se lista para Finanzas
+    if user_role == 'Finance':
+        if getattr(current_user, 'is_admin', False):
+            sedes = [loc for loc in Location.query.order_by(Location.name.asc()).all()
+                     if loc.id != 1]
+        else:
+            sedes = [loc for loc in current_user.locations if loc.id != 1]
+    else:
+        sedes = Location.query.order_by(Location.name.asc()).all()
     
     return render_template('security/login_audit.html', historial=historial, sedes=sedes)

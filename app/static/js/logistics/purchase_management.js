@@ -272,7 +272,7 @@ const handleActionClick = function(e) {
                             </div>
                         </td>
                         <td class="text-center px-2">
-                            <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.quantity)}" min="0.01" step="0.01">
+                            <input type="text" inputmode="decimal" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.quantity)}" placeholder="0.00">
                         </td>
                         <td class="text-center px-2">
                             <input type="text" class="form-control text-center edit-lot border-secondary text-dark px-1 font-monospace" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.lot_number === 'N/A' ? '' : item.lot_number)}" placeholder="Opcional">
@@ -283,7 +283,7 @@ const handleActionClick = function(e) {
                         <td class="text-center px-2">
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-secondary text-muted small px-1">${escapeHtml(data.currency)}</span>
-                                <input type="number" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.foreign_price)}" min="0.01" step="0.01">
+                                <input type="text" inputmode="decimal" class="form-control text-end edit-price border-secondary border-start-0 ps-0 text-dark" data-id="${escapeHtml(item.id)}" value="${escapeHtml((parseFloat(item.quantity) * parseFloat(item.foreign_price)).toFixed(2))}" placeholder="0.00">
                             </div>
                         </td>
                         <td class="text-center px-1 align-middle">
@@ -323,7 +323,7 @@ if (btnAddRowEdit) {
                 </div>
             </td>
             <td class="text-center px-2">
-                <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" min="0.01" step="0.01">
+                <input type="text" inputmode="decimal" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" placeholder="0.00">
             </td>
             <td class="text-center px-2">
                 <input type="text" class="form-control text-center edit-lot border-success text-dark px-1 font-monospace" data-id="new_${newRowCounter}" value="" placeholder="Opcional / Auto">
@@ -334,7 +334,7 @@ if (btnAddRowEdit) {
             <td class="text-center px-2">
                 <div class="input-group">
                     <span class="input-group-text bg-success-subtle border-success text-success small px-1">${escapeHtml(currentCurrency)}</span>
-                    <input type="number" class="form-control text-end edit-price border-success border-start-0 ps-0 text-dark" data-id="new_${newRowCounter}" value="" placeholder="0.01" min="0.01" step="0.01">
+                    <input type="text" inputmode="decimal" class="form-control text-end edit-price border-success border-start-0 ps-0 text-dark" data-id="new_${newRowCounter}" value="" placeholder="Total línea" >
                 </div>
             </td>
             <td class="text-center px-1 align-middle">
@@ -355,6 +355,22 @@ if (editTableBody) {
         const row = btn.closest('tr');
         if (row) row.remove();
     });
+}
+
+function parseNumEdit(value) {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return NaN;
+    let s = String(value).trim().replace(/\s+/g, '');
+    if (!s) return NaN;
+    let sign = '';
+    if (s[0] === '-') { sign = '-'; s = s.slice(1); }
+    let norm;
+    if (s.indexOf(',') !== -1) {
+        norm = s.replace(/\./g, '').replace(',', '.');
+    } else {
+        norm = s.replace(/\.(?=\d{3}(?!\d))/g, '');
+    }
+    return parseFloat(sign + norm);
 }
 
 if (btnSaveEdit) {
@@ -383,12 +399,12 @@ if (btnSaveEdit) {
             
             if(qtyInput && priceInput) {
                 const rowId = qtyInput.getAttribute('data-id');
-                const qtyVal = parseFloat(qtyInput.value);
-                const priceVal = parseFloat(priceInput.value);
+                const qtyVal = parseNumEdit(qtyInput.value);
+                const priceVal = parseNumEdit(priceInput.value);
                 const lotVal = lotInput ? lotInput.value.trim() : "";
 
                 let qtyValid = qtyInput.value !== '' && !isNaN(qtyVal) && qtyVal >= 0.01 && qtyVal <= 999999.99;
-                let priceValid = priceInput.value !== '' && !isNaN(priceVal) && priceVal >= 0.01 && priceVal <= 999999.99;
+                let priceValid = priceInput.value !== '' && !isNaN(priceVal) && priceVal >= 0.01 && priceVal <= 999999999.99;
                 if (!qtyValid) qtyInput.classList.add('is-invalid');
                 else qtyInput.classList.remove('is-invalid');
                 if (!priceValid) priceInput.classList.add('is-invalid');
@@ -467,3 +483,36 @@ if (btnSaveEdit) {
         });
     });
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    const exportButtons = document.querySelectorAll('[data-export-listado]');
+    const searchInputEl = document.getElementById('search-input');
+    const supplierFilterEl = document.getElementById('supplier-filter');
+    const dateFilterEl = document.getElementById('date-filter');
+
+    exportButtons.forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const base = btn.getAttribute('href');
+            if (!base) return;
+            const formato = btn.getAttribute('data-export-listado');
+            const params = new URLSearchParams();
+            params.set('formato', formato);
+            const q = searchInputEl ? searchInputEl.value.trim() : '';
+            const supplier = supplierFilterEl ? supplierFilterEl.value.trim() : '';
+            const date = dateFilterEl ? dateFilterEl.value : '';
+            if (q) params.set('q', q);
+            if (supplier) params.set('supplier', supplier);
+            if (date) params.set('date', date);
+            const url = base + '?' + params.toString();
+
+            if (formato === 'pdf') {
+                // PDF inline: se abre en el visor (pestaña nueva) sin generar
+                // evento de descarga que IDM pueda interceptar.
+                window.open(url, '_blank');
+            } else {
+                window.location.href = url;
+            }
+        });
+    });
+});

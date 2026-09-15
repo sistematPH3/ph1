@@ -7,7 +7,7 @@ audit_user_bp = Blueprint('audit_user', __name__, url_prefix='/auditoria')
 @audit_user_bp.route('/usuarios', methods=['GET'])
 @login_required
 def list_user_audits():
-    if not (current_user.is_admin or current_user.is_management or current_user.is_finance):
+    if not current_user.is_admin:
         flash("No tienes permisos para acceder a este módulo.", "danger")
         return redirect(url_for('security.login'))
     # 2. Pasamos el 'current_user' al servicio para evaluar su rol y sedes

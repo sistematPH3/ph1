@@ -53,7 +53,9 @@ class PurchaseManagementService:
 
             total_amount = purchase.total_amount if purchase.total_amount is not None else Decimal('0.00')
             exchange_rate = purchase.exchange_rate if purchase.exchange_rate is not None else Decimal('0.00')
-            total_bs = (total_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            es_bs = str(purchase.currency or '').upper() in ('BS', 'VES', 'BS.', 'BSS')
+            # En Bs el monto ya es bolívares: no se multiplica por la tasa.
+            total_bs = total_amount if es_bs else (total_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             formatted_history.append({
                 'id': purchase.id,

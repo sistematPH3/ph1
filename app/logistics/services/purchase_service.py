@@ -1,29 +1,27 @@
-from decimal import Decimal
+from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 import json
 from sqlalchemy import text
 from app.extensions import db
 from app.models.logistics_model import Purchase, PurchaseDetail
 from app.models import PurchaseAuditLog, Inventory
 from app.models.inventory_model import Product
-from app.time_utils import current_ve_time
+from app.logistics.requests.purchase_validators import normalizar_numero
 
 class PurchaseService:
     @staticmethod
     def register_purchase(data):
         try:
-            currency = str(data.get('currency', 'USD')).strip().upper()
-            if currency not in ('USD', 'EUR'):
-                return {
-                    'success': False,
-                    'message': 'Moneda no soportada. Debe ser USD o EUR.',
-                }
-            purchase_date = current_ve_time()
+            purchase_date = datetime.utcnow()
+            currency = str(data['currency']).upper()
+            if currency in ('VES', 'BS.', 'BSS'):
+                currency = 'BS'
             new_purchase = Purchase(
                 supplier_id=data['supplier_id'],
                 purchase_date=purchase_date,
                 total_amount=Decimal('0.00'),
                 currency=currency,
-                exchange_rate=Decimal(str(data['exchange_rate'])),
+                exchange_rate=Decimal(normalizar_numero(data['exchange_rate'])),
                 user_id=data['user_id'],
                 invoice_url=data.get('invoice_url'), 
                 status='COMPLETED' 
@@ -32,18 +30,26 @@ class PurchaseService:
             db.session.flush()
 
             calculated_total = Decimal('0.00')
-            exchange_rate = Decimal(str(data['exchange_rate']))
+            exchange_rate = Decimal(normalizar_numero(data['exchange_rate']))
+            es_bs = currency == 'BS'
             
             details_for_audit = []
             sku_lot_counters = {}
 
             for item in data['items']:
                 product_id = int(item['product_id'])
-                quantity = Decimal(str(item.get('quantity', 0.0)))
-                foreign_price = Decimal(str(item['foreign_price']))
-                
-                price_bs = foreign_price * exchange_rate
-                calculated_total += (foreign_price * quantity)
+                quantity = Decimal(normalizar_numero(item.get('quantity', 0.0)))
+                # El precio registrado es el TOTAL pagado por toda la cantidad de
+                # ese producto (según la moneda seleccionada). Se divide entre la
+                # cantidad para almacenarlo por unidad.
+                linea_total = Decimal(normalizar_numero(item['foreign_price']))
+                foreign_price = (linea_total / quantity).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                # En Bs el precio ya es bolívares: no se vuelve a multiplicar por la tasa.
+                price_bs = (foreign_price if es_bs
+                            else foreign_price * exchange_rate)
+                calculated_total += linea_total
 
                 producto_obj = db.session.query(Product).get(product_id)
                 prod_name = producto_obj.name if producto_obj else f"Insumo ID {product_id}"
