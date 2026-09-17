@@ -1,62 +1,38 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=14">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/statistics_alerts.css') }}?v=3">
 {% endblock %}
 
 {% block content %}
+{% set etiquetas_periodo = {'WEEKLY': 'Semanal', 'MONTHLY': 'Mensual', 'QUARTERLY': 'Trimestral', 'ANNUAL': 'Anual'} %}
 <div class="dash-banner">
-    <div class="dash-banner-main">
-        <div class="dash-banner-brand">
-            <span class="dash-banner-avatar">{{ current_user.name[0] if current_user.name else 'A' }}</span>
-            <div class="dash-banner-heading">
-                <span class="dash-banner-kicker"><i class="bi bi-shield-check"></i> Administración General</span>
-                <h1 class="dash-banner-title">Resumen de Operaciones</h1>
-            </div>
-        </div>
+    <div class="dash-banner-texto">
+        <span class="dash-banner-kicker"><i class="bi bi-shield-check"></i>Administración General</span>
+        <h1 class="dash-banner-title">Panel De Administrador</h1>
         <p class="dash-banner-sub">
             Hola <strong>{{ current_user.name.split(' ')[0] if current_user.name else 'administrador' }}</strong>, así está
             el estado de compras, consumo, mermas y traslados.
         </p>
     </div>
-    <div class="dash-banner-actions">
-        <div class="dash-selector">
-            <form method="GET" action="{{ url_for('dashboard.admin_dashboard') }}" class="dash-selector-form">
-                {% set etiquetas_periodo = {'WEEKLY': 'Semanal', 'MONTHLY': 'Mensual', 'QUARTERLY': 'Trimestral', 'ANNUAL': 'Anual'} %}
-                <label>Período
-                    <select name="period" onchange="this.form.submit()">
-                        {% for pt in ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL'] %}
-                        <option value="{{ pt }}" {% if pt == period_type %}selected{% endif %}>{{ etiquetas_periodo[pt] }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label>Moneda
-                    <select name="moneda" onchange="this.form.submit()">
-                        {% for m in ['USD', 'EUR', 'BS'] %}
-                        <option value="{{ m }}" {% if m == moneda %}selected{% endif %}>{{ m }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label>Sede
-                    <select name="sede" onchange="this.form.submit()">
-                        <option value="" {% if not sede_seleccionada %}selected{% endif %}>Todas las sedes</option>
-                        {% for sede in sedes %}
-                        <option value="{{ sede.id }}" {% if sede.id == sede_seleccionada %}selected{% endif %}>{{ sede.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-            </form>
-            {# TODO(mariuska): repuntar a la ruta de su pantalla de gráficos
-               cuando la suba (url_for('analytics.graficos', ...)). Mientras
-               tanto oculto el CTA: el destino 'analytics.estadisticas' ya no
-               existe (pantalla borrada en la división del trabajo). #}
-            <a href="{{ url_for('dashboard.admin_dashboard') }}" class="btn-stats btn-stats-banner btn-stats-banner-hidden">
-                <i class="bi bi-bar-chart-line"></i> Gráficos y estadísticas
-            </a>
-            <a href="{{ url_for('analytics.config_estadisticas') }}" class="btn-stats btn-stats-banner-ghost">
-                <i class="bi bi-sliders"></i> Configurar alarmas
-            </a>
+    <div class="dash-banner-aside">
+        <div class="dash-banner-perfil">
+            <div class="dash-banner-perfil-avatar">{{ current_user.name[:1]|upper if current_user.name else 'A' }}</div>
+            <div class="dash-banner-perfil-copy">
+                <span class="dash-banner-perfil-nombre">{{ current_user.name }}</span>
+                <span class="dash-banner-perfil-rol">Administrador General</span>
+            </div>
+        </div>
+        <div class="dash-banner-badge">
+            <i class="bi bi-calendar3"></i>
+            <div class="dash-banner-badge-copy">
+                <span class="dash-banner-badge-t">Período vigente</span>
+                <span class="dash-banner-badge-v">{{ etiquetas_periodo[period_type] }}</span>
+            </div>
         </div>
     </div>
 </div>
@@ -73,124 +49,181 @@
 } %}
 
 {% set simbolo = {'USD': '$', 'EUR': '€', 'BS': 'Bs. '}.get(moneda, '$') %}
-<div class="dash-stats">
+
+<div class="dash-seccion-head">
+    <h2 class="dash-seccion-titulo">
+        <span class="dash-seccion-ico"><i class="bi bi-speedometer2"></i></span>
+        Indicadores del período
+    </h2>
+    <span class="dash-seccion-leyenda"><i class="bi bi-circle-fill dash-leyenda-dot"></i>{{ simbolo }} · {{ etiquetas_periodo[period_type] }}</span>
+</div>
+
+<div class="dash-kpi-grid">
     {% for key, cfg in cols_kpi.items() %}
     {% set serie = datos_grafico.metrics.get(key) or [0] %}
     {% set comp = comparativo['metricas'].get(key, {}) %}
-    <div class="dash-stat" style="--stat-clr: {{ cfg.color }}; background: linear-gradient(135deg, {{ cfg.color }}0d, #ffffff 65%);">
-        <div class="dash-stat-icon" style="background: linear-gradient(135deg, {{ cfg.color }}, {{ cfg.color }}cc);"><i class="bi {{ cfg.icono }}"></i></div>
-        <div class="dash-stat-body">
-            <div class="dash-stat-label">{{ cfg.label }}</div>
-            <div class="dash-stat-value" title="{{ serie[-1]|ph_amount }} {{ moneda }}">{{ simbolo }}{{ serie[-1]|ph_amount }}</div>
-            <div class="dash-stat-comp">
-                {% if comp %}
-                {% set dir = 'up' if comp.diff > 0 else ('down' if comp.diff < 0 else 'flat') %}
-                <span class="kpi-comp-badge {{ dir }}" title="Anterior: {{ comp.anterior|ph_amount }} {{ moneda }}">
-                    {% if dir == 'flat' %}<i class="bi bi-dash-lg"></i>
-                    {% else %}<i class="bi {{ 'bi-arrow-up-right' if dir == 'up' else 'bi-arrow-down-right' }}"></i>
-                    {% endif %}
-                    {{ simbolo }}{{ comp.diff|ph_amount }} ({{ comp.variacion_pct }} %)
-                </span>
-                {% else %}
-                <span class="dash-stat-hint">&nbsp;</span>
+    {% set metric_class = key.lower() %}
+    <div class="dash-kpi-card dash-kpi-card--{{ metric_class }}">
+        <div class="dash-kpi-ico dash-kpi-ico--{{ metric_class }}"><i class="bi {{ cfg.icono }}"></i></div>
+        <div class="dash-kpi-label">{{ cfg.label }}</div>
+        <div class="dash-kpi-value" title="{{ serie[-1]|ph_amount }} {{ moneda }}">{{ simbolo }}{{ serie[-1]|ph_amount }}</div>
+        <div class="dash-kpi-comp">
+            {% if comp %}
+            {% set dir = 'up' if comp.diff > 0 else ('down' if comp.diff < 0 else 'flat') %}
+            {% if dir == 'flat' %}{% set sem = 'flat' %}{% else %}{% set sem = 'up' if dir == 'down' else 'down' %}{% endif %}
+            <span class="kpi-comp-badge {{ sem }}" title="Anterior: {{ comp.anterior|ph_amount }} {{ moneda }}">
+                {% if dir == 'flat' %}<i class="bi bi-dash-lg"></i>
+                {% else %}<i class="bi {{ 'bi-arrow-up-right' if dir == 'up' else 'bi-arrow-down-right' }}"></i>
                 {% endif %}
-            </div>
+                {{ simbolo }}{{ comp.diff|ph_amount }} ({{ comp.variacion_pct }} %)
+            </span>
+            <span class="kpi-comp-label">vs período anterior</span>
+            {% else %}
+            <span class="dash-stat-hint">&nbsp;</span>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
-    <div class="dash-stat" style="--stat-clr: #0f766e; background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), #ffffff 65%);">
-        <div class="dash-stat-icon" style="background: linear-gradient(135deg, #0f766e, #0f766ecc);"><i class="bi bi-bar-chart-line"></i></div>
-        <div class="dash-stat-body">
-            <div class="dash-stat-label">Costo operativo</div>
-            <div class="dash-stat-value" title="Compras − consumo − mermas − pérdidas ({{ moneda }})">{{ simbolo }}{{ costo_operativo.total|ph_amount }}</div>
-            <div class="dash-stat-comp"><span class="dash-stat-hint">Compras − consumo − mermas − pérdidas</span></div>
-        </div>
+    <div class="dash-kpi-card dash-kpi-card--costo-operativo">
+        <div class="dash-kpi-ico dash-kpi-ico--costo-operativo"><i class="bi bi-bar-chart-line"></i></div>
+        <div class="dash-kpi-label">Costo operativo</div>
+        <div class="dash-kpi-value" title="Compras − consumo − mermas − pérdidas ({{ moneda }})">{{ simbolo }}{{ costo_operativo.total|ph_amount }}</div>
+        <div class="dash-kpi-comp"><span class="dash-stat-hint">Compras − consumo − mermas − pérdidas</span></div>
     </div>
 </div>
 
-<div class="dash-content">
+<div class="dash-filtros">
+    <form method="GET" action="{{ url_for('dashboard.admin_dashboard') }}" class="dash-selector-form">
+        <div class="dash-filtros-titulo"><i class="bi bi-funnel-fill"></i>Filtros</div>
+        <label>Período
+            <select name="period" onchange="this.form.submit()">
+                {% for pt in ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL'] %}
+                <option value="{{ pt }}" {% if pt == period_type %}selected{% endif %}>{{ etiquetas_periodo[pt] }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Moneda
+            <select name="moneda" onchange="this.form.submit()">
+                {% for m in ['USD', 'EUR', 'BS'] %}
+                <option value="{{ m }}" {% if m == moneda %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Sede
+            <select name="sede" onchange="this.form.submit()">
+                <option value="" {% if not sede_seleccionada %}selected{% endif %}>Todas las sedes</option>
+                {% for sede in sedes %}
+                <option value="{{ sede.id }}" {% if sede.id == sede_seleccionada %}selected{% endif %}>{{ sede.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="button" id="btn-refresh-snapshots"
+                class="btn-stats btn-stats-primary"
+                title="Recalcular los totales del período ahora mismo (suelen actualizarse solos al abrir el panel)"
+                data-url="{{ url_for('analytics.refresh_snapshots') }}"
+                data-period="{{ period_type }}">
+            <i class="bi bi-arrow-repeat"></i> Actualizar datos
+        </button>
+        <a href="{{ url_for('analytics.config_estadisticas') }}" class="btn-stats btn-stats-primary">
+            <i class="bi bi-sliders"></i> Configurar alarmas
+        </a>
+    </form>
+</div>
+
+<div class="dash-seccion-head dash-seccion-head--paneles">
+    <h2 class="dash-seccion-titulo">
+        <span class="dash-seccion-ico"><i class="bi bi-graph-up-arrow"></i></span>
+        Exploración de métricas
+    </h2>
+    <span class="dash-seccion-leyenda"><i class="bi bi-circle-fill dash-leyenda-dot"></i>serie por período · snapshot {{ etiquetas_periodo[period_type] }}</span>
+</div>
+
+<div class="dash-content"
+     data-datos-grafico='{{ datos_grafico|tojson }}'
+     data-mermas-tipo='{{ mermas_por_tipo|tojson }}'>
     <div class="dash-panel">
         <div class="dash-panel-header">
             <h2 class="dash-panel-title">
                 <span class="panel-icon"><i class="bi bi-graph-up-arrow"></i></span>
                 Evolución de métricas
             </h2>
-            <div class="metric-tabs" id="metricTabs">
+            <div class="metric-tabs" id="metricTabs" role="tablist">
                 {% for key, cfg in cols_kpi.items() %}
-                <button type="button" class="metric-tab{% if loop.first %} active{% endif %}"
-                        data-metric="{{ key }}"
-                        {% if loop.first %}style="border-color:{{ cfg.color }}; background:{{ cfg.color }}; color:#fff;"{% endif %}>
-                    <span class="dot" style="background:{% if not loop.first %}{{ cfg.color }}{% else %}#fff{% endif %};"></span>
+                <button type="button" class="metric-tab metric-tab--{{ key.lower() }}{% if loop.first %} active{% endif %}"
+                        data-metric="{{ key }}">
+                    <span class="dot"></span>
                     {{ cfg.label }}
                 </button>
                 {% endfor %}
+                <button type="button" class="metric-tab metric-tab--all" data-metric="ALL">
+                    <span class="dot"></span>
+                    Ver todas
+                </button>
             </div>
         </div>
-        <p class="dash-subtitle">Valores en {{ moneda }}. Selecciona una métrica para ver su tendencia de los últimos períodos.</p>
+        <p class="dash-subtitle">Valores en {{ moneda }}. Selecciona una métrica o usa "Ver todas" para comparar la serie de los últimos períodos.</p>
         <div class="dash-chart">
             <canvas id="globalChart"></canvas>
             <div class="dash-empty" id="dashEmpty">
                 <i class="bi bi-inbox"></i>
-                Sin datos. Regenera los snapshots desde el cajón de estadísticas.
+                Aún no hay operaciones registradas en el período seleccionado.
             </div>
         </div>
     </div>
 
-    <div class="dash-panel">
-        <div class="dash-panel-header">
-            <h2 class="dash-panel-title">
-                <span class="panel-icon"><i class="bi bi-trash3"></i></span>
-                Mermas por tipo
-            </h2>
+    <div class="dash-col-der">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h2 class="dash-panel-title">
+                    <span class="panel-icon"><i class="bi bi-trash3"></i></span>
+                    Mermas por tipo
+                </h2>
+            </div>
+            <p class="dash-subtitle">Costo en USD de las mermas aprobadas/pendientes de {{ mermas_por_tipo.period_label }}, por tipo.</p>
+            {% if mermas_por_tipo.tipos %}
+            <div class="dash-chart">
+                <canvas id="mermasTipoChart"></canvas>
+            </div>
+            <div class="mermas-tipos-legend" id="mermasTiposLegend"></div>
+            {% else %}
+            <div class="dash-empty" style="display:block;">
+                <i class="bi bi-inbox"></i>
+                Sin mermas valorizadas en el período.
+            </div>
+            {% endif %}
         </div>
-        <p class="dash-subtitle">Costo en USD de las mermas aprobadas/pendientes de {{ mermas_por_tipo.period_label }}, por tipo.</p>
-        {% if mermas_por_tipo.tipos %}
-        <div class="dash-chart">
-            <canvas id="mermasTipoChart"></canvas>
+
+        <div class="dash-panel atend-panel">
+            <div class="dash-panel-header">
+                <h2 class="dash-panel-title">
+                    <span class="panel-icon"><i class="bi bi-bell-fill"></i></span>
+                    Atención requerida
+                </h2>
+            </div>
+            <div class="atend-list">
+                <a class="atend-row" style="--at-clr:#ce1126; background:linear-gradient(90deg, rgba(206,17,38,.10), #ffffff 60%);" href="{{ url_for('waste_approvals.bandeja_aprobaciones') }}">
+                    <span class="atend-icon"><i class="bi bi-trash3"></i></span>
+                    <span class="atend-text">Mermas por aprobar<span class="atend-sub">en la bandeja de aprobación</span></span>
+                    <span class="atend-count">{{ pendientes.mermas_pendientes }}</span>
+                    <i class="bi bi-chevron-right atend-arrow"></i>
+                </a>
+                <a class="atend-row" style="--at-clr:#2563eb; background:linear-gradient(90deg, rgba(37,99,235,.10), #ffffff 60%);" href="{{ url_for('logistics_list.movement_list') }}">
+                    <span class="atend-icon"><i class="bi bi-truck"></i></span>
+                    <span class="atend-text">Traslados en tránsito<span class="atend-sub">sin recibir por la sede destino</span></span>
+                    <span class="atend-count">{{ pendientes.traslados_en_transito }}</span>
+                    <i class="bi bi-chevron-right atend-arrow"></i>
+                </a>
+                <a class="atend-row" style="--at-clr:#7c3aed; background:linear-gradient(90deg, rgba(124,58,237,.10), #ffffff 60%);" href="{{ url_for('movement_dispute.list_disputes') }}">
+                    <span class="atend-icon"><i class="bi bi-exclamation-triangle"></i></span>
+                    <span class="atend-text">Novedades / disputas<span class="atend-sub">pendientes de arbitraje</span></span>
+                    <span class="atend-count">{{ pendientes.disputas_pendientes }}</span>
+                    <i class="bi bi-chevron-right atend-arrow"></i>
+                </a>
+            </div>
         </div>
-        <div class="mermas-tipos-legend" id="mermasTiposLegend"></div>
-        {% else %}
-        <div class="dash-empty" style="display:block;">
-            <i class="bi bi-inbox"></i>
-            Sin mermas valorizadas en el período.
-        </div>
-        {% endif %}
     </div>
 </div>
 
-<div class="dash-panel atend-panel">
-    <div class="dash-panel-header">
-        <h2 class="dash-panel-title">
-            <span class="panel-icon"><i class="bi bi-bell-fill"></i></span>
-            Atención requerida
-        </h2>
-    </div>
-    <div class="atend-list">
-        <a class="atend-row" style="--at-clr:#ce1126; background:linear-gradient(90deg, rgba(206,17,38,.10), #ffffff 60%);" href="{{ url_for('waste_approvals.bandeja_aprobaciones') }}">
-            <span class="atend-icon"><i class="bi bi-trash3"></i></span>
-            <span class="atend-text">Mermas por aprobar<span class="atend-sub">en la bandeja de aprobación</span></span>
-            <span class="atend-count">{{ pendientes.mermas_pendientes }}</span>
-            <i class="bi bi-chevron-right atend-arrow"></i>
-        </a>
-        <a class="atend-row" style="--at-clr:#2563eb; background:linear-gradient(90deg, rgba(37,99,235,.10), #ffffff 60%);" href="{{ url_for('logistics_list.movement_list') }}">
-            <span class="atend-icon"><i class="bi bi-truck"></i></span>
-            <span class="atend-text">Traslados en tránsito<span class="atend-sub">sin recibir por la sede destino</span></span>
-            <span class="atend-count">{{ pendientes.traslados_en_transito }}</span>
-            <i class="bi bi-chevron-right atend-arrow"></i>
-        </a>
-        <a class="atend-row" style="--at-clr:#7c3aed; background:linear-gradient(90deg, rgba(124,58,237,.10), #ffffff 60%);" href="{{ url_for('movement_dispute.list_disputes') }}">
-            <span class="atend-icon"><i class="bi bi-exclamation-triangle"></i></span>
-            <span class="atend-text">Novedades / disputas<span class="atend-sub">pendientes de arbitraje</span></span>
-            <span class="atend-count">{{ pendientes.disputas_pendientes }}</span>
-            <i class="bi bi-chevron-right atend-arrow"></i>
-        </a>
-    </div>
-</div>
-
-<script>
-    window.PH_DATOS_GRAFICO = {{ datos_grafico|tojson }};
-    window.PH_MERMAS_TIPO = {{ mermas_por_tipo|tojson }};
-</script>
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/dashboard/admin_dashboard.js') }}?v=3"></script>
 {% endblock %}

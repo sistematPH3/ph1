@@ -7,7 +7,6 @@
 #   - POST /estadisticas/refresh (payload válido e inválido, erreo 400).
 #   - GET/POST /config/estadisticas (persistencia y errores de validación).
 #   - GET /api/estadisticas/alarmas (filtro por sedes del usuario Finance).
-#   - GET /estadisticas con parámetros (period_type, moneda, sede).
 #
 # Uso:
 #   .venv/bin/python -m unittest tests.analytics.test_rutas_estadisticas -v
@@ -129,23 +128,14 @@ class RutasEstadisticasTest(unittest.TestCase):
     # ------------------------------------------------------------------
     # Acceso / sesión
     # ------------------------------------------------------------------
-    def test_estadisticas_sin_login_redirige(self):
-        client = self.app.test_client()
-        resp = client.get("/estadisticas", follow_redirects=False)
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn("/auth/login", resp.headers.get("Location", ""))
-
     def test_api_alarmas_sin_login_redirige(self):
         client = self.app.test_client()
         resp = client.get("/api/estadisticas/alarmas", follow_redirects=False)
         self.assertEqual(resp.status_code, 302)
 
-    def test_estadisticas_rol_no_permitido_redirige(self):
+    def test_roles_no_permitidos_no_acceden(self):
         client = self._login(self.ops.id)
-        resp = client.get("/estadisticas", follow_redirects=False)
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn("/auth/login", resp.headers.get("Location", ""))
-        # Operations tampoco entra al refresh ni a config.
+        # Operations no entra al refresh, a la configuración ni a las alarmas.
         self.assertEqual(
             client.post("/estadisticas/refresh",
                         json={"period_type": "MONTHLY"},
@@ -153,6 +143,9 @@ class RutasEstadisticasTest(unittest.TestCase):
         self.assertEqual(
             client.get("/config/estadisticas", follow_redirects=False).status_code,
             302)
+        self.assertEqual(
+            client.get("/api/estadisticas/alarmas",
+                       follow_redirects=False).status_code, 302)
 
     # ------------------------------------------------------------------
     # POST /estadisticas/refresh
@@ -281,25 +274,6 @@ class RutasEstadisticasTest(unittest.TestCase):
     def test_alarmas_api_periodo_invalido_aplica_default(self):
         client = self._login(self.admin.id)
         resp = client.get("/api/estadisticas/alarmas?period_type=DIARIO")
-        self.assertEqual(resp.status_code, 200)
-
-    # ------------------------------------------------------------------
-    # GET /estadisticas (pantalla admin)
-    # ------------------------------------------------------------------
-    def test_estadisticas_admin_renders(self):
-        client = self._login(self.admin.id)
-        resp = client.get("/estadisticas")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("text/html", resp.content_type)
-
-    def test_estadisticas_parametros_validos(self):
-        client = self._login(self.admin.id)
-        resp = client.get("/estadisticas?period_type=QUARTERLY&moneda=EUR&sede=2")
-        self.assertEqual(resp.status_code, 200)
-
-    def test_estadisticas_parametros_invalidos_por_defecto(self):
-        client = self._login(self.admin.id)
-        resp = client.get("/estadisticas?period_type=DIARIO&moneda=XYZ&sede=99")
         self.assertEqual(resp.status_code, 200)
 
     # ------------------------------------------------------------------

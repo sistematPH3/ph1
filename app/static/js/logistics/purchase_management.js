@@ -2,10 +2,11 @@ let newRowCounter = 1;
 let currentCurrency = "USD";
 
 const today = new Date();
-const formattedToday = today.toISOString().split('T')[0];
+const fmtFechaLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const formattedToday = fmtFechaLocal(today);
 const tenYearsAgo = new Date();
 tenYearsAgo.setFullYear(today.getFullYear() - 10);
-const formattedTenYearsAgo = tenYearsAgo.toISOString().split('T')[0];
+const formattedTenYearsAgo = fmtFechaLocal(tenYearsAgo);
 
 const dateFilterInput = document.getElementById('date-filter');
 if (dateFilterInput) {

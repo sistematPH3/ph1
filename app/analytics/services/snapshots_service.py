@@ -177,11 +177,51 @@ def _agregar_mermas(filas, cache):
     return _agregar(filas, valor)
 
 
+def _agregar_traslados(filas, cache):
+    """Valoriza pérdidas en traslados usando el costo del LOTE EXACTO (metodo='lote').
+
+    Si el lote no existe en compras, cae a última compra (comportamiento del motor
+    de costos) y loggea warning.
+    """
+    def valor(fila):
+        from app.inventory.services import product_cost_service
+        product_id = fila['product_id']
+        lot_number = fila.get('lot_number')
+        fecha = fila['date']
+        qty = fila['quantity']
+
+        unit_usd = product_cost_service.obtener_costo_unitario(
+            product_id,
+            fecha=fecha,
+            moneda='USD',
+            metodo='lote' if lot_number else 'ultima',
+            lote=lot_number,
+        )
+        tasas = _tasas_en(fecha, cache=cache)
+        rate_usd = tasas.get('USD')
+        rate_eur = tasas.get('EUR')
+        usd = _redondear(unit_usd * qty)
+        bs = _redondear(usd * rate_usd) if rate_usd else Decimal('0.00')
+        eur = (_redondear(usd * rate_eur / rate_usd) if rate_eur and rate_usd else Decimal('0.00'))
+        return usd, bs, eur
+    return _agregar(filas, valor)
+
+
 def generar_snapshots(period_type=SnapshotPeriodType.MONTHLY, user_id=None, corte=None):
     """Reconstruye (UPSERT) los snapshots de los últimos 13 períodos."""
     if period_type not in PERIOD_TYPES:
         period_type = SnapshotPeriodType.MONTHLY
     ventana = periodos_historia(period_type, limite=13, corte=corte)
+    return _generar_snapshots_ventana(ventana, period_type, user_id)
+
+
+def generar_snapshot_periodo(period_type, inicio, fin, user_id=None):
+    """Genera snapshots para UN solo período (inicio, fin)."""
+    return _generar_snapshots_ventana([(inicio, fin)], period_type, user_id)
+
+
+def _generar_snapshots_ventana(ventana, period_type, user_id):
+    """Genera snapshots para una lista de (inicio, fin)."""
     cache_tasas = {}
     totales = 0
     try:
@@ -203,7 +243,7 @@ def generar_snapshots(period_type=SnapshotPeriodType.MONTHLY, user_id=None, cort
             )
             repo.guardar_snapshots(
                 SnapshotMetric.TRANSFERS, period_type, inicio, fin,
-                _agregar_consumo(repo.filas_traslados(inicio, fin), cache_tasas),
+                _agregar_traslados(repo.filas_traslados(inicio, fin), cache_tasas),
                 user_id=user_id,
             )
             totales += 4
@@ -212,6 +252,22 @@ def generar_snapshots(period_type=SnapshotPeriodType.MONTHLY, user_id=None, cort
         db.session.rollback()
         return {'success': False, 'message': f'Error al generar snapshots: {exc}'}
     return {'success': True, 'message': 'Snapshots actualizados.', 'períodos': len(ventana), 'registros': totales}
+
+
+def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None):
+    """¿Falta el snapshot del período vigente?
+
+    Se usa para la regeneración perezosa: el dashboard del Admin detecta si
+    no existe el snapshot del período actual y lo genera antes de renderizar
+    (el botón "Regenerar snapshots" queda como respaldo manual).
+    """
+    if period_type not in PERIOD_TYPES:
+        period_type = SnapshotPeriodType.MONTHLY
+    inicio, _ = calcular_periodo(period_type, corte)
+    return StatisticsSnapshot.query.filter(
+        StatisticsSnapshot.period_type == period_type,
+        StatisticsSnapshot.period_start == inicio,
+    ).first() is None
 
 
 def leer_configuracion():
@@ -286,8 +342,16 @@ def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None):
     alertas = []
     for (loc_id, metric), por_periodo in por_sede_metrica.items():
         valor = por_periodo.get(inicio_actual, Decimal('0'))
-        prevs = [por_periodo.get(p[0], Decimal('0')) for p in previos]
-        promedio = sum(prevs, Decimal('0')) / Decimal(len(prevs)) if prevs else Decimal('0')
+        # Solo promediar períodos que tengan datos reales (amount_usd > 0)
+        # para no diluir el promedio con ceros de períodos sin actividad.
+        prevs_con_datos = [
+            por_periodo[p[0]]
+            for p in previos
+            if p[0] in por_periodo and por_periodo[p[0]] > 0
+        ]
+        if not prevs_con_datos:
+            continue  # Sin histórico válido, no se puede evaluar
+        promedio = sum(prevs_con_datos, Decimal('0')) / Decimal(len(prevs_con_datos))
         if promedio <= 0 or valor < minimo:
             continue
         if valor > factor * promedio:
@@ -464,11 +528,17 @@ def obtener_comparativo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
 
 def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
                           moneda='USD', location_ids=None):
-    """Por cada sede del período más reciente: sus 4 métricas, merma en cantidad
-    y costo operativo. Ordenado por compras descendente (quién gasta más primero).
+    """Rankings entre sedes para el período más reciente.
 
-    La propuesta responde con esto: ¿qué sede gasta más, más mermas, más
-    traslados y más pérdidas en el período?
+    Devuelve rankings separados por métrica (como pide la propuesta):
+    - gasto_total: compras + consumo (quién gasta más)
+    - mermas_costo: costo de mermas (quién pierde más en mermas)
+    - mermas_cantidad: cantidad de mermas
+    - traslados: valor de traslados (quién genera más traslados)
+    - perdidas_traslado: pérdidas en traslado (quién pierde más en traslados)
+    - costo_operativo: compras - consumo - mermas - traslados
+
+    Cada ranking incluye location_id, location_name, valor y posición.
     """
     campo = _campo_moneda(moneda)
     inicio, _ = calcular_periodo(period_type, corte)
@@ -501,17 +571,38 @@ def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
     for loc_id, datos in por_sede.items():
         datos['costo_operativo'] = (
             datos['compras'] - datos['consumo'] - datos['mermas'] - datos['traslados'])
+        datos['gasto_total'] = datos['compras'] + datos['consumo']
         sedes.append({
             'location_id': loc_id,
             'location_name': nombres.get(loc_id, f'ID {loc_id}'),
             **datos,
         })
-    sedes.sort(key=lambda s: s['compras'], reverse=True)
+
+    # Rankings separados por métrica
+    def _ranking(lista, key, reverse=True):
+        ordenados = sorted(lista, key=lambda s: s.get(key, Decimal('0')), reverse=reverse)
+        return [
+            {'posicion': i + 1, 'location_id': s['location_id'],
+             'location_name': s['location_name'], 'valor': s.get(key, Decimal('0'))}
+            for i, s in enumerate(ordenados)
+        ]
+
+    rankings = {
+        'gasto_total': _ranking(sedes, 'gasto_total'),
+        'mermas_costo': _ranking(sedes, 'mermas'),
+        'mermas_cantidad': _ranking(sedes, 'mermas_qty'),
+        'traslados': _ranking(sedes, 'traslados'),
+        'perdidas_traslado': _ranking(sedes, 'traslados'),
+        'costo_operativo': _ranking(sedes, 'costo_operativo'),
+        'compras': _ranking(sedes, 'compras'),
+    }
+
     return {
         'moneda': str(moneda).upper(),
         'period_type': period_type,
         'period_start': inicio.isoformat(),
         'period_label': _etiqueta_periodo(period_type, inicio),
+        'rankings': rankings,
         'sedes': sedes,
     }
 
@@ -524,6 +615,13 @@ def obtener_mermas_por_tipo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
     APROBADO/PENDIENTE/APROBADO_PARCIAL (solo líneas APROBADO en las parciales),
     sin canceladas, valoradas con el costo en el detalle. Los tipos sin nombre
     se agrupan como 'Sin tipo'.
+
+    NOTA: Esta función consulta directamente WasteDetail + WasteType porque el
+    snapshot `StatisticsSnapshot` solo almacena el total agregado WASTE por
+    sede/período (sin desglose por waste_type_id). El desglose por tipo de merma
+    es una vista de detalle que requiere el JOIN a WasteType, por eso se consulta
+    directamente la tabla fuente manteniendo los mismos criterios de filtrado
+    que el snapshot (estados, canceladas, fechas).
     """
     import collections
 

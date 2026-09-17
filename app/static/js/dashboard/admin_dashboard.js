@@ -2,7 +2,9 @@
 (function () {
     'use strict';
 
-    const datos = window.PH_DATOS_GRAFICO || {periods: [], metrics: {}};
+    const root = document.querySelector('.dash-content') || document.body;
+    const datos = JSON.parse(root.dataset.datosGrafico || '{"periods":[],"metrics":{}}');
+    const mermasTipoData = JSON.parse(root.dataset.mermasTipo || '{"tipos":[]}');
     const orden = ['PURCHASES', 'KITCHEN_CONSUMPTION', 'WASTE', 'TRANSFERS'];
     const config = {
         'PURCHASES': {label: 'Compras', color: '#ce1126'},
@@ -10,6 +12,7 @@
         'WASTE': {label: 'Mermas', color: '#d97706'},
         'TRANSFERS': {label: 'Traslados', color: '#7c3aed'},
     };
+    const ALL_CLR = '#334155';
     const SIMBOLO = {'USD': '$', 'EUR': '€', 'BS': 'Bs. '};
     const moneda = datos.moneda || 'USD';
     const simbolo = SIMBOLO[moneda] || '$';
@@ -22,12 +25,32 @@
         }, 0);
     }
 
+    function datasetsPara(esTodo) {
+        return orden.map(function (m) {
+            const cfg = config[m];
+            return {
+                label: cfg.label + ' (' + moneda + ')',
+                data: datos.metrics[m] || [],
+                borderColor: cfg.color,
+                backgroundColor: cfg.color + '22',
+                fill: !esTodo,
+                tension: 0.32,
+                borderWidth: esTodo ? 1.6 : 2,
+                pointRadius: esTodo ? 2 : 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: cfg.color,
+                pointHoverBackgroundColor: cfg.color,
+                pointHoverBorderColor: cfg.color,
+            };
+        });
+    }
+
     function construir() {
         const ctx = document.getElementById('globalChart');
         if (!ctx) return;
         const emptyEl = document.getElementById('dashEmpty');
-        const cfg = config[activa];
-        const valores = datos.metrics[activa] || [];
+        const esTodo = activa === 'ALL';
         const labels = (datos.periods || []).map(p => p.label);
 
         if (grafico) grafico.destroy();
@@ -44,27 +67,24 @@
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: cfg.label + ' (' + moneda + ')',
-                    data: valores,
-                    borderColor: cfg.color,
-                    backgroundColor: cfg.color + '22',
-                    fill: true,
-                    tension: 0.32,
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    pointBackgroundColor: '#ffffff',
-                    pointBorderColor: cfg.color,
-                    pointHoverBackgroundColor: cfg.color,
-                    pointHoverBorderColor: cfg.color,
-                }]
+                datasets: datasetsPara(esTodo),
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {display: false},
+                    legend: esTodo ? {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: '#5e6a7e',
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            boxWidth: 8,
+                            padding: 18,
+                            font: {size: 11, weight: 600}
+                        }
+                    } : {display: false},
                     tooltip: {
                         callbacks: {
                             label: function (item) {
@@ -93,23 +113,28 @@
     function renderDot(tab, activo) {
         const dot = tab.querySelector('.dot');
         if (!dot) return;
-        dot.style.background = activo ? '#ffffff' : (config[tab.dataset.metric] || {}).color || '#cbd5e1';
+        dot.style.background = activo ? '#ffffff' : (config[tab.dataset.metric] || {}).color || ALL_CLR;
     }
 
     function initTabs() {
         const tabs = document.querySelectorAll('#metricTabs .metric-tab');
         tabs.forEach(function (tab) {
+            tab.setAttribute('role', 'tab');
+            tab.setAttribute('aria-pressed', tab.classList.contains('active') ? 'true' : 'false');
             tab.addEventListener('click', function () {
                 tabs.forEach(function (t) {
                     t.classList.remove('active');
                     t.removeAttribute('style');
+                    t.setAttribute('aria-pressed', 'false');
                     renderDot(t, false);
                 });
                 activa = tab.dataset.metric;
                 tab.classList.add('active');
-                const cfg = config[activa];
-                tab.style.borderColor = cfg.color;
-                tab.style.background = cfg.color;
+                tab.setAttribute('aria-pressed', 'true');
+                const cfg = config[activa] || {};
+                const clr = cfg.color || ALL_CLR;
+                tab.style.borderColor = clr;
+                tab.style.background = clr;
                 tab.style.color = '#ffffff';
                 renderDot(tab, true);
                 construir();
@@ -122,7 +147,7 @@
 
     function construirMermasTipo() {
         const ctx = document.getElementById('mermasTipoChart');
-        const datos = window.PH_MERMAS_TIPO || {tipos: []};
+        const datos = mermasTipoData;
         const panel = ctx ? ctx.closest('.dash-panel') : null;
         if (!ctx || !panel || !datos.tipos || !datos.tipos.length) return;
 
@@ -153,9 +178,37 @@
         }
     }
 
+    /* ------------------- Regenerar snapshots ------------------- */
+    function initRefresh() {
+        const btn = document.getElementById('btn-refresh-snapshots');
+        if (!btn) return;
+        const original = btn.innerHTML;
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            btn.innerHTML = 'Actualizando datos…';
+            try {
+                const resp = await fetch(btn.dataset.url, {
+                    method: 'POST',
+                    headers: {'X-Requested-With': 'fetch'},
+                    body: new URLSearchParams({period_type: btn.dataset.period})
+                });
+                const data = await resp.json();
+                if (!data || !data.success) {
+                    throw new Error((data && data.message) || 'No se pudieron regenerar los snapshots.');
+                }
+                setTimeout(function () { window.location.reload(); }, 900);
+            } catch (e) {
+                btn.innerHTML = original;
+                btn.disabled = false;
+                window.alert('Error: ' + (e.message || 'No se pudieron regenerar los snapshots.'));
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initTabs();
         construir();
         construirMermasTipo();
+        initRefresh();
     });
 })();

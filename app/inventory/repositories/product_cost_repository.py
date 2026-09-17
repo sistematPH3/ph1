@@ -18,19 +18,28 @@ def tasas_bcv(fecha=None, cache=None):
     """Tasa BCV vigente por moneda para la fecha dada (Bs por unidad).
 
     Devuelve {currency: Decimal(rate)} con las tasas más recientes cuyo
-    timestamp es <= fecha. Si no hay ninguna para una moneda la omite.
+    timestamp es <= fecha. Si no hay ninguna para una moneda en esa fecha,
+    hace fallback a la más reciente disponible (cualquier fecha) para no
+    romper valorizaciones por falta de tasa en un día puntual.
     """
     if fecha is None:
         fecha = current_ve_time()
     if cache is not None and fecha in cache:
         return cache[fecha]
+    # 1) Buscar tasas <= fecha
     filas = ExchangeRateHistory.query.filter(
         ExchangeRateHistory.timestamp <= fecha
     ).all()
-    # Para cada moneda solo cuenta la tasa más reciente (<= fecha).
     mas_reciente = {}
     for r in sorted(filas, key=lambda x: x.timestamp):
         mas_reciente[r.currency] = Decimal(str(r.rate))
+    # 2) Fallback: si falta USD o EUR, buscar la más reciente global (sin filtro de fecha)
+    for moneda in ('USD', 'EUR'):
+        if moneda not in mas_reciente:
+            r = ExchangeRateHistory.query.filter_by(currency=moneda) \
+                .order_by(ExchangeRateHistory.timestamp.desc()).first()
+            if r:
+                mas_reciente[moneda] = Decimal(str(r.rate))
     if cache is not None:
         cache[fecha] = mas_reciente
     return mas_reciente

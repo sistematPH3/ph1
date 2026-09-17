@@ -6,6 +6,7 @@ la regla de negocio correspondiente. La valorización a USD/BS/EUR la hace el
 servicio (snapshots_service) usando el motor de costos y las tasas BCV.
 """
 import json
+import logging
 from datetime import datetime, time
 from decimal import Decimal
 
@@ -13,6 +14,8 @@ from app.extensions import db
 from app.models.logistics_model import Location, Movement, MovementDetail, Purchase, PurchaseDetail
 from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.statistics_model import StatisticsSnapshot
+
+logger = logging.getLogger(__name__)
 
 
 def sedes_activas():
@@ -71,7 +74,11 @@ def filas_consumo_cocina(inicio, fin):
         if isinstance(data, str):
             try:
                 data = json.loads(data)
-            except (json.JSONDecodeError, TypeError, ValueError):
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                logger.warning(
+                    "AuditLog ID %s: JSON inválido en changed_data: %s",
+                    log.id, exc
+                )
                 data = {}
         data = data if isinstance(data, dict) else {}
         try:
@@ -125,7 +132,8 @@ def filas_traslados(inicio, fin):
     cancelados/anulados/rechazados (CANCELADO, CANCELADO_EMISOR, ANULADO,
     RECHAZADO): un traslado que nunca salió no es una pérdida.
 
-    Se valoran las PÉRDIDAS (missing_quantity; si es nulo, la cantidad enviada).
+    Se valoran las PÉRDIDAS (missing_quantity; si es nulo, la cantidad enviada)
+    usando el costo del LOTE EXACTO que se envió.
     """
     filas = MovementDetail.query \
         .join(Movement, MovementDetail.movement_id == Movement.id) \
@@ -147,6 +155,7 @@ def filas_traslados(inicio, fin):
         resultado.append({
             'location_id': mov.origin_location_id,
             'product_id': d.product_id,
+            'lot_number': d.lot_number,
             'quantity': Decimal(str(perdida)),
             'date': mov.date,
         })

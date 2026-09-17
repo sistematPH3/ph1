@@ -12,10 +12,13 @@ Firmas públicas (contrato con Rápido 2 / Mariuska):
     obtener_costo_unitario(product_id, fecha=None, moneda='USD', metodo='ultima') -> Decimal
     valorizar_cantidad(product_id, cantidad, fecha=None, moneda='USD') -> Decimal
 """
+import logging
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.inventory.repositories import product_cost_repository as repo
+
+logger = logging.getLogger(__name__)
 
 CENTESIMA = Decimal('0.01')
 
@@ -111,6 +114,11 @@ def obtener_costo_unitario(product_id, fecha=None, moneda='USD', metodo='ultima'
         if detail is not None:
             unit_usd = _a_usd(detail.foreign_price, detail.purchase.currency, fecha, tasa_cache)
             return _de_usd_a(unit_usd, moneda, fecha, tasa_cache)
+        logger.warning(
+            "obtener_costo_unitario: lote '%s' no encontrado para producto %s (fecha %s), "
+            "usando última compra como fallback",
+            lote, product_id, fecha
+        )
 
     filas = repo.compras_producto(int(product_id), as_of=fecha,
                                   limite=3 if metodo == 'promedio3' else 1)

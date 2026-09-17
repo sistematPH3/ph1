@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 import json
 from sqlalchemy import text
@@ -7,12 +6,13 @@ from app.models.logistics_model import Purchase, PurchaseDetail
 from app.models import PurchaseAuditLog, Inventory
 from app.models.inventory_model import Product
 from app.logistics.requests.purchase_validators import normalizar_numero
+from app.time_utils import current_ve_time
 
 class PurchaseService:
     @staticmethod
     def register_purchase(data):
         try:
-            purchase_date = datetime.utcnow()
+            purchase_date = current_ve_time()
             currency = str(data['currency']).upper()
             if currency in ('VES', 'BS.', 'BSS'):
                 currency = 'BS'

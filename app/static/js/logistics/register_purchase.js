@@ -350,16 +350,22 @@ function setupHeaderValidation() {
     });
 }
 
+function fechaLocalInput(d) {
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${dia}`;
+}
+
 function configureDatePickerLimits(expInput) {
     if (!expInput) return;
 
     const minDateObj = new Date();
     minDateObj.setDate(minDateObj.getDate() + 1);
-    expInput.min = minDateObj.toISOString().split('T')[0];
+    expInput.min = fechaLocalInput(minDateObj);
 
     const maxDateObj = new Date();
     maxDateObj.setFullYear(maxDateObj.getFullYear() + 10);
-    expInput.max = maxDateObj.toISOString().split('T')[0];
+    expInput.max = fechaLocalInput(maxDateObj);
 }
 
 function attachRowValidationListeners(row) {
@@ -387,7 +393,7 @@ function attachRowValidationListeners(row) {
                     if (days > 0 && !expInput.value) {
                         const autoDateObj = new Date();
                         autoDateObj.setDate(autoDateObj.getDate() + days);
-                        expInput.value = autoDateObj.toISOString().split('T')[0];
+                        expInput.value = fechaLocalInput(autoDateObj);
                     }
                 }
             }

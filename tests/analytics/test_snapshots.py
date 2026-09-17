@@ -857,10 +857,12 @@ class SnapshotsTest(unittest.TestCase):
 
         supplier = _make_supplier_here()
         # purchase_service registra en la sede central (id=1) y su auditoría lo
-        # exige como FK; la siembra del test la crea explícitamente.
-        db.session.add(Location(name="Almacén Central", state="Zulia",
-                                is_active=True, id=1))
-        db.session.flush()
+        # exige como FK; la siembra del test la crea explícitamente, evitando
+        # chocar con la sede que el propio setUp ya dejó con id=1.
+        if Location.query.get(1) is None:
+            db.session.add(Location(name="Almacén Central", state="Zulia",
+                                    is_active=True, id=1))
+            db.session.flush()
         fixed = _dt(2026, 9, 30, 23, 30, 0)
         with patch('app.logistics.services.purchase_service.current_ve_time',
                    return_value=fixed):

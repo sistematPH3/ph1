@@ -292,7 +292,7 @@ class WasteEditService:
 
             unit_cost = obtener_costo_unitario(
                 int(pid),
-                fecha=datetime.utcnow(),
+                fecha=waste.date,
                 moneda="USD",
                 metodo="lote",
                 lote=str(lot).strip(),

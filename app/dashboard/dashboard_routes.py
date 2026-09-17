@@ -11,6 +11,22 @@ from app.decorators.roles import (
     operations_required
 )
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
+from app.analytics.requests.statistics_validators import (
+    validate_period_type,
+    validate_moneda,
+)
+from app.analytics.services.snapshots_service import (
+    leer_configuracion,
+    evaluar_alarmas,
+    obtener_grafico_evolucion,
+    obtener_comparativo,
+    obtener_costo_operativo,
+    obtener_mermas_por_tipo,
+    obtener_pendientes,
+    generar_snapshots,
+    faltan_snapshots,
+)
+from app.models import Location
 from app.dashboard.dashboard_service import (
     get_subgerente_context,
     get_finance_dashboard_context,
@@ -37,6 +53,20 @@ def _contexto_estadisticas(period_type, moneda='USD', location_ids=None):
             },
         }
     return alertas_estadisticas, datos_grafico
+
+def _asegurar_snapshots(period_type, user_id=None):
+    """Regeneración perezosa: si falta el snapshot del período vigente se
+    calcula SOLO ese período antes de renderizar. Un fallo aquí no debe tumbar el panel."""
+    try:
+        if faltan_snapshots(period_type):
+            from app.analytics.services.snapshots_service import (
+                calcular_periodo, generar_snapshot_periodo,
+            )
+            inicio, fin = calcular_periodo(period_type)
+            generar_snapshot_periodo(period_type, inicio, fin, user_id=user_id)
+    except Exception:
+        pass
+
 
 @dashboard_bp.route('/')
 @login_required
@@ -93,6 +123,7 @@ def admin_dashboard():
     if sede_id is not None and not any(s.id == sede_id for s in sedes):
         sede_id = None
     location_ids = [sede_id] if sede_id is not None else None
+    _asegurar_snapshots(period_type, user_id=current_user.id)
     alertas_estadisticas, datos_grafico = _contexto_estadisticas(
         period_type, moneda=moneda, location_ids=location_ids,
     )

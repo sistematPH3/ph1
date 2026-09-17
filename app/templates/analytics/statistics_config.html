@@ -1,96 +1,112 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/statistics.css') }}?v=5">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/statistics_config.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
 <div class="cfg-wrapper">
-    <div class="stats-header">
-        <h1>Configuración de Alarmas de Estadísticas</h1>
-        <p>Ajusta la regla de irregularidad y la moneda con la que abren los reportes.
-           Cada sede genera una alarma cuando su valor del período supera el factor
-           por su promedio histórico de 3 períodos.</p>
+    <h2 class="cfg-page-title">Configuración de Alarmas</h2>
+
+    <div class="cfg-panel">
+        <div class="cfg-panel-head">
+            <span class="cfg-panel-ico"><i class="bi bi-info-circle-fill"></i></span>
+            <h2 class="cfg-panel-title">Qué se configura aquí</h2>
+            <span class="cfg-panel-leyenda">Alcance global</span>
+        </div>
+        <ul class="cfg-info-list">
+            <li><i class="bi bi-check-circle-fill"></i><span><strong>Factor de disparo</strong>: cuántas veces debe superar el promedio histórico para disparar alarmas.</span></li>
+            <li><i class="bi bi-check-circle-fill"></i><span><strong>Mínimo en USD</strong>: si el monto del período no alcanza este valor, no se genera alarma (evita ruido).</span></li>
+            <li><i class="bi bi-check-circle-fill"></i><span><strong>Moneda por defecto</strong>: con qué moneda abren las estadísticas y los reportes.</span></li>
+        </ul>
+        <p class="cfg-panel-note">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Las alarmas se evalúan automáticamente por separado en cada sede y para cada tipo de
+            movimiento (compras, consumo de cocina, mermas y traslados), usando el promedio de los
+            3 períodos anteriores. Desde aquí sólo se ajustan los parámetros globales; las alarmas por
+            sede se activan de forma automática al superar el umbral.</span>
+        </p>
     </div>
 
-    <div class="cfg-info-banner">
-        <div class="cfg-info-icon"><i class="bi bi-info-circle-fill"></i></div>
-        <div class="cfg-info-body">
-            <strong>Qué se configura aquí:</strong>
-            <ul>
-                <li><b>Factor de disparo</b>: cuántas veces debe superar el promedio histórico para disparar alarmas.</li>
-                <li><b>Mínimo en USD</b>: si el monto del período no alcanza este valor, no se genera alarma (evita ruido).</li>
-                <li><b>Moneda por defecto</b>: con qué moneda abren las estadísticas y los reportes.</li>
-            </ul>
-            <strong>Qué se puede configurar:</strong>
-            <p class="mb-0">Las alarmas se evalúan automáticamente por separado en cada sede y para cada tipo de
-            movimiento (compras, consumo de cocina, mermas y traslados), usando el promedio de los
-            3 períodos anteriores. Desde aquí sólo se ajustan los parámetros globales; los alarmas por
-            sede se activan de forma automática al superar el umbral.</p>
-        </div>
+    <div class="cfg-seccion-head">
+        <h2>
+            <span class="cfg-seccion-ico"><i class="bi bi-sliders"></i></span>
+            Parámetros globales
+        </h2>
+        <span class="cfg-seccion-leyenda"><i class="bi bi-circle-fill"></i>se aplican a todas las sedes</span>
     </div>
 
     <form id="form-statistics-config" novalidate>
         <div class="cfg-grid">
-            <div class="cfg-card">
-                <div class="cfg-icon"><i class="bi bi-percent"></i></div>
-                <div class="flex-grow-1">
-                    <h2 class="cfg-card-title">Factor de disparo <span class="cfg-unit-badge">multiplicador</span></h2>
-                    <p class="cfg-card-desc">Multiplica el promedio de los 3 períodos anteriores como umbral.
-                       Ejemplo: 2.0 = se alerta cuando el valor duplica el promedio.</p>
-                    <div style="max-width:160px">
-                        <input type="number" class="cfg-input" id="ESTADISTICAS_FACTOR"
-                               name="ESTADISTICAS_FACTOR" step="0.1" min="0.1"
-                               value="{{ configs.ESTADISTICAS_FACTOR }}">
-                        <div class="invalid-feedback" id="error-factor">El factor debe ser un número mayor que 0.</div>
-                    </div>
+            <div class="cfg-card" style="--cfg-clr: #ce1126; background: radial-gradient(420px 140px at 100% -20%, rgba(206, 17, 38, .10), transparent 60%), linear-gradient(150deg, #ffffff, #ffffff 58%);">
+                <div class="cfg-card-head">
+                    <span class="cfg-card-ico" style="background: linear-gradient(135deg, #e31937, #ce1126);"><i class="bi bi-percent"></i></span>
+                    <h3 class="cfg-card-title">Factor de disparo <span class="cfg-unit-badge" style="color:#ce1126;background:rgba(206,17,38,.08);">multiplicador</span></h3>
                 </div>
+                <p class="cfg-card-desc">Multiplica el promedio de los 3 períodos anteriores como umbral.
+                   Ejemplo: 2.0 = se alerta cuando el valor duplica el promedio.</p>
+                <label class="cfg-field-label" for="ESTADISTICAS_FACTOR">Umbral</label>
+                <div class="cfg-input-wrap">
+                    <input type="number" class="cfg-input" id="ESTADISTICAS_FACTOR"
+                           name="ESTADISTICAS_FACTOR" step="0.1" min="0.1"
+                           value="{{ configs.ESTADISTICAS_FACTOR }}">
+                    <span class="cfg-input-sufijo">×</span>
+                </div>
+                <div class="invalid-feedback" id="error-factor">El factor debe ser un número mayor que 0.</div>
             </div>
 
-            <div class="cfg-card">
-                <div class="cfg-icon"><i class="bi bi-cash-stack"></i></div>
-                <div class="flex-grow-1">
-                    <h2 class="cfg-card-title">Mínimo en USD <span class="cfg-unit-badge">USD</span></h2>
-                    <p class="cfg-card-desc">Valor mínimo que debe alcanzar el período para que
-                       el disparador sea considerado una alarma (evita ruido con cifras pequeñas).</p>
-                    <div style="max-width:160px">
-                        <input type="number" class="cfg-input" id="ESTADISTICAS_MINIMO_USD"
-                               name="ESTADISTICAS_MINIMO_USD" step="0.01" min="0"
-                               value="{{ configs.ESTADISTICAS_MINIMO_USD }}">
-                        <div class="invalid-feedback" id="error-minimo">El mínimo debe ser un número mayor o igual que 0.</div>
-                    </div>
+            <div class="cfg-card" style="--cfg-clr: #0f766e; background: radial-gradient(420px 140px at 100% -20%, rgba(15, 118, 110, .14), transparent 60%), linear-gradient(150deg, #ecfaf2, #ffffff 58%);">
+                <div class="cfg-card-head">
+                    <span class="cfg-card-ico" style="background: linear-gradient(135deg, #52d494, #1a9e63);"><i class="bi bi-cash-stack"></i></span>
+                    <h3 class="cfg-card-title">Mínimo en USD <span class="cfg-unit-badge" style="color:#0f766e;background:rgba(15,118,110,.10);">USD</span></h3>
                 </div>
+                <p class="cfg-card-desc">Valor mínimo que debe alcanzar el período para que
+                   el disparador sea considerado una alarma (evita ruido con cifras pequeñas).</p>
+                <label class="cfg-field-label" for="ESTADISTICAS_MINIMO_USD">Valor mínimo</label>
+                <div class="cfg-input-wrap">
+                    <input type="number" class="cfg-input" id="ESTADISTICAS_MINIMO_USD"
+                           name="ESTADISTICAS_MINIMO_USD" step="0.01" min="0"
+                           value="{{ configs.ESTADISTICAS_MINIMO_USD }}">
+                    <span class="cfg-input-sufijo">$</span>
+                </div>
+                <div class="invalid-feedback" id="error-minimo">El mínimo debe ser un número mayor o igual que 0.</div>
             </div>
 
-            <div class="cfg-card">
-                <div class="cfg-icon"><i class="bi bi-currency-dollar"></i></div>
-                <div class="flex-grow-1">
-                    <h2 class="cfg-card-title">Moneda por defecto <span class="cfg-unit-badge">reportes</span></h2>
-                    <p class="cfg-card-desc">Con qué moneda abren las estadísticas (y el dashboard del Admin).
-                       El usuario siempre puede cambiarla desde el selector.</p>
-                    <div style="max-width:160px">
-                        <select class="cfg-input" id="ESTADISTICAS_MONEDA" name="ESTADISTICAS_MONEDA">
-                            {% for m in ['USD', 'EUR', 'BS'] %}
-                            <option value="{{ m }}" {% if m == configs.ESTADISTICAS_MONEDA %}selected{% endif %}>{{ m }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="invalid-feedback" id="error-moneda">Moneda no válida (use USD, EUR o BS).</div>
-                    </div>
+            <div class="cfg-card" style="--cfg-clr: #7c3aed; background: radial-gradient(420px 140px at 100% -20%, rgba(124, 58, 237, .12), transparent 60%), linear-gradient(150deg, #ffffff, #ffffff 58%);">
+                <div class="cfg-card-head">
+                    <span class="cfg-card-ico" style="background: linear-gradient(135deg, #a78bfa, #7c3aed);"><i class="bi bi-currency-dollar"></i></span>
+                    <h3 class="cfg-card-title">Moneda por defecto <span class="cfg-unit-badge" style="color:#7c3aed;background:rgba(124,58,237,.10);">reportes</span></h3>
                 </div>
+                <p class="cfg-card-desc">Con qué moneda abren las estadísticas (y el dashboard del Admin).
+                   El usuario siempre puede cambiarla desde el selector.</p>
+                <label class="cfg-field-label" for="ESTADISTICAS_MONEDA">Moneda de apertura</label>
+                <select class="cfg-input" id="ESTADISTICAS_MONEDA" name="ESTADISTICAS_MONEDA">
+                    {% for m in ['USD', 'EUR', 'BS'] %}
+                    <option value="{{ m }}" {% if m == configs.ESTADISTICAS_MONEDA %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+                <div class="invalid-feedback" id="error-moneda">Moneda no válida (use USD, EUR o BS).</div>
             </div>
         </div>
 
         <div class="cfg-preview">
-            <i class="bi bi-lightbulb"></i>
-            Una sede genera alarma cuando el valor del período supera <strong>{{ configs.ESTADISTICAS_FACTOR }}×</strong>
-            el promedio de los 3 períodos anteriores y alcanza al menos
-            <strong>${{ configs.ESTADISTICAS_MINIMO_USD }}</strong>.
-            La regla se evalúa por separado para compras, consumo de cocina, mermas y traslados, en cada sede activa.
+            <i class="bi bi-lightbulb-fill"></i>
+            <div class="cfg-preview-copy">
+                <span class="cfg-preview-tag">Regla de disparo actual</span>
+                Una sede genera alarma cuando el valor del período supera
+                <strong>{{ configs.ESTADISTICAS_FACTOR }}×</strong>
+                el promedio de los 3 períodos anteriores y alcanza al menos
+                <strong>${{ configs.ESTADISTICAS_MINIMO_USD }}</strong>.
+                La regla se evalúa por separado para compras, consumo de cocina, mermas y traslados, en cada sede activa.
+            </div>
         </div>
 
         <div class="invalid-feedback d-block" id="cfgError" style="display:none;"></div>
 
-        <div class="cfg-actions mt-3">
+        <div class="cfg-actions">
             {# TODO(mariuska): repuntar 'Volver' a su pantalla de gráficos cuando
                la suba. El endpoint 'dashboard.admin_dashboard' fue eliminado. #}
             <a href="{{ url_for('dashboard.admin_dashboard') }}" class="btn-stats btn-stats-ghost">
