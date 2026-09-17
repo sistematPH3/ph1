@@ -43,7 +43,7 @@ class MermaApprovalsRepository:
 
     @staticmethod
     def get_admins():
-        return User.query.filter(User.role.has(name='Administrator')).all()
+        return User.query.filter(User.role.has(name.in_(['Administrator', 'Admin']))).all()
 
     # ------------------------------------------------------------------
     # Mermas pendientes (cola de espera / bandeja)

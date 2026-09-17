@@ -56,7 +56,9 @@ class InventoryViewRepository:
             Location.is_active == True,
             Product.is_active == True,
             Inventory.current_quantity > 0,
-            Inventory.current_quantity <= Inventory.min_stock
+            (Inventory.current_quantity
+             - func.coalesce(Inventory.transit_quantity, 0)
+             - func.coalesce(Inventory.reserved_quantity, 0)) <= Inventory.min_stock
         ).group_by(Location.id, Location.name).all()
 
         return [

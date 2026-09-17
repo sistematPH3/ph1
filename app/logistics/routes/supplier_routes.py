@@ -8,7 +8,7 @@ from app.logistics.services.supplier_service import SupplierService
 from app.logistics.repositories.supplier_repository import SupplierRepository
 
 # Importamos el decorador dinámico unificado
-from app.decorators.roles import require_roles
+from app.decorators.roles import require_roles, require_roles_api
 
 suppliers_bp = Blueprint('suppliers', __name__)
 
@@ -45,7 +45,7 @@ def handle_register():
 # =========================================================================
 
 @suppliers_bp.route('/suppliers/check-name', methods=['POST'])
-@login_required
+@require_roles_api('admin', 'management', 'manager')
 def check_name():
     data = request.get_json() or {}
     name = data.get('name', '').strip()
@@ -64,7 +64,7 @@ def check_name():
 
 
 @suppliers_bp.route('/suppliers/check-tax-id', methods=['POST'])
-@login_required
+@require_roles_api('admin', 'management', 'manager')
 def check_tax_id():
     data = request.get_json() or {}
     tax_id = data.get('tax_id', '').strip()
@@ -83,7 +83,7 @@ def check_tax_id():
 
 
 @suppliers_bp.route('/suppliers/check-phone', methods=['POST'])
-@login_required
+@require_roles_api('admin', 'management', 'manager')
 def check_phone():
     data = request.get_json() or {}
     phone = data.get('phone', '').strip()
@@ -102,7 +102,7 @@ def check_phone():
 
 
 @suppliers_bp.route('/suppliers/check-email', methods=['POST'])
-@login_required
+@require_roles_api('admin', 'management', 'manager')
 def check_email():
     data = request.get_json() or {}
     email = data.get('email', '').strip()

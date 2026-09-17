@@ -8,13 +8,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
 {% endblock %}
 
+{% block icon_class %}bi-geo-alt-fill{% endblock %}
+
 {% block title_list %}
-    <span class="d-flex align-items-center">
-        <span class="brand-box me-3">
-            <i class="bi bi-geo-alt-fill text-white"></i>
-        </span>
-        <span>Gestión de Sedes</span>
-    </span>
+    Gestión de Sedes
 {% endblock %}
 
 {% block subtitle_list %}Control y estado de sucursales a nivel nacional{% endblock %}

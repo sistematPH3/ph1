@@ -2,6 +2,20 @@ let rawInventoryData = [];
 let currentPage = 1;
 const ITEMS_PER_PAGE = 5;
 
+function getAvailableQty(item) {
+    if (item.available_quantity != null) return Number(item.available_quantity);
+    const current = item.current_quantity != null ? Number(item.current_quantity) : 0;
+    const transit = item.transit_quantity != null ? Number(item.transit_quantity) : 0;
+    const reserved = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
+    return Math.max(0, current - transit - reserved);
+}
+
+function isItemLow(item) {
+    if (item.is_low_stock !== undefined) return item.is_low_stock;
+    const minStock = item.min_stock != null ? Number(item.min_stock) : 0;
+    return getAvailableQty(item) <= minStock;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('inventoryViewApp');
     const baseApiUrl = appContainer ? appContainer.dataset.apiUrl : '/inventory/api/list';
@@ -136,12 +150,14 @@ function ensureLotsModalExists() {
                                     <tr>
                                         <th class="text-start ps-3">N° de Lote / Partida</th>
                                         <th class="text-center">Vencimiento</th>
-                                        <th class="text-center">Existencia Ingresada</th>
+                                        <th class="text-center">Disponible</th>
+                                        <th class="text-center">Congelado</th>
+                                        <th class="text-center">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="lotsModalBody">
                                     <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted">
+                                        <td colspan="5" class="text-center py-4 text-muted">
                                             <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
                                         </td>
                                     </tr>
@@ -174,9 +190,9 @@ async function openLotsModal(locationId, productId, productName, sku) {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="3" class="text-center py-4 text-muted">
-                    <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
-                </td>
+<td colspan="5" class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
+        </td>
             </tr>
         `;
     }
@@ -191,14 +207,21 @@ async function openLotsModal(locationId, productId, productName, sku) {
             if (result.lots.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted py-4">
+                        <td colspan="5" class="text-center text-muted py-4">
                             <i class="bi bi-info-circle fs-5 d-block mb-1 text-secondary"></i>
                             No hay partidas de lotes individuales registradas para este insumo en esta sede.
                         </td>
                     </tr>
                 `;
             } else {
-                tbody.innerHTML = result.lots.map(l => `
+                tbody.innerHTML = result.lots.map(l => {
+                    const disponible = Number(l.quantity != null ? l.quantity : 0).toFixed(2);
+                    const congelado = Number(l.frozen_quantity != null ? l.frozen_quantity : 0).toFixed(2);
+                    const merma = Number(l.frozen_merma_quantity != null ? l.frozen_merma_quantity : 0).toFixed(2);
+                    const transito = Number(l.frozen_transit_quantity != null ? l.frozen_transit_quantity : 0).toFixed(2);
+                    const total = (Number(disponible) + Number(congelado)).toFixed(2);
+                    const hasCancelled = Number(congelado) > 0;
+                    return `
                     <tr>
                         <td class="ps-3 fw-bold text-dark font-monospace">${l.lot_number}</td>
                         <td class="text-center">
@@ -206,9 +229,15 @@ async function openLotsModal(locationId, productId, productName, sku) {
                                 <i class="bi bi-calendar-event me-1"></i>${l.expiration_date}
                             </span>
                         </td>
-                        <td class="text-center fw-bold text-primary">${Number(l.quantity).toFixed(2)}</td>
+                        <td class="text-center fw-bold text-success">${disponible}</td>
+                        <td class="text-center">
+                            <span class="fw-bold ${hasCancelled ? 'text-warning' : 'text-muted'}">${congelado}</span>
+                            ${hasCancelled ? `<small class="d-block text-muted fs-7">Mermas ${merma} · Tránsito ${transito}</small>` : ''}
+                        </td>
+                        <td class="text-center fw-bold text-primary">${total}</td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             }
         } else {
             throw new Error(result.error || 'Error en la respuesta');
@@ -216,7 +245,7 @@ async function openLotsModal(locationId, productId, productName, sku) {
     } catch (e) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="3" class="text-center text-danger py-4">
+                <td colspan="5" class="text-center text-danger py-4">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i> No se pudo cargar el desglose de lotes.
                 </td>
             </tr>
@@ -267,9 +296,9 @@ function updateInventoryView() {
         const name = (item.product_name || item.product?.name || '').toLowerCase();
         const matchesSearch = (searchTerm === '' || sku.includes(searchTerm) || name.includes(searchTerm));
 
-        const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+        const qty = getAvailableQty(item);
         const minStock = item.min_stock != null ? Number(item.min_stock) : 0;
-        const isLow = item.is_low_stock !== undefined ? item.is_low_stock : (qty <= minStock);
+        const isLow = isItemLow(item);
 
         let matchesStatus = true;
         if (selectedStatus === 'low') matchesStatus = isLow;
@@ -283,9 +312,9 @@ function updateInventoryView() {
     if (filteredData.length === 0) {
         if (selectedStatus === 'low') {
             const zeroStockLowItems = rawInventoryData.filter(item => {
-                const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+                const qty = getAvailableQty(item);
                 const minStock = item.min_stock != null ? Number(item.min_stock) : 0;
-                const isLow = item.is_low_stock !== undefined ? item.is_low_stock : (qty <= minStock);
+                const isLow = isItemLow(item);
                 
                 const sku = (item.sku || item.product?.sku || '').toLowerCase();
                 const name = (item.product_name || item.product?.name || '').toLowerCase();
@@ -301,7 +330,7 @@ function updateInventoryView() {
             const existsWithZeroStock = rawInventoryData.some(item => {
                 const sku = (item.sku || item.product?.sku || '').toLowerCase();
                 const name = (item.product_name || item.product?.name || '').toLowerCase();
-                const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
+                const qty = getAvailableQty(item);
                 return (sku.includes(searchTerm) || name.includes(searchTerm)) && qty <= 0;
             });
 
@@ -384,17 +413,20 @@ function renderTableRows(items, emptySearchReason = null) {
         const sku = item.sku || item.product?.sku || 'N/A';
         const name = item.product_name || item.product?.name || 'Sin Nombre';
         const locationName = item.location_name || item.location?.name || 'Sede';
-        const qty = item.current_quantity != null ? Number(item.current_quantity).toFixed(2) : '0.00';
+        const qty = getAvailableQty(item).toFixed(2);
         const minQty = item.min_stock != null ? Number(item.min_stock).toFixed(2) : '0.00';
         const unit = item.unit || item.product?.unit_of_measure || '';
+        const reservedQty = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
 
-        const isLow = item.is_low_stock !== undefined 
-            ? item.is_low_stock 
-            : (Number(qty) <= Number(minQty));
+        const isLow = isItemLow(item);
 
         const badge = isLow 
             ? `<span class="badge bg-danger btn-pill px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Stock Bajo</span>`
             : `<span class="badge bg-success btn-pill px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> Normal</span>`;
+
+        const frozenHint = reservedQty > 0
+            ? `<small class="d-block text-warning fs-7 fw-semibold">+${reservedQty.toFixed(2)} congelados</small>`
+            : '';
 
         return `
             <tr>
@@ -410,8 +442,9 @@ function renderTableRows(items, emptySearchReason = null) {
                     </button>
                 </td>
                 <td data-label="Ubicación"><span class="badge bg-light text-dark border">${locationName}</span></td>
-                <td data-label="Stock Actual" class="text-center fw-bold fs-6">
+                <td data-label="Stock Disponible" class="text-center fw-bold fs-6">
                     ${qty} <small class="text-muted fs-7">${unit}</small>
+                    ${frozenHint}
                 </td>
                 <td data-label="Stock Mínimo" class="text-center text-muted">${minQty}</td>
                 <td data-label="Estado" class="text-center">${badge}</td>
@@ -482,9 +515,7 @@ function updateDashboardCards(inventoryData) {
     if (!Array.isArray(inventoryData)) return;
 
     const lowStockCount = inventoryData.filter(item => {
-        const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
-        const minStock = item.min_stock != null ? Number(item.min_stock) : 0;
-        return item.is_low_stock !== undefined ? item.is_low_stock : (qty <= minStock);
+        return isItemLow(item);
     }).length;
 
     const countElement = document.getElementById('cardLowStockCount');

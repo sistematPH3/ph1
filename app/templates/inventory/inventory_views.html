@@ -204,7 +204,7 @@
                                 <th>SKU</th>
                                 <th>Producto / Insumo</th>
                                 <th>Ubicación</th>
-                                <th class="text-center">Stock Actual</th>
+                                <th class="text-center">Disponible</th>
                                 <th class="text-center">Stock Mínimo</th>
                                 <th class="text-center">Estado</th>
                             </tr>
@@ -225,13 +225,16 @@
                                         </button>
                                     </td>
                                     <td data-label="Ubicación"><span class="badge bg-light text-dark border">{{ item.location.name if item.location else 'Sede' }}</span></td>
-                                    <td data-label="Stock Actual" class="text-center fw-bold fs-6">
-                                        {{ "%.2f"|format(item.current_quantity or 0) }} 
+                                    <td data-label="Stock Disponible" class="text-center fw-bold fs-6">
+                                        {{ "%.2f"|format((item.current_quantity or 0) - (item.transit_quantity or 0) - (item.reserved_quantity or 0)) }}
                                         <small class="text-muted fs-7">{% if item.product %}{{ item.product.unit_of_measure or '' }}{% endif %}</small>
+                                        {% if (item.reserved_quantity or 0) > 0 %}
+                                        <small class="d-block text-warning fs-7 fw-semibold">+{{ "%.2f"|format(item.reserved_quantity) }} congelados</small>
+                                        {% endif %}
                                     </td>
                                     <td data-label="Stock Mínimo" class="text-center text-muted">{{ "%.2f"|format(item.min_stock or 0) }}</td>
                                     <td data-label="Estado" class="text-center">
-                                        {% if (item.current_quantity or 0) <= (item.min_stock or 0) %}
+                                        {% if (item.current_quantity or 0) - (item.transit_quantity or 0) - (item.reserved_quantity or 0) <= (item.min_stock or 0) %}
                                             <span class="badge bg-danger btn-pill px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Stock Bajo</span>
                                         {% else %}
                                             <span class="badge bg-success btn-pill px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> Normal</span>

@@ -607,7 +607,7 @@ def _notify_response_resolved(movement, resolver_user_id):
         ).all():
             recipients[user.id] = user
     for user in User.query.filter(
-        User.role.has(Role.name.in_(['Administrator', 'Finance']))
+        User.role.has(Role.name.in_(['Administrator', 'Admin', 'Finance']))
     ).all():
         recipients[user.id] = user
 

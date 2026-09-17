@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import flash, redirect, url_for
+from flask import flash, jsonify, redirect, url_for
 from flask_login import current_user
 
 def admin_required(f):
@@ -107,6 +107,38 @@ def require_roles(*allowed_roles):
                 flash("Acceso denegado: No cuenta con los privilegios necesarios para esta acción.", "danger")
                 return redirect(url_for('security.login'))
                 
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+def require_roles_api(*allowed_roles):
+    """
+    Variante de require_roles para endpoints JSON/AJAX.
+    En lugar de redirigir al login responde 401 (sin sesión) o 403 (sin permiso),
+    para que el frontend reciba una respuesta coherente.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return jsonify({'success': False, 'message': 'No autenticado.'}), 401
+
+            role_checks = {
+                'admin': current_user.is_admin,
+                'management': current_user.is_management,
+                'manager': current_user.is_manager,
+                'assistant_manager': current_user.is_assistant_manager,
+                'operations': current_user.is_operations,
+                'finance': current_user.is_finance,
+                'guest': current_user.is_guest
+            }
+
+            has_permission = any(role_checks.get(role, False) for role in allowed_roles)
+
+            if not has_permission:
+                return jsonify({'success': False, 'message': 'Permisos insuficientes.'}), 403
+
             return f(*args, **kwargs)
         return decorated_function
     return decorator

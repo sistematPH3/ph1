@@ -81,10 +81,8 @@ def _nombre_descarga(tipo, formato):
 # =============================================================================
 @audit_exports_bp.route('/auditoria/accesos/export', methods=['GET'])
 @login_required
+@require_roles('admin', 'finance')
 def descargar_accesos():
-    user_role = current_user.role.name if hasattr(current_user, 'role') and current_user.role else ''
-    if user_role not in ('Administrator', 'Finance'):
-        return jsonify({'success': False, 'message': 'Permisos insuficientes.'}), 403
     return _descargar('accesos', _nombre_descarga)
 
 
@@ -93,9 +91,8 @@ def descargar_accesos():
 # =============================================================================
 @audit_exports_bp.route('/auditoria/usuarios/export', methods=['GET'])
 @login_required
+@require_roles('admin')
 def descargar_usuarios():
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Permisos insuficientes.'}), 403
     return _descargar('usuarios', _nombre_descarga)
 
 
@@ -134,5 +131,6 @@ def descargar_mermas():
 # =============================================================================
 @audit_exports_bp.route('/waste/audit/export', methods=['GET'])
 @login_required
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def descargar_inventario():
     return _descargar('inventario', _nombre_descarga)

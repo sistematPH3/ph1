@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, flash
 from flask_login import login_required, current_user
 from app.models import Location, Product
 from app.logistics.services.movement_dispatch_service import MovementDispatchService
-from app.decorators.roles import require_roles
+from app.decorators.roles import require_roles, require_roles_api
 
 dispatch_bp = Blueprint('dispatch_bp', __name__)
 
@@ -33,7 +33,7 @@ def dispatch_form_view():
     )
 
 @dispatch_bp.route('/get-product-lots', methods=['GET'])
-@login_required
+@require_roles_api('admin')
 def get_product_lots_api():
     location_id = request.args.get('location_id', type=int)
     product_id = request.args.get('product_id', type=int)

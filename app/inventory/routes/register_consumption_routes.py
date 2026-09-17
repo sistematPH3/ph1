@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template, session
+from flask_login import login_required
+from app.decorators.roles import require_roles, require_roles_api
 from app.inventory.requests.register_consumption_validators import validate_consumption_payload
 from app.inventory.services.register_consumption_service import (
     register_consumption, 
@@ -10,7 +12,11 @@ from app.inventory.services.register_consumption_service import (
 
 register_consumption_bp = Blueprint('register_consumption', __name__)
 
+OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
+
 @register_consumption_bp.route('/inventory/register-consumption', methods=['GET'])
+@login_required
+@require_roles(*OPERATIVE_ROLES)
 def show_consumption_form():
     user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
     
@@ -25,6 +31,7 @@ def show_consumption_form():
     )
 
 @register_consumption_bp.route('/api/inventory/locations/<int:location_id>/products', methods=['GET'])
+@require_roles_api(*OPERATIVE_ROLES)
 def fetch_location_products(location_id):
     user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
 
@@ -35,6 +42,7 @@ def fetch_location_products(location_id):
     return jsonify({'success': True, 'products': products}), 200
 
 @register_consumption_bp.route('/api/inventory/locations/<int:location_id>/products/<int:product_id>/lots', methods=['GET'])
+@require_roles_api(*OPERATIVE_ROLES)
 def fetch_product_lots(location_id, product_id):
     user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
 
@@ -45,6 +53,7 @@ def fetch_product_lots(location_id, product_id):
     return jsonify({'success': True, 'lots': lots}), 200
 
 @register_consumption_bp.route('/api/inventory/register-consumption', methods=['POST'])
+@require_roles_api(*OPERATIVE_ROLES)
 def process_consumption():
     data = request.get_json()
     validation = validate_consumption_payload(data)

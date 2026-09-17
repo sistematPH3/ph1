@@ -132,6 +132,13 @@ def create_app():
         # ==========================================================\
 
         # ==========================================================\
+        # AUDITORÍA DE GASTOS DE COCINA (NUEVO)
+        # ==========================================================\
+        from .inventory.routes.kitchen_expense_audit_routes import kitchen_expense_audit_bp
+        app.register_blueprint(kitchen_expense_audit_bp)
+        # ==========================================================\
+
+        # ==========================================================\
         # GESTIÓN DE COMPRAS 
         # ==========================================================\
         from .logistics.routes.purchase_management_routes import purchase_management_bp

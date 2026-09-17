@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_approvals.css') }}?v=19">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_approvals.css') }}?v=24">
 {% endblock %}
 
 {% block content %}
@@ -28,19 +28,22 @@
             </div>
         </div>
 
-        <!-- Barra de Filtros -->
-        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="input-group" style="max-width: 320px;">
-                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control" placeholder="Buscar por ID, Sede, Tipo..." id="searchApprovalInput">
-            </div>
-            <div class="text-muted small fw-semibold">
-                <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas.
+        <!-- Cintillo de Filtros -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="searchApprovalInput" class="form-control rounded-pill bg-light border-0 ps-5"
+                           placeholder="Buscar por ID, Sede, Tipo..." style="height: 36px;" autocomplete="off">
+                </div>
+                <div class="text-white small fw-semibold w-100 mt-1">
+                    <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas.
+                </div>
             </div>
         </div>
 
         <!-- Tabla de Mermas Pendientes -->
-        <div class="table-responsive">
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card">
             <table class="table ph-table align-middle">
                 <thead>
                     <tr style="background-color: #af1515 !important;">

@@ -54,7 +54,7 @@
         </li>
         {% endif %}
 
-        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations or current_user.is_finance %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-box-seam main-icon"></i>
@@ -62,12 +62,16 @@
                 <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
             </a>
             <div class="menu-desplegable">
+                {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
                 <a class="nav-link sub-link" href="{{ url_for('inventory.list_categories') }}">Categorías</a>
                 <a class="nav-link sub-link" href="{{ url_for('inventory.create_product') }}">Registro de Insumos</a>
                 <a class="nav-link sub-link" href="{{ url_for('inventory.list_products') }}">Menú de Insumos</a>
                 <a class="nav-link sub-link" href="{{ url_for('register_consumption.show_consumption_form') }}">Registro de Consumo</a>
                 <a class="nav-link sub-link" href="{{ url_for('inventory.render_inventory_views') }}">Inventario Dual</a>
-                <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Gestión y Auditoría de Inventario</a>
+                {% endif %}
+                {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager %}
+                <a class="nav-link sub-link" href="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}">Gestión y Auditoría de Gastos de Cocina</a>
+                {% endif %}
             </div>
         </li>
         {% endif %}
@@ -112,10 +116,6 @@
                     </span>
                     {% endif %}
                 </a>
-                {% endif %}
-
-                {% if can_view_responses %}
-                <a class="nav-link sub-link" href="{{ url_for('response_inbox.admin_responses') }}">Respuestas de Administración</a>
                 {% endif %}
 
                 <a class="nav-link sub-link" href="{{ url_for('register_waste.nueva_merma') }}">Nueva Merma</a>
@@ -163,9 +163,9 @@
                 {% endif %}
                 <a class="nav-link sub-link" href="{{ url_for('logistics_audit.view_movement_audit') }}">Auditoría de Traslados</a>
                 <a class="nav-link sub-link" href="{{ url_for('waste_audit.ver_auditoria') }}">Auditoría de Mermas</a>
-                
-                {% if current_user.is_finance %}
                 <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Auditoría de Inventario</a>
+                {% if current_user.is_finance and not current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}">Auditoría de Gastos de Cocina</a>
                 {% endif %}
             </div>
         </li>

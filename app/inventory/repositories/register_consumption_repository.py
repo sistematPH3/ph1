@@ -1,5 +1,6 @@
 import json
-from sqlalchemy import func
+from datetime import datetime
+from sqlalchemy import func, or_
 from app.extensions import db
 from app.time_utils import current_ve_time
 from app.models.inventory_model import Inventory, Product
@@ -177,27 +178,67 @@ class RegisterConsumptionRepository:
             if r.lot_number and str(r.lot_number).strip() != 'N/A':
                 salidas_aprobadas[str(r.lot_number).strip()] = float(r.total_mermado or 0.0)
 
+        # Mermas PENDIENTES: la cantidad está congelada (reserved_quantity) y no
+        # está disponible para consumo. Se resta de la disponibilidad del lote
+        # para que la UI de consumo nunca muestre Mercancía que no se puede tocar.
+        salidas_pendientes = {}
+        pendientes = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_pend')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            or_(
+                Waste.status == 'PENDIENTE',
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status != 'APROBADO'),
+            ),
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+
+        for r in pendientes:
+            if r.lot_number and str(r.lot_number).strip() != 'N/A':
+                salidas_pendientes[str(r.lot_number).strip()] = float(r.total_pend or 0.0)
+
+        # Disponible agregado de la sede (igual criterio que el consumo):
+        # físico - en tránsito - congelado por mermas.
+        inventory_item = RegisterConsumptionRepository.get_inventory_item(prod_id, loc_id)
+        stock_actual = float(inventory_item.current_quantity) if inventory_item else 0.0
+        reservado = float(inventory_item.reserved_quantity or 0) if inventory_item else 0.0
+        transit = float(inventory_item.transit_quantity or 0) if inventory_item else 0.0
+        disponible_total = max(0.0, stock_actual - transit - reservado)
+
         lots = []
         for lot_num, data in entradas_por_lote.items():
             disponible = (data['total_in']
                           - salidas_traslados.get(lot_num, 0.0)
                           - salidas_consumo.get(lot_num, 0.0)
-                          - salidas_aprobadas.get(lot_num, 0.0))
+                          - salidas_aprobadas.get(lot_num, 0.0)
+                          - salidas_pendientes.get(lot_num, 0.0))
 
             if disponible > 0.001:
                 lots.append({
                     'lot_number': lot_num,
                     'expiration_date': data['expiration_date'].strftime('%d/%m/%Y') if data['expiration_date'] else 'Sin vencimiento',
                     'exp_date_raw': data['expiration_date'],
-                    'quantity': round(float(disponible), 2)
+                    'disponible': disponible
                 })
 
         lots.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
 
+        remaining_pool = disponible_total
+        result = []
         for l in lots:
-            l.pop('exp_date_raw', None)
+            capped_qty = min(l['disponible'], max(0.0, remaining_pool))
+            if capped_qty > 0.001:
+                result.append({
+                    'lot_number': l['lot_number'],
+                    'expiration_date': l['expiration_date'],
+                    'quantity': round(float(capped_qty), 2)
+                })
+                remaining_pool -= capped_qty
 
-        return lots
+        return result
 
     @staticmethod
     def record_lot_consumption_audit(inventory_item, lot_number, quantity_consumed, previous_stock, new_stock, user_id=None, notes=None):

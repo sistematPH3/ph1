@@ -4,7 +4,7 @@ from app.models.waste_model import WasteType
 from app.models.logistics_model import Location
 from app.waste.services.waste_audit_service import WasteAuditService
 from app.waste.requests.waste_audit_validators import validate_audit_filters
-from app.decorators.roles import require_roles
+from app.decorators.roles import require_roles, require_roles_api
 import json
 
 waste_audit_bp = Blueprint('waste_audit', __name__, url_prefix='/waste/merma')
@@ -75,7 +75,7 @@ def auditoria_api():
 
 
 @waste_audit_bp.route('/locations/api/all', methods=['GET'])
-@login_required
+@require_roles_api('admin', 'finance')
 def get_all_locations():
     try:
         # Consulta de sedes activas desde la base de datos

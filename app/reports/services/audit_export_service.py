@@ -270,7 +270,7 @@ def construir_accesos(user, filtros):
         loc_ids = [loc.id for loc in user.locations]
         query = query.filter(LoginAudit.location_id.in_(loc_ids))
         query = query.join(LoginAudit.role).filter(
-            Role.name.notin_(['Administrator', 'Guest'])
+            Role.name.notin_(['Administrator', 'Admin', 'Guest'])
         )
         if es_global:
             query = query.filter(LoginAudit.location_id.is_(None))
