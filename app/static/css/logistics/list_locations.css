@@ -104,15 +104,15 @@ body.bg-main {
 
 /* Estado normal del buscador: Aseguramos el estilo aplicando directamente al ID */
 #searchInput {
-    height: 44px !important;
+    height: 36px !important;
     padding: 5px 15px 5px 44px !important;
     font-size: 0.9rem !important;
-    border: 1px solid var(--ph-border-soft) !important; /* Gris suave en reposo */
-    border-radius: 50px !important; /* Curvatura perfecta de píldora */
+    border: none !important;
+    border-radius: 50px !important;
     width: 100% !important;
-    background-color: #F8FAFC !important; /* Fondo gris claro limpio */
+    background-color: #f8f9fa !important;
     color: var(--ph-text-soft) !important;
-    transition: all 0.25s ease-in-out !important; /* Transición fluida */
+    transition: all 0.25s ease-in-out !important;
 }
 
 /* Estado de enfoque (Focus): Borde rojo corporativo con brillo de 3px idéntico al filtro */

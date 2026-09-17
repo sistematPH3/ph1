@@ -746,10 +746,20 @@ def obtener_consumo_valorizado(location_ids, desde, hasta):
         l_num = c_data.get('lot_number')
         if not l_num or str(l_num).strip() in ('', 'N/A'):
             l_num = None
-        try:
-            cantidad = Decimal(str(c_data.get('quantity_changed', 0.0) or 0.0))
-        except (TypeError, ValueError):
-            cantidad = Decimal('0.00')
+        # Cantidad efectiva: si el gasto fue editado/anulado/reactivado, el
+        # movimiento compensatorio deja 'edited_quantity' en el log original.
+        # Se usa esa magnitud (con signo de egreso) para reflejar el gasto REAL
+        # corregido y no la cantidad original ya reemplazada.
+        if c_data.get('edited_quantity') is not None:
+            try:
+                cantidad = -abs(Decimal(str(c_data.get('edited_quantity'))))
+            except (TypeError, ValueError):
+                cantidad = Decimal('0.00')
+        else:
+            try:
+                cantidad = Decimal(str(c_data.get('quantity_changed', 0.0) or 0.0))
+            except (TypeError, ValueError):
+                cantidad = Decimal('0.00')
         if p_id is None or not cantidad:
             continue
 

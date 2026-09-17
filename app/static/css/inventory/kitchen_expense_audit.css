@@ -1,0 +1,126 @@
+/* ==========================================================================
+   AUDITORÍA DE GASTOS DE COCINA
+   ========================================================================== */
+
+/* Tarjeta de ajuste (consumo reactivado / corrección): se distingue del
+   ingreso (verde) y del egreso (rojo) heredados de auditinventory.css. */
+.ph-audit-card.is-ajuste { border-left-color: #fd7e14; }
+.ph-audit-num.ajuste      { background-color: #fd7e14; }
+
+/* Monto valorizado al último costo de compra */
+.ke-amount {
+    display: inline-block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.2em 0.8em;
+    border-radius: 20px;
+}
+
+.ke-amount-menos {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.ke-amount-mas {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+/* Monto original de un gasto corregido: se muestra tachado antes del vigente */
+.ke-amount-orig {
+    text-decoration: line-through;
+    opacity: 0.6;
+    font-weight: 600;
+}
+
+/* Números de detalle (diferencia / cambio de stock) en tamaño normal */
+.ph-qty-badge-sm {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.05em 0.6em;
+    border-radius: 12px;
+}
+
+/* Flecha original -> corregida en la cabecera de gastos corregidos */
+.ke-correction-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #6c757d;
+}
+.ke-correction-arrow i {
+    color: #0d6efd;
+    font-size: 0.9rem;
+}
+.ke-correction-arrow .ke-new-qty {
+    color: #0d6efd;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   VISTA DE TELÉFONO (<=767.98px)
+   Las tarjetas de auditoría se apilan: primero el producto, luego las cifras
+   (cantidad, severidad, monto y fecha) y por último las acciones.
+   ========================================================================== */
+@media (max-width: 767.98px) {
+
+    /* Cabecera de la tarjeta: una columna */
+    .ph-audit-card > .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.6rem !important;
+    }
+
+    .ph-audit-card > .d-flex.justify-content-between > .d-flex.align-items-center {
+        align-items: flex-start !important;
+    }
+
+    /* Bloque de cifras: en fila, alineado a la izquierda y con salto de línea */
+    .ph-audit-card > .d-flex.justify-content-between > .d-flex.flex-column {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        width: 100%;
+        gap: 0.5rem 0.6rem !important;
+    }
+
+    /* Cantidad restada y precio: tamaño cómodo en teléfono */
+    .ph-audit-card .ph-qty-badge {
+        font-size: 1rem;
+        padding: 0.15em 0.7em;
+    }
+
+    .ph-audit-card .ke-amount {
+        font-size: 0.9rem;
+    }
+
+    .ph-audit-card .ph-audit-num {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        font-size: 0.95rem;
+    }
+
+    /* Botón "Ver Detalle" a lo ancho */
+    .ph-audit-card > .btn.btn-ph-info {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Detalle: cada dato ocupa toda la fila */
+    .ph-tl-detail .row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    /* Acciones del detalle (Editar / Anular / Activar) a lo ancho */
+    .ph-tl-detail .d-flex.flex-wrap.gap-2 > .btn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}

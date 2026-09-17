@@ -1,0 +1,378 @@
+{% extends 'layout.html' %}
+
+{% block title %}Auditoría de Gastos de Cocina | Pizza Hut{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}?v=8">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/kitchen_expense_audit.css') }}?v=5">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <div class="d-flex align-items-center mb-1">
+            <div class="ph-icon-box me-3 shadow-sm">
+                <i class="bi bi-fire"></i>
+            </div>
+            <div>
+                <h2 class="ph-title mb-1">Auditoría de Gastos de Cocina</h2>
+                <p class="text-muted mb-0">Consumos registrados en las sedes y movimientos compensatorios (ediciones, anulaciones y activaciones), valorizados al último costo de compra.</p>
+            </div>
+        </div>
+
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="flex-grow-1 position-relative" style="max-width: 340px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="auditSearchInput" class="form-control rounded-pill bg-light border-0 ps-5 py-2"
+                           placeholder="Buscar por insumo, sede, lote o responsable...">
+                </div>
+                <div>
+                    <form method="GET" action="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}" class="d-flex gap-2 align-items-center">
+                        {% if is_admin %}
+                        <select name="location_id" id="filter_location" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                            <option value="">Todas las sedes</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if filters.get('location_id')|string == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+                        <select name="severity" id="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                            <option value="">Todas las severidades</option>
+                            {% for sev_val, sev_txt in [('NORMAL','NORMAL'), ('ALERTA','ALERTA'), ('CRITICO','CRÍTICO'), ('EDITADO','EDITADO'), ('ANULADO','ANULADO')] %}
+                            <option value="{{ sev_val }}" {% if filters.get('severity') == sev_val %}selected{% endif %}>{{ sev_txt }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="d-flex align-items-center gap-1">
+                            <label for="start_date" class="small text-white fw-semibold text-nowrap mb-0">Desde</label>
+                            <input type="date" id="start_date" name="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                                   value="{{ filters.get('start_date', '') }}" min="{{ date_min }}" max="{{ date_max }}" onchange="this.form.submit()">
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <label for="end_date" class="small text-white fw-semibold text-nowrap mb-0">Hasta</label>
+                            <input type="date" id="end_date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
+                                   value="{{ filters.get('end_date', '') }}" min="{{ date_min }}" max="{{ date_max }}" onchange="this.form.submit()">
+                        </div>
+                        <input type="hidden" name="tab" value="{{ active_tab }}">
+                        {% if filters.get('location_id') or filters.get('severity') or filters.get('start_date') or filters.get('end_date') %}
+                        <a href="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}" class="btn btn-sm btn-outline-light rounded-pill px-3">Limpiar</a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs ph-tabs" id="kitchenExpenseTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'gastos' %}active{% endif %}" id="gastos-tab" data-bs-toggle="tab" data-bs-target="#gastos" type="button" role="tab">
+                    <i class="bi bi-fire me-2 text-danger"></i>Gastos de Cocina ({{ counts.gastos }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'ajustes' %}active{% endif %}" id="ajustes-tab" data-bs-toggle="tab" data-bs-target="#ajustes" type="button" role="tab">
+                    <i class="bi bi-arrow-repeat me-2 text-warning"></i>Ajustes y Anulaciones ({{ counts.ajustes }})
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="kitchenExpenseTabsContent">
+
+            <div class="tab-pane fade {% if active_tab == 'gastos' %}show active{% endif %}" id="gastos" role="tabpanel">
+
+                {% for e in entries %}
+                {% set det_id = 'det-gasto-' ~ e.id ~ '-' ~ loop.index0 %}
+                {% set side = 'is-egreso' if e.qty < 0 else 'is-ingreso' %}
+                {% set num_class = 'egreso' if e.qty < 0 else 'ingreso' %}
+                <div class="ph-audit-card {{ side }} bg-white shadow-sm rounded-4 p-4 mb-4"
+                     data-search="Gasto {{ e.product }} {{ e.sede }} {{ e.user_name }} {{ e.action }} {{ e.lot or '' }}">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="ph-audit-num {{ num_class }} me-3">{{ e.id }}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="badge-action-pill {{ 'action-red-light' if e.qty < 0 else 'action-blue' }}">{{ e.action | replace('_', ' ') | title }}</span>
+                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    <span class="ph-badge-location">Lote: {{ e.lot if e.lot and e.lot != 'N/A' else 'S/L' }}</span>
+                                    {% if e.is_annulled %}
+                                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Anulado</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="ph-qty-badge {{ 'ph-qty-egreso' if e.qty < 0 else 'ph-qty-ingreso' }}">{% if e.qty > 0 %}+{% endif %}{{ e.qty | ph_qty }}</span>
+                            {% if e.is_corrected %}
+                            <span class="ke-correction-arrow">{{ e.gasto_orig | ph_qty }} <i class="bi bi-arrow-right"></i> <span class="ke-new-qty">{{ e.gasto_new | ph_qty }}</span></span>
+                            {% endif %}
+                            <span>
+                                <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
+                            </span>
+                            {% if e.amount is not none or e.amount_orig is not none %}
+                            <span class="ke-amount {{ 'ke-amount-menos' if e.qty < 0 else 'ke-amount-mas' }}">
+                                {% if e.amount_orig is not none %}
+                                <span class="ke-amount-orig">{% if e.qty < 0 %}-{% endif %}{{ e.amount_orig | ph_amount }} {{ e.currency }}</span>
+                                <i class="bi bi-arrow-right mx-1"></i>
+                                {% endif %}
+                                {% if e.amount is not none %}{% if e.qty < 0 %}-{% elif e.qty > 0 %}+{% endif %}{{ e.amount | ph_amount }} {{ e.currency }}{% else %}0 {{ e.currency }}{% endif %}
+                            </span>
+                            {% endif %}
+                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-ph-info btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ det_id }}" aria-expanded="false">
+                        <i class="bi bi-eye me-1"></i>Ver Detalle
+                    </button>
+
+                    <div class="collapse mt-3" id="{{ det_id }}">
+                        <div class="ph-tl-detail p-3 bg-light">
+
+                            {% if e.is_annulled %}
+                            <div class="alert alert-danger border-0 py-2 small mb-3">
+                                <i class="bi bi-x-octagon-fill me-2"></i>
+                                Este gasto fue anulado. El stock fue reintegrado a la sede mediante un movimiento compensatorio.
+                            </div>
+                            {% else %}
+                            {% if e.gasto_orig is not none and e.gasto_new is not none and e.gasto_orig != e.gasto_new %}
+                            <div class="alert alert-warning border-0 py-2 small mb-3">
+                                <i class="bi bi-pencil-square me-2"></i>
+                                Este gasto (#{{ e.id }}) fue corregido{% if e.target_log_id %}: ver el ajuste #{{ e.target_log_id }} en la pestaña Ajustes{% else %}; consulte la pestaña Ajustes para ver el movimiento compensatorio{% endif %}.
+                            </div>
+                            {% endif %}
+                            {% endif %}
+
+                            <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                <div class="col-6">Stock Disponible Actual</div>
+                                <div class="col-6">ID Log</div>
+                            </div>
+                            <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
+                                <div class="col-6">{{ e.current_qty | ph_qty }}</div>
+                                <div class="col-6 text-muted">#{{ e.id }}</div>
+                            </div>
+
+                            <div class="pt-2 border-top">
+                                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
+                                </div>
+                                <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Registro de consumo de cocina' }}</div>
+
+                                {% if e.manage_note %}
+                                <div class="badge bg-secondary p-2 mt-2"><i class="bi bi-lock-fill me-1"></i>{{ e.manage_note }}</div>
+                                {% elif e.can_manage %}
+                                <div class="mt-3 border-top pt-2 d-flex flex-wrap gap-2">
+                                    {% if e.manage_mode == 'ACTIVAR' %}
+                                    <button class="btn btn-sm btn-outline-success btn-action-log" data-action="ACTIVAR" data-id="{{ e.id }}">
+                                        <i class="bi bi-check-circle me-1"></i>Activar
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-outline-primary btn-action-log" data-action="EDITAR" data-id="{{ e.id }}">
+                                        <i class="bi bi-pencil-square me-1"></i>Editar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="{{ e.id }}">
+                                        <i class="bi bi-x-circle me-1"></i>Anular
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-fire fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay gastos de cocina registrados</h5>
+                    <p class="mb-0">No se encontraron consumos que coincidan con los filtros actuales.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="tab-pane fade {% if active_tab == 'ajustes' %}show active{% endif %}" id="ajustes" role="tabpanel">
+
+                {% for e in entries %}
+                {% set det_id = 'det-ajuste-' ~ e.id ~ '-' ~ loop.index0 %}
+                {% set side = 'is-ajuste' if e.qty < 0 else 'is-ingreso' %}
+                {% set num_class = 'ajuste' if e.qty < 0 else 'ingreso' %}
+                <div class="ph-audit-card {{ side }} bg-white shadow-sm rounded-4 p-4 mb-4"
+                     data-search="Ajuste {{ e.product }} {{ e.sede }} {{ e.user_name }} {{ e.action }} {{ e.lot or '' }}">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="ph-audit-num {{ num_class }} me-3">{{ e.id }}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
+                                    <span class="badge-action-pill {{ 'action-red-light' if e.qty < 0 else 'action-blue' }}">{{ e.action | replace('_', ' ') | title }}</span>
+                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    <span class="ph-badge-location">Lote: {{ e.lot if e.lot and e.lot != 'N/A' else 'S/L' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                            <span class="ph-qty-badge {{ 'ph-qty-egreso' if e.qty < 0 else 'ph-qty-ingreso' }}">
+                                {%- if 'AJUSTE' in e.action.upper() and e.gasto_new is not none -%}
+                                {{ e.gasto_new | ph_qty }}
+                                {%- else -%}
+                                {% if e.qty > 0 %}+{% endif %}{{ e.qty | ph_qty }}
+                                {%- endif -%}
+                            </span>
+                            {% if e.is_corrected %}
+                            <span class="ke-correction-arrow">{{ e.gasto_orig | ph_qty }} <i class="bi bi-arrow-right"></i> <span class="ke-new-qty">{{ e.gasto_new | ph_qty }}</span></span>
+                            {% endif %}
+                            <span>
+                                <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
+                            </span>
+                            {% if e.amount is not none %}
+                            <span class="ke-amount {{ 'ke-amount-menos' if e.qty < 0 else 'ke-amount-mas' }}">
+                                {% if e.qty < 0 %}-{% elif e.qty > 0 %}+{% endif %}{{ e.amount | ph_amount }} {{ e.currency }}
+                            </span>
+                            {% endif %}
+                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-ph-info btn-sm rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ det_id }}" aria-expanded="false">
+                        <i class="bi bi-eye me-1"></i>Ver Detalle
+                    </button>
+
+                    <div class="collapse mt-3" id="{{ det_id }}">
+                        <div class="ph-tl-detail p-3 bg-light">
+
+                            {% if 'REVERSION' in e.action.upper() %}
+                            <div class="alert alert-success border-0 py-2 small d-flex align-items-center mb-3">
+                                <i class="bi bi-arrow-return-left me-2 flex-shrink-0"></i>
+                                Reintegro por anulación de un gasto: el stock vuelve a la sede.
+                            </div>
+                            {% elif 'ACTIVACION' in e.action.upper() %}
+                            <div class="alert alert-warning border-0 py-2 small d-flex align-items-center mb-3">
+                                <i class="bi bi-arrow-repeat me-2 flex-shrink-0"></i>
+                                Reactivación de un gasto anulado: el consumo vuelve a descontar del stock.
+                            </div>
+                            {% elif 'AJUSTE' in e.action.upper() %}
+                            <div class="alert alert-info border-0 py-2 small d-flex align-items-center mb-3">
+                                <i class="bi bi-pencil-square me-2 flex-shrink-0"></i>
+                                Corrección de la cantidad realmente gastada registrada en la auditoría.
+                            </div>
+                            {% endif %}
+
+                            {% if e.target_log_id %}
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="badge bg-light text-dark border"><i class="bi bi-link-45deg me-1"></i>Gasto original #{{ e.target_log_id }}</span>
+                                <span class="small text-muted">Ajuste #{{ e.id }} de la auditoría</span>
+                            </div>
+                            {% endif %}
+
+                            {% if e.gasto_orig is not none and e.gasto_new is not none and e.gasto_orig != e.gasto_new %}
+                            <div class="row fw-bold text-dark mb-1" style="font-size: 0.9rem;">
+                                <div class="col-4">
+                                    <span class="d-block text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">Cantidad Original</span>
+                                    {{ e.gasto_orig | ph_qty }}
+                                </div>
+                                <div class="col-4">
+                                    <span class="d-block text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">Cantidad Corregida</span>
+                                    <span class="text-primary">{{ e.gasto_new | ph_qty }}</span>
+                                </div>
+                                <div class="col-4">
+                                    <span class="d-block text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">Diferencia</span>
+                                    <span class="text-primary" style="font-size: 0.9rem; font-weight: 700;">
+                                        {% if (e.gasto_new - e.gasto_orig) > 0 %}+{% endif %}{{ (e.gasto_new - e.gasto_orig) | ph_qty }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Cambio de Stock:</span>
+                                <span class="text-primary" style="font-size: 0.9rem; font-weight: 700;">
+                                    {% if e.qty > 0 %}+{% endif %}{{ e.qty | ph_qty }}
+                                </span>
+                                <span class="small text-muted">
+                                    ({% if e.qty < 0 %}se descontaron{% else %}se devolvieron{% endif %} {{ e.qty | abs | ph_qty }} unidades, del disponible {{ e.prev_qty | ph_qty }} al {{ e.new_qty | ph_qty }})
+                                </span>
+                            </div>
+                            {% else %}
+                            <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                <div class="col-4">Disponible Anterior</div>
+                                <div class="col-4">Nuevo Disponible</div>
+                                <div class="col-4">ID Log</div>
+                            </div>
+                            <div class="row fw-bold text-dark mb-3" style="font-size: 0.9rem;">
+                                <div class="col-4">{{ e.prev_qty | ph_qty }}</div>
+                                <div class="col-4">{{ e.new_qty | ph_qty }}</div>
+                                <div class="col-4 text-muted">#{{ e.id }}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Cambio Exacto:</span>
+                                <span class="ph-qty-badge ph-qty-badge-sm {{ 'ph-qty-egreso' if e.qty < 0 else 'ph-qty-ingreso' }}">
+                                    {% if e.qty > 0 %}+{% endif %}{{ e.qty | ph_qty }}
+                                </span>
+                            </div>
+                            {% endif %}
+
+                            <div class="pt-2 border-top">
+                                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
+                                </div>
+                                <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Movimiento compensatorio' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-arrow-repeat fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>No hay ajustes ni anulaciones</h5>
+                    <p class="mb-0">No se encontraron movimientos compensatorios que coincidan con los filtros actuales.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="actionAuditModal" tabindex="-1" aria-labelledby="actionAuditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="actionAuditModalLabel">Confirmar Acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="actionAuditForm">
+                    <input type="hidden" id="actionLogId">
+                    <input type="hidden" id="actionType">
+
+                    <div class="alert alert-warning small d-flex align-items-center mb-3">
+                        <i class="bi bi-info-circle-fill me-2 fs-5 flex-shrink-0"></i>
+                        <div>Esta acción generará un nuevo movimiento compensatorio en la auditoría. El registro original permanecerá inalterable.</div>
+                    </div>
+
+                    <div class="mb-3" id="editQuantityContainer" style="display: none;">
+                        <label for="newQuantityInput" class="form-label fw-bold small text-muted">Nueva Cantidad Real Gastada</label>
+                        <input type="number" step="0.01" min="0" max="999999.99" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">
+
+                        <label for="editLotInput" class="form-label fw-bold small text-muted mt-3">N° de Lote Afectado (Opcional)</label>
+                        <input type="text" class="form-control font-monospace" id="editLotInput" placeholder="Ej: LOTE-001">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="actionNotes" class="form-label fw-bold small text-muted">Motivo de la modificación (Obligatorio)</label>
+                        <textarea class="form-control" id="actionNotes" rows="3" placeholder="Explique por qué se está realizando este ajuste o anulación..." required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger px-4" id="btnConfirmAction">Procesar Acción</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/inventory/kitchen_expense_audit.js') }}?v=1"></script>
+{% endblock %}

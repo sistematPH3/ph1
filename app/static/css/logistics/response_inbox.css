@@ -480,3 +480,23 @@
         -webkit-overflow-scrolling: touch;
     }
 }
+
+/* =========================================================
+   CINTILLO DE FILTROS (Buscador + selects) - Responsive
+   ========================================================= */
+@media (max-width: 767.98px) {
+    .ph-filters-cintillo > .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.6rem;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        max-width: none !important;
+    }
+
+    .ph-filters-cintillo select,
+    .ph-filters-cintillo .form-select {
+        width: 100% !important;
+    }
+}

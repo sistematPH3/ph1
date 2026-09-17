@@ -1,13 +1,16 @@
 from flask import Blueprint, request, render_template, flash, redirect, url_for
+from app.decorators.roles import admin_required
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
 
 imgbb_bp = Blueprint('imgbb', __name__)
 
 @imgbb_bp.route('/test-upload', methods=['GET'])
+@admin_required
 def show_upload_form():
     return render_template('test_imgbb.html')
 
 @imgbb_bp.route('/test-upload', methods=['POST'])
+@admin_required
 def process_upload():
     if 'invoice_photo' not in request.files:
         flash("No se encontró ningún archivo.", "error")

@@ -565,7 +565,7 @@ class RegisterWasteRepository:
     @staticmethod
     def notify_admins_pending(waste_id, location_id, message):
         admins = User.query.filter(
-            User.role.has(name='Administrator'),
+            User.role.has(name.in_(['Administrator', 'Admin'])),
             User.is_active == True
         ).all()
         for admin in admins:

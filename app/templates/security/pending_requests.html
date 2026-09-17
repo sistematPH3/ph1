@@ -8,63 +8,56 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}?v=6.0">
 
-<div class="container-fluid py-3 py-md-5 px-2 px-md-4">
-    <div class="main-white-panel p-3 p-md-5">
-        
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
-            <div>
-                <div class="d-flex align-items-center gap-3 mb-2 mb-md-1">
-                    <div class="icon-box-red">
-                        <i class="bi bi-shield-lock-fill"></i>
-                    </div>
-                    <h3 class="module-title m-0">Gestión de Permisos</h3>
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <!-- Encabezado corporativo -->
+        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-shield-lock-fill"></i>
                 </div>
-                <p class="text-subtitle m-0">Revisión de nuevos colaboradores en espera de acceso al sistema</p>
+                <div>
+                    <h2 class="ph-title mb-1">Gestión de Permisos</h2>
+                    <p class="text-muted mb-0">Revisión de nuevos colaboradores en espera de acceso al sistema</p>
+                </div>
             </div>
             <span class="badge badge-module-tag rounded-pill px-3 py-2 fw-semibold shadow-sm align-self-start align-self-md-auto">
                 Módulo Administrativo
             </span>
         </div>
 
-        <div class="filters-section-container mb-4">
-            <div class="row g-3">
-                <div class="col-12 col-md-8">
-                    <div class="search-box-container w-100" style="position: relative;">
-                        <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
-                        <input type="text" id="userInput" class="form-control search-input" 
-                               onkeyup="filterTable()"
-                               placeholder="Buscar por nombre o correo..." 
-                               style="padding-left: 44px !important; border-radius: 50px; height: 48px;">
-                    </div>
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap w-100">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="userInput" class="form-control rounded-pill bg-light border-0 ps-5"
+                           onkeyup="filterTable()"
+                           placeholder="Buscar por nombre o correo..." style="height: 36px;">
                 </div>
-
-                <div class="col-12 col-md-4">
-                    <div class="dropdown h-100">
-                        <button class="btn btn-filter-sort rounded-pill px-4 w-100 h-100 d-flex align-items-center justify-content-between shadow-sm fw-medium dropdown-toggle" 
-                                type="button" 
-                                id="dropdownFilter" 
-                                data-bs-toggle="dropdown" 
-                                aria-expanded="false" 
-                                style="height: 48px !important;">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-sort-down me-2 text-muted"></i>
-                                <span id="selectedFilterLabel">
-                                    {% if request.args.get('sort') == 'desc' %}Orden: Z-A{% else %}Ordenar{% endif %}
-                                </span>
-                            </div>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end w-100 shadow-sm border-0 rounded-3" aria-labelledby="dropdownFilter" style="font-size: 0.9rem;">
-                            <li><a class="dropdown-item py-2" href="#" onclick="toggleSort(event)"><i class="bi bi-sort-alpha-down me-2 text-muted"></i>Nombre (A-Z)</a></li>
-                        </ul>
-                    </div>
+                <div class="dropdown">
+                    <button class="btn btn-light rounded-pill px-4 d-flex align-items-center justify-content-between fw-medium dropdown-toggle"
+                            type="button"
+                            id="dropdownFilter"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            style="height: 36px;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-sort-down me-2 text-muted"></i>
+                            <span id="selectedFilterLabel">
+                                {% if request.args.get('sort') == 'desc' %}Orden: Z-A{% else %}Ordenar{% endif %}
+                            </span>
+                        </div>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end w-100 shadow-sm border-0 rounded-3" aria-labelledby="dropdownFilter" style="font-size: 0.9rem;">
+                        <li><a class="dropdown-item py-2" href="#" onclick="toggleSort(event)"><i class="bi bi-sort-alpha-down me-2 text-muted"></i>Nombre (A-Z)</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
 
-        <div class="card card-ph-clean border-0">
-            <div class="card-body p-0">
-                
-                <div class="table-responsive d-none d-md-block">
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card d-none d-md-block">
                     <table class="table align-middle m-0" id="userTable">
                         <thead>
                             <tr class="text-uppercase content-table-header">
@@ -108,7 +101,7 @@
                     </table>
                 </div>
 
-                <div class="mobile-cards-container d-block d-md-none" id="userCardsContainer">
+                <div class="mobile-cards-container d-block d-md-none mt-3" id="userCardsContainer">
                     {% for usuario in usuarios_espera %}
                     <div class="mobile-user-card p-3 mb-3 border rounded-4 shadow-sm">
                         <div class="d-flex align-items-center mb-3">
@@ -160,9 +153,6 @@
                 </div>
                 {% endif %}
 
-            </div>
-        </div>
-        
     </div>
 </div>
 

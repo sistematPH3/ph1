@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy import func, or_, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Purchase, PurchaseDetail, AuditLog
+from app.models.waste_model import Waste, WasteDetail
 from app.inventory.repositories.inventory_views_repository import InventoryViewRepository
 
 class InventoryViewService:
@@ -73,6 +74,9 @@ class InventoryViewService:
         total_stock = float(inventory.current_quantity) if inventory else 0.0
         if total_stock <= 0:
             return []
+
+        reservado_total = float(inventory.reserved_quantity or 0) + float(inventory.transit_quantity or 0)
+        disponible_total = max(0.0, total_stock - reservado_total)
 
         entradas_lote = {}
         salidas_traslado = {}
@@ -256,19 +260,68 @@ class InventoryViewService:
                     l_num_clean = str(l_num).strip()
                     salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(float(qty_change))
 
+        # Mermas PENDIENTES: la cantidad está congelada (reserved_quantity) y no
+        # está disponible para consumo/traslado, así que también se descuenta del
+        # lote. Mismo criterio que register_waste_repository.
+        salidas_mermas_pendientes = {}
+        pendientes_rows = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_pend')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            or_(
+                Waste.status == 'PENDIENTE',
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status != 'APROBADO'),
+            ),
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+        for lot, total_pend in pendientes_rows:
+            if lot and str(lot).strip() and str(lot).strip() != 'N/A':
+                lote_limpio = str(lot).strip()
+                salidas_mermas_pendientes[lote_limpio] = float(total_pend or 0.0)
+
+        # Traslados EN_TRANSITO: esa mercancía ya salió físicamente de la sede
+        # (despacho pendiente de recepción), así que no se puede tocar. Se resta
+        # del disponible (vía salidas_traslado) y además se desglosa como
+        # "Congelado/Tránsito" para que el usuario sepa cuánto está en camino.
+        salidas_transito = {}
+        en_transito_rows = db.session.query(
+            MovementDetail.lot_number,
+            func.sum(MovementDetail.quantity).label('total_transit')
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == loc_id,
+            Movement.type != 'RETORNO_EMERGENCIA',
+            Movement.status == 'EN_TRANSITO',
+            MovementDetail.product_id == prod_id,
+            MovementDetail.lot_number.isnot(None),
+            MovementDetail.lot_number != ''
+        ).group_by(MovementDetail.lot_number).all()
+        for lot, total_transit in en_transito_rows:
+            if lot and str(lot).strip() and str(lot).strip() != 'N/A':
+                lote_limpio = str(lot).strip()
+                salidas_transito[lote_limpio] = float(total_transit or 0.0)
+
         lots_raw = []
         for lot_num, data in entradas_lote.items():
             total_in = data['total_in']
             total_out_traslados = salidas_traslado.get(lot_num, 0.0)
             total_out_consumos = salidas_consumo.get(lot_num, 0.0)
+            total_out_mermas = salidas_mermas_pendientes.get(lot_num, 0.0)
+            total_out_transito = salidas_transito.get(lot_num, 0.0)
 
-            disponible = total_in - total_out_traslados - total_out_consumos
+            disponible = total_in - total_out_traslados - total_out_consumos - total_out_mermas
 
             if disponible > 0.001:
                 lots_raw.append({
                     'lot_number': lot_num,
                     'expiration_date': data['expiration_date'].strftime('%Y-%m-%d') if data['expiration_date'] else '',
                     'disponible': disponible,
+                    'frozen': total_out_mermas,
+                    'transit': total_out_transito,
                     'initial_quantity': round(float(total_in), 2),
                     'exp_date_raw': data['expiration_date']
                 })
@@ -276,20 +329,21 @@ class InventoryViewService:
         lots_raw.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
 
         lots = []
-        remaining_pool = total_stock
+        remaining_pool = disponible_total
 
         for item in lots_raw:
-            if remaining_pool <= 0.001:
-                break
-
-            capped_qty = min(item['disponible'], remaining_pool)
-            if capped_qty > 0.001:
+            capped_qty = min(item['disponible'], max(0.0, remaining_pool))
+            congelado_total = float(item.get('frozen', 0.0)) + float(item.get('transit', 0.0))
+            if capped_qty > 0.001 or congelado_total > 0.001:
                 lots.append({
                     'lot_number': item['lot_number'],
                     'expiration_date': item['expiration_date'],
                     'quantity': round(float(capped_qty), 2),
                     'current_quantity': round(float(capped_qty), 2),
                     'available_quantity': round(float(capped_qty), 2),
+                    'frozen_quantity': round(congelado_total, 2),
+                    'frozen_merma_quantity': round(float(item.get('frozen', 0.0)), 2),
+                    'frozen_transit_quantity': round(float(item.get('transit', 0.0)), 2),
                     'initial_quantity': item['initial_quantity']
                 })
                 remaining_pool -= capped_qty
