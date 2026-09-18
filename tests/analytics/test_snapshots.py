@@ -6,7 +6,7 @@
 
 import os
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -79,7 +79,7 @@ class SnapshotsTest(unittest.TestCase):
     def _compra(self, units=10, price=Decimal("10.00"), currency="USD",
                 price_bs=Decimal("36.50"), status="COMPLETED"):
         p = Purchase(
-            purchase_date=datetime.utcnow(),
+            purchase_date=datetime.now(timezone.utc),
             total_amount=Decimal(str(units * price)),
             currency=currency,
             exchange_rate=price_bs,
@@ -102,7 +102,7 @@ class SnapshotsTest(unittest.TestCase):
     def _merma(self, status, cantidad, unit_cost=Decimal("10.00"), cancelada=False):
         w = Waste(
             location_id=self.loc_a.id,
-            date=datetime.utcnow(),
+            date=datetime.now(timezone.utc),
             user_id=self.user.id,
             status=status,
             total_quantity=cantidad,
@@ -110,7 +110,7 @@ class SnapshotsTest(unittest.TestCase):
             currency="USD",
         )
         if cancelada:
-            w.cancelled_at = datetime.utcnow()
+            w.cancelled_at = datetime.now(timezone.utc)
             w.cancel_reason = "prueba"
         db.session.add(w)
         db.session.flush()
@@ -131,7 +131,7 @@ class SnapshotsTest(unittest.TestCase):
             action=action,
             user_id=self.user.id,
             location_id=self.loc_a.id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             changed_data={"product_id": self.product.id,
                           "quantity_changed": quantities},
         ))
@@ -142,7 +142,7 @@ class SnapshotsTest(unittest.TestCase):
             type="TRASLADO",
             origin_location_id=self.loc_a.id,
             destination_location_id=self.loc_b.id,
-            date=datetime.utcnow(),
+            date=datetime.now(timezone.utc),
             user_id=self.user.id,
             status=status,
         )
@@ -175,7 +175,7 @@ class SnapshotsTest(unittest.TestCase):
     def _tasa(self, currency, rate):
         db.session.add(ExchangeRateHistory(
             currency=currency, rate=Decimal(str(rate)), source="TEST",
-            timestamp=datetime.utcnow(), user_id=self.user.id,
+            timestamp=datetime.now(timezone.utc), user_id=self.user.id,
         ))
         db.session.flush()
 
@@ -310,7 +310,7 @@ class SnapshotsTest(unittest.TestCase):
     def test_genera_snapshots_mermas_parcial_solo_lineas_aprobadas(self):
         w = Waste(
             location_id=self.loc_a.id,
-            date=datetime.utcnow(),
+            date=datetime.now(timezone.utc),
             user_id=self.user.id,
             status="APROBADO_PARCIAL",
             total_quantity=Decimal("8.00"),
@@ -354,7 +354,7 @@ class SnapshotsTest(unittest.TestCase):
         db.session.flush()
 
         def merma(status, tipo_id, qty, unit_cost, estado_linea="APROBADO"):
-            w = Waste(location_id=self.loc_a.id, date=datetime.utcnow(),
+            w = Waste(location_id=self.loc_a.id, date=datetime.now(timezone.utc),
                       user_id=self.user.id, status=status,
                       total_quantity=qty,
                       total_cost=Decimal(str(qty * unit_cost)),
@@ -374,7 +374,7 @@ class SnapshotsTest(unittest.TestCase):
         merma("APROBADO", vencido.id, Decimal("6.00"), Decimal("10.00"))
         merma("PENDIENTE", danado.id, Decimal("2.00"), Decimal("5.00"))
         # Parcial: solo suma la línea APROBADO (8 x $2), no la PENDIENTE (3 x $2).
-        w = Waste(location_id=self.loc_a.id, date=datetime.utcnow(),
+        w = Waste(location_id=self.loc_a.id, date=datetime.now(timezone.utc),
                   user_id=self.user.id, status="APROBADO_PARCIAL",
                   total_quantity=Decimal("11.00"),
                   total_cost=Decimal("22.00"), currency="USD")
@@ -408,11 +408,11 @@ class SnapshotsTest(unittest.TestCase):
         tipo = WasteType(name="Robo", code="ROBO")
         db.session.add(tipo)
         db.session.flush()
-        w = Waste(location_id=self.loc_a.id, date=datetime.utcnow(),
+        w = Waste(location_id=self.loc_a.id, date=datetime.now(timezone.utc),
                   user_id=self.user.id, status="APROBADO",
                   total_quantity=Decimal("5.00"),
                   total_cost=Decimal("25.00"), currency="USD",
-                  cancelled_at=datetime.utcnow(), cancel_reason="test")
+                  cancelled_at=datetime.now(timezone.utc), cancel_reason="test")
         db.session.add(w)
         db.session.flush()
         db.session.add(WasteDetail(

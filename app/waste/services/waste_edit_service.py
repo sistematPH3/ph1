@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import current_ve_time
 from decimal import Decimal
 
 from app.waste.repositories.waste_edit_repository import WasteEditRepository
@@ -25,7 +26,7 @@ class WasteEditService:
         if not waste:
             return None, "La merma indicada no existe."
 
-        now = datetime.utcnow()
+        now = current_ve_time()
         created_at = waste.date or now
         time_elapsed = now - created_at
 
@@ -153,7 +154,7 @@ class WasteEditService:
         if waste.status != "PENDIENTE":
             return {"success": False, "message": "Solo se pueden editar mermas en estado PENDIENTE."}, 400
 
-        now = datetime.utcnow()
+        now = current_ve_time()
         created_at = waste.date or now
         time_elapsed = now - created_at
 

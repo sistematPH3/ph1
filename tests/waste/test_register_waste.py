@@ -25,7 +25,7 @@
 import io
 import os
 import unittest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import create_engine, text
 
@@ -557,7 +557,7 @@ class WasteRegisterTest(unittest.TestCase):
             total_cost=0,
             currency="USD",
             notes="historial",
-            date=datetime.utcnow() - timedelta(days=days_ago),
+            date=datetime.now(timezone.utc) - timedelta(days=days_ago),
         )
         db.session.add(w)
         db.session.commit()
@@ -1518,6 +1518,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         self.assertIn("VENCIDO", codes)
 
     def test_banner_incluye_central_por_defecto(self):
+        """El banner ya no está en la página de merma (solo en Dashboard)."""
         env = self._seed_central_env(lot="L-CEN")
         env["waste_type"].applies_central = False
         db.session.commit()
@@ -1526,8 +1527,9 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
             sess["_user_id"] = str(env["user_id"])
         page = client.get("/waste/merma/new")
         self.assertEqual(page.status_code, 200)
-        self.assertIn("Almacén Central", page.get_data(as_text=True))
-        self.assertIn("L-CEN", page.get_data(as_text=True))
+        html = page.get_data(as_text=True)
+        self.assertNotIn("expired-alert-wrapper", html)
+        self.assertNotIn("expired-alert-grid", html)
 
     def test_banner_incluye_central_con_parametro(self):
         env = self._seed_central_env(lot="L-CEN")
@@ -1541,19 +1543,15 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
             sess["_user_id"] = str(env["user_id"])
         page = client.get("/waste/merma/new")
         self.assertEqual(page.status_code, 200)
-        self.assertIn("Almacén Central", page.get_data(as_text=True))
-        self.assertIn("L-CEN", page.get_data(as_text=True))
+        html = page.get_data(as_text=True)
+        self.assertNotIn("expired-alert-wrapper", html)
+        self.assertNotIn("expired-alert-grid", html)
 
     def test_banner_incluye_central_si_tipo_aplica(self):
         env = self._seed_central_env(lot="L-CEN")
         env["waste_type"].applies_central = True
         db.session.commit()
         client = self.app.test_client()
-        with client.session_transaction() as sess:
-            sess["_user_id"] = str(env["user_id"])
-        page = client.get("/waste/merma/new")
-        self.assertEqual(page.status_code, 200)
-        self.assertIn("L-CEN", page.get_data(as_text=True))
 
     def test_tipo_no_aplicable_a_central_se_omite_y_si_aplica_en_sucursal(self):
         env = self._seed_central_env()
@@ -1721,7 +1719,9 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         self.assertEqual(vencidos[0]["lot_number"], env["lot"])
         self.assertEqual(vencidos[0]["quantity"], 100.0)
 
-    def test_renderizar_registro_muestra_banner_de_vencidos(self):
+    def test_renderizar_registro_NO_muestra_banner_de_vencidos(self):
+        """Las alertas de vencidos NO deben aparecer en el formulario de merma.
+        Según la propuesta, solo aparecen en el Dashboard."""
         env = self._seed_env(stock=50.0, waste_limit=20.0)
         client = self.app.test_client()
         with client.session_transaction() as sess:
@@ -1729,10 +1729,13 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         resp = client.get("/waste/merma/new")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn("Productos vencidos detectados", html)
-        self.assertIn("L-001", html)
-        self.assertIn("/waste/merma/new", html)
-        self.assertIn("Registrar merma de vencido", html)
+        # NO debe aparecer el banner/alert de vencidos en el contenido principal
+        # (puede aparecer en el sidebar como enlace de navegación)
+        self.assertNotIn("expired-alert-wrapper", html)
+        self.assertNotIn("expired-alert-grid", html)
+        # Pero sí debe estar el formulario normal
+        self.assertIn("Registro de Merma", html)
+        self.assertIn("Selección de sede", html)
 
     # ------------------------------------------------------------------
     # 8.12) REGLA DE TIEMPO: solo cuentan mermas decisivas (historial)
@@ -1743,12 +1746,12 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         aprobada = Waste(location_id=env["location_id"],
                          waste_type_id=env["waste_type"].id,
                          user_id=u_id, status="APROBADO",
-                         date=datetime.utcnow() - timedelta(days=20),
+                         date=datetime.now(timezone.utc) - timedelta(days=20),
                          total_quantity=5.0, total_cost=0, currency="USD")
         rechazada = Waste(location_id=env["location_id"],
                           waste_type_id=env["waste_type"].id,
                           user_id=u_id, status="RECHAZADO",
-                          date=datetime.utcnow() - timedelta(days=1),
+                          date=datetime.now(timezone.utc) - timedelta(days=1),
                           total_quantity=5.0, total_cost=0, currency="USD")
         db.session.add_all([aprobada, rechazada])
         db.session.commit()
@@ -1852,7 +1855,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
             severity="NORMAL",
             user_id=env["user_id"],
             location_id=env["location_id"],
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             changed_data={
                 "product_id": env["product_id"],
                 "product_name": "Tomate",

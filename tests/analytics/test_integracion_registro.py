@@ -14,7 +14,7 @@
 
 import os
 import unittest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -41,7 +41,8 @@ _ensure_test_database_exists()
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app import create_app, db  # noqa: E402
-from app.models import (  # noqa: E402
+from app.models import (
+    Supplier,  # noqa: E402
     AuditLog, Inventory, Location, Movement, MovementDetail, Product, Purchase,
     PurchaseDetail, Role, SnapshotMetric, SnapshotPeriodType, StatisticsSnapshot,
     User, Waste, WasteDetail, WasteType,
@@ -88,6 +89,11 @@ class RegistroSnapshotsTest(unittest.TestCase):
             reserved_quantity=0.0, min_stock=5.0,
         )
         db.session.add(self.inventory)
+        db.session.flush()
+
+        # Proveedor para tests de compras
+        self.supplier = Supplier(name="Proveedor Test", tax_id="J-00000000-1")
+        db.session.add(self.supplier)
         db.session.flush()
 
     def tearDown(self):
@@ -362,18 +368,18 @@ class RegistroSnapshotsTest(unittest.TestCase):
     # ==================================================================
     def test_filas_consumo_tolera_string_y_dict(self):
         from app.analytics.repositories.snapshots_repository import filas_consumo_cocina
-        desde = datetime.utcnow() - timedelta(days=1)
-        hasta = datetime.utcnow() + timedelta(days=1)
+        desde = datetime.now(timezone.utc) - timedelta(days=1)
+        hasta = datetime.now(timezone.utc) + timedelta(days=1)
         db.session.add(AuditLog(
             affected_table="inventory", action="GASTO_COCINA",
             user_id=self.user.id, location_id=self.sede.id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             changed_data={"product_id": self.product.id, "quantity_changed": -7.0},
         ))
         db.session.add(AuditLog(
             affected_table="inventory", action="GASTO_COCINA",
             user_id=self.user.id, location_id=self.sede.id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             changed_data='{"product_id": ' + str(self.product.id) + ', "quantity_changed": -3.0}',
         ))
         db.session.commit()
@@ -499,7 +505,7 @@ class RegistroSnapshotsTest(unittest.TestCase):
     def test_registrar_compra_moneda_no_soportada_rechazada(self):
         from app.logistics.services.purchase_service import PurchaseService
         res = PurchaseService.register_purchase({
-            "supplier_id": 1, "currency": "BS", "exchange_rate": 36.5,
+            "supplier_id": self.supplier.id, "currency": "BS", "exchange_rate": 36.5,
             "user_id": self.user.id, "invoice_url": "", "items": [],
         })
         self.assertFalse(res["success"])

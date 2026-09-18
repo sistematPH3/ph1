@@ -11,6 +11,9 @@
 <!-- Componente Reusable de Alertas de Stock -->
 {% include 'alerts/_alerts_stock.html' %}
 
+<!-- Componente de Alertas de Productos Vencidos -->
+{% include 'alerts/_alerts_expired.html' %}
+
 <div class="dashboard-grid">
     <a href="{{ url_for('inventory.list_products') }}" class="card-link">
         <div class="card-dash">

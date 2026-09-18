@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 import math
+import sys
 from sqlalchemy import text
 from app.models.inventory_model import db
 from app.models.waste_model import Waste, WasteDetail, WasteDetailPhoto
@@ -317,7 +318,7 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
                             'ya haya pasado.'
                         )
                     }
-                hoy = datetime.now().date()
+                hoy = current_ve_time().date()
                 vence = expiration_date.date() if hasattr(expiration_date, 'date') else expiration_date
                 if vence >= hoy:
                     return {
@@ -436,5 +437,7 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
         db.session.rollback()
         return {'success': False, 'message': str(e)}
     except Exception as e:
+        import traceback
+        print("EXCEPTION:", traceback.format_exc(), file=sys.stderr)
         db.session.rollback()
         return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}

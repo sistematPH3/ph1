@@ -1,0 +1,69 @@
+{% if vencidos %}
+<div class="expired-alert-wrapper">
+    <!-- Encabezado con ícono y contador de lotes vencidos -->
+    <div class="expired-alert-header">
+        <h3 class="expired-alert-title">
+            <span class="expired-alert-icon">
+                <i class="bi bi-clock-history"></i>
+            </span>
+            Productos Vencidos
+        </h3>
+        <span class="expired-alert-badge-count">
+            {{ vencidos|length }} {% if vencidos|length == 1 %}Lote{% else %}Lotes{% endif %}
+        </span>
+    </div>
+
+    <!-- Agrupado por sede -->
+    {% set vencidos_por_sede = {} %}
+    {% for v in vencidos %}
+        {% if v.location_id not in vencidos_por_sede %}
+            {% set _ = vencidos_por_sede.update({v.location_id: {'name': v.location_name, 'items': []}}) %}
+        {% endif %}
+        {% set _ = vencidos_por_sede[v.location_id]['items'].append(v) %}
+    {% endfor %}
+
+    <div class="expired-alert-grid">
+        {% for sede_id, sede_data in vencidos_por_sede.items() %}
+        <div class="expired-sede-group">
+            <div class="expired-sede-header">
+                <i class="bi bi-building"></i> {{ sede_data.name }}
+                <span class="expired-sede-count">{{ sede_data.items|length }} {% if sede_data.items|length == 1 %}lote{% else %}lotes{% endif %}</span>
+            </div>
+            <div class="expired-sede-items">
+                {% for v in sede_data.items %}
+                {% if readonly %}
+                <div class="expired-alert-item expired-alert-item-readonly">
+                {% else %}
+                <a class="expired-alert-item"
+                   href="{{ url_for('register_waste.nueva_merma', origin='alarma_vencido', lock=1, location_id=v.location_id, product_id=v.product_id, lot_number=v.lot_number, quantity=v.quantity) }}"
+                   title="Registrar la merma de este lote">
+                {% endif %}
+                    <div class="expired-alert-info">
+                        <span class="expired-alert-product">{{ v.product_name }}</span>
+                        <span class="expired-alert-lot">
+                            <i class="bi bi-tag"></i> Lote {{ v.lot_number }}
+                        </span>
+                    </div>
+
+                    <div class="expired-alert-metrics">
+                        <span class="expired-val-qty">{{ v.quantity }} unds</span>
+                        <span class="expired-val-exp">Vence {{ v.expiration_date }}</span>
+                    </div>
+
+                    {% if not readonly %}
+                    <span class="expired-alert-cta">
+                        Registrar merma <i class="bi bi-arrow-right-circle"></i>
+                    </span>
+                    {% else %}
+                    <span class="expired-alert-cta expired-alert-cta-readonly">
+                        Solo lectura
+                    </span>
+                    {% endif %}
+                {% if not readonly %}</a>{% else %}</div>{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

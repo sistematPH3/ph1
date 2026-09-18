@@ -5,7 +5,7 @@
 
 import os
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -209,7 +209,7 @@ class AlarmasTest(unittest.TestCase):
 
     def test_obtener_pendientes(self):
         db.session.add(Waste(
-            location_id=self.loc.id, status="PENDIENTE", date=datetime.utcnow(),
+            location_id=self.loc.id, status="PENDIENTE", date=datetime.now(timezone.utc),
             total_quantity=Decimal("1"), total_cost=Decimal("1"), currency="USD",
         ))
         movimiento = Movement(

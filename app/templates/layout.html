@@ -13,7 +13,10 @@
 
 <!-- CSS de Alertas de Stock -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/alerts_stock.css') }}">
-    
+
+<!-- CSS de Alertas de Productos Vencidos -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/alerts_expired.css') }}">
+
     {% if can_view_disputes or can_view_responses %}
     <!-- CSS de Notificaciones (novedades del admin + campana de respuestas) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notifications.css') }}">

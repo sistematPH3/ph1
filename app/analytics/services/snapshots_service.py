@@ -220,54 +220,63 @@ def generar_snapshot_periodo(period_type, inicio, fin, user_id=None):
     return _generar_snapshots_ventana([(inicio, fin)], period_type, user_id)
 
 
-def _generar_snapshots_ventana(ventana, period_type, user_id):
-    """Genera snapshots para una lista de (inicio, fin)."""
+def _generar_snapshots_ventana(ventana, period_type, user_id, chunk_size=50):
+    """Genera snapshots para una lista de (inicio, fin) en chunks para evitar timeout."""
     cache_tasas = {}
     totales = 0
     try:
-        for inicio, fin in ventana:
-            repo.guardar_snapshots(
-                SnapshotMetric.PURCHASES, period_type, inicio, fin,
-                _agregar_compras(repo.filas_compras(inicio, fin), cache_tasas),
-                user_id=user_id,
-            )
-            repo.guardar_snapshots(
-                SnapshotMetric.KITCHEN_CONSUMPTION, period_type, inicio, fin,
-                _agregar_consumo(repo.filas_consumo_cocina(inicio, fin), cache_tasas),
-                user_id=user_id,
-            )
-            repo.guardar_snapshots(
-                SnapshotMetric.WASTE, period_type, inicio, fin,
-                _agregar_mermas(repo.filas_mermas(inicio, fin), cache_tasas),
-                user_id=user_id,
-            )
-            repo.guardar_snapshots(
-                SnapshotMetric.TRANSFERS, period_type, inicio, fin,
-                _agregar_traslados(repo.filas_traslados(inicio, fin), cache_tasas),
-                user_id=user_id,
-            )
-            totales += 4
-        db.session.commit()
+        # Procesar en chunks para evitar timeout en datasets grandes
+        for i in range(0, len(ventana), chunk_size):
+            chunk = ventana[i:i + chunk_size]
+            for inicio, fin in chunk:
+                repo.guardar_snapshots(
+                    SnapshotMetric.PURCHASES, period_type, inicio, fin,
+                    _agregar_compras(repo.filas_compras(inicio, fin), cache_tasas),
+                    user_id=user_id,
+                )
+                repo.guardar_snapshots(
+                    SnapshotMetric.KITCHEN_CONSUMPTION, period_type, inicio, fin,
+                    _agregar_consumo(repo.filas_consumo_cocina(inicio, fin), cache_tasas),
+                    user_id=user_id,
+                )
+                repo.guardar_snapshots(
+                    SnapshotMetric.WASTE, period_type, inicio, fin,
+                    _agregar_mermas(repo.filas_mermas(inicio, fin), cache_tasas),
+                    user_id=user_id,
+                )
+                repo.guardar_snapshots(
+                    SnapshotMetric.TRANSFERS, period_type, inicio, fin,
+                    _agregar_traslados(repo.filas_traslados(inicio, fin), cache_tasas),
+                    user_id=user_id,
+                )
+                totales += 4
+            # Commit por chunk para liberar memoria y evitar lock largo
+            db.session.commit()
+        return {'success': True, 'message': 'Snapshots actualizados.', 'períodos': len(ventana), 'registros': totales}
     except Exception as exc:
         db.session.rollback()
         return {'success': False, 'message': f'Error al generar snapshots: {exc}'}
-    return {'success': True, 'message': 'Snapshots actualizados.', 'períodos': len(ventana), 'registros': totales}
 
 
-def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None):
-    """¿Falta el snapshot del período vigente?
+def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, location_ids=None):
+    """¿Falta el snapshot del período vigente para alguna sede?
 
     Se usa para la regeneración perezosa: el dashboard del Admin detecta si
     no existe el snapshot del período actual y lo genera antes de renderizar
     (el botón "Regenerar snapshots" queda como respaldo manual).
+
+    Si se pasa location_ids, verifica solo esas sedes.
     """
     if period_type not in PERIOD_TYPES:
         period_type = SnapshotPeriodType.MONTHLY
     inicio, _ = calcular_periodo(period_type, corte)
-    return StatisticsSnapshot.query.filter(
+    query = StatisticsSnapshot.query.filter(
         StatisticsSnapshot.period_type == period_type,
         StatisticsSnapshot.period_start == inicio,
-    ).first() is None
+    )
+    if location_ids:
+        query = query.filter(StatisticsSnapshot.location_id.in_(location_ids))
+    return query.first() is None
 
 
 def leer_configuracion():
@@ -305,10 +314,14 @@ def _set_parametro(key, value, descripcion=None):
     return parametro
 
 
-def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None):
+def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None, crear_notificaciones=False):
     """Alarmas de irregularidad: valor del período actual > factor × promedio
     de los 3 períodos anteriores (siempre que el promedio sea > 0 y el valor
-    alcance el mínimo configurado, en USD)."""
+    alcance el mínimo configurado, en USD).
+
+    Si `crear_notificaciones=True`, crea registros Notification tipo ALERTA_ESTADISTICA
+    para los usuarios que tienen acceso a la sede correspondiente.
+    """
     config = leer_configuracion()
     factor = Decimal(config['ESTADISTICAS_FACTOR'])
     minimo = Decimal(config['ESTADISTICAS_MINIMO_USD'])
@@ -340,6 +353,8 @@ def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None):
     }
 
     alertas = []
+    alertas_para_notificar = []  # (loc_id, metric, alerta_dict)
+
     for (loc_id, metric), por_periodo in por_sede_metrica.items():
         valor = por_periodo.get(inicio_actual, Decimal('0'))
         # Solo promediar períodos que tengan datos reales (amount_usd > 0)
@@ -356,7 +371,7 @@ def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None):
             continue
         if valor > factor * promedio:
             variacion = ((valor / promedio) - 1) * 100 if promedio else Decimal('0')
-            alertas.append({
+            alerta = {
                 'metric': metric,
                 'metric_label': etiquetas.get(metric, metric),
                 'location_id': loc_id,
@@ -364,9 +379,118 @@ def evaluar_alarmas(period_type=SnapshotPeriodType.MONTHLY, location_ids=None):
                 'valor_usd': valor,
                 'promedio_usd': promedio,
                 'variacion_pct': _redondear(variacion),
-            })
+            }
+            alertas.append(alerta)
+            alertas_para_notificar.append((loc_id, metric, alerta))
+
+    # Crear notificaciones si se solicita
+    if crear_notificaciones and alertas_para_notificar:
+        _crear_notificaciones_alarmas(alertas_para_notificar, period_type, inicio_actual)
+
     alertas.sort(key=lambda a: (a['metric'], a['location_id']))
     return alertas
+
+
+def _crear_notificaciones_alarmas(alertas_para_notificar, period_type, period_start):
+    """Crea notificaciones ALERTA_ESTADISTICA para usuarios con acceso a la sede.
+
+    - Admin: recibe todas las alarmas
+    - Finance: solo alarmas de sus sedes asignadas
+    - Otros roles operativos: solo sus sedes (consistente con dashboard)
+    """
+    from app.models import User, Notification
+
+    etiquetas_metrica = {
+        SnapshotMetric.PURCHASES: 'Compras',
+        SnapshotMetric.KITCHEN_CONSUMPTION: 'Consumo Cocina',
+        SnapshotMetric.WASTE: 'Mermas',
+        SnapshotMetric.TRANSFERS: 'Traslados',
+    }
+
+    etiquetas_periodo = {
+        SnapshotPeriodType.WEEKLY: 'semanal',
+        SnapshotPeriodType.MONTHLY: 'mensual',
+        SnapshotPeriodType.QUARTERLY: 'trimestral',
+        SnapshotPeriodType.ANNUAL: 'anual',
+    }
+
+    # Obtener todos los usuarios activos con roles que ven alarmas
+    usuarios = User.query.filter(User.is_active == True).all()
+
+    notificaciones_creadas = 0
+
+    for user in usuarios:
+        # Determinar sedes que ve el usuario
+        if user.is_admin:
+            sedes_usuario = None  # None = todas
+        elif user.is_finance:
+            sedes_usuario = [loc.id for loc in user.locations if loc.is_active]
+            if not sedes_usuario:
+                continue
+        elif user.is_management or user.is_manager or user.is_assistant_manager or user.is_operations:
+            sedes_usuario = [loc.id for loc in user.locations if loc.is_active]
+            if not sedes_usuario:
+                continue
+        else:
+            continue  # Otros roles no ven alarmas estadísticas
+
+        # Filtrar alertas que corresponden a las sedes del usuario
+        for loc_id, metric, alerta in alertas_para_notificar:
+            if sedes_usuario is not None and loc_id not in sedes_usuario:
+                continue
+
+            # Evitar duplicados: usamos movement_id codificado (metric * 100000 + loc_id)
+            # como clave única junto con user_id y type.
+            # El multiplicador 100000 evita colisiones con IDs reales de Movement (asumimos < 100000).
+            metric_value_map = {
+                SnapshotMetric.PURCHASES: 1,
+                SnapshotMetric.KITCHEN_CONSUMPTION: 2,
+                SnapshotMetric.WASTE: 3,
+                SnapshotMetric.TRANSFERS: 4,
+            }
+            movement_id_encoded = metric_value_map.get(metric, 0) * 100000 + loc_id
+
+            existing = Notification.query.filter_by(
+                user_id=user.id,
+                type='ALERTA_ESTADISTICA',
+                movement_id=movement_id_encoded
+            ).first()
+
+            if existing:
+                continue  # Ya existe notificación para esta métrica/sede/usuario
+
+            # Crear mensaje con enlace a estadísticas
+            metric_label = etiquetas_metrica.get(metric, metric)
+            periodo_label = etiquetas_periodo.get(period_type, period_type)
+            message = (
+                f"⚠️ Alarma estadística: {metric_label} en {alerta['location_name']} "
+                f"({periodo_label} {period_start.strftime('%d/%m/%Y')}). "
+                f"Valor: {float(alerta['valor_usd']):,.2f} USD, "
+                f"Promedio 3 prev: {float(alerta['promedio_usd']):,.2f} USD "
+                f"(+{alerta['variacion_pct']}%)."
+            )
+
+            notif = Notification(
+                user_id=user.id,
+                location_id=loc_id,
+                type='ALERTA_ESTADISTICA',
+                message=message[:255],
+                is_read=False,
+                movement_id=movement_id_encoded,
+                waste_id=None,
+                created_at=current_ve_time(),
+            )
+            db.session.add(notif)
+            notificaciones_creadas += 1
+
+    # Commit único fuera del loop para evitar commits parciales
+    if notificaciones_creadas > 0:
+        try:
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            # Log error but don't crash
+            pass
 
 
 def obtener_grafico_evolucion(period_type=SnapshotPeriodType.MONTHLY, corte=None,

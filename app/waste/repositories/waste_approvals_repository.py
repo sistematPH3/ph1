@@ -6,6 +6,7 @@ notificación y auditoría) vive en waste_approvals_service.py.
 """
 import json
 from datetime import datetime, timedelta
+from app.time_utils import current_ve_time
 
 from sqlalchemy import case, func
 
@@ -225,14 +226,14 @@ class MermaApprovalsRepository:
         lo hace el servicio; aquí solo se actualiza el estado y el aprobador)."""
         waste.status = new_status
         waste.approved_by_id = user_id
-        waste.approved_at = datetime.now()
+        waste.approved_at = current_ve_time()
 
     @staticmethod
     def mark_line_resolved(detail, user_id, decision, reason=None):
         """Marca UNA línea como APROBADO o RECHAZADO (decisión por producto)."""
         detail.status = 'APROBADO' if decision == 'aprobar' else 'RECHAZADO'
         detail.resolved_by_id = user_id
-        detail.resolved_at = datetime.now()
+        detail.resolved_at = current_ve_time()
         detail.resolution_reason = (reason or '').strip() or None
 
     @staticmethod
@@ -243,7 +244,7 @@ class MermaApprovalsRepository:
         guardado para la Auditoría de Inventario."""
         waste.status = 'CANCELADA'
         waste.cancelled_by_id = user_id
-        waste.cancelled_at = datetime.now()
+        waste.cancelled_at = current_ve_time()
         waste.cancel_reason = (reason or '').strip()
 
     @staticmethod

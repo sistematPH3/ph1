@@ -189,15 +189,16 @@ def guardar_snapshots(metric, period_type, inicio, fin, filas_por_sede, user_id=
         snap.record_count = agg.get('registros', 0)
         if user_id:
             snap.calculated_by_user_id = user_id
-    obsoletos = StatisticsSnapshot.query.filter(
-        StatisticsSnapshot.metric == metric,
-        StatisticsSnapshot.period_type == period_type,
-        StatisticsSnapshot.period_start == inicio,
-    )
+    # Solo eliminar obsoletos si HAY datos nuevos para ese período/métrica.
+    # Si filas_por_sede está vacía (no hay datos nuevos), NO borrar históricos:
+    # pueden ser datos legítimos de meses anteriores que no deben perderse.
     if filas_por_sede:
-        obsoletos = obsoletos.filter(
+        obsoletos = StatisticsSnapshot.query.filter(
+            StatisticsSnapshot.metric == metric,
+            StatisticsSnapshot.period_type == period_type,
+            StatisticsSnapshot.period_start == inicio,
             StatisticsSnapshot.location_id.notin_(list(filas_por_sede.keys())),
         )
-    for snap in obsoletos.all():
-        db.session.delete(snap)
+        for snap in obsoletos.all():
+            db.session.delete(snap)
     db.session.flush()

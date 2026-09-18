@@ -11,6 +11,7 @@ from app.decorators.roles import (
     operations_required
 )
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
+from app.inventory.services.lot_availability_service import obtener_vencidos_para_dashboard
 from app.analytics.requests.statistics_validators import (
     validate_period_type,
     validate_moneda,
@@ -38,11 +39,15 @@ def _contexto_estadisticas(period_type, moneda='USD', location_ids=None):
     """Contexto del cajón sin tumbar el dashboard si algo falla (tabla vacía, etc.)."""
     try:
         alertas_estadisticas = evaluar_alarmas(period_type, location_ids=location_ids)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Error evaluando alarmas: %s", exc)
         alertas_estadisticas = []
     try:
         datos_grafico = obtener_grafico_evolucion(period_type, moneda=moneda, location_ids=location_ids)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Error obteniendo gráfico evolución: %s", exc)
         datos_grafico = {
             'period_type': period_type,
             'moneda': moneda,
@@ -54,11 +59,11 @@ def _contexto_estadisticas(period_type, moneda='USD', location_ids=None):
         }
     return alertas_estadisticas, datos_grafico
 
-def _asegurar_snapshots(period_type, user_id=None):
+def _asegurar_snapshots(period_type, user_id=None, location_ids=None):
     """Regeneración perezosa: si falta el snapshot del período vigente se
     calcula SOLO ese período antes de renderizar. Un fallo aquí no debe tumbar el panel."""
     try:
-        if faltan_snapshots(period_type):
+        if faltan_snapshots(period_type, location_ids=location_ids):
             from app.analytics.services.snapshots_service import (
                 calcular_periodo, generar_snapshot_periodo,
             )
@@ -92,22 +97,26 @@ def index():
 @management_required
 def director_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/management_dashboard.html', alarmas=alarmas)
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+    return render_template('dashboard/management_dashboard.html', alarmas=alarmas, vencidos=vencidos)
 
 @dashboard_bp.route('/manager-dashboard')
 @login_required
 @manager_required
 def manager_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/manager_dashboard.html', alarmas=alarmas)
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+    return render_template('dashboard/manager_dashboard.html', alarmas=alarmas, vencidos=vencidos)
 
 @dashboard_bp.route('/assistant-manager')
 @login_required
 @assistant_manager_required
 def assistant_manager_dashboard():
+    vencidos = obtener_vencidos_para_dashboard(current_user)
     return render_template(
         'dashboard/assistant_manager_dashboard.html',
-        **get_subgerente_context(current_user)
+        **get_subgerente_context(current_user),
+        vencidos=vencidos
     )
 
 @dashboard_bp.route('/admin')
@@ -115,6 +124,7 @@ def assistant_manager_dashboard():
 @admin_required
 def admin_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
+    vencidos = obtener_vencidos_para_dashboard(current_user)
     period_type = validate_period_type(request.args.get('period'))
     default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
     moneda = validate_moneda(request.args.get('moneda'), default=default_moneda)
@@ -123,7 +133,7 @@ def admin_dashboard():
     if sede_id is not None and not any(s.id == sede_id for s in sedes):
         sede_id = None
     location_ids = [sede_id] if sede_id is not None else None
-    _asegurar_snapshots(period_type, user_id=current_user.id)
+    _asegurar_snapshots(period_type, user_id=current_user.id, location_ids=location_ids)
     alertas_estadisticas, datos_grafico = _contexto_estadisticas(
         period_type, moneda=moneda, location_ids=location_ids,
     )
@@ -160,6 +170,7 @@ def admin_dashboard():
         pendientes=pendientes,
         sedes=sedes,
         sede_seleccionada=sede_id,
+        vencidos=vencidos,
     )
 
 @dashboard_bp.route('/finance')
@@ -167,6 +178,7 @@ def admin_dashboard():
 @finance_required
 def finance_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
+    vencidos = obtener_vencidos_para_dashboard(current_user)
     sede_raw = request.args.get('sede', '')
     sede_id = int(sede_raw) if sede_raw.isdigit() else None
     periodo_raw = request.args.get('periodo', '')
@@ -176,7 +188,7 @@ def finance_dashboard():
             periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
         except ValueError:
             periodo = None
-    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas,
+    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas, vencidos=vencidos,
                            **get_finance_dashboard_context(
                                current_user, sede_id=sede_id,
                                period_start=periodo, alarmas=alarmas))
@@ -186,4 +198,5 @@ def finance_dashboard():
 @operations_required
 def operations_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
-    return render_template('dashboard/operations_dashboard.html', alarmas=alarmas)
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+    return render_template('dashboard/operations_dashboard.html', alarmas=alarmas, vencidos=vencidos)

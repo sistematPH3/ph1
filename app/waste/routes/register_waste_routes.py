@@ -1,6 +1,5 @@
-import io
 import time
-from flask import Blueprint, request, jsonify, render_template, session
+from flask import Blueprint, request, jsonify, render_template, flash, redirect, url_for, session
 from flask_login import login_required, current_user
 from app.decorators.roles import require_roles
 from app.waste.requests.register_waste_validators import validate_register_waste_payload
@@ -33,23 +32,83 @@ def nueva_merma():
 
     locations, is_admin, waste_types = get_form_data(user_id)
 
-    vencidos = []
-    try:
-        for loc in locations:
-            if loc.id == 1 and not RegisterWasteRepository.vencido_permitido_en_central():
-                continue
-            for v in RegisterWasteRepository.get_expired_lots(loc.id):
-                v = dict(v)
-                v['location_id'] = loc.id
-                v['location_name'] = loc.name
-                vencidos.append(v)
-    except Exception:
-        vencidos = []
-    vencidos.sort(key=lambda v: (v['location_name'], v['expiration_date']))
+    from app.inventory.services.lot_availability_service import obtener_vencidos_para_dashboard
+    vencidos = obtener_vencidos_para_dashboard(current_user)
 
     single_location = None
     if not is_admin and len(locations) == 1:
         single_location = locations[0]
+
+    # --- Deep link desde alarma de vencidos ---
+    alarm_prefill = None
+    origin = request.args.get('origin')
+    lock = request.args.get('lock')
+
+    if origin == 'alarma_vencido' and lock == '1':
+        # Revalidar en servidor: sede, lote vencido, cantidad válida
+        location_id = request.args.get('location_id', type=int)
+        product_id = request.args.get('product_id', type=int)
+        lot_number = request.args.get('lot_number', type=str)
+        quantity = request.args.get('quantity', type=float)
+
+        # Validar parámetros obligatorios
+        if not all([location_id, product_id, lot_number, quantity is not None]):
+            flash('Parámetros de alarma incompletos.', 'danger')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Verificar acceso a la sede
+        if not user_can_access_location(user_id, location_id):
+            flash('No tienes permisos para acceder a esta sede.', 'danger')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Verificar que la sede es Central y si permite vencidos
+        if location_id == 1 and not RegisterWasteRepository.vencido_permitido_en_central():
+            flash('La Sede Central no permite registro de vencidos.', 'danger')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Revalidar que el lote sigue vencido y tiene saldo
+        vencidos_loc = RegisterWasteRepository.get_expired_lots(location_id)
+        lote_encontrado = None
+        for v in vencidos_loc:
+            if v['product_id'] == product_id and v['lot_number'] == str(lot_number).strip():
+                lote_encontrado = v
+                break
+
+        if not lote_encontrado:
+            flash('El lote ya no está vencido o no tiene saldo disponible.', 'warning')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Validar cantidad no supera saldo
+        if quantity > lote_encontrado['quantity'] + 1e-9:
+            flash(f'Cantidad solicitada ({quantity}) supera el saldo disponible ({lote_encontrado["quantity"]}).', 'danger')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Verificar que el tipo VENCIDO existe y está activo
+        waste_type_vencido = next((wt for wt in RegisterWasteRepository.get_waste_types() if wt.code == 'VENCIDO' and wt.is_active), None)
+        if not waste_type_vencido:
+            flash('El tipo de merma VENCIDO no está configurado.', 'danger')
+            return redirect(url_for('register_waste.nueva_merma'))
+
+        # Persistir la alarma validada en la sesión: el POST solo acepta estos datos.
+        session['alarma_vencido'] = {
+            'location_id': location_id,
+            'product_id': product_id,
+            'lot_number': str(lot_number).strip(),
+            'quantity': float(quantity),
+        }
+
+        # Armar prefill para el template
+        alarm_prefill = {
+            'location_id': location_id,
+            'product_id': product_id,
+            'lot_number': str(lot_number).strip(),
+            'quantity': float(quantity),
+            'waste_type_id': waste_type_vencido.id,
+            'waste_type_name': waste_type_vencido.name,
+            'product_name': lote_encontrado['product_name'],
+            'expiration_date': lote_encontrado['expiration_date'],
+        }
+    # --- Fin deep link ---
 
     return render_template(
         'waste/register_waste.html',
@@ -57,6 +116,7 @@ def nueva_merma():
         is_admin=is_admin,
         single_location=single_location,
         vencidos=vencidos,
+        alarm_prefill=alarm_prefill,
     )
 
 @register_waste_bp.route('/api/waste/locations/<int:location_id>/types', methods=['GET'])
@@ -181,6 +241,54 @@ def crear_merma():
             'request_id': form.get('request_id'),
         }
 
+    # --- Bloqueo mono-ítem para deep link desde alarma de vencidos ---
+    origin = data.get('origin') if isinstance(data, dict) else None
+    if origin == 'alarma_vencido':
+        items = data.get('items', []) if isinstance(data.get('items'), list) else []
+        if len(items) != 1:
+            return jsonify({'success': False, 'message': 'La alarma de vencidos solo permite un ítem.'}), 400
+        item = items[0]
+        required = ('product_id', 'lot_number', 'quantity', 'waste_type_id')
+        for f in required:
+            if f not in item:
+                return jsonify({'success': False, 'message': f'Falta campo obligatorio: {f}'}), 400
+
+        try:
+            qty = float(item.get('quantity'))
+            loc_id = int(data.get('location_id'))
+            product_id = int(item.get('product_id'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Los campos (sede, producto, cantidad) son inválidos.'}), 400
+
+        alarm = session.get('alarma_vencido')
+        if not alarm:
+            return jsonify({'success': False, 'message': 'Los datos de la alarma expiraron: vuelve a entrar desde el cuadro de vencidos.'}), 400
+
+        # La ubicación debe ser la misma que validó el GET del deep link.
+        if (loc_id != alarm['location_id']
+                or product_id != alarm['product_id']
+                or str(item.get('lot_number', '')).strip() != alarm['lot_number']
+                or abs(qty - alarm['quantity']) > 1e-6):
+            return jsonify({'success': False, 'message': 'Los datos enviados no coinciden con la alarma original.'}), 400
+
+        # El motivo debe ser VENCIDO (tipo activo).
+        wt_vencido = next((wt for wt in RegisterWasteRepository.get_waste_types() if wt.code == 'VENCIDO' and wt.is_active), None)
+        try:
+            item_waste_type_id = int(item.get('waste_type_id'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'El tipo de merma debe ser VENCIDO.'}), 400
+        if not wt_vencido or item_waste_type_id != wt_vencido.id:
+            return jsonify({'success': False, 'message': 'El tipo de merma debe ser VENCIDO.'}), 400
+
+        # Revalidación en vivo: el lote sigue vencido y la cantidad no supera el saldo.
+        lote = next((v for v in RegisterWasteRepository.get_expired_lots(loc_id)
+                     if v['product_id'] == product_id and v['lot_number'] == str(item.get('lot_number', '')).strip()), None)
+        if not lote:
+            return jsonify({'success': False, 'message': 'El lote ya no está vencido o no tiene saldo disponible.'}), 400
+        if qty > lote['quantity'] + 1e-9:
+            return jsonify({'success': False, 'message': f'La cantidad ({qty}) supera el saldo disponible ({lote["quantity"]}).'}), 400
+    # --- Fin bloqueo alarma ---
+
     validation = validate_register_waste_payload(data)
     if not validation['is_valid']:
         return jsonify({'success': False, 'errors': validation['errors']}), 400
@@ -202,6 +310,7 @@ def crear_merma():
     )
 
     if result['success']:
+        session.pop('alarma_vencido', None)
         return jsonify(result), 200
     else:
         return jsonify(result), 400
