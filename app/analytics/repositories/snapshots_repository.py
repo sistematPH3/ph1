@@ -55,7 +55,7 @@ def filas_compras(inicio, fin):
             'date': p.purchase_date,
         }
         for d in filas for p in [d.purchase]
-        if (p.currency or 'USD').upper() in ('USD', 'EUR')
+        if (p.currency or 'USD').upper() in ('USD', 'EUR', 'BS')
     ]
 
 

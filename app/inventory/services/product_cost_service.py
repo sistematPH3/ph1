@@ -32,12 +32,13 @@ def _tasas(fecha, cache=None):
 
 
 def _a_usd(foreign_value, moneda_compra, fecha, tasa_cache=None):
-    """Convierte un precio de compra (USD/EUR) a USD usando la tasa BCV.
+    """Convierte un precio de compra (USD/EUR/BS) a USD usando la tasa BCV.
 
-    purchase.currency solo puede ser USD o EUR. El precio en BS de la compra
-    (price_bs) se conserva como está; acá trabajamos con la moneda original.
-    `tasa_cache` es un dict compartido (puede estar vacío) donde se guardan
-    las tasas consultadas; si es None se consulta sin caché.
+    purchase.currency admite USD, EUR o BS. El precio en BS de la compra
+    (foreign_value/price_bs) se conserva como está y acá se convierte a USD
+    dividiendo entre la tasa BCV de USD. `tasa_cache` es un dict compartido
+    (puede estar vacío) donde se guardan las tasas consultadas; si es None se
+    consulta sin caché.
     """
     tasas = _tasas(fecha, tasa_cache) if tasa_cache is not None else _tasas(fecha)
     moneda_compra = (moneda_compra or 'USD').upper()
@@ -49,6 +50,11 @@ def _a_usd(foreign_value, moneda_compra, fecha, tasa_cache=None):
         if not tasa_usd or not tasa_eur:
             raise ValueError('No hay tasas BCV para convertir EUR a USD.')
         return _redondear(Decimal(str(foreign_value)) * tasa_eur / tasa_usd)
+    if moneda_compra == 'BS':
+        tasa_usd = tasas.get('USD')
+        if not tasa_usd:
+            raise ValueError('No hay tasa BCV de USD para convertir BS a USD.')
+        return _redondear(Decimal(str(foreign_value)) / tasa_usd)
     raise ValueError(f'Moneda de compra no soportada: {moneda_compra}')
 
 

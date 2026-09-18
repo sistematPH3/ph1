@@ -136,12 +136,19 @@ def _agregar(filas, valor_usd_bs_eur):
 def _agregar_compras(filas, cache):
     def valor(fila):
         qty = fila['quantity']
-        if fila['currency'] == 'EUR':
+        moneda = fila['currency']
+        if moneda == 'EUR':
             tasas = _tasas_en(fila['date'], cache=cache)
             rate_usd = tasas.get('USD')
             rate_eur = tasas.get('EUR')
             usd = _redondear(fila['unit_foreign'] * qty * rate_eur / rate_usd) if rate_usd and rate_eur else Decimal('0.00')
             eur = _redondear(fila['unit_foreign'] * qty)
+        elif moneda == 'BS':
+            tasas = _tasas_en(fila['date'], cache=cache)
+            rate_usd = tasas.get('USD')
+            usd = _redondear(fila['price_bs'] * qty / rate_usd) if fila['price_bs'] and rate_usd else Decimal('0.00')
+            rate_eur = tasas.get('EUR')
+            eur = (_redondear(usd * rate_eur / rate_usd) if usd and rate_eur and rate_usd else Decimal('0.00'))
         else:
             usd = _redondear(fila['unit_foreign'] * qty)
             tasas = _tasas_en(fila['date'], cache=cache)
@@ -803,4 +810,63 @@ def obtener_pendientes():
         'mermas_pendientes': mermas,
         'traslados_en_transito': transito,
         'disputas_pendientes': disputas,
+    }
+
+
+def obtener_flujo_traslados(period_type=SnapshotPeriodType.MONTHLY, moneda='USD',
+                            location_ids=None, corte=None, limite=13):
+    """Flujo REAL de traslados por período para el dashboard del Admin.
+
+    A diferencia del snapshot TRANSFERS (que solo mide pérdidas en traslado),
+    aquí se cuenta TODA la mercancía trasladada y su costo (último costo de
+    compra por producto/lote), reutilizando obtener_traslados_direccional del
+    cajón de finanzas: {periods, serie: {cost, conteo, quantity}, comparativo}.
+    """
+    from app.analytics.services.analysis_reports_service import (
+        obtener_traslados_direccional,
+    )
+
+    if not location_ids:
+        location_ids = [loc.id for loc in Location.query.filter_by(is_active=True).all()]
+    moneda = (moneda or 'USD').upper()
+
+    periodos = periodos_historia(period_type, limite=limite, corte=corte)
+    costos, conteos, cantidades = [], [], []
+    for inicio, fin in periodos:
+        flujo = obtener_traslados_direccional(location_ids, inicio, fin, moneda)
+        total = flujo['total']
+        costos.append(float(total['cost']))
+        conteos.append(total['conteo'])
+        cantidades.append(float(total['quantity']))
+
+    comparativo = {
+        'actual': Decimal('0.00'),
+        'anterior': Decimal('0.00'),
+        'diff': Decimal('0.00'),
+        'variacion_pct': Decimal('0.00'),
+    }
+    if len(costos) >= 2:
+        act, ant = Decimal(str(costos[-1])), Decimal(str(costos[-2]))
+        comparativo = {
+            'actual': act,
+            'anterior': ant,
+            'diff': act - ant,
+            'variacion_pct': (_redondear(((act - ant) / ant) * 100) if ant
+                              else Decimal('0.00')),
+        }
+
+    return {
+        'period_type': period_type,
+        'moneda': moneda,
+        'periods': [
+            {'start': p[0].isoformat(),
+             'label': _etiqueta_periodo(period_type, p[0])}
+            for p in periodos
+        ],
+        'serie': {
+            'cost': costos,
+            'conteo': conteos,
+            'quantity': cantidades,
+        },
+        'comparativo': comparativo,
     }

@@ -17,9 +17,9 @@
     {% set vencidos_por_sede = {} %}
     {% for v in vencidos %}
         {% if v.location_id not in vencidos_por_sede %}
-            {% set _ = vencidos_por_sede.update({v.location_id: {'name': v.location_name, 'items': []}}) %}
+            {% set _ = vencidos_por_sede.update({v.location_id: {'name': v.location_name, 'lotes': []}}) %}
         {% endif %}
-        {% set _ = vencidos_por_sede[v.location_id]['items'].append(v) %}
+        {% set _ = vencidos_por_sede[v.location_id]['lotes'].append(v) %}
     {% endfor %}
 
     <div class="expired-alert-grid">
@@ -27,10 +27,10 @@
         <div class="expired-sede-group">
             <div class="expired-sede-header">
                 <i class="bi bi-building"></i> {{ sede_data.name }}
-                <span class="expired-sede-count">{{ sede_data.items|length }} {% if sede_data.items|length == 1 %}lote{% else %}lotes{% endif %}</span>
+                <span class="expired-sede-count">{{ sede_data.lotes|length }} {% if sede_data.lotes|length == 1 %}lote{% else %}lotes{% endif %}</span>
             </div>
             <div class="expired-sede-items">
-                {% for v in sede_data.items %}
+                {% for v in sede_data.lotes %}
                 {% if readonly %}
                 <div class="expired-alert-item expired-alert-item-readonly">
                 {% else %}

@@ -19,6 +19,17 @@
     let grafico = null;
     let activa = 'PURCHASES';
 
+    // Mismo formato que el filtro ph_amount del servidor: miles con punto,
+    // decimal con coma. Ej: 1824.79 -> '1.824,79'.
+    function formatoMonto(v, dec) {
+        const decs = (dec === undefined || dec === null) ? 2 : dec;
+        const n = Number(v) || 0;
+        const fijos = n.toFixed(decs);
+        const partes = fijos.split('.');
+        partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return partes.length > 1 ? partes[0] + ',' + partes[1] : partes[0];
+    }
+
     function totalDeTodas() {
         return orden.reduce(function (acc, m) {
             return acc + (datos.metrics[m] || []).reduce(function (a, v) { return a + (Number(v) || 0); }, 0);
@@ -88,7 +99,7 @@
                     tooltip: {
                         callbacks: {
                             label: function (item) {
-                                return item.dataset.label + ': ' + simbolo + Number(item.parsed.y || 0).toFixed(2);
+                                return item.dataset.label + ': ' + simbolo + formatoMonto(item.parsed.y, 2);
                             }
                         }
                     }
@@ -98,7 +109,10 @@
                         beginAtZero: true,
                         grid: {color: 'rgba(226, 232, 240, 0.6)'},
                         border: {display: false},
-                        ticks: {color: '#64748b', callback: function (v) { return simbolo + v; }}
+                        ticks: {color: '#64748b', callback: function (v) {
+                            const decs = (Math.abs(v) >= 1 && v === Math.round(v)) ? 0 : 2;
+                            return simbolo + formatoMonto(v, decs);
+                        }}
                     },
                     x: {
                         grid: {display: false},
@@ -162,9 +176,9 @@
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {legend: {display: false}, tooltip: {callbacks: {label: function (item) { return '$' + Number(item.parsed.x || 0).toFixed(2); }}}},
+                plugins: {legend: {display: false}, tooltip: {callbacks: {label: function (item) { return '$' + formatoMonto(item.parsed.x, 2); }}}},
                 scales: {
-                    x: {beginAtZero: true, grid: {color: 'rgba(226,232,240,.6)'}, border: {display: false}, ticks: {color: '#64748b', callback: function (v) { return '$' + v; }}},
+                    x: {beginAtZero: true, grid: {color: 'rgba(226,232,240,.6)'}, border: {display: false}, ticks: {color: '#64748b', callback: function (v) { return '$' + formatoMonto(v, 0); }}},
                     y: {grid: {display: false}, border: {display: false}, ticks: {color: '#334155'}}
                 }
             }
@@ -173,7 +187,7 @@
         const leyenda = document.getElementById('mermasTiposLegend');
         if (leyenda) {
             leyenda.innerHTML = datos.tipos.map(function (t) {
-                return '<span class="merma-tipo-chip"><strong>' + t.tipo + '</strong>: ' + Number(t.cantidad || 0) + ' und · $' + Number(t.monto_usd || 0).toFixed(2) + '</span>';
+                return '<span class="merma-tipo-chip"><strong>' + t.tipo + '</strong>: ' + Number(t.cantidad || 0) + ' und · $' + formatoMonto(t.monto_usd, 2) + '</span>';
             }).join('');
         }
     }

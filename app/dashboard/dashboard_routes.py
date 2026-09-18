@@ -26,6 +26,7 @@ from app.analytics.services.snapshots_service import (
     obtener_pendientes,
     generar_snapshots,
     faltan_snapshots,
+    obtener_flujo_traslados,
 )
 from app.models import Location
 from app.dashboard.dashboard_service import (
@@ -138,6 +139,14 @@ def admin_dashboard():
         period_type, moneda=moneda, location_ids=location_ids,
     )
     try:
+        flujo_traslados = obtener_flujo_traslados(
+            period_type, moneda=moneda, location_ids=location_ids,
+        )
+        if flujo_traslados['serie']['cost']:
+            datos_grafico['metrics']['TRANSFERS'] = flujo_traslados['serie']['cost']
+    except Exception:
+        flujo_traslados = None
+    try:
         pendientes = obtener_pendientes()
     except Exception:
         pendientes = {'mermas_pendientes': 0, 'traslados_en_transito': 0, 'disputas_pendientes': 0}
@@ -171,6 +180,7 @@ def admin_dashboard():
         sedes=sedes,
         sede_seleccionada=sede_id,
         vencidos=vencidos,
+        flujo_traslados=flujo_traslados,
     )
 
 @dashboard_bp.route('/finance')

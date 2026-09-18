@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=14">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=15">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/statistics_alerts.css') }}?v=3">
 {% endblock %}
 
@@ -62,14 +62,24 @@
 
 <div class="dash-kpi-grid">
     {% for key, cfg in cols_kpi.items() %}
+    {% if key == 'TRANSFERS' and flujo_traslados %}
+    {% set serie = flujo_traslados.serie.cost or [0] %}
+    {% set comp = flujo_traslados.comparativo %}
+    {% set detalle_traslado = flujo_traslados.serie.conteo[-1] ~ ' traslados · ' ~ flujo_traslados.serie.quantity[-1]|ph_qty ~ ' uds. movidas' %}
+    {% else %}
     {% set serie = datos_grafico.metrics.get(key) or [0] %}
     {% set comp = comparativo['metricas'].get(key, {}) %}
+    {% set detalle_traslado = none %}
+    {% endif %}
     {% set metric_class = key.lower() %}
     <div class="dash-kpi-card dash-kpi-card--{{ metric_class }}">
         <div class="dash-kpi-ico dash-kpi-ico--{{ metric_class }}"><i class="bi {{ cfg.icono }}"></i></div>
         <div class="dash-kpi-label">{{ cfg.label }}</div>
-        <div class="dash-kpi-value" title="{{ serie[-1]|ph_amount }} {{ moneda }}">{{ simbolo }}{{ serie[-1]|ph_amount }}</div>
+        <div class="dash-kpi-value" title="{% if key == 'TRANSFERS' %}Costo de la mercancía trasladada ({{ moneda }}){% else %}{{ serie[-1]|ph_amount }} {{ moneda }}{% endif %}">{{ simbolo }}{{ serie[-1]|ph_amount }}</div>
         <div class="dash-kpi-comp">
+            {% if detalle_traslado %}
+            <span class="kpi-comp-badge flat"><i class="bi bi-box-seam"></i>{{ detalle_traslado }}</span>
+            {% endif %}
             {% if comp %}
             {% set dir = 'up' if comp.diff > 0 else ('down' if comp.diff < 0 else 'flat') %}
             {% if dir == 'flat' %}{% set sem = 'flat' %}{% else %}{% set sem = 'up' if dir == 'down' else 'down' %}{% endif %}
@@ -227,5 +237,5 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/dashboard/admin_dashboard.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/dashboard/admin_dashboard.js') }}?v=4"></script>
 {% endblock %}

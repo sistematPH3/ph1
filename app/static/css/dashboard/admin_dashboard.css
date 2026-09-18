@@ -27,6 +27,16 @@
    sección controla su propio espaciado (como en finanzas). */
 main.content { padding: 0; }
 
+/* Las tarjetas de alertas (stock, vencidos y estadísticas) se incluyen
+   directamente en el contenido, que aquí no tiene padding: se les da el
+   mismo margen horizontal que a las demás secciones (30px). */
+main.content .stock-alert-wrapper,
+main.content .expired-alert-wrapper,
+main.content .stats-alert-wrapper {
+    margin-left: 30px;
+    margin-right: 30px;
+}
+
 .content {
     background:
         radial-gradient(1000px 520px at 88% -12%, rgba(200, 16, 46, .06), rgba(200, 16, 46, 0) 60%),
@@ -804,7 +814,10 @@ main.content { padding: 0; }
     .dash-kpi-grid,
     .dash-filtros,
     .dash-seccion-head,
-    .dash-content {
+    .dash-content,
+    main.content .stock-alert-wrapper,
+    main.content .expired-alert-wrapper,
+    main.content .stats-alert-wrapper {
         margin-left: 20px;
         margin-right: 20px;
     }
@@ -844,7 +857,10 @@ main.content { padding: 0; }
     .dash-kpi-grid,
     .dash-filtros,
     .dash-seccion-head,
-    .dash-content {
+    .dash-content,
+    main.content .stock-alert-wrapper,
+    main.content .expired-alert-wrapper,
+    main.content .stats-alert-wrapper {
         margin-left: 14px;
         margin-right: 14px;
     }
