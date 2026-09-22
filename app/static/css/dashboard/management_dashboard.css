@@ -1,251 +1,1019 @@
-/* Layout base */
-.wrapper { display: flex; min-height: 100vh; background-color: #f4f7f6; }
-.content-area { flex: 1; padding: 40px; }
-
-/* Cabecera */
-.dashboard-header { margin-bottom: 30px; }
-.dashboard-header h1 { color: #202124; font-weight: 800; }
-
-/* Grid de tarjetas */
-.dashboard-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-    gap: 20px; 
+/* =========================================================
+   Dashboard del Director (Management Dashboard)
+   Estilo visual alineado con el panel de Administrador
+   ========================================================= */
+:root {
+    --bg-color: #f4f4f9;
+    --card-bg: #ffffff;
+    --text-main: #141b2d;
+    --text-muted: #5e6a7e;
+    --primary-red: #c8102e;
+    --primary-red-soft: #e31937;
+    --navy: #1f3864;
+    --gold: #f5b301;
+    --border-color: #e6e9f0;
+    --ph-red-soft: rgba(200, 16, 46, 0.10);
+    --font-ph: 'Archivo', sans-serif;
+    --shadow: 0 4px 10px -2px rgba(18, 27, 45, .08);
+    --shadow-lift: 0 14px 26px -8px rgba(227, 25, 55, .16);
 }
 
-.card-link { text-decoration: none; color: inherit; }
+main.content { padding: 20px 30px; }
 
-.card-dash { 
-    background: white; 
-    padding: 30px; 
-    border-radius: 15px; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    text-align: center;
+/* Banner Hero */
+.dash-banner {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 24px;
+    padding: 24px 30px;
+    border-radius: 18px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    background-image: linear-gradient(120deg, #0a0a0d 0%, #140a0e 45%, #e31937 130%);
+    box-shadow: var(--shadow-lift);
 }
 
-.card-dash:hover { 
-    transform: translateY(-10px); 
-    box-shadow: 0 10px 25px rgba(227, 24, 55, 0.15); 
+.dash-banner-kicker {
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: #ffd9de;
+    text-transform: uppercase;
 }
 
-.card-dash i { font-size: 2rem; color: #E31837; margin-bottom: 15px; }
-.card-dash h3 { margin: 10px 0; color: #202124; }
-.card-dash p { color: #5f6368; font-size: 0.9rem; }
+.dash-banner-title {
+    font-family: var(--font-ph);
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ffffff;
+    margin: 4px 0;
+    text-transform: uppercase;
+}
 
-/* Tarjeta destacada */
-.card-dash.highlight { border-top: 5px solid #E31837; }
+.dash-banner-sub {
+    font-size: .92rem;
+    color: rgba(255, 255, 255, .85);
+    margin: 0;
+}
 
-/* Métricas en vivo (Sub-Gerencia) */
-.metric-grid {
+.dash-banner-badge {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, .3);
+    border: 1px solid rgba(255, 255, 255, .18);
+    backdrop-filter: blur(4px);
+    border-radius: 14px;
+    padding: 10px 16px;
+}
+
+.dash-banner-badge > i {
+    font-size: 1.4rem;
+    color: var(--gold);
+}
+
+.dash-banner-badge-copy { display: flex; flex-direction: column; }
+.dash-banner-badge-t { font-size: .68rem; text-transform: uppercase; color: rgba(255, 255, 255, .72); }
+.dash-banner-badge-v { font-size: .95rem; font-weight: 700; color: #ffffff; }
+
+/* Encabezados de Sección */
+.dash-seccion-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 20px 0 14px;
+}
+
+.dash-seccion-titulo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-ph);
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.dash-seccion-ico {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    background: linear-gradient(135deg, #e31937, #c8102e);
+}
+
+.dash-seccion-leyenda {
+    font-size: .74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.dash-leyenda-dot { font-size: .5rem; color: var(--primary-red); margin-right: 4px; }
+
+/* Tarjetas KPI */
+.dash-kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 26px;
+}
+
+.dash-kpi-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    transition: transform .2s ease, box-shadow .2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    overflow: visible !important; /* Permite que el desplegable flotante sea visible */
+}
+
+.dash-kpi-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: var(--stat-clr, var(--primary-red));
+}
+
+.dash-kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+
+.dash-kpi-ico {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: #ffffff;
+}
+
+.dash-kpi-label { color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.dash-kpi-value { color: var(--text-main); font-size: 1.45rem; font-weight: 800; margin-top: 8px; }
+
+.dash-kpi-card--purchases          { --stat-clr: #ce1126; }
+.dash-kpi-card--kitchen_consumption { --stat-clr: #2563eb; }
+.dash-kpi-card--waste            { --stat-clr: #d97706; }
+.dash-kpi-card--costo-operativo  { --stat-clr: #0f766e; }
+
+.dash-kpi-ico--purchases          { background: linear-gradient(135deg, #ce1126, #ce1126cc); }
+.dash-kpi-ico--kitchen_consumption { background: linear-gradient(135deg, #2563eb, #2563ebcc); }
+.dash-kpi-ico--waste             { background: linear-gradient(135deg, #d97706, #d97706cc); }
+.dash-kpi-ico--costo-operativo   { background: linear-gradient(135deg, #52d494, #1a9e63); }
+
+/* Layout Contenido e Indicadores */
+.dash-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 20px;
     margin-bottom: 30px;
 }
 
-.metric-dash {
-    background: white;
-    padding: 25px 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    text-align: center;
-    border-left: 5px solid #E31837;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.metric-dash:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(227, 24, 55, 0.12);
-}
-
-/* Colores propios por métrica */
-.metric-red { border-left-color: #E31837; }
-.metric-red i, .metric-red .metric-number { color: #E31837; }
-
-.metric-amber { border-left-color: #f59e0b; }
-.metric-amber i, .metric-amber .metric-number { color: #c77700; }
-
-.metric-coral { border-left-color: #e35d3b; }
-.metric-coral i, .metric-coral .metric-number { color: #cc4c2d; }
-
-.metric-dash i {
-    font-size: 1.4rem;
-    display: block;
-    margin-bottom: 8px;
-}
-
-.metric-number {
-    display: block;
-    font-size: 2.1rem;
-    font-weight: 800;
-    color: #202124;
-    line-height: 1.1;
-}
-
-.metric-label {
-    display: block;
-    margin-top: 6px;
-    color: #5f6368;
-    font-size: 0.82rem;
-    font-weight: 500;
-}
-
-/* Paneles de reporte (Sub-Gerencia) */
 .dash-panel {
-    background: white;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    padding: 18px 20px;
-    margin-bottom: 24px;
-    border-left: 4px solid transparent;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: var(--shadow);
 }
-
-.accent-red   { border-left-color: #E31837; }
-.accent-coral { border-left-color: #e35d3b; }
-.accent-amber { border-left-color: #f59e0b; }
 
 .dash-panel-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 10px;
-    border-bottom: 1px solid #f1f3f5;
-    padding-bottom: 12px;
-    margin-bottom: 12px;
+    align-items: center;
+    margin-bottom: 6px;
 }
 
 .dash-panel-title {
     font-size: 1.05rem;
     font-weight: 700;
-    color: #202124;
+    color: var(--text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .9rem;
+    color: #ffffff;
+    background: linear-gradient(135deg, #e31937, #c8102e);
+}
+
+.dash-subtitle { color: var(--text-muted); font-size: .84rem; margin: 0 0 16px; }
+
+/* Grid de Accesos a Módulos */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.card-link { text-decoration: none; color: inherit; }
+
+.card-dash {
+    background: #f8fafc;
+    padding: 22px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-dash:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(200, 16, 46, 0.12);
+}
+
+.card-dash i { font-size: 1.8rem; color: var(--primary-red); margin-bottom: 10px; }
+.card-dash h3 { font-size: 1rem; margin: 6px 0; color: var(--text-main); font-weight: 700; }
+.card-dash p { color: var(--text-muted); font-size: .78rem; margin: 0; }
+.card-dash.highlight { border-top: 4px solid var(--primary-red); }
+
+/* Panel de Atención Requerida */
+.atend-list { display: flex; flex-direction: column; gap: 10px; }
+
+.atend-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+    color: inherit;
+    transition: transform .18s ease;
+}
+
+.atend-row:hover { transform: translateX(3px); }
+
+.atend-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 1.05rem;
+    color: #ffffff;
+    background: var(--at-clr);
+    flex-shrink: 0;
+}
+
+.atend-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: .88rem;
+}
+
+.atend-sub { font-size: .74rem; font-weight: 500; color: var(--text-muted); }
+
+.atend-count {
+    font-size: .95rem;
+    font-weight: 800;
+    color: var(--at-clr);
+    background: rgba(255, 255, 255, .8);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 4px 10px;
+}
+
+.atend-arrow { color: #cbd5e1; font-size: .9rem; }
+
+@media (max-width: 1024px) {
+    .dash-content { grid-template-columns: 1fr; }
+}
+/* Enlaces para tarjetas KPI */
+.dash-kpi-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.dash-kpi-card-link:hover .dash-kpi-card {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 22px rgba(200, 16, 46, 0.15);
+}
+
+.dash-kpi-subtext {
+    margin-top: 10px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-kpi-subtext i {
+    margin-right: 4px;
+    color: var(--primary-red);
+}
+/* Botón Desplegable del Historial de Stock */
+.btn-stock-expand {
+    background: transparent;
+    border: none;
+    color: var(--primary-red);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 6px 0 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-stock-expand:hover {
+    text-decoration: underline;
+}
+
+/* Panel Desplegable con Scrollbar */
+.stock-history-drawer {
+    margin-top: 10px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px;
+    max-height: 140px;
+    overflow-y: auto;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.stock-history-header {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+}
+
+.stock-history-list {
+    list-style: none;
+    padding: 0;
     margin: 0;
 }
 
-.accent-red   .dash-panel-title i { color: #E31837; margin-right: 8px; }
-.accent-coral .dash-panel-title i { color: #e35d3b; margin-right: 8px; }
-.accent-amber .dash-panel-title i { color: #c77700; margin-right: 8px; }
-
-.dash-panel-sub {
-    margin: 2px 0 0 0;
-    color: #5f6368;
-    font-size: 0.85rem;
+.stock-history-list li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border-color);
+    font-size: 0.76rem;
 }
 
-.dash-link {
-    color: #E31837;
-    font-weight: 600;
-    font-size: 0.85rem;
-    text-decoration: none;
-    white-space: nowrap;
+.stock-history-list li:last-child {
+    border-bottom: none;
 }
 
-.dash-link:hover {
-    color: #8f1111;
+.st-prod {
+    color: var(--text-main);
 }
 
-/* Tabla de dashboard */
-.dash-table {
-    margin-bottom: 0;
-    font-size: 0.85rem;
-}
-
-.dash-table thead th {
-    background: #f8f9fb;
-    color: #5f6368;
-    text-transform: uppercase;
+.st-meta {
     font-size: 0.68rem;
-    letter-spacing: 0.6px;
+    color: var(--text-muted);
+}
+/* Enlace principal de la tarjeta KPI */
+.dash-kpi-main-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: opacity 0.2s ease;
+}
+
+.dash-kpi-main-link:hover {
+    opacity: 0.88;
+}
+
+.link-icon-sub {
+    font-size: 0.72rem;
+    color: var(--primary-red);
+    margin-left: 4px;
+}
+/* Colores distintivos por tarjeta */
+.dash-kpi-card--purchases {
+    --stat-clr: #ce1126; /* Rojo */
+}
+
+.dash-kpi-card--kitchen_consumption {
+    --stat-clr: #2563eb; /* Azul */
+}
+
+.dash-kpi-card--waste {
+    --stat-clr: #d97706; /* Ámbar */
+}
+
+.dash-kpi-card--costo-operativo {
+    --stat-clr: #0f766e; /* Verde esmeralda */
+}
+
+/* Efecto hover personalizado según el color de cada tarjeta */
+.dash-kpi-card--purchases:hover {
+    border-color: rgba(206, 17, 38, 0.4);
+    box-shadow: 0 10px 22px rgba(206, 17, 38, 0.12);
+}
+
+.dash-kpi-card--kitchen_consumption:hover {
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
+}
+
+.dash-kpi-card--waste:hover {
+    border-color: rgba(217, 119, 6, 0.4);
+    box-shadow: 0 10px 22px rgba(217, 119, 6, 0.12);
+}
+
+.dash-kpi-card--costo-operativo:hover {
+    border-color: rgba(15, 118, 110, 0.4);
+    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.12);
+}
+/* Contenedor Grid Uniforme */
+.dash-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 26px;
+    align-items: stretch; /* Fuerza a que todas las celdas tengan la misma altura */
+}
+
+.dash-kpi-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Tarjeta Base */
+.dash-kpi-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    transition: transform .2s ease, box-shadow .2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%; /* Ocupa toda la altura del contenedor grid */
+}
+
+/* =========================================================
+   EFECTO ZIGZAG EN BORDES DE COLOR
+   ========================================================= */
+.dash-kpi-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: var(--stat-clr, var(--primary-red));
+}
+
+/* Tarjeta 1 (Rojo) y Tarjeta 3 (Ámbar): Borde ARRIBA */
+.dash-kpi-card--purchases::before,
+.dash-kpi-card--waste::before {
+    top: 0;
+    bottom: auto;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+/* Tarjeta 2 (Azul) y Tarjeta 4 (Verde): Borde ABAJO (Zigzag) */
+.dash-kpi-card--kitchen_consumption::before,
+.dash-kpi-card--costo-operativo::before {
+    bottom: 0;
+    top: auto;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+}
+
+/* Hover suave según el color de cada tarjeta */
+.dash-kpi-card--purchases:hover          { border-color: rgba(206, 17, 38, 0.4); box-shadow: 0 10px 22px rgba(206, 17, 38, 0.12); }
+.dash-kpi-card--kitchen_consumption:hover { border-color: rgba(37, 99, 235, 0.4); box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12); }
+.dash-kpi-card--waste:hover               { border-color: rgba(217, 119, 6, 0.4);  box-shadow: 0 10px 22px rgba(217, 119, 6, 0.12); }
+.dash-kpi-card--costo-operativo:hover     { border-color: rgba(15, 118, 110, 0.4); box-shadow: 0 10px 22px rgba(15, 118, 110, 0.12); }
+
+/* =========================================================
+   HISTORIAL DESPLEGABLE FLOTANTE (Sin afectar la altura)
+   ========================================================= */
+.stock-history-drawer {
+    position: absolute;
+    top: calc(100% + 8px); /* Flota por debajo de la tarjeta */
+    left: 0;
+    right: 0;
+    z-index: 100; /* Se muestra por encima del contenido inferior */
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    max-height: 180px;
+    overflow-y: auto;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+}
+
+.btn-stock-expand {
+    background: transparent;
     border: none;
-    padding: 0.5rem 0.8rem;
-}
-
-.dash-table tbody td {
-    vertical-align: middle;
-    border-bottom: 1px solid #f0f2f5;
-    padding: 0.45rem 0.8rem;
-    color: #202124;
-}
-
-.dash-table tbody tr:hover td {
-    background: #fafbfd;
-}
-
-.route-line {
+    color: var(--primary-red);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 6px 0 0 0;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-weight: 500;
-    font-size: 0.85rem;
+    gap: 4px;
+    margin-top: 4px;
 }
 
-.exp-date {
-    font-weight: 600;
-    color: #202124;
+.btn-stock-expand:hover { text-decoration: underline; }
+/* =========================================================
+   CÁPSULAS DE BANNER (Usuario y Selector de Sede)
+   ========================================================= */
+.dash-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-/* Chips y badges */
-.dash-chip {
-    background: #f1f3f5;
-    color: #495057;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.2em 0.6em;
+/* Cápsula de Usuario */
+.dash-user-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
     border-radius: 50px;
-    white-space: nowrap;
+    padding: 6px 18px 6px 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.dash-lot {
-    background: #fff4e5;
-    color: #b45309;
-    font-weight: 600;
-    font-size: 0.75rem;
-    padding: 0.2em 0.6em;
-    border-radius: 6px;
-    border: 1px solid #fde4c0;
-    white-space: nowrap;
+.dash-user-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f5b301, #d97706);
+    color: #0f0a0d;
+    font-family: var(--font-ph);
+    font-weight: 900;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.dash-badge {
-    font-weight: 600;
-    font-size: 0.72rem;
-    padding: 0.3em 0.75em;
-    border-radius: 50px;
-    white-space: nowrap;
-    display: inline-block;
+.dash-user-info {
+    display: flex;
+    flex-direction: column;
 }
 
-.dash-badge-success { background: #d1e7dd; color: #0f5132; }
-.dash-badge-info    { background: #cff4fc; color: #055160; }
-.dash-badge-danger  { background: #f8d7da; color: #842029; }
-.dash-badge-warning { background: #fff3cd; color: #664d03; }
-.dash-badge-secondary { background: #e9ecef; color: #495057; }
+.dash-user-name {
+    font-family: var(--font-ph);
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+}
 
-.dash-qty-critical {
+.dash-user-role {
+    font-size: 0.62rem;
     font-weight: 700;
-    color: #E31837;
+    color: rgba(255, 255, 255, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-top: 2px;
 }
 
-/* Dos columnas lado a lado */
-.dash-row {
+/* Cápsula de Selector de Sede */
+.dash-sede-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    border-radius: 16px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dash-sede-icon {
+    font-size: 1.2rem;
+    color: var(--gold);
+}
+
+.dash-sede-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-sede-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/* Selector de Sede Limpio (Sin bordes de navegador) */
+.dash-sede-select {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: #ffffff;
+    font-family: var(--font-ph);
+    font-size: 0.88rem;
+    font-weight: 800;
+    cursor: pointer;
+    padding: 0 20px 0 0;
+    margin: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    /* Flecha personalizada blanca limpia */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23ffffff' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right center !important;
+}
+
+/* Evitar que aparezca el borde azul/gris al hacer clic */
+.dash-sede-select:focus,
+.dash-sede-select:active {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Estilo para las opciones del menú desplegable */
+.dash-sede-select option {
+    background-color: #140a0e;
+    color: #ffffff;
+    font-weight: 600;
+}
+/* =========================================================
+   ALTURA FIJA Y SCROLLBAR PARA TARJETAS DE ALERTAS
+   ========================================================= */
+
+/* Límite de altura para el Panel de Críticos y Próximos a Vencer */
+.dash-panel-body-scroll,
+.atend-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 6px; /* Espacio para que el scrollbar no sobreponga el contenido */
+}
+
+/* Personalización del Scrollbar (Chrome, Safari, Edge) */
+.dash-panel-body-scroll::-webkit-scrollbar,
+.atend-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dash-panel-body-scroll::-webkit-scrollbar-track,
+.atend-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+}
+
+.dash-panel-body-scroll::-webkit-scrollbar-thumb,
+.atend-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.dash-panel-body-scroll::-webkit-scrollbar-thumb:hover,
+.atend-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+/* Layout del Panel de Críticos (45% / 55%) */
+.criticos-grid-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
+    grid-template-columns: 45% 55%;
+    gap: 20px;
+    margin-top: 12px;
 }
 
-.dash-row .dash-panel { margin-bottom: 0; }
-
-.access-panel {
-    border-top: 4px solid #E31837;
+.criticos-col {
+    display: flex;
+    flex-direction: column;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 8px;
 }
 
-.access-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+/* Línea divisoria vertical entre secciones */
+.criticos-col:first-child {
+    border-right: 1px solid var(--border-color);
+    padding-right: 20px;
 }
 
-@media (max-width: 900px) {
-    .dash-row { grid-template-columns: 1fr; }
-    .dash-row .dash-panel { margin-bottom: 24px; }
+/* --- ESTADOS VACÍOS (EMPTY STATES) --- */
+
+/* Estado Vacío Global (Sin ninguna alerta) */
+.empty-state-global {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    text-align: center;
+    margin-top: 12px;
+}
+
+.empty-state-icon {
+    font-size: 2.2rem;
+    color: #10b981; /* Verde esmeralda éxito */
+    margin-bottom: 8px;
+}
+
+.empty-state-title {
+    font-family: var(--font-ph);
+    font-size: 0.98rem;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.empty-state-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Estado Vacío Por Columna (Individual) */
+.empty-state-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px 16px;
+    background: #f8fafc;
+    border: 1px dashed #e2e8f0;
+    border-radius: 12px;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-align: center;
+    min-height: 100px;
+    height: 100%;
+}
+
+.empty-state-col i {
+    font-size: 1.15rem;
+    color: #10b981;
+}
+
+/* Ajuste Responsivo para Móviles/Tablets */
+@media (max-width: 992px) {
+    .criticos-grid-container {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Cambia la línea vertical por una horizontal en móviles */
+    .criticos-col:first-child {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding-right: 0;
+        padding-bottom: 20px;
+    }
+}
+/* =========================================================
+   FIX: Evitar salto de línea en etiquetas (badges) de alertas
+   ========================================================= */
+.criticos-col [class*="badge"],
+.criticos-col .badge,
+.criticos-col span {
+    white-space: nowrap; /* Fuerza a que "1 Insumo" quede en una sola línea */
+}
+
+/* Alineación limpia de la cabecera de la alerta */
+.criticos-col div {
+    flex-shrink: 0;
+}
+/* =========================================================
+   FIX DEFINITIVO DE DESBORDAMIENTO Y SALTO DE LÍNEA
+   ========================================================= */
+
+/* 1. Control de ancho estricto del contenedor principal */
+.criticos-col {
+    overflow-x: hidden !important;
+    overflow-y: auto;
+    max-width: 100% !important;
+}
+
+/* 2. Forzar a TODOS los sub-elementos internos a no superar el 100% del ancho */
+.criticos-col * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* 3. Activar flex-wrap en TODOS los divs anidados internos */
+.criticos-col div,
+.criticos-col .d-flex,
+.criticos-col [class*="item"],
+.criticos-col [class*="card"] {
+    flex-wrap: wrap !important;
+    gap: 6px 8px !important;
+}
+
+/* 4. Evitar deformación de badges y botones (mantiene texto en una sola línea) */
+.criticos-col .btn,
+.criticos-col a,
+.criticos-col [class*="badge"],
+.criticos-col .badge {
+    white-space: nowrap !important;
+    word-break: normal !important;
+    flex-shrink: 0 !important;
+}
+
+/* 5. Comportamiento del botón: Se alinea a la derecha y baja limpiamente */
+.criticos-col .btn,
+.criticos-col a {
+    font-size: 0.72rem !important;
+    padding: 4px 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-left: auto !important; /* Si baja de fila, se posiciona a la derecha */
+}
+/* Texto del Badge para Sede Única */
+.dash-sede-name {
+    color: #ffffff;
+    font-family: var(--font-ph);
+    font-size: 0.88rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+/* =========================================================
+   DISEÑO RESPONSIVO (TABLETS Y MÓVILES)
+   ========================================================= */
+
+/* Tabletas y Pantallas Medianas (<= 992px) */
+@media (max-width: 992px) {
+    main.content {
+        padding: 16px 20px;
+    }
+
+    /* Banner verticalizado */
+    .dash-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        padding: 20px 22px;
+    }
+
+    .dash-banner-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    /* Tarjetas KPI en 2 columnas */
+    .dash-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+
+    /* Paneles principales en columna única */
+    .dash-content {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* Panel de Alertas en 1 sola columna con divisor horizontal */
+    .criticos-grid-container {
+        grid-template-columns: 1fr;
+    }
+
+    .criticos-col:first-child {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding-right: 0;
+        padding-bottom: 20px;
+    }
+}
+
+/* Teléfonos Móviles (<= 576px) */
+@media (max-width: 576px) {
+    main.content {
+        padding: 12px 10px;
+    }
+
+    /* Compactación del Banner */
+    .dash-banner {
+        padding: 16px;
+        border-radius: 14px;
+    }
+
+    .dash-banner-title {
+        font-size: 1.35rem;
+    }
+
+    .dash-banner-sub {
+        font-size: 0.82rem;
+    }
+
+    /* Cápsulas de usuario y sede ocupan todo el ancho */
+    .dash-banner-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .dash-user-pill,
+    .dash-sede-pill {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 12px;
+        padding: 8px 14px;
+    }
+
+    .dash-sede-info,
+    .sede-selector-form {
+        width: 100%;
+    }
+
+    .dash-sede-select {
+        width: 100%;
+    }
+
+    /* Tarjetas KPI a 1 columna para fácil lectura táctil */
+    .dash-kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .dash-kpi-card {
+        padding: 14px 16px;
+    }
+
+    .dash-kpi-value {
+        font-size: 1.3rem;
+    }
+
+    /* Ajuste de contenedores y fuentes */
+    .dash-panel {
+        padding: 16px;
+        border-radius: 14px;
+    }
+
+    .dash-panel-title {
+        font-size: 0.95rem;
+    }
+
+    .atend-row {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .atend-text {
+        font-size: 0.82rem;
+    }
+
+    .atend-sub {
+        font-size: 0.7rem;
+    }
+
+    .atend-count {
+        font-size: 0.8rem;
+        padding: 3px 8px;
+    }
+
+    /* Desplegable de flotante ajustado a pantallas pequeñas */
+    .stock-history-drawer {
+        position: static;
+        margin-top: 8px;
+        box-shadow: none;
+    }
 }
