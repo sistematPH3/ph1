@@ -1,50 +1,245 @@
 {% extends "layout.html" %}
 
-{% block content %}
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}">
+{% endblock %}
 
-<header class="dashboard-header">
-    <h1>Panel de Dirección</h1>
-    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
-</header>
+{% block content %}
 
-<!-- Componente Reusable de Alertas de Stock -->
-{% include 'alerts/_alerts_stock.html' %}
-
-<!-- Componente de Alertas de Productos Vencidos -->
-{% include 'alerts/_alerts_expired.html' %}
-
-<div class="dashboard-grid">
-    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-boxes"></i>
-            <h3>Inventario</h3>
-            <p>Gestionar insumos y stock</p>
+<!-- Hero Banner Ejecutivo -->
+<div class="dash-banner">
+    <div class="dash-banner-texto">
+        <span class="dash-banner-kicker"><i class="bi bi-shield-check"></i> Director / Gerencia</span>
+        <h1 class="dash-banner-title">Panel Ejecutivo</h1>
+        <p class="dash-banner-sub">
+            Hola <strong>{{ current_user.name }}</strong>, visión estratégica y estado operativo.
+        </p>
+    </div>
+    
+    <div class="dash-banner-actions">
+    <!-- Cápsula de Usuario con Avatar -->
+    <div class="dash-user-pill">
+        <div class="dash-user-avatar">
+            {{ current_user.name[0]|upper if current_user.name else 'U' }}
         </div>
-    </a>
-
-    <a href="{{ url_for('purchase_management.index') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-shopping-cart"></i>
-            <h3>Compras</h3>
-            <p>Historial y proveedores</p>
+        <div class="dash-user-info">
+            <span class="dash-user-name">{{ current_user.name }}</span>
+            <span class="dash-user-role">Director / Gerencia</span>
         </div>
-    </a>
+    </div>
 
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-truck"></i>
-            <h3>Traslados</h3>
-            <p>Logística de sucursales</p>
+    <!-- Selector si el usuario tiene más de 1 sede -->
+    {% if sedes and sedes|length > 1 %}
+    <div class="dash-sede-pill">
+        <i class="bi bi-geo-alt-fill dash-sede-icon"></i>
+        <div class="dash-sede-info">
+            <span class="dash-sede-label">Sede actual</span>
+            <form method="GET" action="{{ url_for('dashboard.director_dashboard') }}" class="sede-selector-form">
+                <select name="sede" id="sede-select" onchange="this.form.submit()" class="dash-sede-select">
+                    <option value="" {% if not sede_seleccionada %}selected{% endif %}>Todas mis sedes</option>
+                    {% for s in sedes %}
+                    <option value="{{ s.id }}" {% if s.id == sede_seleccionada %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
         </div>
-    </a>
-
-    <a href="{{ url_for('audit.ver_auditoria_accesos') }}" class="card-link">
-        <div class="card-dash highlight">
-            <i class="fas fa-chart-line"></i>
-            <h3>Reportes</h3>
-            <p>Auditoría y métricas</p>
+    </div>
+    {% else %}
+    <!-- Badge de Sede Fija (cuando el usuario solo pertenece a 1 sede) -->
+    <div class="dash-sede-pill">
+        <i class="bi bi-geo-alt-fill dash-sede-icon"></i>
+        <div class="dash-sede-info">
+            <span class="dash-sede-label">Sede asignada</span>
+            <span class="dash-sede-name">
+                {% if sedes and sedes|length == 1 %}
+                    {{ sedes[0].name }}
+                {% elif current_user.sede %}
+                    {{ current_user.sede.name if current_user.sede.name else current_user.sede }}
+                {% else %}
+                    Sede Principal
+                {% endif %}
+            </span>
         </div>
-    </a>
+    </div>
+    {% endif %}
 </div>
+</div>
+
+<!-- Resumen Ejecutivo Global -->
+<div class="dash-seccion-head">
+    <h2 class="dash-seccion-titulo">
+        <span class="dash-seccion-ico"><i class="bi bi-pie-chart-fill"></i></span>
+        Resumen Ejecutivo Global
+    </h2>
+</div>
+
+<div class="dash-kpi-grid">
+
+    <!-- Card 1: Stock Agregado (Borde ARRIBA) -->
+    <div class="dash-kpi-card dash-kpi-card--purchases">
+        <a href="{{ url_for('inventory.render_inventory_views') }}" class="dash-kpi-main-link" title="Ir a la lista completa de inventario">
+            <div class="dash-kpi-ico dash-kpi-ico--purchases"><i class="bi bi-boxes"></i></div>
+            <div class="dash-kpi-label">Stock Agregado <i class="bi bi-box-arrow-up-right link-icon-sub"></i></div>
+            <div class="dash-kpi-value">{{ resumen.stock_agregado|ph_qty if resumen else '0' }} <span class="kpi-unit">uds.</span></div>
+        </a>
+        
+        <div class="dash-kpi-subtext">
+            {% if resumen.ultimo_ingreso %}
+                <i class="bi bi-clock-history"></i> ÚLTIMO: <strong>{{ resumen.ultimo_ingreso.cantidad|ph_qty }} {{ resumen.ultimo_ingreso.unidad }} de {{ resumen.ultimo_ingreso.producto }}</strong>
+            {% else %}
+                <i class="bi bi-info-circle"></i> Sin ingresos recientes
+            {% endif %}
+        </div>
+
+        {% if resumen.historial_ingresos %}
+        <button type="button" id="btn-toggle-stock-history" class="btn-stock-expand">
+            <i class="bi bi-list-ul"></i> Ver últimos ingresos
+        </button>
+
+        <div id="stock-history-drawer" class="stock-history-drawer" style="display: none;">
+            <div class="stock-history-header">Últimos 5 Ingresos</div>
+            <ul class="stock-history-list">
+                {% for item in resumen.historial_ingresos %}
+                <li>
+                    <span class="st-prod"><strong>{{ item.cantidad|ph_qty }} {{ item.unidad }}</strong> - {{ item.producto }}</span>
+                    <span class="st-meta">{{ item.sede }} · {{ item.fecha }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Card 2: Traslados en Tránsito (Borde ABAJO) -->
+    <a href="{{ url_for('logistics_list.movement_list') }}" class="dash-kpi-card-link">
+        <div class="dash-kpi-card dash-kpi-card--kitchen_consumption">
+            <div class="dash-kpi-ico dash-kpi-ico--kitchen_consumption"><i class="bi bi-truck"></i></div>
+            <div class="dash-kpi-label">Traslados en Tránsito</div>
+            <div class="dash-kpi-value">{{ resumen.traslados_en_transito if resumen else 0 }}</div>
+            <div class="dash-kpi-subtext"><i class="bi bi-arrow-right-circle"></i> Ver logística de envíos</div>
+        </div>
+    </a>
+
+    <!-- Card 3: Mermas Pendientes (Borde ARRIBA) -->
+    <a href="{{ url_for('merma_list.mis_pendientes') }}" class="dash-kpi-card-link">
+        <div class="dash-kpi-card dash-kpi-card--waste">
+            <div class="dash-kpi-ico dash-kpi-ico--waste"><i class="bi bi-exclamation-circle"></i></div>
+            <div class="dash-kpi-label">Mermas Pendientes</div>
+            <div class="dash-kpi-value">{{ resumen.mermas_pendientes if resumen else 0 }}</div>
+            <div class="dash-kpi-subtext"><i class="bi bi-clock-history"></i> Ir a bandeja de mermas</div>
+        </div>
+    </a>
+
+    <!-- Card 4: Alertas Críticas (Borde ABAJO) -->
+    <a href="#panel-criticos-seccion" id="link-alertas-criticas" class="dash-kpi-card-link">
+        <div class="dash-kpi-card dash-kpi-card--costo-operativo">
+            <div class="dash-kpi-ico dash-kpi-ico--costo-operativo"><i class="bi bi-shield-exclamation"></i></div>
+            <div class="dash-kpi-label">Alertas Críticas</div>
+            <div class="dash-kpi-value">{{ resumen.alertas_criticas if resumen else 0 }}</div>
+            <div class="dash-kpi-subtext">
+                <span>{{ resumen.cant_stock_bajo }} stock bajo</span> · <span>{{ resumen.cant_vencidos }} vencidos</span>
+            </div>
+        </div>
+    </a>
+
+</div>
+
+<!-- Layout Principal: Panel de Alertas + Proximos a Vencer -->
+<div class="dash-content">
+    
+    <!-- Panel de Alertas (Sección 9.3) -->
+<div class="dash-panel" id="panel-criticos-seccion">
+    <div class="dash-panel-header">
+        <h2 class="dash-panel-title">
+            <span class="panel-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            Panel de Alertas
+        </h2>
+    </div>
+    <p class="dash-subtitle">Monitoreo de stock crítico y mermas de tipo alto o grave.</p>
+
+    {% if resumen and resumen.alertas_criticas == 0 %}
+        <!-- CASO 1: Cero alertas en total (Mensaje General) -->
+        <div class="empty-state-global">
+            <i class="bi bi-shield-check empty-state-icon"></i>
+            <div class="empty-state-title">Estado Operativo Óptimo</div>
+            <div class="empty-state-sub">Actualmente no hay alertas de stock crítico ni productos vencidos.</div>
+        </div>
+    {% else %}
+        <!-- CASO 2 y 3: Hay al menos una alerta activa -->
+        <div class="criticos-grid-container">
+            
+            <!-- Columna Izquierda: Stock Crítico (45%) -->
+            <div class="criticos-col">
+                {% if resumen and resumen.cant_stock_bajo > 0 %}
+                    {% include 'alerts/_alerts_stock.html' %}
+                {% else %}
+                    <!-- CASO 3: Hay mermas, pero NO hay stock crítico -->
+                    <div class="empty-state-col">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Sin alertas de Stock Crítico</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Columna Derecha: Productos Vencidos (55%) -->
+            <div class="criticos-col">
+                {% if resumen and resumen.cant_vencidos > 0 %}
+                    {% include 'alerts/_alerts_expired.html' %}
+                {% else %}
+                    <!-- CASO 2: Hay stock crítico, pero NO hay vencidos -->
+                    <div class="empty-state-col">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>No hay alertas de productos vencidos</span>
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    {% endif %}
+</div>
+
+    <!-- Panel Lateral: Próximos Vencimientos (Prevención FEFO) -->
+    <div class="dash-panel atend-panel">
+        <div class="dash-panel-header">
+            <h2 class="dash-panel-title">
+                <span class="panel-icon" style="background: linear-gradient(135deg, #d97706, #b45309);">
+                    <i class="bi bi-hourglass-split"></i>
+                </span>
+                Próximos a Vencer
+            </h2>
+        </div>
+        <p class="dash-subtitle">Lotes críticos a priorizar en cocina (Próximos 7 días).</p>
+
+        <div class="atend-list">
+            {% if proximos_vencimientos %}
+                {% for lote in proximos_vencimientos %}
+                <div class="atend-row" style="--at-clr:#d97706; background: linear-gradient(90deg, rgba(217,119,6,.08), #ffffff 60%);">
+                    <span class="atend-icon"><i class="bi bi-box-seam"></i></span>
+                    <span class="atend-text">
+                        {{ lote.product }}
+                        <span class="atend-sub">Lote {{ lote.lot }} · {{ lote.location }} · 
+                        <i class="bi bi-calendar3"></i> {{ lote.expiration.strftime('%d/%m/%Y') if lote.expiration.strftime else lote.expiration }}
+                        </span>
+                    </span>
+                    <div style="text-align: right;">
+                        <span class="atend-count" style="color: #d97706; background: #fef3c7; border-color: #fcd34d;">
+                            vence en {{ lote.days }}d
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="dash-kpi-subtext" style="padding: 12px; text-align: center;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981;"></i> No hay lotes próximos a vencer.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard/management_dashboard.js') }}"></script>
 {% endblock %}
