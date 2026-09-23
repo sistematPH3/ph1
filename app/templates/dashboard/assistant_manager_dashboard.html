@@ -1,40 +1,90 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/assistant_manager_dashboard.css') }}?v=7">
 
-<header class="dashboard-header">
-    <h1>Panel de Sub-Gerencia</h1>
-    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>. Resumen operativo de tus sedes.</p>
-</header>
+<!-- BANNER DE ENCABEZADO SUBGERENCIA -->
+<div class="dash-header-banner">
+    <!-- Lado Izquierdo: Títulos y Saludo -->
+    <div class="dash-header-title-area">
+        <span class="dash-header-tag"><i class="fas fa-shield-alt"></i> SUBGERENCIA DE SEDE</span>
+        <h1>PANEL DE SUB-GERENCIA</h1>
+        <p class="dash-header-subtitle">
+            Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>. Resumen operativo de tus sedes.
+        </p>
+    </div>
 
-<!-- Métricas en vivo -->
+    <!-- Lado Derecho: Usuario y Calendario "Resumen Diario" -->
+    <div class="dash-header-right-widgets">
+        <!-- Usuario con Inicial Amarilla -->
+        <div class="dash-header-user-badge">
+            <div class="dash-user-avatar">
+                {{ current_user.name[0]|upper if current_user.name else 'U' }}
+            </div>
+            <div class="dash-user-details">
+                <span class="dash-user-name">{{ current_user.name }}</span>
+                <span class="dash-user-role">SUBGERENTE</span>
+            </div>
+        </div>
+
+        <!-- Widget Calendario: Resumen Diario -->
+        <div class="dash-header-date-badge">
+            <i class="fas fa-calendar-alt"></i>
+            <div class="dash-date-details">
+                <span class="dash-date-label">RESUMEN DIARIO</span>
+                <span class="dash-date-value">{{ current_date if current_date else 'HOY' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Componente de Alertas de Productos Vencidos -->
 {% include 'alerts/_alerts_expired.html' %}
 
+<!-- Métricas en vivo -->
 <div class="metric-grid">
+    <!-- Tarjeta 1: Stock actual -->
     <div class="metric-dash metric-red">
-        <i class="fas fa-truck"></i>
-        <span class="metric-number">{{ en_camino_count }}</span>
-        <span class="metric-label">Traslados en camino</span>
+        <div class="metric-icon">
+            <i class="bi bi-boxes"></i>
+        </div>
+        <div class="metric-content">
+            <span class="metric-number">
+                {{ total_stock | default(0) }}
+                <small style="font-size: 1rem; font-weight: 600;">uds.</small>
+            </span>
+            <span class="metric-label">STOCK ACTUAL</span>
+        </div>
     </div>
-    <div class="metric-dash metric-amber">
-        <i class="fas fa-box-open"></i>
-        <span class="metric-number">{{ por_recibir_count }}</span>
-        <span class="metric-label">Traslados por recibir</span>
+
+    <!-- Tarjeta 2: Traslados por recibir -->
+    <div class="metric-dash metric-blue">
+        <div class="metric-icon">
+            <i class="bi bi-truck"></i>
+        </div>
+        <div class="metric-content">
+            <span class="metric-number">{{ por_recibir_count | default(0) }}</span>
+            <span class="metric-label">Traslados por recibir</span>
+        </div>
     </div>
-    <div class="metric-dash metric-coral">
-        <i class="fas fa-exclamation-triangle"></i>
-        <span class="metric-number">{{ critical_count }}</span>
-        <span class="metric-label">Alertas de stock crítico</span>
+
+    <!-- Tarjeta 3: Alertas de stock crítico -->
+    <div class="metric-dash metric-yellow">
+        <div class="metric-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <div class="metric-content">
+            <span class="metric-number">{{ critical_count | default(0) }}</span>
+            <span class="metric-label">Alertas de stock crítico</span>
+        </div>
     </div>
 </div>
 
 <!-- Últimos traslados -->
-<div class="dash-panel accent-red">
+<div class="dash-panel accent-blue">
     <div class="dash-panel-header">
         <div>
-            <h2 class="dash-panel-title"><i class="fas fa-truck"></i> Últimos traslados</h2>
+            <h2 class="dash-panel-title"><i class="fas fa-truck text-blue"></i> Últimos traslados</h2>
             <p class="dash-panel-sub">Actividad reciente en tus sedes</p>
         </div>
         <a href="{{ url_for('logistics_list.movement_list') }}" class="dash-link">Ver listado completo <i class="fas fa-arrow-right"></i></a>
@@ -80,122 +130,119 @@
 </div>
 
 <div class="dash-row">
-    <!-- Stock crítico -->
-    <div class="dash-panel accent-coral">
-        <div class="dash-panel-header">
-            <div>
-                <h2 class="dash-panel-title"><i class="fas fa-exclamation-triangle"></i> Stock crítico</h2>
-                <p class="dash-panel-sub">Insumos por debajo o al límite del mínimo</p>
-            </div>
-        </div>
 
-        <div class="table-responsive">
-            <table class="table dash-table mb-0">
-                <thead>
-                    <tr>
-                        <th>Insumo</th>
-                        <th>Sede</th>
-                        <th class="text-center">Actual / Mínimo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in critical_stock %}
-                    <tr>
-                        <td class="fw-bold text-dark">{{ a.product_name }}</td>
-                        <td><span class="dash-chip">{{ a.location_name }}</span></td>
-                        <td class="text-center">
-                            <span class="dash-qty-critical">{{ a.new_quantity | ph_qty }}</span>
-                            <span class="text-muted">/ {{ a.min_stock | ph_qty }} {{ a.unit_of_measure }}</span>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3" class="text-center text-muted py-4">Sin alertas de stock crítico en tus sedes.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- ========== STOCK CRÍTICO (estilo cards flotantes) ========== -->
+<div class="dash-panel accent-coral">
+    <div class="dash-panel-header">
+        <div>
+            <h2 class="dash-panel-title">
+                <i class="fas fa-exclamation-triangle text-coral"></i> Stock crítico
+            </h2>
+            <p class="dash-panel-sub">Insumos por debajo o al límite del mínimo</p>
         </div>
+        {% if critical_stock and critical_stock|length > 0 %}
+            <span class="badge bg-warning text-dark">{{ critical_stock|length }} Insumos</span>
+        {% endif %}
     </div>
 
-    <!-- Vencimientos próximos -->
+    <div class="sub-alert-list">
+        {% for a in critical_stock %}
+        <div class="sub-alert-item sub-alert-item--stock d-flex justify-content-between align-items-center">
+            <div class="sub-alert-info">
+                <span class="sub-alert-product">{{ a.product_name }}</span>
+                <span class="sub-alert-location">
+                    <i class="bi bi-building"></i> {{ a.location_name }}
+                </span>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3">
+                <div class="sub-alert-metrics text-end">
+                    <span class="sub-val-current">
+                        Stock: {{ a.new_quantity | ph_qty }}
+                    </span>
+                    <span class="sub-val-min">
+                        (Mín: {{ a.min_stock | ph_qty }} {{ a.unit_of_measure or '' }})
+                    </span>
+                </div>
+                
+                <a href="{{ url_for('inventory.render_inventory_views', search=a.product_name) }}" class="btn-action-alert">
+    Ver inventario <i class="bi bi-arrow-right-short"></i>
+</a>
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-criticos-state">
+            <i class="bi bi-check-circle text-secondary"></i>
+            <h4>Sin Alertas Críticas</h4>
+            <p>Todo el inventario de tus sedes está en niveles óptimos.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+    <!-- ========== VENCIMIENTOS PRÓXIMOS (estilo cards + botón merma) ========== -->
     <div class="dash-panel accent-amber">
         <div class="dash-panel-header">
             <div>
-                <h2 class="dash-panel-title"><i class="fas fa-calendar-times"></i> Vencimientos próximos</h2>
+                <h2 class="dash-panel-title">
+                    <i class="fas fa-clock text-amber"></i> Vencimientos próximos
+                </h2>
                 <p class="dash-panel-sub">Lotes por vencer en los próximos 90 días</p>
             </div>
+            {% if expiring_lots and expiring_lots|length > 0 %}
+                <span class="badge bg-danger text-white">{{ expiring_lots|length }} Lotes</span>
+            {% endif %}
         </div>
 
-        <div class="table-responsive">
-            <table class="table dash-table mb-0">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Lote</th>
-                        <th class="text-center">Vence</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lot in expiring_lots %}
-                    <tr>
-                        <td>
-                            <span class="fw-bold text-dark d-block">{{ lot.product }}</span>
-                            <span class="text-muted small">{{ lot.location }}</span>
-                        </td>
-                        <td><span class="dash-lot">{{ lot.lot }}</span></td>
-                        <td class="text-center">
-                            <span class="exp-date d-block">{{ lot.expiration.strftime('%Y-%m-%d') }}</span>
-                            {% if lot.critical %}
-                            <span class="dash-badge dash-badge-danger">{{ lot.days }} días</span>
-                            {% else %}
-                            <span class="dash-badge dash-badge-warning">{{ lot.days }} días</span>
-                            {% endif %}
-                        </td>
-                    </tr>
+        <div class="sub-alert-list">
+            {% for lot in expiring_lots %}
+            <div class="sub-alert-item sub-alert-item--expired">
+                <div class="sub-alert-info">
+                    <span class="sub-alert-product">{{ lot.product }}</span>
+                    <span class="sub-alert-lot">
+                        <i class="bi bi-tag"></i> Lote {{ lot.lot }}
+                    </span>
+                    <span class="sub-alert-location">
+                        <i class="bi bi-building"></i> {{ lot.location }}
+                    </span>
+                </div>
+
+                <div class="sub-alert-metrics">
+                    <span class="sub-val-qty">{{ lot.quantity | int }} unds</span>
+                    <span class="sub-val-exp">
+                        Vence {{ lot.expiration.strftime('%Y-%m-%d') if lot.expiration else '—' }}
+                    </span>
+                    {% if lot.critical %}
+                        <span class="sub-badge-days danger">{{ lot.days }} días</span>
                     {% else %}
-                    <tr>
-                        <td colspan="3" class="text-center text-muted py-4">Sin lotes próximos a vencer.</td>
-                    </tr>
-                    {% endfor %}
+                        <span class="sub-badge-days warning">{{ lot.days }} días</span>
+                    {% endif %}
+                </div>
+
+                <!-- Botón Registrar merma (versión simplificada sin IDs extra) -->
+                <a href="{{ url_for('register_waste.nueva_merma', origin='alarma_vencido') }}"
+                   class="sub-alert-cta"
+                   title="Registrar merma de este lote">
+                    Registrar merma <i class="bi bi-arrow-right-circle"></i>
+                </a>
+            </div>
+            {% else %}
+            <div class="empty-criticos-state">
+                <i class="bi bi-shield-check text-secondary"></i>
+                <h4>Sin Alertas de Vencimiento</h4>
+                <p>No hay insumos próximos a caducar en tus sedes.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
-
-<!-- Acceso rápido -->
-<div class="dash-panel access-panel">
-    <div class="dash-panel-header">
-        <div>
-            <h2 class="dash-panel-title"><i class="fas fa-th-large"></i> Acceso rápido</h2>
-            <p class="dash-panel-sub">Módulos disponibles para tu rol</p>
-        </div>
-    </div>
-    <div class="dashboard-grid access-grid">
-        <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-            <div class="card-dash">
-                <i class="fas fa-boxes"></i>
-                <h3>Inventario</h3>
-                <p>Gestionar insumos y stock</p>
-            </div>
-        </a>
-
-        <a href="{{ url_for('logistics_list.movement_list') }}" class="card-link">
-            <div class="card-dash">
-                <i class="fas fa-truck"></i>
-                <h3>Traslados</h3>
-                <p>Logística de sucursales</p>
-            </div>
-        </a>
-
-        <a href="#" class="card-link">
-            <div class="card-dash">
-                <i class="fas fa-arrow-down"></i>
-                <h3>Mermas</h3>
-                <p>Control de pérdidas</p>
-            </div>
-        </a>
     </div>
 </div>
 {% endblock %}

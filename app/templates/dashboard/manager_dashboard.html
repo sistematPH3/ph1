@@ -1,50 +1,225 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/management_dashboard.css') }}">
+<!-- Carga de CSS con versión para evitar caché -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/manager_dashboard.css') }}?v=7">
 
-<header class="dashboard-header">
-    <h1>Panel de Gerencia</h1>
-    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
-</header>
+<!-- 1. BANNER DE ENCABEZADO GERENCIA -->
+<div class="dash-header-banner">
+    <!-- Lado Izquierdo: Títulos y Saludo -->
+    <div class="dash-header-title-area">
+        <span class="dash-header-tag"><i class="bi bi-shield-check"></i> GERENCIA DE SEDE</span>
+        <h1>PANEL DE GERENCIA</h1>
+        <p class="dash-header-subtitle">
+            Hola <strong>{{ current_user.name }}</strong>, aquí la visión general de tu sede.
+        </p>
+    </div>
 
-<!-- Componente Reusable de Alertas de Stock -->
-{% include 'alerts/_alerts_stock.html' %}
-
-<!-- Componente de Alertas de Productos Vencidos -->
-{% include 'alerts/_alerts_expired.html' %}
-
-<div class="dashboard-grid">
-    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-boxes"></i>
-            <h3>Inventario</h3>
-            <p>Gestionar insumos y stock</p>
+    <!-- Lado Derecho: Usuario y Sede Actual -->
+    <div class="dash-header-right-widgets">
+        <!-- Usuario con Inicial Amarilla -->
+        <div class="dash-header-user-badge">
+            <div class="dash-user-avatar">
+                {{ current_user.name[0]|upper if current_user.name else 'U' }}
+            </div>
+            <div class="dash-user-details">
+                <span class="dash-user-name">{{ current_user.name }}</span>
+                <span class="dash-user-role">GERENTE DE SEDE</span>
+            </div>
         </div>
-    </a>
 
-    <a href="{{ url_for('purchase_management.index') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-shopping-cart"></i>
-            <h3>Compras</h3>
-            <p>Historial y proveedores</p>
+        <!-- Sede Actual del Usuario -->
+        <div class="dash-header-branch-badge">
+            <i class="bi bi-geo-alt-fill"></i>
+            <div class="dash-branch-details">
+                <span class="dash-branch-label">SEDE ACTUAL</span>
+                <span class="dash-branch-name" id="nombre-sede">
+                    {{ sede_nombre if sede_nombre else (current_user.location.name if current_user.location else (current_user.branch.name if current_user.branch else 'Mi Sede')) }}
+                </span>
+            </div>
         </div>
-    </a>
-
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-truck"></i>
-            <h3>Traslados</h3>
-            <p>Logística de sucursales</p>
-        </div>
-    </a>
-
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-arrow-down"></i>
-            <h3>Mermas</h3>
-            <p>Control de pérdidas</p>
-        </div>
-    </a>
+    </div>
 </div>
+
+<!-- 2. RESÚMENES DE TU SEDE (KPIs GRANDES) -->
+<div class="kpi-section-title">
+    <i class="bi bi-speedometer2"></i>
+    <span>Resúmenes de tu sede</span>
+</div>
+
+<div class="dash-kpi-grid">
+    <!-- Stock Agregado -->
+    <div class="dash-kpi-card dash-kpi-card--stock">
+        <div class="dash-kpi-ico dash-kpi-ico--stock"><i class="bi bi-boxes"></i></div>
+        <div class="dash-kpi-label">Stock Agregado</div>
+        <div class="dash-kpi-value" id="monto-stock-agregado">{{ total_stock|default(0) }} uds.</div>
+        <div class="dash-kpi-comp">
+            <span class="kpi-comp-badge flat"><i class="bi bi-house-check"></i> Sede Actual</span>
+        </div>
+    </div>
+
+    <!-- Consumos Día (Formato Unidades) -->
+    <div class="dash-kpi-card dash-kpi-card--consumos">
+        <div class="dash-kpi-ico dash-kpi-ico--consumos"><i class="bi bi-egg-fried"></i></div>
+        <div class="dash-kpi-label">Consumo Cocina</div>
+        <div class="dash-kpi-value" id="monto-consumo-cocina">{{ consumo_hoy_monto|default(0)|int }} uds.</div>
+        <div class="dash-kpi-comp">
+            <span class="kpi-comp-badge up"><i class="bi bi-check-circle"></i> Al día</span>
+        </div>
+    </div>
+
+    <!-- Mermas Pendientes -->
+    <div class="dash-kpi-card dash-kpi-card--mermas">
+        <div class="dash-kpi-ico dash-kpi-ico--mermas"><i class="bi bi-trash3"></i></div>
+        <div class="dash-kpi-label">Mermas Pendientes</div>
+        <div class="dash-kpi-value" id="mermas-pendientes-count">{{ pending_wastes_count|default(0) }}</div>
+        <div class="dash-kpi-comp">
+            <span class="kpi-comp-badge down"><i class="bi bi-clock-history"></i> Por aprobar</span>
+        </div>
+    </div>
+
+    <!-- Traslados por Recibir -->
+    <div class="dash-kpi-card dash-kpi-card--traslados">
+        <div class="dash-kpi-ico dash-kpi-ico--traslados"><i class="bi bi-truck"></i></div>
+        <div class="dash-kpi-label">Traslados por Recibir</div>
+        <div class="dash-kpi-value" id="traslados-transit-count">{{ transfers_in_transit_count|default(0) }}</div>
+        <div class="dash-kpi-comp">
+            <span class="kpi-comp-badge up"><i class="bi bi-box-seam"></i> En camino</span>
+        </div>
+    </div>
+</div>
+
+<div class="panel-criticos-container" style="margin-top: 1.25rem; margin-bottom: 1.5rem;">
+    <div class="panel-criticos-header">
+        <div class="panel-criticos-title">
+            <i class="bi bi-arrow-left-right" style="color:#2563eb; background:#dbeafe;"></i>
+            <div>
+                <h3>Últimos traslados</h3>
+                <p>Actividad reciente en tus sedes</p>
+            </div>
+        </div>
+        <a href="{{ url_for('logistics_list.movement_list') }}"
+           style="color:#dc2626; font-weight:700; font-size:0.85rem; text-decoration:none;">
+            Ver listado completo
+        </a>
+    </div>
+
+    <div class="panel-criticos-body" style="max-height:none; overflow:visible;">
+        {% if recent_movements and recent_movements|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">ID</th>
+                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Fecha</th>
+                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Origen y Destino</th>
+                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Contenido</th>
+                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in recent_movements %}
+                    <tr>
+                        <td style="font-weight:700; color:#0f172a;">#{{ m.id }}</td>
+                        <td style="color:#64748b; white-space:nowrap;">
+                            {% if m.date %}
+                                {{ m.date.strftime('%Y-%m-%d') if m.date.strftime else m.date }}
+                                <br><small>{{ m.date.strftime('%I:%M %p') if m.date.strftime else '' }}</small>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td style="font-weight:600; color:#1e293b;">
+                            {{ m.origin }} → {{ m.destination }}
+                        </td>
+                        <td>
+                            <span style="background:#f1f5f9; color:#334155; font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:0.4rem;">
+                                {{ m.num_products }} prod. · {{ m.total_qty|int }} unds.
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if m.status_label == 'En Tránsito' %}bg-success
+                                {% elif m.status_label == 'Completado' %}bg-info text-dark
+                                {% else %}bg-secondary{% endif %}"
+                                style="font-size:0.72rem; font-weight:700; text-transform:uppercase;">
+                                {{ m.status_label }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-criticos-state">
+            <i class="bi bi-inbox text-secondary"></i>
+            <h4>Sin traslados recientes</h4>
+            <p>No hay actividad de traslados en tus sedes por ahora.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 3. LAYOUT INFERIOR EN DOS COLUMNAS DE PANELES DE ALERTAS -->
+<div class="dashboard-main-layout">
+    
+    <!-- COLUMNA IZQUIERDA: PANEL DE CRÍTICOS (STOCK MÍNIMO) -->
+    <div class="panel-criticos-container">
+        <div class="panel-criticos-header">
+            <div class="panel-criticos-title">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                <div>
+                    <h3>Panel de Críticos</h3>
+                    <p>Monitoreo de stock crítico y mermas graves</p>
+                </div>
+            </div>
+            {% set total_criticos = (critical_stock_items|length if critical_stock_items else (alarmas|length if alarmas else 0)) %}
+            {% if total_criticos > 0 %}
+                <span class="badge bg-warning text-dark">{{ total_criticos }} Insumos</span>
+            {% endif %}
+        </div>
+        
+        <div class="panel-criticos-body">
+            {% if (critical_stock_items and critical_stock_items|length > 0) or (alarmas and alarmas|length > 0) %}
+                {% include 'alerts/_alerts_stock.html' %}
+            {% else %}
+                <div class="empty-criticos-state">
+                    <i class="bi bi-check-circle text-secondary"></i>
+                    <h4>Sin Alertas Críticas</h4>
+                    <p>Todo el inventario y productos de tu sede están operando en niveles óptimos.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- COLUMNA DERECHA: PANEL DE PRÓXIMOS A VENCER -->
+<div class="panel-criticos-container">
+    <div class="panel-criticos-header">
+        <div class="panel-criticos-title">
+            <i class="bi bi-clock-history text-warning"></i>
+            <div>
+                <h3>Próximos a Vencer</h3>
+                <p>Monitoreo de caducidad y lotes por vencer</p>
+            </div>
+        </div>
+        {% set total_vencidos = expired_items|length if expired_items else 0 %}
+        {% if total_vencidos > 0 %}
+            <span class="badge bg-danger text-white">{{ total_vencidos }} Lotes</span>
+        {% endif %}
+    </div>
+    
+    <div class="panel-criticos-body">
+    {% if vencidos and vencidos|length > 0 %}
+        {% include 'alerts/_alerts_expired.html' %}
+    {% else %}
+        <div class="empty-criticos-state">
+            <i class="bi bi-shield-check text-secondary"></i>
+            <h4>Sin Alertas de Vencimiento</h4>
+            <p>No hay insumos ni productos próximos a caducar en tu sede.</p>
+        </div>
+    {% endif %}
+</div>
+</div>
+
+</div>
+
 {% endblock %}
