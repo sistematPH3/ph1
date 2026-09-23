@@ -1,96 +1,428 @@
-body {
-    background-color: #f0f2f5;
-    margin: 0;
-    overflow-x: hidden;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/* ==========================================================================
+   DASHBOARD GERENCIA - ESTILOS TIPO ADMIN
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Banner de Encabezado Superior (Degradado Oscuro con Widgets)
+   -------------------------------------------------------------------------- */
+.dash-header-banner {
+    background: linear-gradient(135deg, #0b0204 0%, #1a0309 40%, #6e0019 100%);
+    border-radius: 0.85rem;
+    padding: 1.25rem 1.75rem;
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
-.sidebar {
-    height: 100vh;
-    background-color: #2e3e50;
-    color: white;
-    padding-top: 20px;
-    position: fixed;
-    width: 260px;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
-.sidebar a {
-    color: #d1d8e0;
-    text-decoration: none;
-    padding: 18px 25px;
-    display: block;
-    font-weight: 600;
-    font-size: 13px;
+.dash-header-title-area h1 {
+    font-size: 1.6rem;
+    font-weight: 900;
     letter-spacing: 0.5px;
+    margin: 0.2rem 0;
+    color: #ffffff;
+    text-transform: uppercase;
 }
 
-.sidebar a:hover, .sidebar a.active {
-    background-color: #3b4f66;
-    color: white;
+.dash-header-subtitle {
+    font-size: 0.85rem;
+    color: #d1d5db;
+    margin: 0;
 }
 
-.sidebar a i {
-    margin-right: 12px;
-    width: 20px;
-    text-align: center;
-}
-
-.logout-btn {
-    color: #e74c3c !important;
-    margin-top: 25px;
-}
-
-.logout-btn:hover {
-    background-color: transparent !important;
-    color: #c0392b !important;
-}
-
-.main-content {
-    margin-left: 260px;
-    padding: 40px;
-}
-
-.dashboard-title {
+.dash-header-tag {
+    font-size: 0.68rem;
     font-weight: 700;
-    color: #222f3e;
-    margin-bottom: 15px;
-    font-size: 32px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fca5a5;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
-.welcome-text {
-    color: #576574;
-    margin-bottom: 40px;
-    font-size: 15px;
+/* Widgets Lado Derecho */
+.dash-header-right-widgets {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
 }
 
-.card-custom {
-    border: none;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-    transition: all 0.3s ease;
-    height: 100%;
-    padding: 40px 20px;
+.dash-header-user-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0.45rem 1rem 0.45rem 0.5rem;
+    border-radius: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dash-user-avatar {
+    width: 34px;
+    height: 34px;
+    background-color: #f59e0b; /* Amarillo */
+    color: #000000;
+    font-weight: 800;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.dash-user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-user-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.dash-user-role {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #9ca3af;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dash-header-branch-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0.45rem 1.1rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dash-header-branch-badge i {
+    color: #f59e0b;
+    font-size: 0.95rem;
+}
+
+.dash-branch-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-branch-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #9ca3af;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dash-branch-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+/* --------------------------------------------------------------------------
+   2. Sección "Resúmenes de tu sede" (KPIs GRANDES TIPO ADMIN)
+   -------------------------------------------------------------------------- */
+.kpi-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.kpi-section-title i {
+    color: #ce1126;
+    background-color: #fee2e2;
+    padding: 0.45rem;
+    border-radius: 50%;
+    font-size: 1rem;
+}
+
+/* Grilla idéntica al admin */
+.dash-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.75rem;
+}
+
+.dash-kpi-card {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 140px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dash-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Iconos superiores con caja de fondo suave */
+.dash-kpi-ico {
+    width: 42px;
+    height: 42px;
+    border-radius: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Variaciones de color tipo Admin */
+.dash-kpi-card--stock { border-left: 5px solid #ce1126; }
+.dash-kpi-ico--stock { background-color: #fef2f2; color: #ce1126; }
+
+.dash-kpi-card--consumos { border-left: 5px solid #2563eb; }
+.dash-kpi-ico--consumos { background-color: #eff6ff; color: #2563eb; }
+
+.dash-kpi-card--mermas { border-left: 5px solid #d97706; }
+.dash-kpi-ico--mermas { background-color: #fffbeb; color: #d97706; }
+
+.dash-kpi-card--traslados { border-left: 5px solid #7c3aed; }
+.dash-kpi-ico--traslados { background-color: #f5f3ff; color: #7c3aed; }
+
+.dash-kpi-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+}
+
+.dash-kpi-value {
+    font-size: 1.85rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+    margin: 0.35rem 0;
+}
+
+.dash-kpi-comp {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.kpi-comp-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.kpi-comp-badge.up { background-color: #dcfce7; color: #15803d; }
+.kpi-comp-badge.down { background-color: #fee2e2; color: #b91c1c; }
+.kpi-comp-badge.flat { background-color: #f1f5f9; color: #475569; }
+
+/* --------------------------------------------------------------------------
+   3. Disposición a 2 Columnas (Paneles de Alertas en Paralelo)
+   -------------------------------------------------------------------------- */
+.dashboard-main-layout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.5rem;
+}
+
+.panel-criticos-container {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0;
+}
+
+.panel-criticos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-criticos-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.panel-criticos-title i {
+    color: #dc2626;
+    background-color: #fee2e2;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 1.1rem;
+}
+
+/* Icono amarillo/amarronado suave para alertas de vencimiento */
+.panel-criticos-title i.text-warning {
+    color: #d97706;
+    background-color: #fffbeb;
+}
+
+.panel-criticos-title h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.panel-criticos-title p {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.panel-criticos-body {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+/* Estado Vacío de Alertas */
+.empty-criticos-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
     text-align: center;
-    background-color: white;
-    border-top: 4px solid transparent;
+    background-color: #f8f9fa;
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.75rem;
+    margin-top: 0.5rem;
 }
 
-.card-custom:hover {
-    transform: translateY(-5px);
-    border-top: 4px solid #c0392b;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-    cursor: pointer;
+.empty-criticos-state i {
+    font-size: 3rem;
+    color: #94a3b8 !important;
+    margin-bottom: 0.75rem;
 }
 
-.card-title {
-    font-size: 24px;
-    font-weight: 500;
-    color: #222f3e;
-    margin-bottom: 12px;
+.empty-criticos-state h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.35rem;
 }
 
-.card-subtitle {
-    font-size: 14px;
-    color: #8395a7;
+.empty-criticos-state p {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 0;
+    max-width: 260px;
+    line-height: 1.35;
 }
+
+/* Responsive para Pantallas Pequeñas */
+@media (max-width: 992px) {
+    .dashboard-main-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   6. VISTA MÓVIL / TELÉFONO (PANTALLAS < 768px) - GERENCIA
+   ========================================================================== */
+@media (max-width: 768px) {
+    /* Banner de Encabezado Superior */
+    .dash-header-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.25rem 1rem;
+        gap: 1.25rem;
+    }
+
+    .dash-header-title-area h1 {
+        font-size: 1.35rem;
+    }
+
+    .dash-header-subtitle {
+        font-size: 0.8rem;
+    }
+
+    .dash-header-right-widgets {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .dash-header-user-badge,
+    .dash-header-branch-badge {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.5rem 0.85rem;
+    }
+
+    /* Grilla de Tarjetas KPI */
+    .dash-kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .dash-kpi-card {
+        min-height: auto;
+        padding: 1rem 1.15rem;
+    }
+
+    .dash-kpi-value {
+        font-size: 1.6rem;
+    }
+
+    /* Paneles e Inferiores */
+    .dashboard-main-layout {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        margin-top: 1rem;
+    }
+
+    .panel-criticos-container {
+        padding: 1rem;
+    }
+
+    .panel-criticos-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .panel-criticos-header .badge {
+        align-self: flex-start;
+    }
+
+    /* Adaptación de tablas en contenedores móviles */
+    .panel-criticos-body {
+        max-height: 350px;
+        overflow-x: auto;
+    }
+    
+}
+

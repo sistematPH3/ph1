@@ -1,0 +1,779 @@
+/* ==========================================================================
+   DASHBOARD SUB-GERENCIA (ASSISTANT MANAGER) - ESTILOS OFICIALES
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Banner de Encabezado Superior (Degradado Oscuro / Carmesí)
+   -------------------------------------------------------------------------- */
+.dashboard-header,
+.dash-header-banner {
+    background: linear-gradient(135deg, #0b0204 0%, #1a0309 40%, #6e0019 100%);
+    border-radius: 0.85rem;
+    padding: 1.25rem 1.75rem;
+    color: #ffffff;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before,
+.dash-header-banner::before {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: 10px;
+    bottom: 10px;
+    width: 40%;
+    background: linear-gradient(275deg, rgba(227, 25, 55, 0.35), rgba(227, 25, 55, 0) 78%);
+    filter: blur(20px);
+    pointer-events: none;
+}
+
+.dash-header-tag {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #fca5a5;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.25rem;
+}
+
+.dashboard-header h1,
+.dash-header-banner h1 {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    margin: 0 0 0.35rem 0;
+    color: #ffffff;
+    text-transform: uppercase;
+}
+
+.dashboard-header p,
+.dash-header-banner p {
+    font-size: 0.88rem;
+    color: #d1d5db;
+    margin: 0;
+}
+
+.dashboard-header p strong,
+.dash-header-banner p strong {
+    color: #fca5a5;
+    font-weight: 700;
+}
+
+.dash-header-right-widgets {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dash-header-user-badge,
+.dash-header-date-badge {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.65rem;
+    padding: 0.5rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.dash-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #f59e0b;
+    color: #ffffff;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.dash-user-details,
+.dash-date-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-user-name,
+.dash-date-value {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.dash-user-role,
+.dash-date-label {
+    font-size: 0.68rem;
+    color: #fca5a5;
+    font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   2. Grilla de Métricas en Vivo / KPIs (Metric Grid - Estilo Horizontal)
+   -------------------------------------------------------------------------- */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.75rem;
+}
+
+/* Cambiar la disposición interna a horizontal usando Flexbox */
+.metric-dash {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    
+    /* Cambios clave para alineación horizontal */
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.metric-dash:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Contenedor e Ícono ajustado para estar alineado en fila */
+.metric-dash .metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0 !important; /* Elimina el margen inferior */
+    flex-shrink: 0; /* Previene que el ícono se encoja */
+}
+
+.metric-dash .metric-icon i.bi {
+    font-size: 1.35rem;
+    line-height: 1;
+    display: inline-block;
+}
+
+/* Contenedor opcional para envolver el número y la etiqueta */
+.metric-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-number {
+    font-size: 1.85rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+    margin: 0.2rem 0;
+}
+
+.metric-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+}
+
+/* Variaciones de color KPI (Bordes e Íconos) */
+.metric-red {
+    border-left: 5px solid #ce1126;
+}
+.metric-red .metric-icon {
+    background-color: #fee2e2;
+    color: #ce1126;
+}
+
+.metric-blue {
+    border-left: 5px solid #2563eb;
+}
+.metric-blue .metric-icon {
+    background-color: #dbeafe;
+    color: #2563eb;
+}
+
+.metric-yellow {
+    border-left: 5px solid #d97706;
+}
+.metric-yellow .metric-icon {
+    background-color: #fef3c7;
+    color: #d97706;
+}
+
+.metric-amber {
+    border-left: 5px solid #f59e0b;
+}
+.metric-amber .metric-icon {
+    background-color: #fffbeb;
+    color: #d97706;
+}
+
+.metric-coral {
+    border-left: 5px solid #e31937;
+}
+.metric-coral .metric-icon {
+    background-color: #fef2f2;
+    color: #ce1126;
+}
+
+/* --------------------------------------------------------------------------
+   3. Disposición de Paneles y Filas (Dash Panels & Dash Row)
+   -------------------------------------------------------------------------- */
+.dash-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .dash-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dash-panel {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+}
+
+.dash-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dash-panel-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dash-panel-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 0.2rem 0 0 0;
+}
+
+.dash-link {
+    color: #e31937;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.dash-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+/* Acentos en bordes de paneles y colores de íconos en títulos */
+.dash-panel.accent-blue { border-top: 4px solid #2563eb; }
+.dash-panel.accent-coral { border-top: 4px solid #dc2626; }
+.dash-panel.accent-amber { border-top: 4px solid #d97706; }
+
+.text-blue { color: #2563eb; }
+.text-coral { color: #dc2626; }
+.text-amber { color: #d97706; }
+
+/* --------------------------------------------------------------------------
+   4. Tablas Integradas (Dash Table, Chips, Badges & Qty)
+   -------------------------------------------------------------------------- */
+.dash-table {
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.dash-table th {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+}
+
+.dash-table td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dash-chip {
+    display: inline-block;
+    background-color: #f1f5f9;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.4rem;
+}
+
+.dash-lot {
+    font-family: monospace;
+    font-size: 0.8rem;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.3rem;
+    color: #475569;
+}
+
+.dash-qty-critical {
+    font-weight: 800;
+    color: #dc2626;
+}
+
+.exp-date {
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* Badges de Estado */
+.dash-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 2rem;
+    text-transform: uppercase;
+}
+
+.dash-badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.dash-badge-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.route-line {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------------
+   5. Acceso Rápido (Access Panel / Grid)
+   -------------------------------------------------------------------------- */
+.access-panel {
+    background: #ffffff;
+}
+
+.access-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1rem;
+}
+
+.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.card-dash {
+    background: #ffffff;
+    border-radius: 0.85rem;
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.card-dash:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+    border-color: #e31937;
+}
+
+.card-dash i {
+    font-size: 1.75rem;
+    color: #e31937;
+    margin-bottom: 0.75rem;
+}
+
+.card-dash h3 {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+}
+
+.card-dash p {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ==========================================================================
+   6. VISTA MÓVIL / TELÉFONO (PANTALLAS < 768px) - SUB-GERENCIA
+   ========================================================================== */
+@media (max-width: 768px) {
+    /* Banner de Encabezado Superior */
+    .dashboard-header,
+    .dash-header-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.25rem 1rem;
+        gap: 1.25rem;
+    }
+
+    .dashboard-header h1,
+    .dash-header-banner h1 {
+        font-size: 1.35rem;
+    }
+
+    .dashboard-header p,
+    .dash-header-banner p {
+        font-size: 0.8rem;
+    }
+
+    .dash-header-right-widgets {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .dash-header-user-badge,
+    .dash-header-date-badge {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.5rem 0.85rem;
+    }
+
+    /* Grilla de Métricas en Vivo / KPIs */
+    .metric-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .metric-dash {
+        padding: 1rem 1.15rem;
+    }
+
+    .metric-number {
+        font-size: 1.6rem;
+    }
+
+    /* Filas y Paneles de Tablas */
+    .dash-row {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .dash-panel {
+        padding: 1rem;
+    }
+
+    .dash-panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .dash-link {
+        align-self: flex-start;
+    }
+
+    /* Tablas adaptables para pantallas estrechas */
+    .table-responsive {
+        border: 0;
+        overflow-x: auto;
+    }
+
+    .dash-table th, 
+    .dash-table td {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    /* Grilla de Acceso Rápido */
+    .access-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+    }
+}
+
+/* ==========================================================================
+   ESTILO DE CARDS FLOTANTES (Stock crítico + Vencimientos)
+   Solo vive en el CSS del dashboard de subgerente
+   ========================================================================== */
+
+.sub-alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Card base (fila flotante) */
+.sub-alert-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    flex-wrap: wrap;
+}
+
+/* Variante Stock crítico */
+.sub-alert-item--stock {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #f59e0b;
+}
+
+.sub-alert-item--stock:hover {
+    background-color: #fff1f1;
+    border-color: #fca5a5;
+    border-left-color: #d97706;
+    transform: translateX(3px);
+}
+
+/* Variante Vencimientos */
+.sub-alert-item--expired {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #dc2626;
+}
+
+.sub-alert-item--expired:hover {
+    background-color: #fff1f1;
+    border-color: #fca5a5;
+    border-left-color: #991b1b;
+    transform: translateX(3px);
+}
+
+/* Info del producto */
+.sub-alert-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+}
+
+.sub-alert-product {
+    font-weight: 700;
+    color: #1f2937;
+    font-size: 0.95rem;
+}
+
+.sub-alert-location,
+.sub-alert-lot {
+    font-size: 0.82rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sub-alert-location i,
+.sub-alert-lot i {
+    color: #d97706;
+}
+
+.sub-alert-item--expired .sub-alert-location i,
+.sub-alert-item--expired .sub-alert-lot i {
+    color: #dc2626;
+}
+
+/* Métricas */
+.sub-alert-metrics {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sub-val-current {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #dc2626;
+    background-color: #fffbeb;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #fde68a;
+}
+
+.sub-val-min {
+    font-size: 0.82rem;
+    color: #4b5563;
+}
+
+.sub-val-qty {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #dc2626;
+    background-color: #fffbeb;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #fde68a;
+}
+
+.sub-val-exp {
+    font-size: 0.82rem;
+    color: #4b5563;
+    background-color: #fef2f2;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #fecaca;
+}
+
+.sub-badge-days {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+}
+
+.sub-badge-days.danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.sub-badge-days.warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+/* Botón Registrar merma */
+.sub-alert-cta {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #dc2626;
+    background-color: #fef2f2;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #fecaca;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.sub-alert-cta:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+/* Estado vacío (ya lo tenías, lo reforzamos) */
+.empty-criticos-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.75rem;
+}
+
+.empty-criticos-state i {
+    font-size: 2.8rem;
+    color: #94a3b8 !important;
+    margin-bottom: 0.75rem;
+}
+
+.empty-criticos-state h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.35rem;
+}
+
+.empty-criticos-state p {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 0;
+    max-width: 260px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .sub-alert-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .sub-alert-metrics {
+        width: 100%;
+    }
+    .sub-alert-cta {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Botón de acción dentro de las tarjetas de alertas */
+.btn-action-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #dc3545; /* Rojo/Coral acorde a la alerta */
+    background-color: #fff0f1;
+    border: 1px solid #f8d7da;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+}
+
+.btn-action-alert:hover {
+    color: #ffffff;
+    background-color: #dc3545;
+    border-color: #dc3545;
+    text-decoration: none;
+}
+
