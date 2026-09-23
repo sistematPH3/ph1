@@ -4,6 +4,7 @@ from app.extensions import db
 from app.models import Movement, MovementDetail, Product, Location
 from app.logistics.services.movement_list_service import get_movement_list_context
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
+from app.inventory.services.lot_availability_service import obtener_vencidos_para_dashboard
 
 STATUS_DISPLAY = {
     'EN_TRANSITO':       {'label': 'En Tránsito', 'cls': 'dash-badge-success'},
@@ -265,3 +266,243 @@ def _categorias_compras(sede_ids, ancla, limite=5):
     filas = [f for f in cons.get('por_categoria', []) if f['monto'] > 0]
     filas.sort(key=lambda f: -float(f['monto']))
     return filas[:limite]
+
+def get_management_context(current_user, location_id=None):
+    """
+    Resumen ejecutivo y Panel de AlertasCríticos para Director .
+    """
+    from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
+
+    
+    sedes_asignadas = getattr(current_user, 'locations', [])
+    allowed_location_ids = [s.id for s in sedes_asignadas]
+
+    if location_id and location_id in allowed_location_ids:
+        target_location_ids = [location_id]
+    else:
+        target_location_ids = allowed_location_ids
+        location_id = None
+
+
+    stock_agregado = 0
+    ultimo_ingreso = None
+    historial_ingresos = []
+
+    try:
+        if target_location_ids:
+            
+            total_qty = db.session.query(db.func.sum(Inventory.current_quantity))\
+                .filter(Inventory.location_id.in_(target_location_ids)).scalar()
+            stock_agregado = float(total_qty or 0)
+
+            
+            mov_query = db.session.query(MovementDetail, Product, Location, Movement.date)\
+                .join(Movement, MovementDetail.movement_id == Movement.id)\
+                .join(Product, MovementDetail.product_id == Product.id)\
+                .join(Location, Movement.destination_location_id == Location.id)\
+                .filter(
+                    Movement.status == 'COMPLETADO',
+                    Movement.destination_location_id.in_(target_location_ids)
+                )\
+                .order_by(Movement.date.desc())\
+                .limit(5).all()
+
+            for det, prod, loc, fecha in mov_query:
+                unidad = prod.unit_of_measure or 'uds.'
+                item = {
+                    'producto': prod.name,
+                    'cantidad': float(det.quantity or 0),
+                    'unidad': unidad,
+                    'sede': loc.name,
+                    'fecha': fecha.strftime('%d/%m/%Y') if fecha else 'Reciente'
+                }
+                historial_ingresos.append(item)
+
+            if historial_ingresos:
+                ultimo_ingreso = historial_ingresos[0]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando ingresos stock: %s", exc)
+
+    
+    traslados_en_transito = 0
+    try:
+        movs = get_movement_list_context(current_user)
+        en_camino = movs.get('en_camino', []) if isinstance(movs, dict) else []
+        por_recibir = movs.get('por_recibir', []) if isinstance(movs, dict) else []
+        
+        if location_id:
+            en_camino = [m for m in en_camino if m.get('destination_location_id') == location_id or m.get('origin_location_id') == location_id]
+            por_recibir = [m for m in por_recibir if m.get('destination_location_id') == location_id or m.get('origin_location_id') == location_id]
+            
+        traslados_en_transito = len(en_camino) + len(por_recibir)
+    except Exception:
+        traslados_en_transito = 0
+
+    
+    alarmas_stock = obtener_alarmas_para_dashboard()
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+    
+    if location_id:
+        alarmas_stock = [
+            a for a in alarmas_stock 
+            if (isinstance(a, dict) and a.get('location_id') == location_id) or 
+               (hasattr(a, 'location_id') and getattr(a, 'location_id') == location_id)
+        ]
+        vencidos = [
+            v for v in vencidos 
+            if (isinstance(v, dict) and (v.get('location_id') == location_id or v.get('location') == location_id)) or
+               (hasattr(v, 'location_id') and getattr(v, 'location_id') == location_id)
+        ]
+
+    
+    mermas_graves = []
+    mermas_pendientes_count = 0
+    try:
+        from app.models import Waste
+
+        
+        query = db.session.query(Waste).filter(Waste.status == 'PENDIENTE')
+        
+        if target_location_ids:
+            query = query.filter(Waste.location_id.in_(target_location_ids))
+
+        mermas_pendientes_count = query.count()
+        
+        
+        mermas_graves = query.order_by(
+            Waste.date.desc() if hasattr(Waste, 'date') else Waste.id.desc()
+        ).limit(5).all()
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error obteniendo mermas pendientes: %s", exc, exc_info=True)
+        mermas_pendientes_count = 0
+
+    alertas_criticas_count = len(alarmas_stock) + len(vencidos)
+
+    
+    proximos_vencimientos = get_expiring_lots(
+        current_user,
+        limit=5,
+        horizon_days=7,
+    )
+
+    return {
+        'sedes': sedes_asignadas,
+        'sede_seleccionada': location_id,
+        'alarmas': alarmas_stock,
+        'vencidos': vencidos,
+        'mermas_graves': mermas_graves,
+        'proximos_vencimientos': proximos_vencimientos,  
+        'resumen': {
+            'stock_agregado': stock_agregado,
+            'ultimo_ingreso': ultimo_ingreso,
+            'historial_ingresos': historial_ingresos,
+            'traslados_en_transito': traslados_en_transito,
+            'mermas_pendientes': mermas_pendientes_count,
+            'alertas_criticas': alertas_criticas_count,
+            'cant_stock_bajo': len(alarmas_stock),
+            'cant_vencidos': len(vencidos)
+        },
+        'pendientes': {
+            'mermas_pendientes': mermas_pendientes_count,
+            'traslados_en_transito': traslados_en_transito
+        }
+    }
+
+def get_operations_context(current_user, location_id=None):
+    from app.models import Movement, Location
+    from app.logistics.repositories.movement_dispute_repository import MovementDisputeRepository
+
+    sedes_asignadas = getattr(current_user, 'locations', [])
+    allowed_location_ids = [s.id for s in sedes_asignadas]
+
+    if location_id and location_id in allowed_location_ids:
+        target_location_ids = [location_id]
+    else:
+        target_location_ids = allowed_location_ids
+        location_id = None
+
+    # Map de nombres de sedes para despliegue
+    loc_map = {loc.id: loc.name for loc in Location.query.all()} if target_location_ids else {}
+
+    # 1. TRASLADOS EN TRÁNSITO GENERALES (Origen o Destino en mis sedes)
+    query_base = Movement.query
+    if target_location_ids:
+        query_base = query_base.filter(
+            (Movement.origin_location_id.in_(target_location_ids)) | 
+            (Movement.destination_location_id.in_(target_location_ids))
+        )
+
+    movimientos_en_transito = query_base.filter(Movement.status == 'EN_TRANSITO').all()
+
+    # 2. CONTEO DE TRASLADOS RECIBIDOS (COMPLETADOS EN DESTINO)
+    query_recibidos = Movement.query.filter(Movement.status == 'COMPLETADO')
+    if target_location_ids:
+        query_recibidos = query_recibidos.filter(
+            Movement.destination_location_id.in_(target_location_ids)
+        )
+    traslados_recibidos_count = query_recibidos.count()
+
+    # 2. RECEPCIONES PENDIENTES EN MI SEDE (Movimientos EN_TRANSITO donde mi sede es DESTINO)
+    recepciones_pendientes = []
+    if target_location_ids:
+        query_entrantes = Movement.query.filter(
+            Movement.status == 'EN_TRANSITO',
+            Movement.destination_location_id.in_(target_location_ids)
+        ).order_by(Movement.date.desc()).all()
+
+        for m in query_entrantes:
+            recepciones_pendientes.append({
+                'id': m.id,
+                'origen': loc_map.get(m.origin_location_id, f'Sede #{m.origin_location_id}'),
+                'destino': loc_map.get(m.destination_location_id, f'Sede #{m.destination_location_id}'),
+                'fecha': m.date.strftime('%d/%m/%Y %H:%M') if m.date else 'N/A',
+                'tipo': str(getattr(m, 'movement_type', getattr(m, 'type', 'TRASLADO'))).upper()
+            })
+
+    # 3. ALERTAS DE STOCK Y VENCIDOS
+    alarmas_stock = obtener_alarmas_para_dashboard()
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+
+    if location_id:
+        alarmas_stock = [
+            a for a in alarmas_stock 
+            if (isinstance(a, dict) and a.get('location_id') == location_id) or 
+               (hasattr(a, 'location_id') and getattr(a, 'location_id') == location_id)
+        ]
+        vencidos = [
+            v for v in vencidos 
+            if (isinstance(v, dict) and (v.get('location_id') == location_id or v.get('location') == location_id)) or
+               (hasattr(v, 'location_id') and getattr(v, 'location_id') == location_id)
+        ]
+
+    # 4. DISPUTAS E INCIDENCIAS (Usando repositorio oficial)
+    query_disputas = Movement.query.filter(
+        Movement.status.in_(MovementDisputeRepository.PENDING_DISPUTE_STATUSES)
+    )
+
+    if target_location_ids:
+        query_disputas = query_disputas.filter(
+            (Movement.origin_location_id.in_(target_location_ids)) | 
+            (Movement.destination_location_id.in_(target_location_ids))
+        )
+
+    disputas_pendientes = query_disputas.all()
+
+    return {
+        'sedes': sedes_asignadas,
+        'sede_seleccionada': location_id,
+        'resumen': {
+            'en_transito_count': len(movimientos_en_transito),
+            'recibidos_count': traslados_recibidos_count,
+            'disputas_count': len(disputas_pendientes),
+            'mermas_count': len(vencidos),
+            'cant_recepciones_pendientes': len(recepciones_pendientes)
+        },
+        'recepciones_pendientes': recepciones_pendientes[:5],
+        'disputas_pendientes': disputas_pendientes[:5],
+        'alarmas_stock': alarmas_stock[:5],
+        'vencidos': vencidos[:5]
+    }
