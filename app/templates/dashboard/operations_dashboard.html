@@ -1,31 +1,189 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/operations_dashboard.css') }}">
 
-<header class="dashboard-header">
-    <h1>Panel de Operaciones</h1>
-    <p>Bienvenido al sistema administrativo, <strong>{{ current_user.name }}</strong>.</p>
+<header class="dash-hero">
+    <div class="dash-hero-info">
+        <span class="dash-hero-badge"><i class="bi bi-truck me-1"></i>OPERACIONES</span>
+        <h1>PANEL OPERATIVO</h1>
+        <p>Hola {{ current_user.name }}, control de traslados, disputas y recepción en sedes.</p>
+    </div>
+    
+    <div class="dash-hero-actions">
+    <!-- Badge Informativo de Sede -->
+    {% set sedes_usuario = sedes if sedes is defined else getattr(current_user, 'locations', []) %}
+    {% if sedes_usuario and sedes_usuario|length == 1 %}
+    <div class="dash-location-badge">
+        <i class="bi bi-geo-alt-fill dash-location-icon"></i>
+        <div class="dash-location-info">
+            <span class="dash-location-label">SEDE ASIGNADA</span>
+            <span class="dash-location-name">{{ sedes_usuario[0].name }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pill de Perfil de Usuario -->
+    <div class="dash-user-pill">
+        <div class="dash-avatar-circle">
+            {{ current_user.name[0] | upper }}
+        </div>
+        <div class="dash-user-details">
+            <span class="dash-user-name">{{ current_user.name }}</span>
+            <span class="dash-user-role">OPERACIONES</span>
+        </div>
+    </div>
+    
+</div>
 </header>
 
 <!-- Componente de Alertas de Productos Vencidos -->
 {% include 'alerts/_alerts_expired.html' %}
 
-<div class="dashboard-grid">
-    <a href="{{ url_for('inventory.list_products') }}" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-boxes"></i>
-            <h3>Inventario</h3>
-            <p>Gestionar insumos y stock</p>
+<!-- Tarjetas KPI Resumen -->
+<div class="dash-kpi-grid">
+    <div class="dash-kpi-card blue">
+        <div class="dash-kpi-data">
+            <span class="dash-kpi-title">TRASLADOS EN TRÁNSITO</span>
+            <span class="dash-kpi-value">{{ resumen.en_transito_count }}</span>
+            <a href="{{ url_for('logistics_list.movement_list', tab='en-camino') }}" class="dash-kpi-link">Ver logística de envíos &rarr;</a>
         </div>
-    </a>
+        <div class="dash-kpi-icon-box blue-bg">
+            <i class="bi bi-truck"></i>
+        </div>
+    </div>
 
-    <a href="#" class="card-link">
-        <div class="card-dash">
-            <i class="fas fa-arrow-down"></i>
-            <h3>Mermas</h3>
-            <p>Control de pérdidas</p>
+    <div class="dash-kpi-card green">
+        <div class="dash-kpi-data">
+            <span class="dash-kpi-title">TRASLADOS RECIBIDOS</span>
+            <span class="dash-kpi-value">{{ resumen.recibidos_count }}</span>
         </div>
-    </a>
+        <div class="dash-kpi-icon-box green-bg">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+    </div>
+
+    <div class="dash-kpi-card red">
+        <div class="dash-kpi-data">
+            <span class="dash-kpi-title">DISPUTAS PENDIENTES</span>
+            <span class="dash-kpi-value">{{ resumen.disputas_count }}</span>
+        </div>
+        <div class="dash-kpi-icon-box red-bg">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+    </div>
+
+    <div class="dash-kpi-card orange">
+        <div class="dash-kpi-data">
+            <span class="dash-kpi-title">ALERTAS DE MERMAS</span>
+            <span class="dash-kpi-value">{{ resumen.mermas_count }}</span>
+            <a href="{{ url_for('merma_list.mis_pendientes') }}" class="dash-kpi-link">Ver mermas &rarr;</a>
+        </div>
+        <div class="dash-kpi-icon-box orange-bg">
+            <i class="bi bi-trash-fill"></i>
+        </div>
+    </div>
 </div>
+
+    <!-- SECCIÓN DE PANELES INFORMATIVOS -->
+    <div class="row mt-4 g-4">
+        <!-- PANEL IZQUIERDO: RECEPCIONES PENDIENTES -->
+        <div class="col-md-6">
+            <div class="card dash-info-card h-100">
+                <div class="card-header dash-info-header">
+                    <h6 class="dash-info-title">
+                        <i class="bi bi-box-seam-fill text-primary"></i>
+                        Recepciones Pendientes
+                    </h6>
+                    {% if recepciones_pendientes %}
+                        <span class="badge rounded-pill bg-primary-subtle text-primary fw-bold">
+                            {{ recepciones_pendientes|length }} en camino
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body dash-card-body-scroll">
+                    {% if recepciones_pendientes %}
+                        <div class="dash-list-group">
+                            {% for r in recepciones_pendientes %}
+                            <div class="dash-list-item">
+                                <div class="dash-item-main">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="dash-badge-type">{{ r.tipo }}</span>
+                                        <strong class="dash-item-id">Envío #{{ r.id }}</strong>
+                                    </div>
+                                    <div class="dash-item-sub">
+                                        <i class="bi bi-geo-alt me-1"></i>Origen: {{ r.origen }}
+                                        <span class="mx-1">•</span>
+                                        <i class="bi bi-clock me-1"></i>{{ r.fecha }}
+                                    </div>
+                                </div>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
+                                    En tránsito
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="dash-empty-state">
+                            <i class="bi bi-check-circle-fill text-success fs-2 mb-2 d-block"></i>
+                            <p class="mb-0 fw-semibold text-dark">Todas las recepciones están al día</p>
+                            <span class="text-muted small">No hay despachos pendientes por llegar a esta sede.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL DERECHO: DISPUTAS PENDIENTES -->
+        <div class="col-md-6">
+            <div class="card dash-info-card h-100">
+                <div class="card-header dash-info-header">
+                    <h6 class="dash-info-title text-danger">
+                        <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+                        Disputas Pendientes
+                    </h6>
+                    {% if disputas_pendientes %}
+                        <span class="badge rounded-pill bg-danger-subtle text-danger fw-bold">
+                            {{ disputas_pendientes|length }} por arbitrar
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body dash-card-body-scroll">
+                    {% if disputas_pendientes %}
+                        <div class="dash-list-group">
+                            {% for d in disputas_pendientes %}
+                            <div class="dash-list-item">
+                                <div class="dash-item-main">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="dash-badge-dispute">
+                                            {{ d.status.replace('_', ' ') }}
+                                        </span>
+                                        <strong class="dash-item-id">Movimiento #{{ d.id }}</strong>
+                                    </div>
+                                    <div class="dash-item-sub">
+                                        <i class="bi bi-arrow-right-circle me-1"></i>
+                                        {{ d.origin_location.name if d.origin_location else 'Sede Origen' }} &rarr; 
+                                        {{ d.destination_location.name if d.destination_location else 'Sede Destino' }}
+                                    </div>
+                                </div>
+                                <span class="badge bg-warning-subtle text-dark border border-warning rounded-pill px-3 py-2">
+                                    Pendiente Arbitraje
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="dash-empty-state">
+                            <i class="bi bi-shield-check-fill text-success fs-2 mb-2 d-block"></i>
+                            <p class="mb-0 fw-semibold text-dark">Sin disputas registradas</p>
+                            <span class="text-muted small">No existen incidencias en proceso de arbitraje.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
