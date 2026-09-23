@@ -32,6 +32,8 @@ from app.models import Location
 from app.dashboard.dashboard_service import (
     get_subgerente_context,
     get_finance_dashboard_context,
+    get_management_context,
+    get_operations_context,
 )
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -97,9 +99,11 @@ def index():
 @login_required
 @management_required
 def director_dashboard():
-    alarmas = obtener_alarmas_para_dashboard()
-    vencidos = obtener_vencidos_para_dashboard(current_user)
-    return render_template('dashboard/management_dashboard.html', alarmas=alarmas, vencidos=vencidos)
+    
+    sede_id = request.args.get('sede', type=int)
+    context = get_management_context(current_user, location_id=sede_id)
+
+    return render_template('dashboard/management_dashboard.html', **context)
 
 @dashboard_bp.route('/manager-dashboard')
 @login_required
@@ -207,6 +211,6 @@ def finance_dashboard():
 @login_required
 @operations_required
 def operations_dashboard():
-    alarmas = obtener_alarmas_para_dashboard()
-    vencidos = obtener_vencidos_para_dashboard(current_user)
-    return render_template('dashboard/operations_dashboard.html', alarmas=alarmas, vencidos=vencidos)
+    sede_id = request.args.get('location_id', type=int)
+    context = get_operations_context(current_user, location_id=sede_id)
+    return render_template('dashboard/operations_dashboard.html', **context)
