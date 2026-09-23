@@ -109,9 +109,48 @@ def director_dashboard():
 @login_required
 @manager_required
 def manager_dashboard():
+    from app.dashboard.dashboard_service import get_manager_context, get_expiring_lots
+
     alarmas = obtener_alarmas_para_dashboard()
-    vencidos = obtener_vencidos_para_dashboard(current_user)
-    return render_template('dashboard/manager_dashboard.html', alarmas=alarmas, vencidos=vencidos)
+    vencidos_raw = obtener_vencidos_para_dashboard(current_user)
+
+    ctx = get_manager_context(current_user)
+
+    # 1. Obtenemos la lista (la misma fuente que usa el subgerente)
+    lotes = get_expiring_lots(current_user) or ctx.get('expiring_lots', []) or []
+
+    # 2. La transformamos al formato exacto que espera _alerts_expired.html
+    vencidos = []
+    for item in lotes:
+        vencidos.append({
+            'location_id': item.get('location_id'),
+            'location_name': item.get('location') or item.get('location_name') or 'Sede',
+            'product_name': item.get('product') or item.get('product_name') or item.get('name') or 'Producto',
+            'lot_number': item.get('lot') or item.get('lot_number') or '-',
+            'quantity': item.get('quantity') or 0,
+            'expiration_date': item.get('expiration_date') or (item.get('expiration').strftime('%Y-%m-%d') if hasattr(item.get('expiration'), 'strftime') else item.get('expiration')),
+            'product_id': item.get('product_id'),
+            # extras por si acaso
+            'days': item.get('days'),
+            'critical': item.get('critical'),
+        })
+
+    return render_template(
+        'dashboard/manager_dashboard.html',
+        alarmas=alarmas,
+        vencidos=vencidos,                    
+        critical_stock_items=alarmas,
+        expired_items=vencidos,
+        expiring_lots=vencidos,
+        total_stock=ctx.get('total_stock', 0),
+        consumo_hoy_monto=ctx.get('consumo_hoy_monto', 0),
+        pending_wastes_count=ctx.get('pending_wastes_count', 0),
+        transfers_in_transit_count=ctx.get('transfers_in_transit_count', 0),
+        sede=ctx.get('sede'),
+        sede_nombre=ctx.get('sede_nombre', 'Mi Sede'),
+        location=ctx.get('location'),
+        recent_movements=ctx.get('recent_movements', []),
+    )
 
 @dashboard_bp.route('/assistant-manager')
 @login_required

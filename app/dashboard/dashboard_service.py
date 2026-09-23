@@ -113,6 +113,69 @@ def get_expiring_lots(current_user, limit=5, horizon_days=90):
 
 def get_subgerente_context(current_user):
     """Contexto completo del panel de Sub-Gerencia."""
+    from app import db
+    from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
+    from datetime import date as date_cls
+
+    # 1. Sedes permitidas del subgerente
+    sedes_asignadas = getattr(current_user, 'locations', [])
+    if not sedes_asignadas and hasattr(current_user, 'location') and current_user.location:
+        sedes_asignadas = [current_user.location]
+
+    allowed_location_ids = [s.id for s in sedes_asignadas if hasattr(s, 'id')]
+
+    if not allowed_location_ids:
+        u_loc_id = getattr(current_user, 'location_id', None) or getattr(current_user, 'branch_id', None)
+        if u_loc_id:
+            allowed_location_ids = [u_loc_id]
+
+    target_location_ids = allowed_location_ids
+    location_id = target_location_ids[0] if target_location_ids else None
+
+    # 2. Stock agregado (unidades en inventario)
+    stock_agregado = 0
+    try:
+        if target_location_ids:
+            total_qty = db.session.query(db.func.sum(Inventory.current_quantity))\
+                .filter(Inventory.location_id.in_(target_location_ids)).scalar()
+            stock_agregado = float(total_qty or 0)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando stock subgerente: %s", exc)
+
+    # 3. Consumo en unidades (hoy) – misma lógica que gerencia
+    consumo_unidades = 0
+    try:
+        if target_location_ids:
+            inicio_periodo = date_cls.today()  # cambia a .replace(day=1) si quieres del mes
+
+            cant_movs = db.session.query(db.func.sum(MovementDetail.quantity))\
+                .join(Movement, MovementDetail.movement_id == Movement.id)\
+                .filter(
+                    Movement.origin_location_id.in_(target_location_ids),
+                    Movement.status == 'COMPLETADO',
+                    Movement.date >= inicio_periodo
+                )\
+                .scalar()
+
+            consumo_unidades = int(cant_movs or 0)
+
+            # Si no hay movimientos, buscar en mermas del periodo
+            if consumo_unidades == 0:
+                cant_wastes = db.session.query(db.func.sum(WasteDetail.quantity))\
+                    .join(Waste, WasteDetail.waste_id == Waste.id)\
+                    .filter(
+                        Waste.location_id.in_(target_location_ids),
+                        Waste.date >= inicio_periodo
+                    )\
+                    .scalar()
+                consumo_unidades = int(cant_wastes or 0)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando consumo unidades subgerente: %s", exc)
+        consumo_unidades = 0
+
+    # 4. Lo que ya tenías
     alarmas = obtener_alarmas_para_dashboard()
     movimientos = get_movement_list_context(current_user)
 
@@ -123,9 +186,249 @@ def get_subgerente_context(current_user):
         'critical_count': len(alarmas),
         'critical_stock': alarmas,
         'recent_movements': get_recent_movements(current_user),
-'expiring_lots': get_expiring_lots(current_user),
+        'expiring_lots': get_expiring_lots(current_user),
+
+        # ← NUEVO: lo que necesita la tarjeta de unidades
+        'total_stock': int(stock_agregado),
+        'consumo_hoy_monto': int(consumo_unidades),
     }
 
+def get_manager_context(current_user, location_id=None):
+    """
+    Contexto dinámico completo para el Dashboard de Sede.
+    Garantiza el conteo real de consumos en unidades.
+    """
+    from app import db
+    from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
+
+    g = globals()
+
+    # 1. IDENTIFICACIÓN Y FILTRADO DE SEDES DINÁMICAS
+    sedes_asignadas = getattr(current_user, 'locations', [])
+    if not sedes_asignadas and hasattr(current_user, 'location') and current_user.location:
+        sedes_asignadas = [current_user.location]
+
+    allowed_location_ids = [s.id for s in sedes_asignadas if hasattr(s, 'id')]
+    
+    if not allowed_location_ids:
+        u_loc_id = getattr(current_user, 'location_id', None) or getattr(current_user, 'branch_id', None)
+        if u_loc_id:
+            allowed_location_ids = [u_loc_id]
+
+    if location_id and location_id in allowed_location_ids:
+        target_location_ids = [location_id]
+    else:
+        target_location_ids = allowed_location_ids
+        location_id = target_location_ids[0] if target_location_ids else None
+
+    # Sede actual para mostrar en el Header
+    sede_actual = None
+    if target_location_ids:
+        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+
+    # 2. CÁLCULO DE STOCK AGREGADO
+    stock_agregado = 0
+    ultimo_ingreso = None
+    historial_ingresos = []
+
+    try:
+        if target_location_ids:
+            total_qty = db.session.query(db.func.sum(Inventory.current_quantity))\
+                .filter(Inventory.location_id.in_(target_location_ids)).scalar()
+            stock_agregado = float(total_qty or 0)
+
+            mov_query = db.session.query(MovementDetail, Product, Location, Movement.date)\
+                .join(Movement, MovementDetail.movement_id == Movement.id)\
+                .join(Product, MovementDetail.product_id == Product.id)\
+                .join(Location, Movement.destination_location_id == Location.id)\
+                .filter(
+                    Movement.status == 'COMPLETADO',
+                    Movement.destination_location_id.in_(target_location_ids)
+                )\
+                .order_by(Movement.date.desc())\
+                .limit(5).all()
+
+            for det, prod, loc, fecha in mov_query:
+                unidad = prod.unit_of_measure or 'uds.'
+                item = {
+                    'producto': prod.name,
+                    'cantidad': float(det.quantity or 0),
+                    'unidad': unidad,
+                    'sede': loc.name,
+                    'fecha': fecha.strftime('%d/%m/%Y') if fecha else 'Reciente'
+                }
+                historial_ingresos.append(item)
+
+            if historial_ingresos:
+                ultimo_ingreso = historial_ingresos[0]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando ingresos stock: %s", exc)
+
+    # 3. TRASLADOS EN TRÁNSITO / POR RECIBIR
+    traslados_en_transito = 0
+    try:
+        if 'get_movement_list_context' in g and callable(g['get_movement_list_context']):
+            movs = g['get_movement_list_context'](current_user)
+            en_camino = movs.get('en_camino', []) if isinstance(movs, dict) else []
+            por_recibir = movs.get('por_recibir', []) if isinstance(movs, dict) else []
+            traslados_en_transito = len(en_camino) + len(por_recibir)
+            
+            if traslados_en_transito == 0 and location_id:
+                for m in (en_camino + por_recibir):
+                    m_dest = m.get('destination_location_id') if isinstance(m, dict) else getattr(m, 'destination_location_id', None)
+                    m_orig = m.get('origin_location_id') if isinstance(m, dict) else getattr(m, 'origin_location_id', None)
+                    if m_dest == location_id or m_orig == location_id:
+                        traslados_en_transito += 1
+    except Exception:
+        traslados_en_transito = 0
+
+  # 4. ALERTAS DE STOCK Y VENCIDOS
+    alarmas_stock = []
+    vencidos = []
+    expiring_lots = []
+
+    try:
+        if 'obtener_alarmas_para_dashboard' in g and callable(g['obtener_alarmas_para_dashboard']):
+            alarmas_stock = g['obtener_alarmas_para_dashboard']()
+        if 'obtener_vencidos_para_dashboard' in g and callable(g['obtener_vencidos_para_dashboard']):
+            vencidos = g['obtener_vencidos_para_dashboard'](current_user)
+
+        # 1. Obtener lotes sin procesar
+        raw_expiring = get_expiring_lots(current_user)
+        
+        # 2. Mapear y adaptar la estructura a lo que requiere la plantilla
+        mapped_lots = []
+        for item in raw_expiring:
+            expiration_val = item.get('expiration')
+            exp_date_str = expiration_val.strftime('%Y-%m-%d') if hasattr(expiration_val, 'strftime') else expiration_val
+            
+            mapped_lots.append({
+                'name': item.get('product'),
+                'product': item.get('product'),
+                'lot': item.get('lot'),
+                'location': item.get('location'),
+                'expiration_date': exp_date_str,
+                'expiration': expiration_val,
+                'quantity': item.get('quantity'),
+                'days': item.get('days'),
+                'critical': item.get('critical'),
+                'location_id': item.get('location_id')
+            })
+
+        # 3. Filtrar de forma segura por sede si aplica (sin colisión de variables ni getattr)
+        if location_id:
+            target_id = location_id
+            filtered_lots = []
+            for lot_item in mapped_lots:
+                item_loc_id = lot_item.get('location_id') if isinstance(lot_item, dict) else None
+                if item_loc_id is None or item_loc_id == target_id:
+                    filtered_lots.append(lot_item)
+            expiring_lots = filtered_lots
+        else:
+            expiring_lots = mapped_lots
+
+        if location_id:
+            alarmas_stock = [
+                a for a in alarmas_stock 
+                if (isinstance(a, dict) and a.get('location_id') == location_id) or 
+                   (hasattr(a, 'location_id') and getattr(a, 'location_id') == location_id)
+            ]
+            vencidos = [
+                v for v in vencidos 
+                if (isinstance(v, dict) and (v.get('location_id') == location_id or v.get('location') == location_id)) or
+                   (hasattr(v, 'location_id') and getattr(v, 'location_id') == location_id)
+            ]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error procesando alertas y lotes: %s", exc)
+
+    # 5. MERMAS PENDIENTES
+    mermas_graves = []
+    mermas_pendientes_count = 0
+    try:
+        query = db.session.query(Waste).filter(Waste.status.in_(['PENDIENTE', 'pending']))
+        if target_location_ids:
+            query = query.filter(Waste.location_id.in_(target_location_ids))
+
+        mermas_pendientes_count = query.count()
+        mermas_graves = query.order_by(
+            Waste.date.desc() if hasattr(Waste, 'date') else Waste.id.desc()
+        ).limit(5).all()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error obteniendo mermas pendientes: %s", exc)
+        mermas_pendientes_count = 0
+
+   # 6. CONSUMO COCINA EN UNIDADES (desde AuditLog - GASTO_COCINA)
+    consumo_unidades = 0
+    try:
+        if target_location_ids:
+            from datetime import date as date_cls
+            from app.models.waste_model import AuditLog
+            import json
+            from sqlalchemy import func
+
+            inicio_periodo = date_cls.today()
+
+            audits = db.session.query(AuditLog.changed_data).filter(
+                AuditLog.location_id.in_(target_location_ids),
+                AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA']),
+                func.date(AuditLog.timestamp) >= inicio_periodo
+            ).all()
+
+            total = 0.0
+            for row in audits:
+                c_data = row[0] if row else None
+                if not c_data:
+                    continue
+                if isinstance(c_data, str):
+                    try:
+                        c_data = json.loads(c_data)
+                    except Exception:
+                        continue
+                if isinstance(c_data, dict):
+                    try:
+                        qty = float(c_data.get('quantity_changed', 0) or 0)
+                        total += abs(qty)
+                    except (TypeError, ValueError):
+                        continue
+
+            consumo_unidades = int(total)
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando consumo cocina: %s", exc)
+        consumo_unidades = 0
+
+    # 7. RETORNO UNIFICADO
+    return {
+        'sede': sede_actual,
+        'sede_nombre': getattr(sede_actual, 'name', 'Mi Sede') if sede_actual else 'Mi Sede',
+        'location': sede_actual,
+        'sedes': sedes_asignadas,
+        'sede_seleccionada': location_id,
+        'alarmas': alarmas_stock,
+        'critical_stock_items': alarmas_stock,
+        'vencidos': vencidos,
+        'expiring_lots': expiring_lots,
+        'mermas_graves': mermas_graves,
+        'total_stock': int(stock_agregado),
+        'consumo_hoy_monto': int(consumo_unidades),
+        'pending_wastes_count': int(mermas_pendientes_count),
+        'transfers_in_transit_count': int(traslados_en_transito),
+        'recent_movements': get_recent_movements(current_user, limit=5),
+        'resumen': {
+            'stock_agregado': stock_agregado,
+            'ultimo_ingreso': ultimo_ingreso,
+            'historial_ingresos': historial_ingresos,
+            'traslados_en_transito': traslados_en_transito,
+            'mermas_pendientes': mermas_pendientes_count,
+            'alertas_criticas': len(alarmas_stock) + len(vencidos),
+            'cant_stock_bajo': len(alarmas_stock),
+            'cant_vencidos': len(vencidos)
+        }
+    }
 
 def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
                                   alarmas=None):
