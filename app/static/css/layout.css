@@ -507,7 +507,10 @@ body.modal-open .toggle-sidebar-btn {
 body.sidebar-tall .wrapper {
     overflow-y: auto;
 }
-body.sidebar-tall .content {
+/* El contenido fijo solo aplica sin modales abiertos: `position: sticky`
+   crea un contexto de apilamiento que pondría el modal POR DEBAJO del
+   backdrop de Bootstrap (pantalla oscura bloqueada). */
+body.sidebar-tall:not(.modal-open) .content {
     position: sticky;
     top: 0;
 }
@@ -517,4 +520,10 @@ body.sidebar-tall .content {
     z-index: 1060;
     background-color: #000000;
     padding-top: 6px;
+}
+
+/* Con un modal abierto, "Cerrar Sesión" queda por debajo del backdrop (1050)
+   para no tapar ni bloquear la ventana flotante. */
+body.modal-open .sidebar-actions {
+    z-index: 1020;
 }
