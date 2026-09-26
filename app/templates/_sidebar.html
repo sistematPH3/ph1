@@ -54,7 +54,7 @@
         </li>
         {% endif %}
 
-        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations or current_user.is_finance %}
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-box-seam main-icon"></i>
@@ -96,7 +96,7 @@
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-truck main-icon"></i>
-                <span class="link-text">TRASLADOS Y MERMAS</span>
+                <span class="link-text">TRASLADOS</span>
                 <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
             </a>
             <div class="menu-desplegable">
@@ -104,7 +104,7 @@
                 <a class="nav-link sub-link" href="{{ url_for('logistics.dispatch_bp.dispatch_form_view') }}">Nuevo Traslado</a>
                 {% endif %}
                 <a class="nav-link sub-link" href="/logistics/movements">Listado Operativo de Traslados</a>
-                
+
                 {% if current_user.is_admin %}
                 <a class="nav-link sub-link dispute-sub-link" href="/logistics/movements/admin/disputes">
                     <span>Arbitraje de Disputas</span>
@@ -117,7 +117,18 @@
                     {% endif %}
                 </a>
                 {% endif %}
+            </div>
+        </li>
+        {% endif %}
 
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-recycle main-icon"></i>
+                <span class="link-text">MERMAS</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
                 <a class="nav-link sub-link" href="{{ url_for('register_waste.nueva_merma') }}">Nueva Merma</a>
                 <a class="nav-link sub-link" href="{{ url_for('merma_list.mis_pendientes') }}">Mermas Pendientes</a>
                 <a class="nav-link sub-link dispute-sub-link" href="{{ url_for('waste_approvals.bandeja_aprobaciones') }}">

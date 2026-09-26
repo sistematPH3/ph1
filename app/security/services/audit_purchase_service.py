@@ -60,6 +60,9 @@ class AuditPurchaseService:
 
     @staticmethod
     def _formatear(current_user, results):
+        from app.reports.services.export_service import (
+            formatear_cantidad, formatear_numero, formatear_tasa)
+
         audits_list = []
 
         for audit, user, role in results:
@@ -69,7 +72,8 @@ class AuditPurchaseService:
                 if audit.new_data:
                     changed_data['Costo Total de la Factura'] = {
                         'old': '',
-                        'new': f"{audit.new_data.get('total_amount', 0)} {audit.new_data.get('currency', '')}"
+                        'new': (f"{formatear_numero(audit.new_data.get('total_amount'), 2)} "
+                                f"{audit.new_data.get('currency', '')}")
                     }
             elif audit.action_type == 'ANNULLED':
                 changed_data['Estado de Factura'] = {
@@ -86,9 +90,13 @@ class AuditPurchaseService:
                 }
 
                 if str(float(prev.get('total_amount', 0))) != str(float(curr.get('total_amount', 0))):
-                    changed_data['Costo Total de la Factura'] = {'old': prev.get('total_amount'), 'new': curr.get('total_amount')}
+                    changed_data['Costo Total de la Factura'] = {
+                        'old': formatear_numero(prev.get('total_amount'), 2),
+                        'new': formatear_numero(curr.get('total_amount'), 2)}
                 if str(float(prev.get('exchange_rate', 0))) != str(float(curr.get('exchange_rate', 0))):
-                    changed_data['Tasa de Cambio Aplicada'] = {'old': prev.get('exchange_rate'), 'new': curr.get('exchange_rate')}
+                    changed_data['Tasa de Cambio Aplicada'] = {
+                        'old': formatear_tasa(prev.get('exchange_rate')),
+                        'new': formatear_tasa(curr.get('exchange_rate'))}
 
                 prev_details = {str(d.get('id', d.get('product_id'))): d for d in prev.get('details', [])}
                 curr_details = {str(d.get('id', d.get('product_id'))): d for d in curr.get('details', [])}
@@ -103,14 +111,24 @@ class AuditPurchaseService:
                     prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
 
                     if not p_item and c_item:
-                        changed_data[f'Insumo Añadido: {prod_name}'] = {'old': '-', 'new': f"Cant. Comprada: {c_item.get('quantity')} | Precio Unitario: {c_item.get('foreign_price')}"}
+                        changed_data[f'Insumo Añadido: {prod_name}'] = {
+                            'old': '-',
+                            'new': (f"Cant. Comprada: {formatear_cantidad(c_item.get('quantity'))} | "
+                                    f"Precio Unitario: {formatear_numero(c_item.get('foreign_price'), 2)}")}
                     elif p_item and not c_item:
-                        changed_data[f'Insumo Eliminado: {prod_name}'] = {'old': f"Cant. Comprada: {p_item.get('quantity')} | Precio Unitario: {p_item.get('foreign_price')}", 'new': '-'}
+                        changed_data[f'Insumo Eliminado: {prod_name}'] = {
+                            'old': (f"Cant. Comprada: {formatear_cantidad(p_item.get('quantity'))} | "
+                                    f"Precio Unitario: {formatear_numero(p_item.get('foreign_price'), 2)}"),
+                            'new': '-'}
                     else:
                         if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
-                            changed_data[f'Cantidad Comprada de {prod_name}'] = {'old': p_item.get('quantity'), 'new': c_item.get('quantity')}
+                            changed_data[f'Cantidad Comprada de {prod_name}'] = {
+                                'old': formatear_cantidad(p_item.get('quantity')),
+                                'new': formatear_cantidad(c_item.get('quantity'))}
                         if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
-                            changed_data[f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})'] = {'old': p_item.get('foreign_price'), 'new': c_item.get('foreign_price')}
+                            changed_data[f'Precio Unitario de {prod_name} (Cant. Comprada: {formatear_cantidad(c_item.get("quantity"))})'] = {
+                                'old': formatear_numero(p_item.get('foreign_price'), 2),
+                                'new': formatear_numero(c_item.get('foreign_price'), 2)}
                         p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
                         c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
                         if p_date != c_date:

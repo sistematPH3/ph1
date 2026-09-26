@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>Pizza Hut - Gestión Administrativa</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     
     <!-- CSS -->
 <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v=3">
 
 <!-- CSS de Alertas de Stock -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/alerts_stock.css') }}">
@@ -35,7 +36,7 @@
 
    <!-- JS -->
 <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/layout.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/layout.js') }}?v=4"></script>
 
     {% if can_view_disputes %}
     <!-- Contenedor de avisos de novedades (dashboard + sidebar en vivo) -->

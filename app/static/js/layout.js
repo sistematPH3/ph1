@@ -161,4 +161,17 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         });
     }
+
+    // =========================================================
+    // 5. MENÚ ALTO: si la barra lateral desborda la pantalla, se
+    //    habilita scroll de página para llegar al final (mantiene
+    //    los submenús flotantes). "Cerrar Sesión" queda anclado.
+    // =========================================================
+    if (window.innerWidth > 1024) {
+        const applyTall = function () {
+            document.body.classList.toggle("sidebar-tall", !sidebar.classList.contains("collapsed") && sidebar.scrollHeight > sidebar.clientHeight + 4);
+        };
+        applyTall();
+        window.addEventListener("resize", applyTall);
+    }
 });

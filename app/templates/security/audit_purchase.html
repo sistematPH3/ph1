@@ -15,20 +15,22 @@
     <div class="ph-card">
 
         <!-- Encabezado corporativo -->
-        <div class="d-flex align-items-center mb-1">
-            <div class="ph-icon-box me-3 shadow-sm">
-                <i class="bi bi-clipboard2-data"></i>
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-clipboard2-data"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Auditoría de Compras</h2>
+                    <p class="text-muted mb-0">Registro de creación, edición y anulación de facturas de proveedores.</p>
+                </div>
             </div>
-            <div>
-                <h2 class="ph-title mb-1">Auditoría de Compras</h2>
-                <p class="text-muted mb-0">Registro de creación, edición y anulación de facturas de proveedores.</p>
-            </div>
+            {% set sedes = sedes|default([]) %}
+            {% set export_base_url = url_for('audit_exports.descargar_compras') %}
+            {% set export_sin_fechas = True %}
+            {% set export_derecha = True %}
+            {% include 'reports/audit_export_toolbar.html' %}
         </div>
-
-        {% set sedes = sedes|default([]) %}
-        {% set export_base_url = url_for('audit_exports.descargar_compras') %}
-        {% set export_sin_fechas = True %}
-        {% include 'reports/audit_export_toolbar.html' %}
 
         <!-- Filtros dentro del cintillo rojo -->
         <div class="ph-filters-cintillo mt-3">

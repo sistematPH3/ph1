@@ -6,6 +6,12 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import LoginAudit, Location, Role
 from app.reports.repositories.export_repository import obtener_nombre_autor
+from app.reports.services.export_service import (
+    formatear_cantidad,
+    formatear_monto,
+    formatear_numero,
+    formatear_tasa,
+)
 from app.security.repositories.audit_user_repository import AuditUserRepository
 from app.security.services.audit_purchase_service import AuditPurchaseService
 
@@ -539,10 +545,10 @@ def construir_listado_compras(user, filtros):
             'filas': [
                 ('Proveedor', p['supplier_name']),
                 ('Fecha de Compra', fecha),
-                ('Monto Total', f"{p['total_amount']} {p['currency']}"),
-                ('Total en Bs.', f"Bs. {p['total_bs']}"),
+                ('Monto Total', f"{formatear_numero(p['total_amount'], 2)} {p['currency']}"),
+                ('Total en Bs.', f"Bs. {formatear_monto(p['total_bs'])}"),
                 ('Moneda', p['currency']),
-                ('Tasa Aplicada', f"Bs. {p['exchange_rate']}"),
+                ('Tasa Aplicada', f"1 {p['currency']} = {formatear_tasa(p['exchange_rate'])} Bs."),
                 ('Estado', estado),
             ],
         })
@@ -556,10 +562,10 @@ def construir_listado_compras(user, filtros):
         'filas': [[f"#{p['id']}", p['supplier_name'],
                    p['purchase_date'].strftime('%d/%m/%Y %I:%M %p')
                    if p['purchase_date'] else '—',
-                   f"{p['total_amount']} {p['currency']}",
-                   f"Bs. {p['total_bs']}",
+                   f"{formatear_numero(p['total_amount'], 2)} {p['currency']}",
+                   f"Bs. {formatear_monto(p['total_bs'])}",
                    p['currency'],
-                   f"Bs. {p['exchange_rate']}",
+                   f"1 {p['currency']} = {formatear_tasa(p['exchange_rate'])} Bs.",
                    'COMPLETED' if p['status'] == 'COMPLETED' else 'ANULADA']
                   for p in filtradas],
         'items': items,
@@ -611,12 +617,12 @@ def construir_detalle_compra(user, purchase_id, filtros):
         total_bs += precio_bs
         insumos.append([
             f"{nombre} ({sku})" if sku else nombre,
-            f"{item.quantity}",
+            formatear_cantidad(item.quantity),
             item.lot_number or 'N/A',
             item.expiration_date.strftime('%d/%m/%Y')
             if item.expiration_date else 'N/A',
-            f"{item.foreign_price} {purchase.currency}",
-            f"Bs. {precio_bs:,.2f}",
+            f"{formatear_numero(item.foreign_price, 2)} {purchase.currency}",
+            f"Bs. {formatear_numero(precio_bs, 2)}",
         ])
 
     tablas = [{
@@ -631,10 +637,10 @@ def construir_detalle_compra(user, purchase_id, filtros):
             ['Fecha de Compra',
              fecha_local.strftime('%d/%m/%Y %I:%M %p') if fecha_local else '—'],
             ['Moneda', purchase.currency or '—'],
-            ['Tasa Aplicada', f"1 {purchase.currency} = {tasa} Bs."],
+            ['Tasa Aplicada', f"1 {purchase.currency} = {formatear_tasa(tasa)} Bs."],
             ['Monto Total Facturado',
-             f"{purchase.total_amount} {purchase.currency}"],
-            ['Total en Bs.', f"Bs. {total_bs:,.2f}"],
+             f"{formatear_numero(purchase.total_amount, 2)} {purchase.currency}"],
+            ['Total en Bs.', f"Bs. {formatear_numero(total_bs, 2)}"],
             ['Estado', 'ANULADA' if purchase.status == 'ANNULLED'
              else 'COMPLETADA'],
         ],
@@ -650,10 +656,10 @@ def construir_detalle_compra(user, purchase_id, filtros):
                  fecha_local.strftime('%d/%m/%Y %I:%M %p')
                  if fecha_local else '—'),
                 ('Moneda', purchase.currency or '—'),
-                ('Tasa Aplicada', f"1 {purchase.currency} = {tasa} Bs."),
+                ('Tasa Aplicada', f"1 {purchase.currency} = {formatear_tasa(tasa)} Bs."),
                 ('Monto Total Facturado',
-                 f"{purchase.total_amount} {purchase.currency}"),
-                ('Total en Bs.', f"Bs. {total_bs:,.2f}"),
+                 f"{formatear_numero(purchase.total_amount, 2)} {purchase.currency}"),
+                ('Total en Bs.', f"Bs. {formatear_numero(total_bs, 2)}"),
                 ('Estado', 'ANULADA' if purchase.status == 'ANNULLED'
                  else 'COMPLETADA'),
             ],
@@ -718,23 +724,35 @@ def _cambios_edicion_compra(log):
     """Replica las diferencias visualizadas en el detalle de la compra."""
     from app.models.inventory_model import Product
 
+    def fmt_num(v):
+        return formatear_numero(v, 2) if v is not None else None
+
+    def fmt_tasa(v):
+        return formatear_tasa(v) if v is not None else None
+
     cambios = []
     prev = log.previous_data or {}
     curr = log.new_data or {}
 
     if prev.get('total_amount') != curr.get('total_amount'):
         cambios.append({'field': 'Costo Total de la Factura',
-                        'from': prev.get('total_amount'),
-                        'to': curr.get('total_amount')})
+                        'from': fmt_num(prev.get('total_amount')),
+                        'to': fmt_num(curr.get('total_amount'))})
     if prev.get('exchange_rate') != curr.get('exchange_rate'):
         cambios.append({'field': 'Tasa de Cambio Aplicada',
-                        'from': prev.get('exchange_rate'),
-                        'to': curr.get('exchange_rate')})
+                        'from': fmt_tasa(prev.get('exchange_rate')),
+                        'to': fmt_tasa(curr.get('exchange_rate'))})
 
     prev_details = {str(d.get('id', d.get('product_id'))): d
                     for d in prev.get('details', [])}
     curr_details = {str(d.get('id', d.get('product_id'))): d
                     for d in curr.get('details', [])}
+
+    def txt_insumo(d_item):
+        return (f"Cant. Comprada: {formatear_cantidad(d_item.get('quantity'))} | "
+                f"Lote: {d_item.get('lot_number')} | "
+                f"Precio Unitario: "
+                f"{formatear_numero(d_item.get('foreign_price'), 2)}")
 
     for key in set(list(prev_details.keys()) + list(curr_details.keys())):
         p_item = prev_details.get(key)
@@ -745,24 +763,20 @@ def _cambios_edicion_compra(log):
 
         if not p_item and c_item:
             cambios.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-',
-                            'to': (f"Cant. Comprada: {c_item.get('quantity')} | "
-                                   f"Lote: {c_item.get('lot_number')} | "
-                                   f"Precio Unitario: {c_item.get('foreign_price')}")})
+                            'to': txt_insumo(c_item)})
         elif p_item and not c_item:
             cambios.append({'field': f'Insumo Eliminado: {prod_name}',
-                            'from': (f"Cant. Comprada: {p_item.get('quantity')} | "
-                                     f"Lote: {p_item.get('lot_number')} | "
-                                     f"Precio Unitario: {p_item.get('foreign_price')}"),
+                            'from': txt_insumo(p_item),
                             'to': '-'})
         else:
             if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
                 cambios.append({'field': f'Cantidad Comprada de {prod_name}',
-                                'from': p_item.get('quantity'),
-                                'to': c_item.get('quantity')})
+                                'from': formatear_cantidad(p_item.get('quantity')),
+                                'to': formatear_cantidad(c_item.get('quantity'))})
             if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
-                cambios.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})',
-                                'from': p_item.get('foreign_price'),
-                                'to': c_item.get('foreign_price')})
+                cambios.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {formatear_cantidad(c_item.get("quantity"))})',
+                                'from': formatear_numero(p_item.get('foreign_price'), 2),
+                                'to': formatear_numero(c_item.get('foreign_price'), 2)})
             p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
             c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
             if p_date != c_date:

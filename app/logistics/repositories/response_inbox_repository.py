@@ -131,7 +131,9 @@ class ResponseInboxRepository:
         - El usuario normal solo ve las respuestas de los traslados que pasan
           por sus sedes asignadas (origen o destino): son exactamente las que
           tienen una Notification RESPUESTA_TRASLADO a su nombre.
-        - Admin y Finanzas lo ven todo (bandeja global).
+        - Solo Admin (Administrator/Admin) lo ve todo (bandeja global); los
+          demás roles, incluido Finanzas, solo ven las respuestas relacionadas
+          con sus sedes asignadas.
         """
         # 0) Estado "leído" del usuario (servidor).
         notifications = Notification.query.filter_by(
@@ -149,7 +151,7 @@ class ResponseInboxRepository:
             .all()
         )
 
-        is_global = user.is_admin or user.is_finance
+        is_global = user.is_admin
         resolution_map = {}
         for log in resolution_logs:
             data = ResponseInboxRepository._read_data(log)
@@ -321,7 +323,7 @@ class ResponseInboxRepository:
         if not by_waste:
             return []
 
-        is_global = user.is_admin or user.is_finance
+        is_global = user.is_admin
         scope_ids = None
         if not is_global:
             scope_ids = set(ResponseInboxRepository._user_locations_ids(user.id))
@@ -534,7 +536,7 @@ message=(
         waste = Waste.query.get(waste_id)
         if not waste:
             return False
-        if not (user.is_admin or user.is_finance):
+        if not user.is_admin:
             scope_ids = set(ResponseInboxRepository._user_locations_ids(user.id))
             if waste.location_id not in scope_ids:
                 return False

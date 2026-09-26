@@ -10,12 +10,45 @@ from app.reports.repositories.export_repository import (
 
 def formatear_monto(valor):
     """Monto con separador de miles y coma decimal (es-VE)."""
-    if valor is None:
-        valor = Decimal('0')
-    texto = f"{float(valor):,.2f}"
+    return formatear_numero(valor, 2)
+
+
+def formatear_numero(valor, decimales=2):
+    """Número completo es-VE: miles con punto, decimales con coma.
+
+    Ej: 3674.34 -> '3.674,34'; 600000.0 -> '600.000,00'.
+    """
+    if valor is None or valor == '':
+        valor = 0
+    try:
+        f = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+    texto = f"{f:,.{decimales}f}"
     partes = texto.split('.')
     enteros = partes[0].replace(',', '.')
-    return f"{enteros},{partes[1]}"
+    return f"{enteros},{partes[1]}" if len(partes) > 1 else enteros
+
+
+def formatear_cantidad(valor):
+    """Cantidad es-VE sin ceros forzados: '30' o '0,7'."""
+    if valor is None:
+        return '0'
+    f = float(valor)
+    decs = 0 if f == int(f) else 2
+    return formatear_numero(f, decs)
+
+
+def formatear_tasa(valor):
+    """Tasa de cambio: entera '1' o hasta 4 decimales '846,5131'."""
+    if valor is None:
+        return '0'
+    try:
+        f = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+    decs = 0 if f == int(f) else 4
+    return formatear_numero(f, decs)
 
 
 def construir_exportacion(filtros, user_id):

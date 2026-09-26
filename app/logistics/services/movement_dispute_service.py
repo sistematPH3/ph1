@@ -591,7 +591,7 @@ def _notify_response_resolved(movement, resolver_user_id):
     verá la respuesta del Administrador en la bandeja.
 
     Destinatarios: los usuarios asignados a las sedes del traslado (origen o
-    destino) y todos los admin/finanzas (que ven la bandeja global). Se
+    destino) y todos los admin (Administrator/Admin, bandeja global). Se
     incluye también al usuario que emitió el dictamen: los admins reciben
     TODAS las respuestas, aunque las hayan resuelto ellos mismos. El estado
     "leído" (is_read) queda en el servidor, por lo que NO depende del
@@ -607,7 +607,7 @@ def _notify_response_resolved(movement, resolver_user_id):
         ).all():
             recipients[user.id] = user
     for user in User.query.filter(
-        User.role.has(Role.name.in_(['Administrator', 'Admin', 'Finance']))
+        User.role.has(Role.name.in_(['Administrator', 'Admin']))
     ).all():
         recipients[user.id] = user
 

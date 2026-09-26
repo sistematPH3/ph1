@@ -497,3 +497,24 @@ body.modal-open .toggle-sidebar-btn {
         padding: 20px; 
     }
 }
+
+/* =========================================================
+   MENÚ ALTO (.sidebar-tall): cuando la barra lateral desborda
+   la pantalla se permite scroll de página; el contenido queda
+   fijo y "Cerrar Sesión" queda anclado abajo. Los submenús
+   flotantes a un lado se conservan intactos.
+   ========================================================= */
+body.sidebar-tall .wrapper {
+    overflow-y: auto;
+}
+body.sidebar-tall .content {
+    position: sticky;
+    top: 0;
+}
+.sidebar-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1060;
+    background-color: #000000;
+    padding-top: 6px;
+}
