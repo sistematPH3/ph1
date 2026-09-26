@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/admin_dashboard.css') }}?v=17">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/statistics_alerts.css') }}?v=3">
 {% endblock %}
 
@@ -231,11 +231,51 @@
                     <span class="atend-count">{{ pendientes.disputas_pendientes }}</span>
                     <i class="bi bi-chevron-right atend-arrow"></i>
                 </a>
+
+                <div class="atend-row atend-row--toggler"
+                     data-atend-target="atendVencidos"
+                     role="button" tabindex="0"
+                     style="--at-clr:#b45309; background:linear-gradient(90deg, rgba(180,83,9,.10), #ffffff 60%);">
+                    <span class="atend-icon"><i class="bi bi-clock-history"></i></span>
+                    <span class="atend-text">Productos por vencer<span class="atend-sub">lotes que vencen en los próximos 90 días</span></span>
+                    <span class="atend-count">{{ expiring_lots|length }}</span>
+                    <i class="bi bi-chevron-down atend-arrow atend-arrow--toggle"></i>
+                </div>
+                <div class="atend-expand" id="atendVencidos" hidden>
+                    {% if expiring_lots %}
+                    <div class="fin-lotes-list atend-lotes">
+                        {% for lot in expiring_lots %}
+                        <div class="fin-lote-item">
+                            <div class="fin-lote-info">
+                                <span class="fin-lote-product"><i class="bi bi-box-seam me-1"></i>{{ lot.product }}</span>
+                                <div class="fin-lote-meta">
+                                    <span><i class="bi bi-tag"></i>Lote {{ lot.lot }}</span>
+                                    <span><i class="bi bi-building"></i>{{ lot.location }}</span>
+                                    <span class="fin-lote-venc">Vence {{ lot.expiration.strftime('%d/%m/%Y') if lot.expiration else '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="fin-lote-side">
+                                <span class="fin-lote-ud">{{ lot.quantity|ph_qty }} uds.</span>
+                                <span class="fin-lote-dias {{ 'fin-lote-dias--crit' if lot.critical else 'fin-lote-dias--ok' }}">{{ lot.days }} días</span>
+                                <a href="{{ url_for('register_waste.nueva_merma', origin='alarma_vencido', lock=1, lot_number=lot.lot, quantity=lot.quantity) }}"
+                                   class="fin-lote-cta" title="Registrar la merma de este lote">
+                                    Registrar merma <i class="bi bi-arrow-right-short"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="dash-subtitle atend-lotes-empty">
+                        <i class="bi bi-shield-check me-1"></i>Sin productos por vencer en los próximos 90 días.
+                    </p>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/dashboard/admin_dashboard.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/dashboard/admin_dashboard.js') }}?v=5"></script>
 {% endblock %}

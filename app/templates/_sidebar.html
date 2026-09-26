@@ -76,7 +76,7 @@
         </li>
         {% endif %}
 
-        {% if current_user.is_admin or current_user.is_management or current_user.is_manager %}
+        {% if current_user.is_admin %}
         <li class="nav-item">
             <a class="nav-link sidebar-toggler" href="javascript:void(0)">
                 <i class="bi bi-cart main-icon"></i>

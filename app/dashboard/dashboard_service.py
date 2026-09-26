@@ -32,23 +32,28 @@ def _ids_de_sedes(user):
     return [loc.id for loc in getattr(user, 'locations', [])]
 
 
-def get_recent_movements(current_user, limit=5):
-    """Últimos traslados que involucran las sedes del usuario."""
+def get_recent_movements(current_user, limit=5, desde=None, hasta=None):
+    """Últimos traslados que involucran las sedes del usuario.
+
+    Con ``desde``/``hasta`` (fechas) se acota al rango de un período."""
     sedes = _ids_de_sedes(current_user)
     if not sedes:
         return []
 
-    movs = (
+    query = (
         Movement.query
         .filter(Movement.status.in_(['EN_TRANSITO', 'COMPLETADO', 'CANCELADO_EMISOR']))
         .filter(
             (Movement.origin_location_id.in_(sedes)) |
             (Movement.destination_location_id.in_(sedes))
         )
-        .order_by(Movement.date.desc())
-        .limit(limit)
-        .all()
     )
+    if desde:
+        query = query.filter(Movement.date >= datetime_cls.combine(desde, time_cls.min))
+    if hasta:
+        query = query.filter(Movement.date < datetime_cls.combine(hasta, time_cls.min))
+
+    movs = query.order_by(Movement.date.desc()).limit(limit).all()
 
     loc_map = {loc.id: loc for loc in Location.query.all()}
     rows = []
@@ -71,7 +76,10 @@ def get_recent_movements(current_user, limit=5):
 
 def get_expiring_lots(current_user, limit=5, horizon_days=90):
     """Lotes recibidos (COMPLETADO) en las sedes del usuario que vencen pronto."""
-    sedes = _ids_de_sedes(current_user)
+    if getattr(current_user, 'is_admin', False):
+        sedes = [l.id for l in Location.query.filter_by(is_active=True).all()]
+    else:
+        sedes = _ids_de_sedes(current_user)
     if not sedes:
         return []
 
@@ -111,8 +119,11 @@ def get_expiring_lots(current_user, limit=5, horizon_days=90):
     return lots
 
 
-def get_subgerente_context(current_user):
-    """Contexto completo del panel de Sub-Gerencia."""
+def get_subgerente_context(current_user, location_id=None, period_start=None):
+    """Contexto completo del panel de Sub-Gerencia.
+    Con ``location_id`` se acota a una sede; con ``period_start`` (inicio de un
+    mes ancla) el consumo de cocina y los traslados recientes se acotan a ese
+    período; sin él, reflejan el día de hoy."""
     from app import db
     from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
     from datetime import date as date_cls
@@ -129,8 +140,31 @@ def get_subgerente_context(current_user):
         if u_loc_id:
             allowed_location_ids = [u_loc_id]
 
-    target_location_ids = allowed_location_ids
-    location_id = target_location_ids[0] if target_location_ids else None
+    if location_id and location_id in allowed_location_ids:
+        target_location_ids = [location_id]
+    else:
+        target_location_ids = allowed_location_ids
+        location_id = target_location_ids[0] if target_location_ids else None
+
+    sede_actual = None
+    if target_location_ids:
+        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+
+    # Períodos disponibles para el filtro (meses con actividad real en las sedes)
+    try:
+        anc_fechas = _anclas_reales(target_location_ids, False, 12)
+    except Exception:
+        anc_fechas = [
+            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+        ]
+    periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
+
+    if period_start:
+        periodo_inicio = period_start
+        periodo_fin = _sumar_meses(period_start, 1)
+    else:
+        periodo_inicio = date_cls.today()
+        periodo_fin = None
 
     # 2. Stock agregado (unidades en inventario)
     stock_agregado = 0
@@ -143,31 +177,37 @@ def get_subgerente_context(current_user):
         import logging
         logging.getLogger(__name__).error("Error calculando stock subgerente: %s", exc)
 
-    # 3. Consumo en unidades (hoy) – misma lógica que gerencia
+    # 3. Consumo en unidades (hoy o período) – misma lógica que gerencia
     consumo_unidades = 0
     try:
         if target_location_ids:
-            inicio_periodo = date_cls.today()  # cambia a .replace(day=1) si quieres del mes
+            condi_consumo = [
+                Movement.origin_location_id.in_(target_location_ids),
+                Movement.status == 'COMPLETADO',
+                Movement.date >= periodo_inicio,
+            ]
+            if periodo_fin:
+                condi_consumo.append(Movement.date < periodo_fin)
 
             cant_movs = db.session.query(db.func.sum(MovementDetail.quantity))\
                 .join(Movement, MovementDetail.movement_id == Movement.id)\
-                .filter(
-                    Movement.origin_location_id.in_(target_location_ids),
-                    Movement.status == 'COMPLETADO',
-                    Movement.date >= inicio_periodo
-                )\
+                .filter(*condi_consumo)\
                 .scalar()
 
             consumo_unidades = int(cant_movs or 0)
 
-            # Si no hay movimientos, buscar en mermas del periodo
+            # Si no hay movimientos, buscar en mermas del período
             if consumo_unidades == 0:
+                condi_waste = [
+                    Waste.location_id.in_(target_location_ids),
+                    Waste.date >= periodo_inicio,
+                ]
+                if periodo_fin:
+                    condi_waste.append(Waste.date < periodo_fin)
+
                 cant_wastes = db.session.query(db.func.sum(WasteDetail.quantity))\
                     .join(Waste, WasteDetail.waste_id == Waste.id)\
-                    .filter(
-                        Waste.location_id.in_(target_location_ids),
-                        Waste.date >= inicio_periodo
-                    )\
+                    .filter(*condi_waste)\
                     .scalar()
                 consumo_unidades = int(cant_wastes or 0)
     except Exception as exc:
@@ -175,7 +215,7 @@ def get_subgerente_context(current_user):
         logging.getLogger(__name__).error("Error calculando consumo unidades subgerente: %s", exc)
         consumo_unidades = 0
 
-    # 4. Lo que ya tenías
+    # 4. Alarmas y movimientos
     alarmas = obtener_alarmas_para_dashboard()
     movimientos = get_movement_list_context(current_user)
 
@@ -185,21 +225,39 @@ def get_subgerente_context(current_user):
         'por_recibir_count': len(movimientos["por_recibir"]),
         'critical_count': len(alarmas),
         'critical_stock': alarmas,
-        'recent_movements': get_recent_movements(current_user),
-        'expiring_lots': get_expiring_lots(current_user),
+        'recent_movements': get_recent_movements(
+            current_user, limit=5, desde=periodo_inicio if period_start else None,
+            hasta=periodo_fin if period_start else None,
+        ),
+        'expiring_lots': get_expiring_lots(current_user, limit=5),
 
         # ← NUEVO: lo que necesita la tarjeta de unidades
         'total_stock': int(stock_agregado),
         'consumo_hoy_monto': int(consumo_unidades),
+
+        # Filtros y etiquetas (mismo esquema que gerencia)
+        'sede': sede_actual,
+        'sede_nombre': getattr(sede_actual, 'name', 'Mi Sede') if sede_actual else 'Mi Sede',
+        'sedes': sedes_asignadas,
+        'sede_seleccionada': location_id,
+        'periodos_mes': periodos_mes,
+        'periodo_actual': period_start,
+        'periodo_etiqueta': (
+            _etiqueta_ancla(period_start) if period_start
+            else _etiqueta_ancla(date_cls.today().replace(day=1))
+        ),
     }
 
-def get_manager_context(current_user, location_id=None):
+def get_manager_context(current_user, location_id=None, period_start=None):
     """
     Contexto dinámico completo para el Dashboard de Sede.
     Garantiza el conteo real de consumos en unidades.
+    Con ``period_start`` (inicio de un mes ancla) el consumo de cocina y los
+    traslados recientes se acotan a ese período; sin él, reflejan el día de hoy.
     """
     from app import db
     from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
+    from datetime import date as date_cls
 
     g = globals()
 
@@ -225,6 +283,23 @@ def get_manager_context(current_user, location_id=None):
     sede_actual = None
     if target_location_ids:
         sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+
+    # Períodos disponibles para el filtro (meses con actividad real en las sedes)
+    try:
+        anc_fechas = _anclas_reales(target_location_ids, False, 12)
+    except Exception:
+        anc_fechas = [
+            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+        ]
+    periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
+
+    # Rango del período para acotar consumo y traslados
+    if period_start:
+        periodo_inicio = period_start
+        periodo_fin = _sumar_meses(period_start, 1)
+    else:
+        periodo_inicio = date_cls.today()
+        periodo_fin = None
 
     # 2. CÁLCULO DE STOCK AGREGADO
     stock_agregado = 0
@@ -318,27 +393,15 @@ def get_manager_context(current_user, location_id=None):
 
         # 3. Filtrar de forma segura por sede si aplica (sin colisión de variables ni getattr)
         if location_id:
-            target_id = location_id
             filtered_lots = []
             for lot_item in mapped_lots:
                 item_loc_id = lot_item.get('location_id') if isinstance(lot_item, dict) else None
-                if item_loc_id is None or item_loc_id == target_id:
+                if item_loc_id is None or item_loc_id == location_id:
                     filtered_lots.append(lot_item)
             expiring_lots = filtered_lots
         else:
             expiring_lots = mapped_lots
 
-        if location_id:
-            alarmas_stock = [
-                a for a in alarmas_stock 
-                if (isinstance(a, dict) and a.get('location_id') == location_id) or 
-                   (hasattr(a, 'location_id') and getattr(a, 'location_id') == location_id)
-            ]
-            vencidos = [
-                v for v in vencidos 
-                if (isinstance(v, dict) and (v.get('location_id') == location_id or v.get('location') == location_id)) or
-                   (hasattr(v, 'location_id') and getattr(v, 'location_id') == location_id)
-            ]
     except Exception as exc:
         import logging
         logging.getLogger(__name__).error("Error procesando alertas y lotes: %s", exc)
@@ -369,13 +432,15 @@ def get_manager_context(current_user, location_id=None):
             import json
             from sqlalchemy import func
 
-            inicio_periodo = date_cls.today()
-
-            audits = db.session.query(AuditLog.changed_data).filter(
+            condi_consumo = [
                 AuditLog.location_id.in_(target_location_ids),
                 AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA']),
-                func.date(AuditLog.timestamp) >= inicio_periodo
-            ).all()
+                func.date(AuditLog.timestamp) >= periodo_inicio,
+            ]
+            if periodo_fin:
+                condi_consumo.append(func.date(AuditLog.timestamp) < periodo_fin)
+
+            audits = db.session.query(AuditLog.changed_data).filter(*condi_consumo).all()
 
             total = 0.0
             for row in audits:
@@ -417,7 +482,16 @@ def get_manager_context(current_user, location_id=None):
         'consumo_hoy_monto': int(consumo_unidades),
         'pending_wastes_count': int(mermas_pendientes_count),
         'transfers_in_transit_count': int(traslados_en_transito),
-        'recent_movements': get_recent_movements(current_user, limit=5),
+        'recent_movements': get_recent_movements(
+            current_user, limit=5, desde=periodo_inicio if period_start else None,
+            hasta=periodo_fin if period_start else None,
+        ),
+        'periodos_mes': periodos_mes,
+        'periodo_actual': period_start,
+        'periodo_etiqueta': (
+            _etiqueta_ancla(period_start) if period_start
+            else _etiqueta_ancla(date_cls.today().replace(day=1))
+        ),
         'resumen': {
             'stock_agregado': stock_agregado,
             'ultimo_ingreso': ultimo_ingreso,
@@ -570,15 +644,21 @@ def _categorias_compras(sede_ids, ancla, limite=5):
     filas.sort(key=lambda f: -float(f['monto']))
     return filas[:limite]
 
-def get_management_context(current_user, location_id=None):
+def get_management_context(current_user, location_id=None, period_start=None):
     """
-    Resumen ejecutivo y Panel de AlertasCríticos para Director .
-    """
+    Resumen ejecutivo y Panel de Alertas Críticos para Director.
+    Con ``period_start`` (inicio de un mes ancla) el consumo de cocina y los
+    traslados recientes se acotan a ese período; sin él, reflejan el día de hoy."""
     from app.models import Location, Inventory, Product, Movement, MovementDetail, Waste, WasteDetail
+    from datetime import date as date_cls
 
-    
     sedes_asignadas = getattr(current_user, 'locations', [])
-    allowed_location_ids = [s.id for s in sedes_asignadas]
+    allowed_location_ids = [s.id for s in sedes_asignadas if hasattr(s, 'id')]
+
+    if not allowed_location_ids:
+        u_loc_id = getattr(current_user, 'location_id', None) or getattr(current_user, 'branch_id', None)
+        if u_loc_id:
+            allowed_location_ids = [u_loc_id]
 
     if location_id and location_id in allowed_location_ids:
         target_location_ids = [location_id]
@@ -586,6 +666,25 @@ def get_management_context(current_user, location_id=None):
         target_location_ids = allowed_location_ids
         location_id = None
 
+    sede_actual = None
+    if target_location_ids:
+        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+
+    # Períodos disponibles para el filtro
+    try:
+        anc_fechas = _anclas_reales(target_location_ids, False, 12)
+    except Exception:
+        anc_fechas = [
+            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+        ]
+    periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
+
+    if period_start:
+        periodo_inicio = period_start
+        periodo_fin = _sumar_meses(period_start, 1)
+    else:
+        periodo_inicio = date_cls.today()
+        periodo_fin = None
 
     stock_agregado = 0
     ultimo_ingreso = None
@@ -593,12 +692,10 @@ def get_management_context(current_user, location_id=None):
 
     try:
         if target_location_ids:
-            
             total_qty = db.session.query(db.func.sum(Inventory.current_quantity))\
                 .filter(Inventory.location_id.in_(target_location_ids)).scalar()
             stock_agregado = float(total_qty or 0)
 
-            
             mov_query = db.session.query(MovementDetail, Product, Location, Movement.date)\
                 .join(Movement, MovementDetail.movement_id == Movement.id)\
                 .join(Product, MovementDetail.product_id == Product.id)\
@@ -627,52 +724,88 @@ def get_management_context(current_user, location_id=None):
         import logging
         logging.getLogger(__name__).error("Error calculando ingresos stock: %s", exc)
 
-    
+    # 3. CONSUMO COCINA EN UNIDADES (periodo o hoy) – misma lógica que gerencia
+    consumo_unidades = 0
+    try:
+        if target_location_ids:
+            from app.models.waste_model import AuditLog
+            import json
+            from sqlalchemy import func as sa_func
+
+            condi_consumo = [
+                AuditLog.location_id.in_(target_location_ids),
+                AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA']),
+                sa_func.date(AuditLog.timestamp) >= periodo_inicio,
+            ]
+            if periodo_fin:
+                condi_consumo.append(sa_func.date(AuditLog.timestamp) < periodo_fin)
+
+            audits = db.session.query(AuditLog.changed_data).filter(*condi_consumo).all()
+
+            total = 0.0
+            for row in audits:
+                c_data = row[0] if row else None
+                if not c_data:
+                    continue
+                if isinstance(c_data, str):
+                    try:
+                        c_data = json.loads(c_data)
+                    except Exception:
+                        continue
+                if isinstance(c_data, dict):
+                    try:
+                        qty = float(c_data.get('quantity_changed', 0) or 0)
+                        total += abs(qty)
+                    except (TypeError, ValueError):
+                        continue
+
+            consumo_unidades = int(total)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Error calculando consumo cocina director: %s", exc)
+        consumo_unidades = 0
+
     traslados_en_transito = 0
     try:
         movs = get_movement_list_context(current_user)
         en_camino = movs.get('en_camino', []) if isinstance(movs, dict) else []
         por_recibir = movs.get('por_recibir', []) if isinstance(movs, dict) else []
-        
+
         if location_id:
             en_camino = [m for m in en_camino if m.get('destination_location_id') == location_id or m.get('origin_location_id') == location_id]
             por_recibir = [m for m in por_recibir if m.get('destination_location_id') == location_id or m.get('origin_location_id') == location_id]
-            
+
         traslados_en_transito = len(en_camino) + len(por_recibir)
     except Exception:
         traslados_en_transito = 0
 
-    
     alarmas_stock = obtener_alarmas_para_dashboard()
     vencidos = obtener_vencidos_para_dashboard(current_user)
-    
+
     if location_id:
         alarmas_stock = [
-            a for a in alarmas_stock 
-            if (isinstance(a, dict) and a.get('location_id') == location_id) or 
+            a for a in alarmas_stock
+            if (isinstance(a, dict) and a.get('location_id') == location_id) or
                (hasattr(a, 'location_id') and getattr(a, 'location_id') == location_id)
         ]
         vencidos = [
-            v for v in vencidos 
+            v for v in vencidos
             if (isinstance(v, dict) and (v.get('location_id') == location_id or v.get('location') == location_id)) or
                (hasattr(v, 'location_id') and getattr(v, 'location_id') == location_id)
         ]
 
-    
     mermas_graves = []
     mermas_pendientes_count = 0
     try:
         from app.models import Waste
 
-        
         query = db.session.query(Waste).filter(Waste.status == 'PENDIENTE')
-        
+
         if target_location_ids:
             query = query.filter(Waste.location_id.in_(target_location_ids))
 
         mermas_pendientes_count = query.count()
-        
-        
+
         mermas_graves = query.order_by(
             Waste.date.desc() if hasattr(Waste, 'date') else Waste.id.desc()
         ).limit(5).all()
@@ -684,7 +817,6 @@ def get_management_context(current_user, location_id=None):
 
     alertas_criticas_count = len(alarmas_stock) + len(vencidos)
 
-    
     proximos_vencimientos = get_expiring_lots(
         current_user,
         limit=5,
@@ -692,12 +824,25 @@ def get_management_context(current_user, location_id=None):
     )
 
     return {
+        'sede': sede_actual,
+        'sede_nombre': getattr(sede_actual, 'name', 'Mi Sede') if sede_actual else 'Mi Sede',
         'sedes': sedes_asignadas,
         'sede_seleccionada': location_id,
         'alarmas': alarmas_stock,
         'vencidos': vencidos,
         'mermas_graves': mermas_graves,
-        'proximos_vencimientos': proximos_vencimientos,  
+        'proximos_vencimientos': proximos_vencimientos,
+        'consumo_hoy_monto': int(consumo_unidades),
+        'recent_movements': get_recent_movements(
+            current_user, limit=5, desde=periodo_inicio if period_start else None,
+            hasta=periodo_fin if period_start else None,
+        ),
+        'periodos_mes': periodos_mes,
+        'periodo_actual': period_start,
+        'periodo_etiqueta': (
+            _etiqueta_ancla(period_start) if period_start
+            else _etiqueta_ancla(date_cls.today().replace(day=1))
+        ),
         'resumen': {
             'stock_agregado': stock_agregado,
             'ultimo_ingreso': ultimo_ingreso,
@@ -706,7 +851,8 @@ def get_management_context(current_user, location_id=None):
             'mermas_pendientes': mermas_pendientes_count,
             'alertas_criticas': alertas_criticas_count,
             'cant_stock_bajo': len(alarmas_stock),
-            'cant_vencidos': len(vencidos)
+            'cant_vencidos': len(vencidos),
+            'consumo_hoy_monto': int(consumo_unidades),
         },
         'pendientes': {
             'mermas_pendientes': mermas_pendientes_count,
@@ -714,8 +860,13 @@ def get_management_context(current_user, location_id=None):
         }
     }
 
-def get_operations_context(current_user, location_id=None):
+def get_operations_context(current_user, location_id=None, period_start=None):
+    """
+    Panel operativo de traslados, recepciones y disputas.
+    Con ``period_start`` (inicio de un mes ancla) los traslados recibidos se
+    acotan a ese período; sin él, reflejan el día de hoy."""
     from app.models import Movement, Location
+    from datetime import date as date_cls
     from app.logistics.repositories.movement_dispute_repository import MovementDisputeRepository
 
     sedes_asignadas = getattr(current_user, 'locations', [])
@@ -730,6 +881,22 @@ def get_operations_context(current_user, location_id=None):
     # Map de nombres de sedes para despliegue
     loc_map = {loc.id: loc.name for loc in Location.query.all()} if target_location_ids else {}
 
+    # Períodos disponibles para el filtro (igual que el resto de los paneles)
+    try:
+        anc_fechas = _anclas_reales(target_location_ids, False, 12)
+    except Exception:
+        anc_fechas = [
+            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+        ]
+    periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
+
+    if period_start:
+        periodo_inicio = period_start
+        periodo_fin = _sumar_meses(period_start, 1)
+    else:
+        periodo_inicio = date_cls.today()
+        periodo_fin = None
+
     # 1. TRASLADOS EN TRÁNSITO GENERALES (Origen o Destino en mis sedes)
     query_base = Movement.query
     if target_location_ids:
@@ -740,12 +907,18 @@ def get_operations_context(current_user, location_id=None):
 
     movimientos_en_transito = query_base.filter(Movement.status == 'EN_TRANSITO').all()
 
-    # 2. CONTEO DE TRASLADOS RECIBIDOS (COMPLETADOS EN DESTINO)
+    # 2. CONTEO DE TRASLADOS RECIBIDOS (COMPLETADOS EN DESTINO, con corte por período)
     query_recibidos = Movement.query.filter(Movement.status == 'COMPLETADO')
     if target_location_ids:
         query_recibidos = query_recibidos.filter(
             Movement.destination_location_id.in_(target_location_ids)
         )
+    try:
+        query_recibidos = query_recibidos.filter(Movement.date >= periodo_inicio)
+        if periodo_fin:
+            query_recibidos = query_recibidos.filter(Movement.date < periodo_fin)
+    except (TypeError, NotImplementedError):
+        pass
     traslados_recibidos_count = query_recibidos.count()
 
     # 2. RECEPCIONES PENDIENTES EN MI SEDE (Movimientos EN_TRANSITO donde mi sede es DESTINO)
@@ -807,5 +980,11 @@ def get_operations_context(current_user, location_id=None):
         'recepciones_pendientes': recepciones_pendientes[:5],
         'disputas_pendientes': disputas_pendientes[:5],
         'alarmas_stock': alarmas_stock[:5],
-        'vencidos': vencidos[:5]
+        'vencidos': vencidos[:5],
+        'periodos_mes': periodos_mes,
+        'periodo_actual': period_start,
+        'periodo_etiqueta': (
+            _etiqueta_ancla(period_start) if period_start
+            else _etiqueta_ancla(date_cls.today().replace(day=1))
+        ),
     }

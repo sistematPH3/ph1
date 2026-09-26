@@ -33,7 +33,7 @@ def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
             db.session.rollback()
 
 @purchase_bp.route('/purchases/new', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def new_purchase_form():
     products_query = db.session.query(Product, ProductType).outerjoin(
         ProductType, Product.product_type_id == ProductType.id
@@ -60,7 +60,7 @@ def new_purchase_form():
     )
 
 @purchase_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
-@require_roles('admin', 'management', 'manager', 'finance')
+@require_roles('admin')
 def view_purchase_details(purchase_id):
     purchase = Purchase.query.get_or_404(purchase_id)
     supplier = Supplier.query.get(purchase.supplier_id)
@@ -169,7 +169,7 @@ def view_purchase_details(purchase_id):
     )
 
 @purchase_bp.route('/purchases/<int:purchase_id>/export', methods=['GET'])
-@require_roles('admin', 'management', 'manager', 'finance')
+@require_roles('admin')
 def export_purchase_detail(purchase_id):
     if not Purchase.query.get(purchase_id):
         flash('La compra solicitada no existe.', 'error')
@@ -207,7 +207,7 @@ def export_purchase_detail(purchase_id):
 
 
 @purchase_bp.route('/purchases', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def create_purchase():
     try:
         foto_factura = request.files.get('invoice_photo')

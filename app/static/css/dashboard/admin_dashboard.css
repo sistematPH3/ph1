@@ -690,6 +690,11 @@ main.content .stats-alert-wrapper {
     flex: 1;
 }
 
+/* La gráfica lateral (mermas) más baja y compacta */
+.dash-col-der .dash-chart { height: 205px; }
+
+.dash-col-der .dash-empty { padding: 30px 20px; }
+
 .dash-empty {
     padding: 70px 20px;
     text-align: center;
@@ -806,6 +811,159 @@ main.content .stats-alert-wrapper {
     flex-shrink: 0;
 }
 
+/* --- Fila desplegable "Productos por vencer" en Atención requerida --- */
+.atend-row--toggler {
+    cursor: pointer;
+    user-select: none;
+}
+
+.atend-row--toggler:hover { border-color: color-mix(in srgb, #b45309 35%, transparent); }
+
+.atend-arrow--toggle {
+    color: #b45309;
+    transition: transform .18s ease;
+}
+
+.atend-row--toggler[aria-expanded="true"] .atend-arrow--toggle { transform: rotate(180deg); }
+
+.atend-expand {
+    margin: 2px 0 10px;
+    padding: 0 10px;
+}
+
+.atend-lotes {
+    margin-top: 0;
+    padding: 12px;
+    background: #fbfcfe;
+    border: 1px solid #eef1f6;
+    border-radius: 12px;
+}
+
+.atend-lotes-empty {
+    margin: 0;
+    padding: 14px;
+    background: #fbfcfe;
+    border: 1px dashed #e5e9f0;
+    border-radius: 12px;
+    color: #8a94a8;
+}
+
+.fin-lotes-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fin-lote-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e7ebf2;
+    border-left: 4px solid #e5a400;
+    border-radius: 12px;
+    padding: 13px 15px;
+    transition: box-shadow .18s ease, border-color .18s ease;
+}
+
+.fin-lote-item:hover {
+    box-shadow: var(--shadow);
+    border-color: #f0c9d0;
+}
+
+.fin-lote-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.fin-lote-product {
+    font-weight: 800;
+    color: #1f2937;
+    font-size: .9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.25;
+}
+
+.fin-lote-product i { color: #c8102e; font-size: .82rem; }
+
+.fin-lote-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px 14px;
+    font-size: .74rem;
+    color: #6b7280;
+    flex-wrap: wrap;
+    line-height: 1.4;
+}
+
+.fin-lote-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.fin-lote-meta i { color: #c8102e; }
+
+.fin-lote-venc { color: #8a94a8; }
+
+.fin-lote-side {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-top: 1px dashed #e5e9f0;
+    padding-top: 9px;
+    margin-top: 1px;
+}
+
+.fin-lote-ud {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #334155;
+    background: #eef2f7;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-lote-dias {
+    font-size: .72rem;
+    font-weight: 800;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-lote-dias--crit { background: #fee2e2; color: #c2442e; }
+.fin-lote-dias--ok   { background: #fff3d6; color: #b45309; }
+
+.fin-lote-cta {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #c8102e;
+    background: #fdf0f2;
+    border: 1px solid #f5c6cd;
+    border-radius: .5rem;
+    padding: .36rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background .18s ease;
+}
+
+.fin-lote-cta:hover { background: #fbe3e7; color: #c8102e; }
+
 /* =========================================================
    RESPONSIVE — TABLET Y TELÉFONO (mismo ritmo que finanzas)
    ========================================================= */
@@ -886,4 +1044,11 @@ main.content .stats-alert-wrapper {
     .dash-col-der { gap: 14px; }
 
     .dash-chart { height: 280px; }
+
+    .fin-lote-item { align-items: stretch; }
+    .fin-lote-side { justify-content: space-between; }
+}
+
+@media (max-width: 400px) {
+    .fin-lote-cta { width: 100%; justify-content: center; }
 }

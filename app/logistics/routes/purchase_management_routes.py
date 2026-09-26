@@ -25,7 +25,7 @@ ACTIVE_SUPPLIER_STATUSES = ('ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA')
 
 
 @purchase_management_bp.route('/purchases/management', methods=['GET'], strict_slashes=False)
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def index():
     try:
         service = get_management_service()
@@ -67,7 +67,7 @@ def index():
         return render_template('logistics/purchase_management.html', purchases=[], suppliers=[], products=[])
 
 @purchase_management_bp.route('/purchases/management/export', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def exportar_listado():
     try:
         from app.reports.services import audit_export_service
@@ -105,7 +105,7 @@ def exportar_listado():
         return redirect(url_for('purchase_management.index'))
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/details', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def get_details(purchase_id):
     try:
         service = get_management_service()
@@ -155,7 +155,7 @@ def get_details(purchase_id):
         return jsonify({"error": f"Error interno en el servidor: {str(e)}"}), 500
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/annul', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def annul(purchase_id):
     try:
         service = get_management_service()
@@ -174,7 +174,7 @@ def annul(purchase_id):
     return redirect(url_for('purchase_management.index'))
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/edit', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def edit_purchase(purchase_id):
     try:
         service = get_management_service()

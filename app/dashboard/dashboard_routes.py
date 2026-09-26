@@ -34,6 +34,7 @@ from app.dashboard.dashboard_service import (
     get_finance_dashboard_context,
     get_management_context,
     get_operations_context,
+    get_expiring_lots,
 )
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -99,49 +100,63 @@ def index():
 @login_required
 @management_required
 def director_dashboard():
-    
     sede_id = request.args.get('sede', type=int)
-    context = get_management_context(current_user, location_id=sede_id)
+    periodo_raw = request.args.get('periodo', '')
+    periodo = None
+    if periodo_raw:
+        try:
+            periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
+        except ValueError:
+            periodo = None
 
-    return render_template('dashboard/management_dashboard.html', **context)
+    ctx = get_management_context(current_user, location_id=sede_id, period_start=periodo)
+
+    periodo_label = ctx.get('periodo_etiqueta') or 'Período actual'
+    consumo_etiqueta = 'Hoy' if not periodo else periodo_label
+    periodo_marca = 'HOY' if not periodo else periodo_label.upper()
+
+    return render_template(
+        'dashboard/management_dashboard.html',
+        **ctx,
+        periodo_label=periodo_label,
+        periodo_marca=periodo_marca,
+        consumo_etiqueta=consumo_etiqueta,
+        es_multisede=len(ctx.get('sedes', []) or []) > 1,
+    )
 
 @dashboard_bp.route('/manager-dashboard')
 @login_required
 @manager_required
 def manager_dashboard():
-    from app.dashboard.dashboard_service import get_manager_context, get_expiring_lots
+    from app.dashboard.dashboard_service import get_manager_context
 
-    alarmas = obtener_alarmas_para_dashboard()
-    vencidos_raw = obtener_vencidos_para_dashboard(current_user)
+    sede_id = request.args.get('sede', type=int)
+    periodo_raw = request.args.get('periodo', '')
+    periodo = None
+    if periodo_raw:
+        try:
+            periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
+        except ValueError:
+            periodo = None
 
-    ctx = get_manager_context(current_user)
+    ctx = get_manager_context(current_user, location_id=sede_id, period_start=periodo)
 
-    # 1. Obtenemos la lista (la misma fuente que usa el subgerente)
-    lotes = get_expiring_lots(current_user) or ctx.get('expiring_lots', []) or []
+    # Alarmas de stock (ya acotadas a las sedes del usuario) y lotes reales vencidos
+    alarmas = ctx.get('alarmas', []) or []
+    vencidos = obtener_vencidos_para_dashboard(current_user)
+    expiring_lots = ctx.get('expiring_lots', []) or []
 
-    # 2. La transformamos al formato exacto que espera _alerts_expired.html
-    vencidos = []
-    for item in lotes:
-        vencidos.append({
-            'location_id': item.get('location_id'),
-            'location_name': item.get('location') or item.get('location_name') or 'Sede',
-            'product_name': item.get('product') or item.get('product_name') or item.get('name') or 'Producto',
-            'lot_number': item.get('lot') or item.get('lot_number') or '-',
-            'quantity': item.get('quantity') or 0,
-            'expiration_date': item.get('expiration_date') or (item.get('expiration').strftime('%Y-%m-%d') if hasattr(item.get('expiration'), 'strftime') else item.get('expiration')),
-            'product_id': item.get('product_id'),
-            # extras por si acaso
-            'days': item.get('days'),
-            'critical': item.get('critical'),
-        })
+    periodo_label = ctx.get('periodo_etiqueta') or 'Período actual'
+    consumo_etiqueta = 'Hoy' if not periodo else (ctx.get('periodo_etiqueta') or 'Período')
+    periodo_marca = 'HOY' if not periodo else consumo_etiqueta.upper()
 
     return render_template(
         'dashboard/manager_dashboard.html',
         alarmas=alarmas,
-        vencidos=vencidos,                    
+        vencidos=vencidos,
         critical_stock_items=alarmas,
         expired_items=vencidos,
-        expiring_lots=vencidos,
+        expiring_lots=expiring_lots,
         total_stock=ctx.get('total_stock', 0),
         consumo_hoy_monto=ctx.get('consumo_hoy_monto', 0),
         pending_wastes_count=ctx.get('pending_wastes_count', 0),
@@ -150,17 +165,44 @@ def manager_dashboard():
         sede_nombre=ctx.get('sede_nombre', 'Mi Sede'),
         location=ctx.get('location'),
         recent_movements=ctx.get('recent_movements', []),
+        sedes=ctx.get('sedes', []),
+        es_multisede=len(ctx.get('sedes', []) or []) > 1,
+        sede_seleccionada=sede_id,
+        periodos_mes=ctx.get('periodos_mes', []),
+        periodo_actual=periodo,
+        periodo_label=periodo_label,
+        periodo_marca=periodo_marca,
+        consumo_etiqueta=consumo_etiqueta,
     )
 
 @dashboard_bp.route('/assistant-manager')
 @login_required
 @assistant_manager_required
 def assistant_manager_dashboard():
+    sede_id = request.args.get('sede', type=int)
+    periodo_raw = request.args.get('periodo', '')
+    periodo = None
+    if periodo_raw:
+        try:
+            periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
+        except ValueError:
+            periodo = None
+
+    ctx = get_subgerente_context(current_user, location_id=sede_id, period_start=periodo)
     vencidos = obtener_vencidos_para_dashboard(current_user)
+
+    periodo_label = ctx.get('periodo_etiqueta') or 'Período actual'
+    consumo_etiqueta = 'Hoy' if not periodo else periodo_label
+    periodo_marca = 'HOY' if not periodo else periodo_label.upper()
+
     return render_template(
         'dashboard/assistant_manager_dashboard.html',
-        **get_subgerente_context(current_user),
-        vencidos=vencidos
+        **ctx,
+        vencidos=vencidos,
+        periodo_label=periodo_label,
+        periodo_marca=periodo_marca,
+        consumo_etiqueta=consumo_etiqueta,
+        es_multisede=len(ctx.get('sedes', []) or []) > 1,
     )
 
 @dashboard_bp.route('/admin')
@@ -169,6 +211,10 @@ def assistant_manager_dashboard():
 def admin_dashboard():
     alarmas = obtener_alarmas_para_dashboard()
     vencidos = obtener_vencidos_para_dashboard(current_user)
+    try:
+        expiring_lots = get_expiring_lots(current_user, limit=6)
+    except Exception:
+        expiring_lots = []
     period_type = validate_period_type(request.args.get('period'))
     default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
     moneda = validate_moneda(request.args.get('moneda'), default=default_moneda)
@@ -223,6 +269,7 @@ def admin_dashboard():
         sedes=sedes,
         sede_seleccionada=sede_id,
         vencidos=vencidos,
+        expiring_lots=expiring_lots,
         flujo_traslados=flujo_traslados,
     )
 
@@ -250,6 +297,36 @@ def finance_dashboard():
 @login_required
 @operations_required
 def operations_dashboard():
-    sede_id = request.args.get('location_id', type=int)
-    context = get_operations_context(current_user, location_id=sede_id)
-    return render_template('dashboard/operations_dashboard.html', **context)
+    sede_id = request.args.get('sede', type=int)
+    periodo_raw = request.args.get('periodo', '')
+    periodo = None
+    if periodo_raw:
+        try:
+            periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
+        except ValueError:
+            periodo = None
+
+    ctx = get_operations_context(current_user, location_id=sede_id, period_start=periodo)
+
+    expiring_lots = []
+    try:
+        expiring_lots = get_expiring_lots(current_user, limit=5, horizon_days=7)
+    except Exception:
+        expiring_lots = []
+
+    sedes = ctx.get('sedes', []) or []
+    sede_nombre = ctx.get('sede_nombre') or (sedes[0].name if sedes else 'Mi Sede')
+    periodo_label = ctx.get('periodo_etiqueta') or 'Período actual'
+    periodo_marca = 'HOY' if not periodo else periodo_label.upper()
+
+    return render_template(
+        'dashboard/operations_dashboard.html',
+        **ctx,
+        alarmas=ctx.get('alarmas_stock', []) or [],
+        expiring_lots=expiring_lots,
+        sede_nombre=sede_nombre,
+        sede=sede_nombre,
+        es_multisede=len(sedes) > 1,
+        periodo_label=periodo_label,
+        periodo_marca=periodo_marca,
+    )

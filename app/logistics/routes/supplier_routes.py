@@ -13,12 +13,12 @@ from app.decorators.roles import require_roles, require_roles_api
 suppliers_bp = Blueprint('suppliers', __name__)
 
 @suppliers_bp.route('/suppliers/register', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def show_register_form():
     return render_template('logistics/register-supplier.html')
 
 @suppliers_bp.route('/suppliers/register', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def handle_register():
     try:
         supplier_request = SupplierRequest(request.form)
@@ -45,7 +45,7 @@ def handle_register():
 # =========================================================================
 
 @suppliers_bp.route('/suppliers/check-name', methods=['POST'])
-@require_roles_api('admin', 'management', 'manager')
+@require_roles_api('admin')
 def check_name():
     data = request.get_json() or {}
     name = data.get('name', '').strip()
@@ -64,7 +64,7 @@ def check_name():
 
 
 @suppliers_bp.route('/suppliers/check-tax-id', methods=['POST'])
-@require_roles_api('admin', 'management', 'manager')
+@require_roles_api('admin')
 def check_tax_id():
     data = request.get_json() or {}
     tax_id = data.get('tax_id', '').strip()
@@ -83,7 +83,7 @@ def check_tax_id():
 
 
 @suppliers_bp.route('/suppliers/check-phone', methods=['POST'])
-@require_roles_api('admin', 'management', 'manager')
+@require_roles_api('admin')
 def check_phone():
     data = request.get_json() or {}
     phone = data.get('phone', '').strip()
@@ -102,7 +102,7 @@ def check_phone():
 
 
 @suppliers_bp.route('/suppliers/check-email', methods=['POST'])
-@require_roles_api('admin', 'management', 'manager')
+@require_roles_api('admin')
 def check_email():
     data = request.get_json() or {}
     email = data.get('email', '').strip()

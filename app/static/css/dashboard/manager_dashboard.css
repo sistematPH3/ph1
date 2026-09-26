@@ -1,428 +1,308 @@
-/* ==========================================================================
-   DASHBOARD GERENCIA - ESTILOS TIPO ADMIN
-   ========================================================================== */
+/* =========================================================
+   PANEL DE GERENCIA — ajustes sobre el sistema visual de finanzas
+   (compila con finance_dashboard.css y los componentes de alertas)
+   ========================================================= */
 
-/* --------------------------------------------------------------------------
-   1. Banner de Encabezado Superior (Degradado Oscuro con Widgets)
-   -------------------------------------------------------------------------- */
-.dash-header-banner {
-    background: linear-gradient(135deg, #0b0204 0%, #1a0309 40%, #6e0019 100%);
-    border-radius: 0.85rem;
-    padding: 1.25rem 1.75rem;
-    color: #ffffff;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
+/* Las secciones del panel controlan su espaciado; el main ya no aporta padding
+   (igual que en finanzas). Se alinean las alarmas al margen del hero. */
+main.content .stock-alert-wrapper,
+main.content .expired-alert-wrapper {
+    margin-left: 30px;
+    margin-right: 30px;
 }
 
-.dash-header-title-area h1 {
-    font-size: 1.6rem;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    margin: 0.2rem 0;
-    color: #ffffff;
+/* --- Tabla de traslados recientes --- */
+.fin-mov-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+}
+
+.fin-mov-table thead th {
     text-transform: uppercase;
-}
-
-.dash-header-subtitle {
-    font-size: 0.85rem;
-    color: #d1d5db;
-    margin: 0;
-}
-
-.dash-header-tag {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #fca5a5;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-}
-
-/* Widgets Lado Derecho */
-.dash-header-right-widgets {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-}
-
-.dash-header-user-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    background: rgba(0, 0, 0, 0.35);
-    padding: 0.45rem 1rem 0.45rem 0.5rem;
-    border-radius: 2rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.dash-user-avatar {
-    width: 34px;
-    height: 34px;
-    background-color: #f59e0b; /* Amarillo */
-    color: #000000;
+    font-size: .66rem;
+    letter-spacing: .06em;
     font-weight: 800;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.95rem;
+    color: #8a94a8;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eceff5;
 }
 
-.dash-user-details {
-    display: flex;
-    flex-direction: column;
+.fin-mov-table tbody td {
+    padding: 11px 10px;
+    border-bottom: 1px solid #f0f2f7;
+    color: #2a3040;
+    vertical-align: middle;
 }
 
-.dash-user-name {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #ffffff;
-    line-height: 1.1;
-}
+.fin-mov-table tbody tr:last-child td { border-bottom: none; }
 
-.dash-user-role {
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: #9ca3af;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
+.fin-mov-table tbody tr:hover { background: #f7f9fc; }
 
-.dash-header-branch-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    background: rgba(0, 0, 0, 0.35);
-    padding: 0.45rem 1.1rem;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.dash-header-branch-badge i {
-    color: #f59e0b;
-    font-size: 0.95rem;
-}
-
-.dash-branch-details {
-    display: flex;
-    flex-direction: column;
-}
-
-.dash-branch-label {
-    font-size: 0.6rem;
+.fin-mov-id {
     font-weight: 800;
-    color: #9ca3af;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-
-.dash-branch-name {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #ffffff;
-    line-height: 1.1;
-}
-
-/* --------------------------------------------------------------------------
-   2. Sección "Resúmenes de tu sede" (KPIs GRANDES TIPO ADMIN)
-   -------------------------------------------------------------------------- */
-.kpi-section-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #1f2937;
-    margin-bottom: 1rem;
-}
-
-.kpi-section-title i {
-    color: #ce1126;
-    background-color: #fee2e2;
-    padding: 0.45rem;
-    border-radius: 50%;
-    font-size: 1rem;
-}
-
-/* Grilla idéntica al admin */
-.dash-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 1.75rem;
-}
-
-.dash-kpi-card {
-    background: #ffffff;
-    border-radius: 1rem;
-    padding: 1.25rem 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e2e8f0;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 140px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.dash-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-}
-
-/* Iconos superiores con caja de fondo suave */
-.dash-kpi-ico {
-    width: 42px;
-    height: 42px;
-    border-radius: 0.65rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.35rem;
-    margin-bottom: 0.5rem;
-}
-
-/* Variaciones de color tipo Admin */
-.dash-kpi-card--stock { border-left: 5px solid #ce1126; }
-.dash-kpi-ico--stock { background-color: #fef2f2; color: #ce1126; }
-
-.dash-kpi-card--consumos { border-left: 5px solid #2563eb; }
-.dash-kpi-ico--consumos { background-color: #eff6ff; color: #2563eb; }
-
-.dash-kpi-card--mermas { border-left: 5px solid #d97706; }
-.dash-kpi-ico--mermas { background-color: #fffbeb; color: #d97706; }
-
-.dash-kpi-card--traslados { border-left: 5px solid #7c3aed; }
-.dash-kpi-ico--traslados { background-color: #f5f3ff; color: #7c3aed; }
-
-.dash-kpi-label {
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #64748b;
-}
-
-.dash-kpi-value {
-    font-size: 1.85rem;
-    font-weight: 900;
     color: #0f172a;
-    line-height: 1.1;
-    margin: 0.35rem 0;
 }
 
-.dash-kpi-comp {
+.fin-mov-fecha {
+    color: #64748b;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.fin-mov-fecha small {
+    display: block;
+    font-size: .68rem;
+    color: #94a3b8;
+}
+
+.fin-mov-route {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
+    gap: 8px;
+    font-weight: 600;
+    color: #1e293b;
 }
 
-.kpi-comp-badge {
-    font-size: 0.75rem;
+.fin-mov-arrow {
+    color: #c8102e;
+    font-size: .72rem;
+}
+
+.fin-mov-contenido {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: .74rem;
     font-weight: 700;
-    padding: 0.25rem 0.6rem;
-    border-radius: 0.4rem;
+    padding: .25rem .6rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-mov-badge {
+    display: inline-block;
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .28rem .6rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-mov-badge--ok   { background: #d9f3e6; color: #0f7a4d; }
+.fin-mov-badge--warn { background: #e4f0ff; color: #1d5fb5; }
+.fin-mov-badge--off  { background: #fde3e0; color: #c2442e; }
+
+/* --- Estado vacío (estilo coherente con finanzas) --- */
+.fin-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 34px 20px;
+}
+
+.fin-empty i {
+    font-size: 1.9rem;
+    color: #b6bfcc;
+}
+
+.fin-empty h4 {
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 800;
+    color: #47506b;
+}
+
+.fin-empty p {
+    margin: 0;
+    font-size: .8rem;
+    color: #8a94a8;
+}
+
+/* --- Sede vigente en los filtros --- */
+.fin-sede-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-}
-
-.kpi-comp-badge.up { background-color: #dcfce7; color: #15803d; }
-.kpi-comp-badge.down { background-color: #fee2e2; color: #b91c1c; }
-.kpi-comp-badge.flat { background-color: #f1f5f9; color: #475569; }
-
-/* --------------------------------------------------------------------------
-   3. Disposición a 2 Columnas (Paneles de Alertas en Paralelo)
-   -------------------------------------------------------------------------- */
-.dashboard-main-layout {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
-    align-items: start;
-    margin-top: 1.5rem;
-}
-
-.panel-criticos-container {
-    background: #ffffff;
-    border-radius: 1rem;
-    padding: 1.25rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    border: 1px solid #e2e8f0;
-}
-
-.panel-criticos-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.8rem;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.panel-criticos-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.panel-criticos-title i {
-    color: #dc2626;
-    background-color: #fee2e2;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    font-size: 1.1rem;
-}
-
-/* Icono amarillo/amarronado suave para alertas de vencimiento */
-.panel-criticos-title i.text-warning {
-    color: #d97706;
-    background-color: #fffbeb;
-}
-
-.panel-criticos-title h3 {
-    font-size: 1.05rem;
+    gap: 6px;
+    background: #fdf0f2;
+    border: 1px solid #f5c6cd;
+    color: #c8102e;
+    font-size: .8rem;
     font-weight: 700;
-    color: #0f172a;
-    margin: 0;
+    padding: .35rem .75rem;
+    border-radius: .5rem;
 }
 
-.panel-criticos-title p {
-    font-size: 0.78rem;
-    color: #64748b;
-    margin: 0;
-}
-
-.panel-criticos-body {
-    max-height: 420px;
-    overflow-y: auto;
-}
-
-/* Estado Vacío de Alertas */
-.empty-criticos-state {
+/* --- Lista de lotes por vencer --- */
+.fin-lotes-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
     display: flex;
     flex-direction: column;
+    gap: 8px;
+}
+
+.fin-lote-item {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1rem;
-    text-align: center;
-    background-color: #f8f9fa;
-    border: 2px dashed #cbd5e1;
-    border-radius: 0.75rem;
-    margin-top: 0.5rem;
+    justify-content: space-between;
+    gap: 12px;
+    background: #f8f9fc;
+    border: 1px solid #eef1f6;
+    border-left: 4px solid #e5a400;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-.empty-criticos-state i {
-    font-size: 3rem;
-    color: #94a3b8 !important;
-    margin-bottom: 0.75rem;
+.fin-lote-item:hover {
+    transform: translateX(3px);
+    box-shadow: var(--shadow);
+    border-color: #f0c9d0;
 }
 
-.empty-criticos-state h4 {
-    font-size: 1rem;
-    font-weight: 700;
+.fin-lote-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.fin-lote-product {
+    font-weight: 800;
+    color: #1f2937;
+    font-size: .92rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-lote-product i { color: #c8102e; font-size: .82rem; }
+
+.fin-lote-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: .76rem;
+    color: #6b7280;
+    flex-wrap: wrap;
+}
+
+.fin-lote-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.fin-lote-meta i { color: #c8102e; }
+
+.fin-lote-venc { color: #8a94a8; }
+
+.fin-lote-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.fin-lote-ud {
+    font-size: .74rem;
+    font-weight: 800;
     color: #334155;
-    margin-bottom: 0.35rem;
+    background: #eef2f7;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
 }
 
-.empty-criticos-state p {
-    font-size: 0.8rem;
-    color: #64748b;
-    margin: 0;
-    max-width: 260px;
-    line-height: 1.35;
+.fin-lote-dias {
+    font-size: .72rem;
+    font-weight: 800;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
 }
 
-/* Responsive para Pantallas Pequeñas */
-@media (max-width: 992px) {
-    .dashboard-main-layout {
-        grid-template-columns: 1fr;
-    }
+.fin-lote-dias--crit { background: #fee2e2; color: #c2442e; }
+.fin-lote-dias--ok   { background: #fff3d6; color: #b45309; }
+
+.fin-lote-cta {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #c8102e;
+    background: #fdf0f2;
+    border: 1px solid #f5c6cd;
+    border-radius: .5rem;
+    padding: .36rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background .18s ease;
 }
 
-/* ==========================================================================
-   6. VISTA MÓVIL / TELÉFONO (PANTALLAS < 768px) - GERENCIA
-   ========================================================================== */
-@media (max-width: 768px) {
-    /* Banner de Encabezado Superior */
-    .dash-header-banner {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 1.25rem 1rem;
-        gap: 1.25rem;
+.fin-lote-cta:hover { background: #fbe3e7; color: #c8102e; }
+
+/* El panel de vencimientos próximos abarca toda la fila de la cuadrícula */
+.fin-est--full {
+    grid-column: 1 / -1;
+}
+
+/* =========================================================
+   RESPONSIVE — TABLET
+   ========================================================= */
+@media (max-width: 900px) {
+    .fin-mov-table thead th { padding: 7px 8px; font-size: .62rem; }
+    .fin-mov-table tbody td { padding: 9px 8px; font-size: .78rem; }
+    .fin-mov-contenido { font-size: .7rem; padding: .22rem .5rem; }
+    .fin-kpi-detalle { flex-wrap: wrap; }
+}
+
+/* =========================================================
+   RESPONSIVE — TELÉFONO
+   ========================================================= */
+@media (max-width: 720px) {
+    /* Las alarmas se alinean al margen de las demás secciones */
+    main.content .stock-alert-wrapper,
+    main.content .expired-alert-wrapper {
+        margin-left: 14px;
+        margin-right: 14px;
     }
 
-    .dash-header-title-area h1 {
-        font-size: 1.35rem;
-    }
-
-    .dash-header-subtitle {
-        font-size: 0.8rem;
-    }
-
-    .dash-header-right-widgets {
+    /* Tabla compacta: se ocultan ID y Contenido, queda Fecha/Origen/Estado */
+    .fin-mov-table {
         width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
+        table-layout: auto;
     }
+    .fin-mov-table thead th:nth-child(1),
+    .fin-mov-table thead th:nth-child(4),
+    .fin-mov-table tbody td:nth-child(1),
+    .fin-mov-table tbody td:nth-child(4) { display: none; }
 
-    .dash-header-user-badge,
-    .dash-header-branch-badge {
-        width: 100%;
-        justify-content: flex-start;
-        padding: 0.5rem 0.85rem;
-    }
+    .fin-mov-route { gap: 5px; font-size: .78rem; }
+    .fin-mov-fecha small { font-size: .64rem; }
+    .fin-mov-badge { font-size: .62rem; padding: .22rem .5rem; }
+    .fin-est-marca { font-size: .66rem; }
+    .fin-empty { padding: 26px 14px; }
 
-    /* Grilla de Tarjetas KPI */
-    .dash-kpi-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .dash-kpi-card {
-        min-height: auto;
-        padding: 1rem 1.15rem;
-    }
-
-    .dash-kpi-value {
-        font-size: 1.6rem;
-    }
-
-    /* Paneles e Inferiores */
-    .dashboard-main-layout {
-        grid-template-columns: 1fr;
-        gap: 1.25rem;
-        margin-top: 1rem;
-    }
-
-    .panel-criticos-container {
-        padding: 1rem;
-    }
-
-    .panel-criticos-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-
-    .panel-criticos-header .badge {
-        align-self: flex-start;
-    }
-
-    /* Adaptación de tablas en contenedores móviles */
-    .panel-criticos-body {
-        max-height: 350px;
-        overflow-x: auto;
-    }
-    
+    .fin-lote-item { flex-wrap: wrap; align-items: flex-start; }
+    .fin-lote-side { width: 100%; justify-content: flex-start; }
 }
 
+@media (max-width: 400px) {
+    .fin-mov-fecha { font-size: .74rem; }
+    .fin-mov-route { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .fin-mov-arrow { display: none; }
+    .fin-lote-cta { width: 100%; justify-content: center; }
+}

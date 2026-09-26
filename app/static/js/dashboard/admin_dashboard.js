@@ -219,10 +219,24 @@
         });
     }
 
+    function initAtendToggles() {
+        document.querySelectorAll('.atend-row--toggler').forEach(function (row) {
+            row.addEventListener('click', function (e) {
+                e.preventDefault();
+                var target = document.getElementById(row.getAttribute('data-atend-target'));
+                if (!target) return;
+                var expanded = !target.hidden;
+                target.hidden = expanded;
+                row.setAttribute('aria-expanded', String(!expanded));
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initTabs();
         construir();
         construirMermasTipo();
         initRefresh();
+        initAtendToggles();
     });
 })();

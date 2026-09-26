@@ -1,225 +1,296 @@
 {% extends "layout.html" %}
 
+{% set fin_roles = {
+    'Finance': 'Finanzas',
+    'Administrator': 'Administrador',
+    'Manager': 'Gerente',
+    'Assistant Manager': 'Subgerente',
+    'Operations': 'Operaciones',
+    'Management': 'Dirección',
+    'Guest': 'Invitado',
+} %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;900&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/finance_dashboard.css') }}?v=42">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/manager_dashboard.css') }}?v=11">
+{% endblock %}
+
 {% block content %}
-<!-- Carga de CSS con versión para evitar caché -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/manager_dashboard.css') }}?v=7">
 
-<!-- 1. BANNER DE ENCABEZADO GERENCIA -->
-<div class="dash-header-banner">
-    <!-- Lado Izquierdo: Títulos y Saludo -->
-    <div class="dash-header-title-area">
-        <span class="dash-header-tag"><i class="bi bi-shield-check"></i> GERENCIA DE SEDE</span>
-        <h1>PANEL DE GERENCIA</h1>
-        <p class="dash-header-subtitle">
-            Hola <strong>{{ current_user.name }}</strong>, aquí la visión general de tu sede.
-        </p>
+<!-- Cabecera con identidad corporativa -->
+<div class="fin-hero-wrap">
+<header class="dashboard-header fin-hero">
+    <div class="fin-hero-texto">
+        <p class="fin-hero-kicker"><i class="bi bi-shield-check me-1"></i>Módulo de gerencia &middot; Sistema PH</p>
+        <h1>Panel de Gerencia</h1>
+        <p>Supervisa el stock, los consumos, las mermas y los traslados de tu sede.</p>
     </div>
-
-    <!-- Lado Derecho: Usuario y Sede Actual -->
-    <div class="dash-header-right-widgets">
-        <!-- Usuario con Inicial Amarilla -->
-        <div class="dash-header-user-badge">
-            <div class="dash-user-avatar">
-                {{ current_user.name[0]|upper if current_user.name else 'U' }}
-            </div>
-            <div class="dash-user-details">
-                <span class="dash-user-name">{{ current_user.name }}</span>
-                <span class="dash-user-role">GERENTE DE SEDE</span>
+    <div class="fin-hero-aside">
+        <div class="fin-hero-perfil">
+            <div class="fin-avatar">{{ current_user.name[:1]|upper if current_user.name else 'G' }}</div>
+            <div class="fin-avatar-copy">
+                <div class="fin-avatar-nombre">{{ current_user.name }}</div>
+                <div class="fin-avatar-rol">{% if current_user.role %}{{ fin_roles.get(current_user.role.name, current_user.role.name) }}{% else %}Gerente de Sede{% endif %} · Sede</div>
             </div>
         </div>
-
-        <!-- Sede Actual del Usuario -->
-        <div class="dash-header-branch-badge">
-            <i class="bi bi-geo-alt-fill"></i>
-            <div class="dash-branch-details">
-                <span class="dash-branch-label">SEDE ACTUAL</span>
-                <span class="dash-branch-name" id="nombre-sede">
-                    {{ sede_nombre if sede_nombre else (current_user.location.name if current_user.location else (current_user.branch.name if current_user.branch else 'Mi Sede')) }}
-                </span>
+        <div class="fin-hero-badge">
+            <i class="bi bi-calendar3"></i>
+            <div class="fin-hero-badge-copy">
+                <span class="fin-hero-badge-t">Período vigente</span>
+                <span class="fin-hero-badge-v">{{ periodo_label }}</span>
             </div>
         </div>
     </div>
+</header>
 </div>
 
-<!-- 2. RESÚMENES DE TU SEDE (KPIs GRANDES) -->
-<div class="kpi-section-title">
-    <i class="bi bi-speedometer2"></i>
-    <span>Resúmenes de tu sede</span>
-</div>
+<!-- Alarmas: mismo diseño compartido que en el panel de administración -->
+{% include 'alerts/_alerts_stock.html' %}
 
-<div class="dash-kpi-grid">
-    <!-- Stock Agregado -->
-    <div class="dash-kpi-card dash-kpi-card--stock">
-        <div class="dash-kpi-ico dash-kpi-ico--stock"><i class="bi bi-boxes"></i></div>
-        <div class="dash-kpi-label">Stock Agregado</div>
-        <div class="dash-kpi-value" id="monto-stock-agregado">{{ total_stock|default(0) }} uds.</div>
-        <div class="dash-kpi-comp">
-            <span class="kpi-comp-badge flat"><i class="bi bi-house-check"></i> Sede Actual</span>
+{% include 'alerts/_alerts_expired.html' %}
+
+<!-- Filtros del panel: período a consultar y sede (si hay más de una) -->
+<section class="fin-filtros" aria-label="Filtros del panel">
+    <form method="get" action="{{ url_for('dashboard.manager_dashboard') }}"
+          class="fin-filtros-form">
+        <div class="fin-filtros-titulo">
+            <i class="bi bi-funnel me-1"></i>
+            <span>Filtros</span>
         </div>
-    </div>
-
-    <!-- Consumos Día (Formato Unidades) -->
-    <div class="dash-kpi-card dash-kpi-card--consumos">
-        <div class="dash-kpi-ico dash-kpi-ico--consumos"><i class="bi bi-egg-fried"></i></div>
-        <div class="dash-kpi-label">Consumo Cocina</div>
-        <div class="dash-kpi-value" id="monto-consumo-cocina">{{ consumo_hoy_monto|default(0)|int }} uds.</div>
-        <div class="dash-kpi-comp">
-            <span class="kpi-comp-badge up"><i class="bi bi-check-circle"></i> Al día</span>
+        {% if es_multisede %}
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finSede">Sede</label>
+            <select id="finSede" name="sede" class="form-select form-select-sm">
+                <option value="" {% if not sede_seleccionada %}selected{% endif %}>
+                    Todas las sedes{% if not sede_seleccionada %} · activo{% endif %}
+                </option>
+                {% for opt in sedes %}
+                <option value="{{ opt.id }}" {% if sede_seleccionada == opt.id %}selected{% endif %}>
+                    {{ opt.name }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-    </div>
-
-    <!-- Mermas Pendientes -->
-    <div class="dash-kpi-card dash-kpi-card--mermas">
-        <div class="dash-kpi-ico dash-kpi-ico--mermas"><i class="bi bi-trash3"></i></div>
-        <div class="dash-kpi-label">Mermas Pendientes</div>
-        <div class="dash-kpi-value" id="mermas-pendientes-count">{{ pending_wastes_count|default(0) }}</div>
-        <div class="dash-kpi-comp">
-            <span class="kpi-comp-badge down"><i class="bi bi-clock-history"></i> Por aprobar</span>
+        {% endif %}
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finPeriodo">Período</label>
+            <select id="finPeriodo" name="periodo" class="form-select form-select-sm">
+                <option value="" {% if not periodo_actual %}selected{% endif %}>
+                    Período actual{% if not periodo_actual %} · vigente{% endif %}
+                </option>
+                {% for periode in periodos_mes %}
+                <option value="{{ periode.valor }}"{% if periodo_actual == periode.valor %} selected{% endif %}>
+                    {{ periode.etiqueta }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-    </div>
-
-    <!-- Traslados por Recibir -->
-    <div class="dash-kpi-card dash-kpi-card--traslados">
-        <div class="dash-kpi-ico dash-kpi-ico--traslados"><i class="bi bi-truck"></i></div>
-        <div class="dash-kpi-label">Traslados por Recibir</div>
-        <div class="dash-kpi-value" id="traslados-transit-count">{{ transfers_in_transit_count|default(0) }}</div>
-        <div class="dash-kpi-comp">
-            <span class="kpi-comp-badge up"><i class="bi bi-box-seam"></i> En camino</span>
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finAplicar">Consultar</label>
+            <button id="finAplicar" type="submit" class="btn btn-fin-primary btn-sm">
+                <i class="bi bi-arrow-repeat me-1"></i> Aplicar
+            </button>
         </div>
-    </div>
-</div>
+    </form>
+</section>
 
-<div class="panel-criticos-container" style="margin-top: 1.25rem; margin-bottom: 1.5rem;">
-    <div class="panel-criticos-header">
-        <div class="panel-criticos-title">
-            <i class="bi bi-arrow-left-right" style="color:#2563eb; background:#dbeafe;"></i>
-            <div>
-                <h3>Últimos traslados</h3>
-                <p>Actividad reciente en tus sedes</p>
+<!-- KPIs de la sede -->
+<section class="fin-tarjetas" aria-label="Resumen de la sede">
+    <div class="fin-seccion-head">
+        <h2 class="fin-seccion-titulo">
+            <span class="fin-seccion-ico"><i class="bi bi-speedometer2"></i></span>
+            Resumen de la sede
+        </h2>
+        <span class="fin-seccion-leyenda">
+            <i class="bi bi-circle-fill fin-leyenda-dot"></i>{{ sede_nombre }} · {{ periodo_label }}
+        </span>
+    </div>
+    <div class="fin-kpi-grid">
+        <div class="fin-kpi-card fin-kpi--azul">
+            <div class="fin-kpi-ico"><i class="bi bi-boxes"></i></div>
+            <div class="fin-kpi-etiqueta">Stock agregado</div>
+            <div class="fin-kpi-valor">{{ total_stock|ph_qty }} uds.</div>
+            <div class="fin-kpi-detalle"><i class="bi bi-box-seam me-1"></i>Insumos registrados en tus sedes</div>
+            <div class="fin-kpi-pie">
+                <span class="fin-pill fin-pill--flat"><i class="bi bi-house-check"></i> Sede actual</span>
             </div>
         </div>
-        <a href="{{ url_for('logistics_list.movement_list') }}"
-           style="color:#dc2626; font-weight:700; font-size:0.85rem; text-decoration:none;">
-            Ver listado completo
-        </a>
-    </div>
 
-    <div class="panel-criticos-body" style="max-height:none; overflow:visible;">
+        <div class="fin-kpi-card fin-kpi--naranja">
+            <div class="fin-kpi-ico"><i class="bi bi-fire"></i></div>
+            <div class="fin-kpi-etiqueta">Consumo cocina</div>
+            <div class="fin-kpi-valor">{{ consumo_hoy_monto|ph_qty }} uds.</div>
+            <div class="fin-kpi-detalle"><i class="bi bi-clock-history me-1"></i>Unidades gastadas {% if consumo_etiqueta == 'Hoy' %}hoy{% else %}en {{ consumo_etiqueta }}{% endif %}</div>
+            <div class="fin-kpi-pie">
+                <span class="fin-pill fin-pill--flat"><i class="bi bi-check-circle"></i> {{ consumo_etiqueta }}</span>
+            </div>
+        </div>
+
+        <div class="fin-kpi-card fin-kpi--ambar">
+            <div class="fin-kpi-ico"><i class="bi bi-trash3"></i></div>
+            <div class="fin-kpi-etiqueta">Mermas pendientes</div>
+            <div class="fin-kpi-valor">{{ pending_wastes_count }}</div>
+            <div class="fin-kpi-detalle"><i class="bi bi-clipboard-check me-1"></i>Solicitudes en espera de aprobación</div>
+            <div class="fin-kpi-pie">
+                <span class="fin-pill fin-pill--flat"><i class="bi bi-clock-history"></i> Por aprobar</span>
+            </div>
+        </div>
+
+        <div class="fin-kpi-card fin-kpi--verde">
+            <div class="fin-kpi-ico"><i class="bi bi-truck"></i></div>
+            <div class="fin-kpi-etiqueta">Traslados por recibir</div>
+            <div class="fin-kpi-valor">{{ transfers_in_transit_count }}</div>
+            <div class="fin-kpi-detalle"><i class="bi bi-box-seam me-1"></i>Movimientos en camino a tu sede</div>
+            <div class="fin-kpi-pie">
+                <span class="fin-pill fin-pill--flat"><i class="bi bi-box-seam"></i> En camino</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Detalle: traslados recientes + resumen inmediato -->
+<section class="fin-pantallas" aria-label="Detalle de la sede">
+    <div class="panel fin-est">
+        <div class="panel-header">
+            <h2><i class="bi bi-arrow-left-right me-2"></i>Últimos traslados</h2>
+            <span class="fin-est-marca">{{ periodo_marca }} &middot; {{ recent_movements|length }} MOV</span>
+        </div>
         {% if recent_movements and recent_movements|length > 0 %}
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
-                <thead style="background:#f8fafc;">
+            <table class="fin-mov-table">
+                <thead>
                     <tr>
-                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">ID</th>
-                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Fecha</th>
-                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Origen y Destino</th>
-                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Contenido</th>
-                        <th style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#64748b;">Estado</th>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Origen y destino</th>
+                        <th>Contenido</th>
+                        <th>Estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in recent_movements %}
+                    {% set badge_cls = 'fin-mov-badge--ok' if m.status_label == 'Completado'
+                                       else ('fin-mov-badge--warn' if m.status_label == 'En Tránsito' else 'fin-mov-badge--off') %}
                     <tr>
-                        <td style="font-weight:700; color:#0f172a;">#{{ m.id }}</td>
-                        <td style="color:#64748b; white-space:nowrap;">
+                        <td class="fin-mov-id">#{{ m.id }}</td>
+                        <td class="fin-mov-fecha">
                             {% if m.date %}
-                                {{ m.date.strftime('%Y-%m-%d') if m.date.strftime else m.date }}
-                                <br><small>{{ m.date.strftime('%I:%M %p') if m.date.strftime else '' }}</small>
+                                {{ m.date.strftime('%d/%m/%Y') if m.date.strftime else m.date }}
+                                {% if m.date.strftime %}<small>{{ m.date.strftime('%I:%M %p') }}</small>{% endif %}
                             {% else %}—{% endif %}
                         </td>
-                        <td style="font-weight:600; color:#1e293b;">
-                            {{ m.origin }} → {{ m.destination }}
+                        <td>
+                            <div class="fin-mov-route">
+                                <span>{{ m.origin }}</span>
+                                <span class="fin-mov-arrow"><i class="bi bi-arrow-right"></i></span>
+                                <span>{{ m.destination }}</span>
+                            </div>
                         </td>
                         <td>
-                            <span style="background:#f1f5f9; color:#334155; font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:0.4rem;">
-                                {{ m.num_products }} prod. · {{ m.total_qty|int }} unds.
+                            <span class="fin-mov-contenido">
+                                {{ m.num_products }} prod. &middot; {{ m.total_qty|ph_qty }} uds.
                             </span>
                         </td>
-                        <td>
-                            <span class="badge
-                                {% if m.status_label == 'En Tránsito' %}bg-success
-                                {% elif m.status_label == 'Completado' %}bg-info text-dark
-                                {% else %}bg-secondary{% endif %}"
-                                style="font-size:0.72rem; font-weight:700; text-transform:uppercase;">
-                                {{ m.status_label }}
-                            </span>
-                        </td>
+                        <td><span class="fin-mov-badge {{ badge_cls }}">{{ m.status_label }}</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <div class="fin-grafica-note">
+            <i class="bi bi-arrow-left-right text-danger"></i>
+            Actividad reciente de traslados que involucran tus sedes.
+            <a href="{{ url_for('logistics_list.movement_list') }}" class="panel-link ms-2">Ver listado completo</a>
+        </div>
         {% else %}
-        <div class="empty-criticos-state">
-            <i class="bi bi-inbox text-secondary"></i>
+        <div class="fin-empty">
+            <i class="bi bi-inbox"></i>
             <h4>Sin traslados recientes</h4>
             <p>No hay actividad de traslados en tus sedes por ahora.</p>
         </div>
         {% endif %}
     </div>
-</div>
 
-<!-- 3. LAYOUT INFERIOR EN DOS COLUMNAS DE PANELES DE ALERTAS -->
-<div class="dashboard-main-layout">
-    
-    <!-- COLUMNA IZQUIERDA: PANEL DE CRÍTICOS (STOCK MÍNIMO) -->
-    <div class="panel-criticos-container">
-        <div class="panel-criticos-header">
-            <div class="panel-criticos-title">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <div>
-                    <h3>Panel de Críticos</h3>
-                    <p>Monitoreo de stock crítico y mermas graves</p>
-                </div>
-            </div>
-            {% set total_criticos = (critical_stock_items|length if critical_stock_items else (alarmas|length if alarmas else 0)) %}
-            {% if total_criticos > 0 %}
-                <span class="badge bg-warning text-dark">{{ total_criticos }} Insumos</span>
-            {% endif %}
+    <div class="panel fin-est">
+        <div class="panel-header">
+            <h2><i class="bi bi-pie-chart me-2"></i>Resumen del período</h2>
+            <span class="fin-est-marca">{{ periodo_marca }}</span>
         </div>
-        
-        <div class="panel-criticos-body">
-            {% if (critical_stock_items and critical_stock_items|length > 0) or (alarmas and alarmas|length > 0) %}
-                {% include 'alerts/_alerts_stock.html' %}
-            {% else %}
-                <div class="empty-criticos-state">
-                    <i class="bi bi-check-circle text-secondary"></i>
-                    <h4>Sin Alertas Críticas</h4>
-                    <p>Todo el inventario y productos de tu sede están operando en niveles óptimos.</p>
-                </div>
-            {% endif %}
+        <div class="fin-resumen">
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-boxes me-1"></i>Stock agregado</span>
+                <strong>{{ total_stock|ph_qty }} uds.</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-fire me-1"></i>Consumo cocina ({{ consumo_etiqueta }})</span>
+                <strong>{{ consumo_hoy_monto|ph_qty }} uds.</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-trash3 me-1"></i>Mermas pendientes</span>
+                <strong>{{ pending_wastes_count }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-truck me-1"></i>Traslados por recibir</span>
+                <strong>{{ transfers_in_transit_count }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-exclamation-triangle me-1"></i>Alertas de stock</span>
+                <strong>{{ alarmas|length if alarmas else 0 }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-clock-history me-1"></i>Lotes por vencer</span>
+                <strong>{{ expiring_lots|length if expiring_lots else 0 }}</strong>
+            </div>
+        </div>
+        <div class="fin-grafica-note">
+            <i class="bi bi-arrow-repeat text-danger"></i>
+            Consumo y traslados corresponden a {{ periodo_label|lower }}; stock, mermas y alertas muestran el estado actual de {{ sede_nombre }}.
         </div>
     </div>
 
-    <!-- COLUMNA DERECHA: PANEL DE PRÓXIMOS A VENCER -->
-<div class="panel-criticos-container">
-    <div class="panel-criticos-header">
-        <div class="panel-criticos-title">
-            <i class="bi bi-clock-history text-warning"></i>
-            <div>
-                <h3>Próximos a Vencer</h3>
-                <p>Monitoreo de caducidad y lotes por vencer</p>
-            </div>
+    <div class="panel fin-est fin-est--full">
+        <div class="panel-header">
+            <h2><i class="bi bi-clock-history me-2"></i>Vencimientos próximos</h2>
+            <span class="fin-est-marca">90 DÍAS</span>
         </div>
-        {% set total_vencidos = expired_items|length if expired_items else 0 %}
-        {% if total_vencidos > 0 %}
-            <span class="badge bg-danger text-white">{{ total_vencidos }} Lotes</span>
+        {% if expiring_lots and expiring_lots|length > 0 %}
+        <div class="fin-lotes-list">
+            {% for lot in expiring_lots %}
+            <div class="fin-lote-item">
+                <div class="fin-lote-info">
+                    <span class="fin-lote-product"><i class="bi bi-box-seam me-1"></i>{{ lot.product }}</span>
+                    <div class="fin-lote-meta">
+                        <span><i class="bi bi-tag"></i>Lote {{ lot.lot }}</span>
+                        <span><i class="bi bi-building"></i>{{ lot.location }}</span>
+                        <span class="fin-lote-venc">Vence {{ lot.expiration.strftime('%d/%m/%Y') if lot.expiration else '—' }}</span>
+                    </div>
+                </div>
+                <div class="fin-lote-side">
+                    <span class="fin-lote-ud">{{ lot.quantity|ph_qty }} uds.</span>
+                    <span class="fin-lote-dias {{ 'fin-lote-dias--crit' if lot.critical else 'fin-lote-dias--ok' }}">{{ lot.days }} días</span>
+                    <a href="{{ url_for('register_waste.nueva_merma', origin='alarma_vencido', lock=1, lot_number=lot.lot, quantity=lot.quantity) }}"
+                       class="fin-lote-cta" title="Registrar la merma de este lote">
+                        Registrar merma <i class="bi bi-arrow-right-short"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="fin-grafica-note">
+            <i class="bi bi-shield-check text-danger"></i>
+            Lotes por vencer en los próximos 90 días en tus sedes.
+        </div>
+        {% else %}
+        <div class="fin-empty">
+            <i class="bi bi-shield-check"></i>
+            <h4>Sin vencimientos próximos</h4>
+            <p>No hay insumos por caducar en los próximos 90 días.</p>
+        </div>
         {% endif %}
     </div>
-    
-    <div class="panel-criticos-body">
-    {% if vencidos and vencidos|length > 0 %}
-        {% include 'alerts/_alerts_expired.html' %}
-    {% else %}
-        <div class="empty-criticos-state">
-            <i class="bi bi-shield-check text-secondary"></i>
-            <h4>Sin Alertas de Vencimiento</h4>
-            <p>No hay insumos ni productos próximos a caducar en tu sede.</p>
-        </div>
-    {% endif %}
-</div>
-</div>
-
-</div>
+</section>
 
 {% endblock %}
