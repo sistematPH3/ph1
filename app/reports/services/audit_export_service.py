@@ -500,8 +500,9 @@ def construir_compras(user, filtros):
 def construir_listado_compras(user, filtros):
     """Exporta el listado de Gestión de Compras con los filtros de pantalla.
 
-    Replica el filtrado client-side (búsqueda #id/proveedor, proveedor exacto,
-    fecha exacta) para que lo descargado coincida con lo visible.
+    Aplica los filtros de servidor (rango de fechas, estado, proveedor) y luego
+    el refinamiento de pantalla (búsqueda #id/proveedor, proveedor exacto, fecha
+    exacta) para que lo descargado coincida con lo visible.
     """
     from app.logistics.repositories.purchase_management_repository import (
         PurchaseManagementRepository,
@@ -510,8 +511,35 @@ def construir_listado_compras(user, filtros):
         PurchaseManagementService,
     )
 
+    def _fecha(valor):
+        valor = str(valor or '').strip()
+        if not valor:
+            return None
+        try:
+            return datetime.strptime(valor, '%Y-%m-%d').date()
+        except ValueError:
+            return None
+
+    # Los filtros de rango/estado/proveedor llegan como texto desde la query
+    # string; ya fueron validados en la ruta, aquí solo se normalizan.
+    start_date = _fecha(filtros.get('start_date'))
+    end_date = _fecha(filtros.get('end_date'))
+    status = str(filtros.get('status') or '').strip().upper() or None
+    try:
+        supplier_id = int(filtros['supplier_id']) if filtros.get('supplier_id') else None
+    except (TypeError, ValueError):
+        supplier_id = None
+    if status and status not in ('COMPLETED', 'ANNULLED'):
+        status = None
+
     service = PurchaseManagementService(PurchaseManagementRepository(db))
-    purchases = service.get_formatted_history(current_user=user)
+    purchases = service.get_formatted_history(
+        current_user=user,
+        start_date=start_date,
+        end_date=end_date,
+        supplier_id=supplier_id,
+        status=status
+    )
 
     q = (filtros.get('q') or '').replace('#', '').strip().lower()
     supplier = (filtros.get('supplier') or '').strip().lower()
@@ -532,23 +560,37 @@ def construir_listado_compras(user, filtros):
     if fecha:
         filtros['desde'] = datetime.strptime(fecha, '%Y-%m-%d').date()
         filtros['hasta'] = datetime.strptime(fecha, '%Y-%m-%d').date()
+    elif start_date or end_date:
+        filtros['desde'] = start_date
+        filtros['hasta'] = end_date
+
+    etiquetas_estado = {'COMPLETED': 'COMPLETADA', 'ANNULLED': 'ANULADA'}
 
     items = []
+    def texto_total(p):
+        # Sin tasa registrada el equivalente en Bs. no existe: se indica en vez
+        # de exportar 0,00 como si la compra valiera cero bolívares.
+        return ('No calculable (sin tasa)' if p['total_bs'] is None
+                else f"Bs. {formatear_monto(p['total_bs'])}")
+
+    def texto_tasa(p):
+        return ('Sin tasa registrada' if p['exchange_rate'] is None
+                else f"1 {p['currency']} = {formatear_tasa(p['exchange_rate'])} Bs.")
+
     for p in filtradas:
-        estado = ('COMPLETADA' if p['status'] == 'COMPLETED'
-                  else 'ANULADA')
-        fecha = (p['purchase_date'].strftime('%d/%m/%Y %I:%M %p')
-                 if p['purchase_date'] else '—')
+        estado = etiquetas_estado.get(p['status'], p['status'] or '—')
+        fecha_texto = (p['purchase_date'].strftime('%d/%m/%Y %I:%M %p')
+                       if p['purchase_date'] else '—')
         items.append({
             'banda': f"Compra #{p['id']}",
             'derecha': estado,
             'filas': [
                 ('Proveedor', p['supplier_name']),
-                ('Fecha de Compra', fecha),
+                ('Fecha de Compra', fecha_texto),
                 ('Monto Total', f"{formatear_numero(p['total_amount'], 2)} {p['currency']}"),
-                ('Total en Bs.', f"Bs. {formatear_monto(p['total_bs'])}"),
+                ('Total en Bs.', texto_total(p)),
                 ('Moneda', p['currency']),
-                ('Tasa Aplicada', f"1 {p['currency']} = {formatear_tasa(p['exchange_rate'])} Bs."),
+                ('Tasa Aplicada', texto_tasa(p)),
                 ('Estado', estado),
             ],
         })
@@ -563,10 +605,10 @@ def construir_listado_compras(user, filtros):
                    p['purchase_date'].strftime('%d/%m/%Y %I:%M %p')
                    if p['purchase_date'] else '—',
                    f"{formatear_numero(p['total_amount'], 2)} {p['currency']}",
-                   f"Bs. {formatear_monto(p['total_bs'])}",
+                   texto_total(p),
                    p['currency'],
-                   f"1 {p['currency']} = {formatear_tasa(p['exchange_rate'])} Bs.",
-                   'COMPLETED' if p['status'] == 'COMPLETED' else 'ANULADA']
+                   texto_tasa(p),
+                   etiquetas_estado.get(p['status'], p['status'] or '—')]
                   for p in filtradas],
         'items': items,
     }]
@@ -585,6 +627,7 @@ def construir_detalle_compra(user, purchase_id, filtros):
     from app.models.logistics_model import (Purchase, PurchaseAuditLog,
                                              PurchaseDetail, Supplier)
     from app.models.security_model import User
+    from app.logistics.requests.purchase_validators import es_moneda_bs
 
     purchase = db.session.get(Purchase, purchase_id)
     if not purchase:
@@ -605,16 +648,37 @@ def construir_detalle_compra(user, purchase_id, filtros):
 
     fecha_local = (purchase.purchase_date - timedelta(hours=4)
                    if purchase.purchase_date else None)
-    tasa = purchase.exchange_rate or 0
+    # Sin tasa registrada no hay conversión posible: se marca como tal en vez
+    # de usar 0, que exportaba un total en Bs. de cero.
+    tasa = purchase.exchange_rate
+    texto_tasa = (f"1 {purchase.currency} = {formatear_tasa(tasa)} Bs."
+                  if tasa is not None else 'Sin tasa registrada')
+    # En Bs el precio ya es bolívares: price_bs no se multiplica por la tasa.
+    es_bs = es_moneda_bs(purchase.currency)
 
     insumos = []
-    total_bs = 0
+    # Sin tasa no se puede sumar el equivalente en bolívares: se deja en None.
+    total_bs = None if (tasa is None and not es_bs) else 0
+    texto_total_bs = ('No calculable (sin tasa)' if total_bs is None
+                      else f"Bs. {formatear_numero(total_bs, 2)}")
     for fila in filas:
         item, nombre_raw, sku = fila
         nombre = nombre_raw or f'Insumo #{item.product_id}'
-        precio_bs = (float(item.quantity) * float(item.foreign_price)
-                     * float(tasa))
-        total_bs += precio_bs
+        # price_bs es el precio UNITARIO en Bs: el subtotal es cantidad x
+        # price_bs. Antes se calculaba cantidad x foreign_price x tasa, que
+        # reprocesaba la tasa en compras en bolívares.
+        if item.price_bs is not None:
+            unitario_bs = float(item.price_bs)
+        elif es_bs:
+            unitario_bs = float(item.foreign_price or 0)
+        elif tasa is not None:
+            unitario_bs = float(item.foreign_price or 0) * float(tasa)
+        else:
+            unitario_bs = None
+        precio_bs = (None if unitario_bs is None
+                     else float(item.quantity) * unitario_bs)
+        if precio_bs is not None:
+            total_bs += precio_bs
         insumos.append([
             f"{nombre} ({sku})" if sku else nombre,
             formatear_cantidad(item.quantity),
@@ -622,7 +686,8 @@ def construir_detalle_compra(user, purchase_id, filtros):
             item.expiration_date.strftime('%d/%m/%Y')
             if item.expiration_date else 'N/A',
             f"{formatear_numero(item.foreign_price, 2)} {purchase.currency}",
-            f"Bs. {formatear_numero(precio_bs, 2)}",
+            ('No calculable (sin tasa)' if precio_bs is None
+             else f"Bs. {formatear_numero(precio_bs, 2)}"),
         ])
 
     tablas = [{
@@ -637,10 +702,10 @@ def construir_detalle_compra(user, purchase_id, filtros):
             ['Fecha de Compra',
              fecha_local.strftime('%d/%m/%Y %I:%M %p') if fecha_local else '—'],
             ['Moneda', purchase.currency or '—'],
-            ['Tasa Aplicada', f"1 {purchase.currency} = {formatear_tasa(tasa)} Bs."],
+            ['Tasa Aplicada', texto_tasa],
             ['Monto Total Facturado',
              f"{formatear_numero(purchase.total_amount, 2)} {purchase.currency}"],
-            ['Total en Bs.', f"Bs. {formatear_numero(total_bs, 2)}"],
+            ['Total en Bs.', texto_total_bs],
             ['Estado', 'ANULADA' if purchase.status == 'ANNULLED'
              else 'COMPLETADA'],
         ],
@@ -656,10 +721,10 @@ def construir_detalle_compra(user, purchase_id, filtros):
                  fecha_local.strftime('%d/%m/%Y %I:%M %p')
                  if fecha_local else '—'),
                 ('Moneda', purchase.currency or '—'),
-                ('Tasa Aplicada', f"1 {purchase.currency} = {formatear_tasa(tasa)} Bs."),
+                ('Tasa Aplicada', texto_tasa),
                 ('Monto Total Facturado',
                  f"{formatear_numero(purchase.total_amount, 2)} {purchase.currency}"),
-                ('Total en Bs.', f"Bs. {formatear_numero(total_bs, 2)}"),
+                ('Total en Bs.', texto_total_bs),
                 ('Estado', 'ANULADA' if purchase.status == 'ANNULLED'
                  else 'COMPLETADA'),
             ],

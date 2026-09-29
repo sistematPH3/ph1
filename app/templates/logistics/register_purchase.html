@@ -191,11 +191,22 @@
                                    id="dropzoneArea" for="invoice_photo">
                                 <i class="bi bi-camera fs-1 text-muted" id="cameraIcon"></i>
                                 <p class="m-0 mt-2 text-muted fw-medium" id="photoFileName">Toca aquí para tomar foto o abrir galería</p>
-                                <input type="file" id="invoice_photo" name="invoice_photo" class="visually-hidden" accept="image/png, image/jpeg, image/jpg" required>
+                                <input type="file" id="invoice_photo" name="invoice_photo" class="visually-hidden" accept="image/png, image/jpeg, image/jpg, image/webp" required>
                             </label>
                             <button type="button" id="removePhotoBtn" class="btn btn-danger btn-sm rounded-circle position-absolute d-none d-flex align-items-center justify-content-center" style="top: -10px; right: -10px; width: 28px; height: 28px; padding: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                                 <i class="bi bi-x-lg" style="font-size: 0.85rem;"></i>
                             </button>
+                        </div>
+                        {# El sistema lee el texto de la foto y revisa que sea un
+                           comprobante de verdad, no cualquier imagen. #}
+                        <div class="alert alert-light border d-flex align-items-start gap-2 mt-2 mb-0 py-2 px-2" role="note">
+                            <i class="bi bi-receipt fs-6 text-secondary mt-1"></i>
+                            <small class="text-secondary lh-sm">
+                                Debe ser la <strong>factura del proveedor</strong> o el
+                                <strong>comprobante de la tarjeta</strong> con los datos legibles.
+                                No se acepta una foto de cualquier otra cosa: el sistema lee la
+                                imagen para comprobarlo. Si sale borrosa, no se podrá leer.
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -208,5 +219,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.2"></script>
+<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.9"></script>
 {% endblock %}

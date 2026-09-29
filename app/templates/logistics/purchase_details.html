@@ -71,10 +71,24 @@
                             <div class="fw-bold text-dark mb-3 fs-6">{{ user.name if user else 'Sistema' }}</div>
                             <label class="form-label text-muted small text-uppercase fw-bold mb-2 d-block">Comprobante Físico</label>
                             <div>
-                                {% if purchase.invoice_url %}
-                                <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-medium w-100 w-md-auto">
+                                {# invoice_url vale "En proceso..." mientras la
+                                   subida a ImgBB corre y si esa subida falla se
+                                   queda en ese valor para siempre. En ambos
+                                   casos NO es una URL: enlazarla producia un
+                                   boton que llevaba a una pagina inexistente. #}
+                                {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
+                                <a href="{{ purchase.invoice_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-medium w-100 w-md-auto">
                                     <i class="bi bi-link-45deg fs-6 align-middle"></i> Ver Evidencia Fotográfica
                                 </a>
+                                {% elif purchase.invoice_url == 'En proceso...' %}
+                                <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-0 small">
+                                    <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                                    <span>
+                                        La foto del comprobante <strong>no se pudo guardar</strong>
+                                        en el servidor. Esta compra quedó registrada sin evidencia
+                                        recuperable y no hay forma de volver a subirla.
+                                    </span>
+                                </div>
                                 {% else %}
                                 <span class="text-muted small italic">No hay comprobante adjunto.</span>
                                 {% endif %}

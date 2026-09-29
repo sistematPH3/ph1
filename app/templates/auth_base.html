@@ -10,7 +10,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     
     <!-- Estilos Base de Seguridad (Fuentes y Logo) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
+    <!-- Este archivo se llamaba auth_base.css pero nunca existio: el 404 hacia
+         que Inter y Agbalumo, que usa register.css, no se cargaran. Apunta a
+         auth.css, que si existe y tiene las @font-face. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth.css') }}?v=1.0">
     
     <!-- Bloque para que cada uno inserte su propio CSS (Login, Registro, etc.) -->
     {% block extra_css %}{% endblock %}

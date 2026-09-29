@@ -1,47 +1,39 @@
 from ..repositories.register_repository import RegisterRepository
-from ..requests.auth_validators import validar_credenciales_login
 from ..requests.register_validators import validar_datos_registro
 from app.models.security_model import User
 from werkzeug.security import generate_password_hash
 
+
 class RegisterService:
     @staticmethod
     def registrar_usuario(name, email, password):
-        
-        import re
-        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            return {"success": False, "message": "Por favor, verifique el formato del correo."}
+        """
+        Registra un usuario nuevo.
 
-        if not password:
-            return {"success": False, "message": "Por favor, ingrese la contraseña."}
-        
-        if len(password) < 6:
-            return {"success": False, "message": "La contraseña debe tener mínimo 6 caracteres."}
-            
-        if len(password) > 12:
-            return {"success": False, "message": "La contraseña debe tener máximo 12 caracteres."}
+        El alta queda en estado 'pendiente': role_id 0 (invitado) e is_active
+        False, que es lo que espera UserManagementRepository.get_pending_users
+        para mostrarlo en la pantalla de aprobacion del administrador.
 
-        if not re.search(r"[^A-Za-z0-9]", password):
-            return {"success": False, "message": "Esta contraseña debe incluir caracteres especiales."}
+        Antes se creaba con is_active=True, y como LoginService solo rechaza
+        usuarios con is_active False (y la comprobacion de sedes se omite para
+        invitados), la persona se podia conectar sin pasar por la aprobacion.
+        """
+        es_valido, mensaje_error = validar_datos_registro(name, email, password)
+        if not es_valido:
+            return {"success": False, "message": mensaje_error}
 
-        if not re.search(r"[A-Z]", password):
-            return {"success": False, "message": "Esta contraseña debe incluir al menos una letra mayúscula."}
-
-        chequeo_custom = validar_datos_registro(name, email)
-        if not chequeo_custom["valido"]:
-            return {"success": False, "message": "Este usuario ya existe."}
-        
-        hashed_password = generate_password_hash(password)
         nuevo_usuario = User(
-            name=name,
-            email=email,
-            password_hash=hashed_password,
-            is_active=True 
+            name=name.strip(),
+            email=email.strip(),
+            password_hash=generate_password_hash(password),
+            role_id=0,
+            is_active=False,
         )
 
-        resultado = RegisterRepository.guardar_usuario(nuevo_usuario)
-        
-        if resultado:
-            return {"success": True, "message": "Usuario registrado con éxito."}
-        else:
-            return {"success": False, "message": "Error interno al guardar en base de datos."}
+        if RegisterRepository.guardar_usuario(nuevo_usuario):
+            return {
+                "success": True,
+                "message": "Usuario registrado. Un administrador debe aprobar tu cuenta antes de que puedas entrar.",
+            }
+
+        return {"success": False, "message": "Error interno al guardar en base de datos."}

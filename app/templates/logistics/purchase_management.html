@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/security/audit_purchase.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=2.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=2.1">
 {% endblock %}
 
 {% block content %}
@@ -71,7 +71,7 @@
         </div>
 
     <div class="bg-white shadow-sm rounded-4 mt-3 table-card" id="purchases-main-container">
-        <div class="table-responsive d-none d-md-block">
+        <div class="table-responsive d-none d-lg-block">
             <table class="table table-custom-audit table-hover align-middle" id="purchases-table">
                 <thead class="text-uppercase text-muted content-table-header">
                     <tr>
@@ -99,9 +99,9 @@
                             <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
                             <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
                             <td class="fw-bold text-dark">{{ purchase.total_amount|ph_amount }} <span class="text-muted small">{{ purchase.currency }}</span></td>
-                            <td class="fw-bold text-danger">Bs. {{ purchase.total_bs|ph_amount }}</td>
+                            <td class="fw-bold text-danger">{% if purchase.total_bs is none %}<span class="text-muted" title="La compra no tiene tasa de cambio registrada">&mdash;</span>{% else %}Bs. {{ purchase.total_bs|ph_amount }}{% endif %}</td>
                             <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
-                            <td>Bs. {{ purchase.exchange_rate|ph_amount(4) }}</td>
+                            <td>{% if purchase.exchange_rate is none %}<span class="text-muted">&mdash;</span>{% else %}Bs. {{ purchase.exchange_rate|ph_amount(4) }}{% endif %}</td>
                             <td>
                                 {% if purchase.status == 'COMPLETED' %}
                                 <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
@@ -122,7 +122,8 @@
                                         {% if purchase.can_modify %}
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
-                                                data-id="{{ purchase.id }}">
+                                                data-id="{{ purchase.id }}"
+                                                data-purchase-date="{{ purchase.purchase_date.isoformat() }}">
                                             <i class="bi bi-pencil-square"></i> Editar
                                         </button>
                                         
@@ -155,9 +156,9 @@
                                                 <i class="bi bi-image me-1"></i> Ver Factura Original (Evidencia)
                                             </a>
                                             {% elif purchase.invoice_url == 'En proceso...' %}
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
-                                                <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
-                                            </button>
+                                            <span class="badge bg-warning text-dark border" data-bs-toggle="tooltip" title="La foto del comprobante no se pudo guardar en el servidor y no hay forma de volver a subirla.">
+                                                <i class="bi bi-exclamation-triangle me-1"></i> Comprobante no guardado
+                                            </span>
                                             {% else %}
                                             <span class="text-muted small"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
                                             {% endif %}
@@ -198,7 +199,7 @@
             </table>
         </div>
 
-        <div class="d-block d-md-none p-3" id="mobile-purchases-container">
+        <div class="d-block d-lg-none p-3" id="mobile-purchases-container">
             {% if purchases %}
                 {% for purchase in purchases %}
                 <div class="mobile-purchase-card" 
@@ -229,11 +230,11 @@
                         </div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted small fw-bold text-uppercase">Total en Bs.</span>
-                            <span class="fw-bold text-danger">Bs. {{ purchase.total_bs|ph_amount }}</span>
+                            <span class="fw-bold text-danger">{% if purchase.total_bs is none %}<span class="text-muted" title="La compra no tiene tasa de cambio registrada">&mdash;</span>{% else %}Bs. {{ purchase.total_bs|ph_amount }}{% endif %}</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="text-muted small fw-bold text-uppercase">Tasa & Moneda</span>
-                            <span class="fw-semibold text-dark small">{{ purchase.currency }} | Bs. {{ purchase.exchange_rate|ph_amount(4) }}</span>
+                            <span class="fw-semibold text-dark small">{{ purchase.currency }} | {% if purchase.exchange_rate is none %}<span class="text-muted">sin tasa</span>{% else %}Bs. {{ purchase.exchange_rate|ph_amount(4) }}{% endif %}</span>
                         </div>
                     </div>
 
@@ -249,7 +250,8 @@
                             {% if purchase.can_modify %}
                             <button type="button" 
                                     class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger flex-grow-1" 
-                                    data-id="{{ purchase.id }}">
+                                    data-id="{{ purchase.id }}"
+                                    data-purchase-date="{{ purchase.purchase_date.isoformat() }}">
                                 <i class="bi bi-pencil-square"></i> Editar
                             </button>
                             
@@ -277,9 +279,10 @@
                                     <i class="bi bi-image me-1"></i> Ver Factura Original
                                 </a>
                                 {% elif purchase.invoice_url == 'En proceso...' %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
-                                    <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
-                                </button>
+                                <span class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-0 w-100 small">
+                                    <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                                    <span>Comprobante no guardado en el servidor.</span>
+                                </span>
                                 {% else %}
                                 <span class="text-muted small w-100 text-center d-block mb-2"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
                                 {% endif %}
@@ -335,7 +338,8 @@
                 
                 <form id="formAnnulConfirm" method="POST" action="">
                     <div class="d-grid gap-3 px-3">
-                        <button type="submit" class="btn rounded-pill py-2 text-white fw-bold" style="background-color: #b0121a; border: none; font-size: 1rem;">Confirmar</button>
+                        <div id="annulErrorAlert" class="alert alert-danger d-none text-start small mb-0"></div>
+                        <button type="submit" id="btnAnnulConfirm" class="btn rounded-pill py-2 text-white fw-bold" style="background-color: #b0121a; border: none; font-size: 1rem;">Confirmar</button>
                         <a href="#" class="text-muted small text-decoration-none" data-bs-dismiss="modal" style="color: #6c757d !important;">← Cancelar y volver</a>
                     </div>
                 </form>
@@ -345,12 +349,17 @@
 </div>
 
 <div class="modal fade" id="modalEdit" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
             <div class="modal-header bg-light border-bottom-0 py-3 px-4">
-                <h5 class="modal-title fw-bold text-dark">
-                    <i class="bi bi-pencil-square text-primary me-2"></i>Edición de Compra #<span id="editPurchaseId"></span>
-                </h5>
+                <div class="d-flex flex-row justify-content-between align-items-center gap-2 w-100 flex-wrap">
+                    <h5 class="modal-title fw-bold text-dark mb-0">
+                        <i class="bi bi-pencil-square text-primary me-2"></i>Edición de Compra #<span id="editPurchaseId"></span>
+                    </h5>
+                    <div id="editTimeLimit" class="badge rounded-pill px-3 py-2 small d-none" style="background-color: #fff3cd; color: #856404; border: 1px solid #ffc107;">
+                        <i class="bi bi-clock-history me-1"></i> <span id="editTimeLimitText"></span>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
@@ -373,11 +382,11 @@
                         <thead class="table-light text-center small text-uppercase fw-bold border-bottom">
                             <tr>
                                 <th class="text-start ps-3">Insumo (SKU)</th>
-                                <th style="width: 110px;">Cantidad</th>
-                                <th style="width: 130px;">N° Lote</th>
-                                <th style="width: 140px;">Vencimiento</th>
-                                <th style="width: 140px;">Precio (Divisa)</th>
-                                <th style="width: 60px;">Eliminar</th>
+                                <th style="width: 125px;">Cantidad</th>
+                                <th style="width: 225px;">N° Lote</th>
+                                <th style="width: 165px;">Vencimiento</th>
+                                <th style="width: 135px;">Precio unitario (<span id="editCurrencyLabel">Moneda</span>)</th>
+                                <th style="width: 55px;">Eliminar</th>
                             </tr>
                         </thead>
                         <tbody id="edit-table-body">
@@ -406,5 +415,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.4"></script>
+<script>
+    window.current_user_role_id = {{ current_user.role_id if current_user else 0 }};
+</script>
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.7"></script>
 {% endblock %}

@@ -5,56 +5,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const emailInput = document.getElementById('email-input');
     const passwordInput = document.getElementById('password-input');
     const togglePassword = document.getElementById('toggle-password');
-    
+
     const nameError = document.getElementById('name-error');
     const emailError = document.getElementById('email-error');
-    
-    // El error de password lo buscamos o lo creamos si no existe
-    let passError = document.querySelector('.password-wrapper + .error-hint-diego');
-    if (!passError) {
-        passError = document.createElement('div');
-        passError.className = 'error-hint-diego';
-        passwordInput.closest('.form-group').appendChild(passError);
-    }
+    const passError = document.getElementById('password-error-slot');
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const urlCheck = emailInput.getAttribute('data-url');
     const urlOpen = togglePassword.getAttribute('data-eye-open');
     const urlClosed = togglePassword.getAttribute('data-eye-closed');
 
+    // El formato del correo lo decide el backend: se reutiliza su patron para
+    // que el JS no acepte algo que el servidor vaya a rechazar.
+    const correo = window.EmailRules;
+
     // --- FUNCIONES DE APOYO ---
     function mostrarError(input, divError, mensaje) {
+        if (!divError) return;
         divError.textContent = mensaje;
         divError.style.display = 'block';
-        input.classList.add('input-error-border');
+        divError.classList.add('error-visible');
+        if (input) input.classList.add('input-error-border');
     }
 
     function ocultarError(input, divError) {
+        if (!divError) return;
+        divError.textContent = '';
         divError.style.display = 'none';
-        input.classList.remove('input-error-border');
+        divError.classList.remove('error-visible');
+        if (input) input.classList.remove('input-error-border');
     }
 
-// Nombre: Límite de 40 caracteres
-nameInput.addEventListener('input', function() {
-    const nombre = nameInput.value;
-    
-    if (nombre.length === 0) {
-        ocultarError(nameInput, nameError);
-    } else if (nombre.length === 40) {
-        // Se activa justo cuando llega al límite del maxlength físico
-        mostrarError(nameInput, nameError, "Has alcanzado el límite de 40 caracteres.");
-    } else {
-        ocultarError(nameInput, nameError);
-    }
-});
+    // --- Contraseña: checklist vivo (reglas desde el backend) ---
+    // Antes era un else-if que mostraba un solo error y ademas marcaba
+    // "limite alcanzado" como fallo justo en 12 caracteres, que es valido.
+    const validador = window.PasswordRules.init({
+        input: passwordInput,
+        lista: document.getElementById('password-rules'),
+        contador: document.getElementById('password-counter')
+    });
 
-    // Correo: Validación de formato y existencia (Blur)
+    // --- Correo: formato y existencia (Blur) ---
     emailInput.addEventListener('blur', async function() {
         const valor = emailInput.value.trim();
         if (valor === "") return;
 
-        if (!emailRegex.test(valor)) {
-            mostrarError(emailInput, emailError, "El formato del correo no es válido.");
+        if (!correo.esValido(valor, emailInput)) {
+            mostrarError(emailInput, emailError, correo.mensaje());
             return;
         }
 
@@ -64,43 +60,32 @@ nameInput.addEventListener('input', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: valor })
             });
-            const data = await response.json();
+
+            const tipo = response.headers.get('content-type') || '';
+            const data = tipo.includes('application/json') ? await response.json() : null;
+            if (!data) return;
+
             if (data.exists) {
                 mostrarError(emailInput, emailError, "Este correo ya está registrado.");
+            } else if (data.error) {
+                mostrarError(emailInput, emailError, data.error);
             }
-        } catch (e) { console.error("Error validando email:", e); }
+        } catch (e) {
+            // Si la comprobacion falla se deja pasar: el backend volvera a validar.
+            console.warn("No se pudo comprobar el correo:", e);
+        }
     });
 
     emailInput.addEventListener('input', () => ocultarError(emailInput, emailError));
 
-    // Contraseña: Límite de 12, longitud mínima, carácter especial y mayúscula obligatorios
-    passwordInput.addEventListener('input', function() {
-        const pass = passwordInput.value;
-        const tieneEspecial = /[^A-Za-z0-9]/.test(pass);
-        const tieneMayuscula = /[A-Z]/.test(pass);
-        if (pass.length === 0) {
-            ocultarError(passwordInput, passError);
-        } else if (pass.length < 6) {
-            mostrarError(passwordInput, passError, "La contraseña debe tener mínimo 6 caracteres.");
-        } else if (!tieneEspecial) {
-            mostrarError(passwordInput, passError, "Esta contraseña debe incluir caracteres especiales.");
-        } else if (!tieneMayuscula) {
-            mostrarError(passwordInput, passError, "Esta contraseña debe incluir al menos una letra mayúscula.");
-        } else if (pass.length === 12) {
-            mostrarError(passwordInput, passError, "Has alcanzado el límite de 12 caracteres.");
-        } else {
-            ocultarError(passwordInput, passError);
-        }
-    });
-
-    // --- FUNCIÓN DEL OJITO ---
+    // --- FUNCION DEL OJITO ---
     togglePassword.addEventListener('click', function() {
         const tipo = passwordInput.type === 'password' ? 'text' : 'password';
         passwordInput.type = tipo;
         togglePassword.src = (tipo === 'text') ? urlOpen : urlClosed;
     });
 
-    // --- VALIDACIÓN FINAL AL ENVIAR (CAMPOS VACÍOS) ---
+    // --- VALIDACION FINAL AL ENVIAR ---
     form.addEventListener('submit', function(e) {
         let esValido = true;
 
@@ -111,10 +96,20 @@ nameInput.addEventListener('input', function() {
         if (emailInput.value.trim() === "") {
             mostrarError(emailInput, emailError, "El correo es obligatorio.");
             esValido = false;
+        } else if (!correo.esValido(emailInput.value, emailInput)) {
+            // Sin esto, un correo mal formado se colaba si nunca hubo blur.
+            mostrarError(emailInput, emailError, correo.mensaje());
+            esValido = false;
         }
         if (passwordInput.value.trim() === "") {
             mostrarError(passwordInput, passError, "Debes crear una contraseña.");
             esValido = false;
+        } else if (validador) {
+            const problema = validador.problema();
+            if (problema) {
+                mostrarError(passwordInput, passError, problema);
+                esValido = false;
+            }
         }
 
         if (!esValido) e.preventDefault();

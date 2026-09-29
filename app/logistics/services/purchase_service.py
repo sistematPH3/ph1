@@ -1,27 +1,64 @@
 from decimal import ROUND_HALF_UP, Decimal
 import json
+import re
+from flask import current_app
 from sqlalchemy import text
 from app.extensions import db
 from app.models.logistics_model import Purchase, PurchaseDetail
 from app.models import PurchaseAuditLog, Inventory
 from app.models.inventory_model import Product
-from app.logistics.requests.purchase_validators import normalizar_numero
+from app.logistics.requests.purchase_validators import (
+    normalizar_numero,
+    normalizar_moneda,
+)
 from app.time_utils import current_ve_time
 
 class PurchaseService:
     @staticmethod
     def register_purchase(data):
         try:
+            items = data.get('items') or []
+            if not items:
+                return {
+                    'success': False,
+                    'message': 'La compra debe tener al menos un producto.'
+                }
+
             purchase_date = current_ve_time()
-            currency = str(data['currency']).upper()
-            if currency in ('VES', 'BS.', 'BSS'):
-                currency = 'BS'
+            # Se usa normalizar_moneda y no la limpieza propia de antes: el
+            # validador ya reconocia 'BS,S', 'BS.', 'BSS', 'BOLIVAR', etc.
+            # como bolívares, pero aqui la comparacion contra ('VES','BS')
+            # no los cubria, asi que una compra en 'BS,S' pasaba la validacion
+            # como bolivares y despues se guardaba como estranjera,
+            # multiplicando el monto por la tasa (3.000 Bs x 36,5 = 109.500).
+            currency = normalizar_moneda(data['currency'])
+
+            exchange_rate = Decimal(normalizar_numero(data['exchange_rate']))
+            if not exchange_rate.is_finite() or exchange_rate <= 0:
+                raise ValueError(
+                    'La tasa de cambio debe ser un número mayor que cero.')
+
+            # Se valida cada linea ANTES de crear la cabecera. Antes una
+            # cantidad en cero reventaba con DivisionByZero y una negativa
+            # pasaba, dejando stock restado y totales sin sentido.
+            for indice, item in enumerate(items, start=1):
+                cantidad = Decimal(normalizar_numero(item.get('quantity')))
+                importe = Decimal(normalizar_numero(item.get('foreign_price')))
+                for etiqueta, valor in (('cantidad', cantidad),
+                                        ('importe', importe)):
+                    if not valor.is_finite():
+                        raise ValueError(
+                            f'Línea {indice}: la {etiqueta} no es un número válido.')
+                    if valor <= 0:
+                        raise ValueError(
+                            f'Línea {indice}: la {etiqueta} debe ser mayor que cero.')
+
             new_purchase = Purchase(
                 supplier_id=data['supplier_id'],
                 purchase_date=purchase_date,
                 total_amount=Decimal('0.00'),
                 currency=currency,
-                exchange_rate=Decimal(normalizar_numero(data['exchange_rate'])),
+                exchange_rate=exchange_rate,
                 user_id=data['user_id'],
                 invoice_url=data.get('invoice_url'), 
                 status='COMPLETED' 
@@ -30,13 +67,12 @@ class PurchaseService:
             db.session.flush()
 
             calculated_total = Decimal('0.00')
-            exchange_rate = Decimal(normalizar_numero(data['exchange_rate']))
             es_bs = currency == 'BS'
             
             details_for_audit = []
             sku_lot_counters = {}
 
-            for item in data['items']:
+            for item in items:
                 product_id = int(item['product_id'])
                 quantity = Decimal(normalizar_numero(item.get('quantity', 0.0)))
                 # El precio registrado es el TOTAL pagado por toda la cantidad de
@@ -47,8 +83,20 @@ class PurchaseService:
                     Decimal('0.01'), rounding=ROUND_HALF_UP)
 
                 # En Bs el precio ya es bolívares: no se vuelve a multiplicar por la tasa.
+                # Se cuantiza siempre, como hace la edicion de compras: la columna
+                # es Numeric(15,2) y antes se mandaba el producto sin redondear,
+                # de modo que el registro y la edicion redondeaban distinto.
                 price_bs = (foreign_price if es_bs
-                            else foreign_price * exchange_rate)
+                            else (foreign_price * exchange_rate).quantize(
+                                Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+                # El total de la cabecera es la suma de los importes que el
+                # usuario escribio por linea (lo que realmente se pago), y NO
+                # se reconstruye multiplicando el precio unitario ya redondeado
+                # por la cantidad: eso daria 3,33 x 3 = 9,99 contra un total de
+                # 10,00, y ademas descuadaria la regla de que las cantidades no
+                # multiplican el importe de la linea. El redondeo a 2 decimales
+                # del precio unitario es propio de como se guarda el detalle.
                 calculated_total += linea_total
 
                 producto_obj = db.session.query(Product).get(product_id)
@@ -59,8 +107,17 @@ class PurchaseService:
                 if not lot_number or not str(lot_number).strip():
                     date_str = purchase_date.strftime('%Y%m%d')
                     if prod_sku not in sku_lot_counters:
+                        # '_' es comodin en LIKE: un SKU como 'CAFE_01' también
+                        # encontraba los lotes de 'CAFEX01' y la secuencia
+                        # arrancaba mas alta de lo que debia. Se escapan los
+                        # comodines del SKU antes de usarlo como patron.
+                        patron_sku = (prod_sku
+                                      .replace('\\', '\\\\')
+                                      .replace('%', '\\%')
+                                      .replace('_', '\\_'))
                         existing_lots = db.session.query(PurchaseDetail.lot_number).filter(
-                            PurchaseDetail.lot_number.like(f"{prod_sku}-{date_str}-%")
+                            PurchaseDetail.lot_number.like(
+                                f"{patron_sku}-{date_str}-%", escape='\\')
                         ).all()
                         max_seq = 0
                         for (l_num,) in existing_lots:
@@ -136,7 +193,12 @@ class PurchaseService:
                     "notes": f"Ingreso por compra a proveedor (Lote: {lot_number})"
                 }
                 
-                severity = 'REABASTECIDO' if prev_qty <= Decimal('20.00') and new_qty > Decimal('20.00') else 'NORMAL'
+                # El mínimo es el configurado para el producto; antes se usaba
+                # un 20 fijo que clasificaba mal a productos con otro mínimo.
+                minimo = (producto_obj.min_stock_efectivo
+                          if producto_obj else Decimal('20.00'))
+                severity = ('REABASTECIDO'
+                            if prev_qty <= minimo < new_qty else 'NORMAL')
                 
                 db.session.execute(text("""
                     INSERT INTO audit_logs (user_id, action, severity, location_id, changed_data, timestamp)
@@ -148,7 +210,8 @@ class PurchaseService:
                     'ts': current_ve_time()
                 })
 
-            new_purchase.total_amount = calculated_total
+            new_purchase.total_amount = calculated_total.quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             new_data_audit = {
                 "id": new_purchase.id,
@@ -177,9 +240,34 @@ class PurchaseService:
                 "purchase_id": new_purchase.id
             }
 
-        except Exception as e:
+        except ValueError as e:
+            # Errores de los datos que escribio el usuario (tasa en cero,
+            # cantidad en cero, guion bajo como separador de miles). El texto
+            # es del propio codigo de validacion, no una excepcion interna, asi
+            # que si se le puede mostrar tal cual para que sepa que corregir.
             db.session.rollback()
             return {
-                "success": False, 
-                "message": f"Error crítico al registrar la compra: {str(e)}"
+                "success": False,
+                "message": str(e),
+                "error": str(e),
+            }
+
+        except Exception as e:
+            db.session.rollback()
+            # Antes la excepcion se guardaba solo en el mensaje de respuesta y
+            # no se logueaba en ningun lado: un fallo al registrar una compra
+            # no dejaba ni una linea en el log del servidor, y el texto con el
+            # SQL y sus parametros se mandaba de vuelta al navegador.
+            current_app.logger.error(
+                "No se pudo registrar la compra: %s", e, exc_info=True,
+            )
+            # El detalle va al log, nunca a la respuesta: la excepcion incluye
+            # el SQL y sus parametros.
+            return {
+                "success": False,
+                "message": "No se pudo registrar la compra.",
+                "error": (
+                    "No se pudo registrar la compra. Los datos no se guardaron: "
+                    "vuelve a intentarlo y, si sigue fallando, avisa al responsable."
+                ),
             }

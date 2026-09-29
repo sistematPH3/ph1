@@ -56,9 +56,9 @@
                         <div class="input-with-icon">
                             <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/email_icon.png') }}" class="field-icon" alt="Email">
                             <div class="vertical-divider"></div>
-                            <input type="email" name="email" id="email" class="form-input-auth" placeholder="Ingrese su Gmail" required>
+                            <input type="email" name="email" id="email" class="form-input-auth" data-email-pattern="{{ patron_email }}" placeholder="Ingrese su correo electrónico" required>
                         </div>
-                        <div id="emailError" class="error-hint-text">Formato inválido @</div>
+                        <div id="emailError" class="error-hint-text">Debe incluir un "@" y un dominio válido, por ejemplo nombre@correo.com</div>
                     </div>
                     
                     <!-- CAMPO CONTRASEÑA: Con icono, divisor y ojo -->
@@ -96,6 +96,7 @@
 
     <!-- Vinculación del archivo JS externo -->
    <!-- Vinculación del archivo JS con truco para romper el cache automáticamente -->
+<script src="{{ url_for('static', filename='js/security/email-rules.js') }}?v=1.0"></script>
 <script src="{{ url_for('static', filename='js/security/login.js') }}?v={{ range(1, 99999) | random }}"></script>
 </body>
 </html>

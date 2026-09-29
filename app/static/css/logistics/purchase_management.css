@@ -135,51 +135,186 @@ body {
     padding: 1.25rem;
 }
 
-@media (max-width: 767.98px) {
+/* Tablet: el listado pasa a tarjetas (la tabla de 9 columnas solo cabe a
+   partir de 992px) y se reparten en dos columnas para no dejar tarjetas de
+   800px de ancho con el texto estirado. */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    #mobile-purchases-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 1rem;
+        align-items: start;
+    }
+
+    #mobile-purchases-container .mobile-purchase-card {
+        height: 100%;
+        margin-bottom: 1rem;
+    }
+}
+
+/* ------------------------------------------------------------------
+   Modal de edición: la tabla de renglones solo se usa cuando hay ancho
+   de sobra (>=1200px, el breakpoint de .modal-xl). Por debajo se
+   renderiza como tarjetas apiladas, que es donde antes se descuadraba.
+   ------------------------------------------------------------------ */
+#edit-table {
+    /* Sin esto los width de los <th> son sugerencias: el navegador
+       ensancha la columna del precio y el encabezado deja de coincidir
+       con el cuerpo. */
+    table-layout: fixed;
+}
+
+/* El lote se muestra completo: monoespaciado en una columna de 225px
+   alcanza para SKU-YYYYMMDD-NN (medido: 219px con el texto mas largo
+   generado por _generar_lote). */
+#edit-table tbody td .edit-lot {
+    font-size: 0.9rem;
+    letter-spacing: 0;
+}
+
+/* Con table-layout:fixed la celda ya no crece, asi que ningun control puede
+   desbordarla: sin min-width:0 un input[type=date] o el valor maximo de
+   cantidad (999999.99) se salen de su columna. */
+#edit-table tbody td > input,
+#edit-table tbody td > select {
+    min-width: 0;
+}
+
+@media (max-width: 1199.98px) {
     #edit-table thead {
         display: none;
     }
-    
-    #edit-table tbody tr {
+
+    #edit-table,
+    #edit-table tbody,
+    #edit-table tbody tr,
+    #edit-table tbody td {
         display: block;
+        width: auto;
+    }
+
+    #edit-table tbody tr {
         border: 1px solid #e9ecef;
         border-radius: 12px;
-        padding: 12px;
+        padding: 14px;
         margin-bottom: 1rem;
         background-color: #fcfcfc;
     }
-    
+
+    #edit-table tbody tr:last-child {
+        margin-bottom: 0;
+    }
+
+    #edit-table tbody td {
+        padding: 8px 0 !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+    }
+
+    #edit-table tbody td:last-child {
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+    }
+
+    /* Etiqueta del campo + control en la misma fila, sin input-group
+       (su etiqueta nowrap desbordaba y partia el input en dos lineas). */
     #edit-table tbody td {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 8px 0 !important;
-        border-bottom: 1px solid #f0f0f0 !important;
+        gap: 12px;
     }
-    
-    #edit-table tbody td:last-child {
-        border-bottom: none !important;
-    }
-    
+
     #edit-table tbody td::before {
+        flex: 0 0 auto;
         font-weight: 700;
         font-size: 0.75rem;
         color: #6c757d;
         text-transform: uppercase;
-        margin-right: 15px;
     }
-    
+
     #edit-table tbody td:nth-child(1)::before { content: "Insumo:"; }
     #edit-table tbody td:nth-child(2)::before { content: "Cant:"; }
     #edit-table tbody td:nth-child(3)::before { content: "Lote:"; }
     #edit-table tbody td:nth-child(4)::before { content: "Vence:"; }
-    #edit-table tbody td:nth-child(5)::before { content: "Precio:"; }
+    /* La moneda llega desde el propio renglon para no repetirla en un
+       texto fijo que se queda desactualizado. */
+    #edit-table tbody td:nth-child(5)::before {
+        content: "Precio unitario (" attr(data-currency) "):";
+    }
 
     #edit-table tbody td > input,
-    #edit-table tbody td > select,
-    #edit-table tbody td > .input-group,
-    #edit-table tbody td > div {
-        width: 65% !important;
-        max-width: 250px;
+    #edit-table tbody td > select {
+        flex: 1 1 auto;
+        width: auto !important;
+        min-width: 0;
+        max-width: 320px;
+    }
+
+    #edit-table tbody td:nth-child(1) > div,
+    #edit-table tbody td:last-child {
+        max-width: 100%;
+    }
+
+    #edit-table tbody td:last-child {
+        justify-content: flex-end;
+    }
+}
+
+/* Tablet en vertical (>=576px): dos campos por linea, para no dejar la
+   tarjeta a media anchura con controles sueltos de 320px. */
+@media (min-width: 576px) and (max-width: 1199.98px) {
+    #edit-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 1.25rem;
+    }
+
+    #edit-table tbody td:nth-child(1),
+    #edit-table tbody td:last-child {
+        grid-column: 1 / -1;
+    }
+
+    #edit-table tbody td:nth-child(1) {
+        border-bottom: 1px solid #f0f0f0 !important;
+    }
+
+    #edit-table tbody td > input,
+    #edit-table tbody td > select {
+        max-width: none;
+    }
+}
+
+/* Telefono (<576px): la etiqueta va ARRIBA del control en vez de al lado.
+   En 320-375px una etiqueta lateral tipo "PRECIO UNITARIO (USD):" se come
+   el ancho y deja un input de 60px, el mismo defecto del escritorio. */
+@media (max-width: 575.98px) {
+    #edit-table tbody td {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+
+    #edit-table tbody td > input,
+    #edit-table tbody td > select {
+        width: 100% !important;
+        max-width: none;
+    }
+
+    #edit-table tbody td:last-child {
+        align-items: center;
+    }
+
+    #edit-table tbody td:nth-child(1) > div {
+        text-align: left;
+    }
+
+    /* p-4 (32px por lado) deja 228px utiles en un 320px: con el padding de
+       tarjeta, el lote completo no cabia. */
+    #modalEdit .modal-body {
+        padding: 1rem !important;
+    }
+
+    #edit-table tbody tr {
+        padding: 12px;
     }
 }

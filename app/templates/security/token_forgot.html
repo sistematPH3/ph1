@@ -3,27 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pizza Hut - Recuperar Contraseña</title>
+    <title>Recuperar Contraseña | Pizza Hut</title>
+
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/token.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/token_forgot.css') }}?v=1.0">
 </head>
 <body>
-    <div class="card">
-        <h2>Recuperar Contraseña</h2>
-        <p class="text-muted">Ingresa el correo asociado a tu cuenta en el sistema.</p>
-        
-        <form id="forgotForm" novalidate>
-            <p id="error-msg" class="error-alert"></p>
-            
-            <input type="email" id="email" placeholder="Ingrese su correo electrónico." required>
-            
-            <button type="submit">Enviar Enlace</button>
-            <a href="/auth/login" class="btn-cancel">Cancelar</a>
-        </form>
-        
-        <p id="mensaje"></p>
+    <div class="rf-page">
+
+        <!-- TARJETA CENTRADA -->
+        <main class="rf-card">
+            <div class="rf-card-body">
+
+                <!-- PASOS: deja claro que es un proceso de dos etapas y no un login -->
+                <div class="rf-steps">
+                    <div class="rf-step is-active">
+                        <span class="rf-step-dot">1</span>
+                        <span>Verifica tu correo</span>
+                    </div>
+                    <span class="rf-steps-sep" aria-hidden="true"></span>
+                    <div class="rf-step">
+                        <span class="rf-step-dot">2</span>
+                        <span>Nueva contraseña</span>
+                    </div>
+                </div>
+
+                <!-- ENCABEZADO -->
+                <div class="rf-icon-badge">
+                    <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/lock_icon.png') }}" alt="">
+                </div>
+
+                <h1 class="rf-title">Recupera tu contraseña</h1>
+                <p class="rf-lead">
+                    Escribe el correo con el que te registraste y te enviaremos un enlace
+                    para que puedas crear una nueva contraseña.
+                </p>
+
+                <!-- El formulario lo envía token.js por fetch: sin action ni method. -->
+                <form id="forgotForm" novalidate>
+                    <div class="rf-field">
+                        <label class="rf-label" for="email">Correo electrónico</label>
+                        <input type="email" name="email" id="email" class="rf-input"
+                               data-email-pattern="{{ patron_email }}"
+                               placeholder="nombre@correo.com"
+                               autocomplete="email"
+                               required>
+                        <p class="rf-hint">Debe incluir un “@” y un dominio válido, por ejemplo nombre@correo.com.</p>
+                    </div>
+
+                    <p id="error-msg" role="alert"></p>
+
+                    <button type="submit" class="rf-btn">
+                        ENVIAR ENLACE DE RECUPERACIÓN
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </form>
+
+                <p id="mensaje" role="status"></p>
+
+                <div class="rf-note">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Por seguridad, el enlace expira en 1 hora y solo puede usarse una vez. Si no lo solicitaste, puedes ignorar este mensaje.</span>
+                </div>
+
+                <div class="rf-divider">¿Aún no tienes cuenta?</div>
+
+                <p class="rf-foot">
+                    <a href="{{ url_for('security.register') }}">Regístrate aquí</a>
+                </p>
+
+                <div style="text-align:center;">
+                    <a href="{{ url_for('security.login') }}" class="rf-back">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Volver al inicio de sesión
+                    </a>
+                </div>
+
+            </div>
+        </main>
+
     </div>
 
-    <script src="{{ url_for('static', filename='js/security/token.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/security/email-rules.js') }}?v=1.0"></script>
+    <script src="{{ url_for('static', filename='js/security/token.js') }}?v=3.0"></script>
 </body>
 </html>

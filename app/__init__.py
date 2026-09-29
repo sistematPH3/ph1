@@ -227,6 +227,18 @@ def create_app():
         app.jinja_env.filters['ph_amount'] = ph_amount
 
         # ==========================================================
+        # PATRON DE CORREO PARA EL FRONTEND
+        # ==========================================================
+        # Login, registro y "recuperar contrasena" validan el correo con el
+        # mismo patron que el backend (PATRON_EMAIL). Se expone aqui para no
+        # repetirlo en los tres routes: si el backend cambia la regla, el
+        # data-email-pattern de las plantillas cambia con el.
+        @app.context_processor
+        def inject_patron_email():
+            from app.security.requests.auth_validators import PATRON_EMAIL
+            return {'patron_email': PATRON_EMAIL.pattern}
+
+        # ==========================================================
         # CONTEXTO GLOBAL PARA EL SIDEBAR Y LOS AVISOS DE NOVEDADES
         # ==========================================================
         # Provee a todas las plantillas:

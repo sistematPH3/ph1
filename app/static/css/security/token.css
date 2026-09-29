@@ -1,6 +1,13 @@
+/* ==========================================================================
+   Recuperación de contraseña - Sistema Pizza Hut
+   Alineado con el lenguaje visual de login.css / register.css:
+   Agbalumo para títulos, Inter para texto, paleta PH y panel rojo.
+   ========================================================================== */
+
 @font-face {
     font-family: 'Agbalumo';
     src: url('../../fonts/Agbalumo-Regular.ttf') format('truetype');
+    font-weight: normal;
 }
 
 @font-face {
@@ -15,179 +22,499 @@
     font-weight: bold;
 }
 
-body { 
-    font-family: 'Inter', Arial, sans-serif;
-    background-color: #f4f4f4; 
-    padding: 50px; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center;
-    min-height: 90vh;
-    margin: 0;
+:root {
+    --ph-red-dark: #8e0710;
+    --ph-red-bright: #e1171e;
+    --ph-peach: #ffdab9;
+    --ph-orange: #ff9800;
+    --ph-yellow: #ffc107;
+    --ph-ink: #1f1f1f;
 }
 
-.card { 
-    background: white; 
-    padding: 40px; 
-    border-radius: 8px; 
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
-    width: 100%; 
-    max-width: 500px; 
-    text-align: center; 
+* { box-sizing: border-box; }
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    font-family: 'Inter', Arial, sans-serif;
+    color: var(--ph-ink);
+    background-color: #ffffff;
+}
+
+.token-wrapper {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* ============================ COLUMNA IZQUIERDA ========================= */
+.col-left {
+    flex: 0.8;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 40px 20px;
     box-sizing: border-box;
 }
 
-h2 {
-    font-family: 'Agbalumo', cursive; 
-    color: #000000; 
-    font-size: 28px; 
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-weight: normal; 
-    font-style: normal; 
+.brand-logo-main {
+    width: 220px;
+    height: auto;
+    margin: 10px 0 1rem;
 }
 
-.text-muted {
-    color: #666; 
-    font-size: 14px;
-    font-weight: normal;
-    margin-bottom: 25px;
+.left-center-content {
+    text-align: center;
+    max-width: 320px;
 }
 
-input { 
-    font-family: 'Inter', sans-serif; 
-    width: 100%; 
-    padding: 10px; 
-    margin: 15px 0; 
+.info-text-peach {
+    background-color: #ffcc99;
+    color: #000000;
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Agbalumo', cursive;
+    font-size: 0.95rem;
+    margin: 0 0 14px;
+}
+
+.info-lead {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #555555;
+    margin: 0 0 18px;
+}
+
+.btn-registro-link {
+    background-color: var(--ph-red-bright);
+    color: #ffffff;
+    display: inline-block;
+    padding: 8px 18px;
+    border: 2px solid var(--ph-red-dark);
+    border-radius: 10px;
+    font-family: 'Agbalumo', cursive;
+    font-size: 0.9rem;
+    text-decoration: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s ease;
+}
+
+.btn-registro-link:hover {
     background-color: #ffffff;
-    border: 1px solid #ccc; 
-    border-radius: 4px; 
-    box-sizing: border-box; 
-    font-size: 14px;
-    outline: none;
+    color: var(--ph-red-bright);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
 }
 
-input:focus {
-    border-color: #E31837;
+.pizza-slice-image {
+    width: 280px;
+    height: auto;
+    margin: auto 0 10px;
 }
 
-.password-wrapper {
+/* ============================ COLUMNA DERECHA =========================== */
+.col-right {
+    flex: 1.2;
     position: relative;
-    width: 100%;
-    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2.5rem 2rem;
+    overflow: visible;
 }
 
-.password-wrapper input {
-    margin: 0; 
-    padding-right: 45px; 
-}
-
-.toggle-password {
+.col-right::before {
+    content: '';
     position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    color: #666;
+    top: 0;
+    left: -100px;
+    width: calc(100% + 100px);
+    height: 100%;
+    background: var(--ph-red-dark) url('../../img/website_icons/security/hero_icons/fondo_rojo.png');
+    background-size: cover;
+    background-position: left center;
+    background-repeat: no-repeat;
+    mix-blend-mode: darken;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.right-content-wrapper {
+    position: relative;
+    z-index: 110;
+    text-align: center;
+    width: 100%;
+    max-width: 420px;
+}
+
+.group-icon {
+    width: 170px;
+    height: auto;
+    margin-bottom: 0.2rem;
+    opacity: 0.9;
+}
+
+/* Título con borde negro + sombra profunda (mismo truco que login.css) */
+.agbalumo-subtitle-white {
+    font-family: 'Agbalumo', cursive;
+    color: #ffffff;
+    font-size: 1.75rem;
+    margin: 0 0 0.6rem;
+    font-weight: normal;
+    letter-spacing: 1px;
+    text-shadow:
+        -2px -2px 0 #000,
+         2px -2px 0 #000,
+        -2px  2px 0 #000,
+         2px  2px 0 #000,
+         0px  5px 10px rgba(0, 0, 0, 0.8);
+}
+
+.agbalumo-lead {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.88);
+    margin: 0 auto 1.6rem;
+    max-width: 340px;
+}
+
+/* ================================ CAMPOS =============================== */
+.input-container-group {
+    margin-bottom: 18px;
+    width: 100%;
+}
+
+.input-with-icon {
     display: flex;
     align-items: center;
-    transition: color 0.3s;
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    padding: 0 14px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.toggle-password:hover {
-    color: #E31837;
+.input-with-icon:focus-within {
+    border-color: var(--ph-yellow);
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.28);
 }
 
-button { 
+.field-icon {
+    width: 22px;
+    height: auto;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.vertical-divider {
+    width: 1px;
+    height: 25px;
+    background-color: #cccccc;
+    margin: 0 15px;
+    flex-shrink: 0;
+}
+
+.form-input-auth {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
     font-family: 'Inter', sans-serif;
-    width: 100%; 
-    padding: 10px; 
-    background-color: #E31837; 
-    color: white; 
-    border: none; 
-    border-radius: 4px; 
-    cursor: pointer; 
-    font-weight: bold; 
-    font-size: 15px;
-    margin-top: 10px;
-    transition: background-color 0.3s;
+    font-size: 1rem;
+    padding: 14px 0;
+    outline: none;
+    color: #333333;
+    min-width: 0;
 }
 
-button:hover { 
-    background-color: #c2142e; 
+.form-input-auth::placeholder { color: #9a9a9a; }
+
+.eye-toggle-icon {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    opacity: 0.6;
+    margin-left: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    color: #555555;
+    transition: opacity 0.3s ease, color 0.3s ease;
 }
 
-.btn-cancel {
+.eye-toggle-icon:hover {
+    opacity: 1;
+    color: var(--ph-red-bright);
+}
+
+/* ========================== ALERTAS Y MENSAJES ========================= */
+.error-alert {
+    position: relative;
+    text-align: left;
+    color: #ffffff;
+    background-color: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-left: 4px solid var(--ph-yellow);
+    border-radius: 10px;
+    padding: 11px 14px 11px 34px;
+    font-size: 0.83rem;
+    line-height: 1.45;
+    margin: 0 0 16px;
+    width: 100%;
+}
+
+.error-alert::before {
+    content: '!';
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: var(--ph-yellow);
+    color: #3d2c00;
+    font-weight: bold;
+    font-size: 0.7rem;
+    line-height: 15px;
+    text-align: center;
+}
+
+/* Oculto por defecto; el JS alterna display inline al validar */
+.error-alert:empty { display: none; }
+
+#mensaje {
+    background-color: #ffffff;
+    color: #2e7d32;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    font-weight: bold;
+    line-height: 1.5;
+    margin: 16px 0 0;
+    width: 100%;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+#mensaje:empty { display: none; }
+
+#mensaje-container { width: 100%; margin-top: 16px; }
+#mensaje-container:empty { display: none; }
+
+/* ============================ REGLAS DE PASSWORD ======================= */
+.password-rules {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 14px 16px;
+    text-align: left;
+    background-color: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 12px;
+    width: 100%;
+}
+
+.password-rules li {
+    position: relative;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    padding: 3px 0 3px 24px;
+}
+
+.password-rules li::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 8px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--ph-yellow);
+}
+
+/* ================================ BOTONES ============================== */
+.btn-final-negro {
+    width: 85%;
+    max-width: 350px;
+    background-color: #000000;
+    color: #ffffff;
+    padding: 11px;
+    border-radius: 12px;
+    border: 2px solid #ffffff;
+    font-family: 'Agbalumo', cursive;
+    font-size: 1.35rem;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    display: block;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.btn-final-negro:hover {
+    background-color: #ffffff;
+    color: #000000;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.btn-final-negro:active { transform: translateY(0); }
+
+.forget-pass-container {
+    width: 100%;
+    text-align: center;
+    margin-top: 22px;
+}
+
+.forget-pass-peach {
+    background-color: var(--ph-orange);
+    color: #000000;
+    padding: 6px 16px;
+    border-radius: 10px;
+    border: 2px solid #ffffff;
+    font-family: 'Agbalumo', cursive;
+    font-size: 0.75rem;
+    text-decoration: none;
+    display: inline-block;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.forget-pass-peach:hover {
+    background-color: #000000;
+    color: var(--ph-orange);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Enlace que crea el JS tras cambiar la contraseña */
+.login-link {
     display: block;
     width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    background-color: #E31837; 
-    color: white; 
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 15px;
+    margin-top: 12px;
+    background-color: #ffffff;
+    color: #000000;
+    padding: 11px;
+    border: 2px solid #ffffff;
+    border-radius: 12px;
+    font-family: 'Agbalumo', cursive;
+    font-size: 1.05rem;
+    text-align: center;
     text-decoration: none;
-    transition: background-color 0.3s;
-    box-sizing: border-box;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s ease;
 }
 
-.btn-cancel:hover {
-    background-color: #c2142e; 
+.login-link:hover {
+    background-color: #000000;
+    color: #ffffff;
+    transform: translateY(-2px);
 }
 
-.login-link { 
-    display: inline-block; 
-    margin-top: 15px; 
-    background-color: transparent; 
-    color: #E31837; 
-    text-decoration: none; 
-    font-weight: bold; 
-    padding: 8px 15px; 
-    border: 1px solid #E31837; 
-    border-radius: 4px; 
-    transition: background-color 0.3s;
+/* ======================= ESTADO: ENLACE INVÁLIDO ======================= */
+.token-invalid {
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 34px 28px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+    max-width: 420px;
 }
 
-.login-link:hover { 
-    background-color: #fce8eb; 
+.token-invalid .state-icon {
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    background-color: #fdeaea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+    font-size: 2.3rem;
+    color: var(--ph-red-bright);
 }
 
-.error-alert {
-    color: #E31837; 
-    font-size: 13px; 
-    display: none; 
-    margin-bottom: 15px; 
-    text-align: left; 
-    padding: 10px; 
-    border: 1px solid #E31837; 
-    background-color: #fff0f0; 
-    border-radius: 4px; 
+.token-invalid h3 {
+    font-family: 'Agbalumo', cursive;
+    font-size: 1.2rem;
+    color: #000000;
+    margin: 0 0 10px;
 }
 
-#mensaje { 
-    margin-top: 15px; 
-    font-weight: bold; 
-    font-size: 14px;
+.token-invalid p {
+    font-size: 0.87rem;
+    line-height: 1.6;
+    color: #555555;
+    margin: 0 0 8px;
+}
+
+.token-invalid .badge-hours {
+    display: inline-block;
+    background-color: var(--ph-peach);
+    color: #000000;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin: 6px 0 20px;
+}
+
+/* ============================== RESPONSIVE ============================= */
+@media (max-width: 991.98px) {
+    .col-left {
+        flex: 0.9;
+    }
+
+    .brand-logo-main { width: 170px; }
+    .pizza-slice-image { width: 190px; }
+    .group-icon { width: 130px; }
+    .agbalumo-subtitle-white { font-size: 1.5rem; }
+    .col-right { padding: 2rem 1.5rem; }
 }
 
 @media (max-width: 767.98px) {
-    body {
-        padding: 15px;
+    .token-wrapper {
+        flex-direction: column-reverse;
     }
-    
-    .card {
-        padding: 25px 20px;
+
+    .col-left {
+        flex: none;
+        width: 100%;
+        padding: 26px 20px 30px;
     }
-    
-    h2 {
-        font-size: 24px;
+
+    .left-center-content { max-width: none; }
+    .info-text-peach { font-size: 0.85rem; }
+    .info-lead { font-size: 0.85rem; }
+    .brand-logo-main { width: 140px; }
+    .pizza-slice-image { display: none; }
+
+    .col-right {
+        flex: none;
+        width: 100%;
+        padding: 30px 20px 34px;
     }
-    
-    input, button, .btn-cancel, .login-link {
-        padding: 12px;
-        font-size: 16px;
-    }
+
+    .col-right::before { left: 0; width: 100%; }
+
+    .right-content-wrapper { max-width: 440px; }
+    .group-icon { width: 104px; }
+    .agbalumo-subtitle-white { font-size: 1.3rem; }
+    .agbalumo-lead { font-size: 0.85rem; margin-bottom: 1.2rem; }
+
+    .form-input-auth { font-size: 1rem; padding: 15px 0; }
+    .btn-final-negro { width: 100%; font-size: 1.15rem; }
+    .forget-pass-peach { font-size: 0.7rem; }
+    .token-invalid { padding: 26px 20px; }
+}
+
+@media (max-width: 380px) {
+    .col-left { padding: 22px 14px 26px; }
+    .col-right { padding: 26px 14px 30px; }
+    .field-icon, .eye-toggle-icon { width: 19px; height: 19px; }
+    .vertical-divider { margin: 0 11px; }
+    .agbalumo-subtitle-white { font-size: 1.15rem; }
 }

@@ -1,0 +1,480 @@
+/* ==========================================================================
+   Recuperar contraseña - Sistema Pizza Hut
+
+   Rediseño pedido por diseño: la pantalla era un clon del inicio de sesión
+   (mismas dos columnas, mismo panel rojo, mismo input con divisor y mismo
+   botón negro), y se confundían entre sí.
+
+   Aquí se cambia de patrón: tarjeta única centrada sobre fondo claro, con
+   indicador de pasos. El rojo pasa a ser acento (barra, foco, botón) en vez
+   de ser el fondo del panel, que era lo que más se confundía.
+
+   Se mantiene la paleta y las tipografías del sistema (Agbalumo + Inter) y NO
+   se toca token.css, que sigue sirviendo a la pantalla de nueva contraseña.
+   ========================================================================== */
+
+@font-face {
+    font-family: 'Agbalumo';
+    src: url('../../fonts/Agbalumo-Regular.ttf') format('truetype');
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+
+:root {
+    --rf-red: #e1171e;
+    --rf-red-dark: #8e0710;
+    --rf-red-soft: rgba(225, 23, 30, 0.10);
+    --rf-bg: #f6f6f9;
+    --rf-card: #ffffff;
+    --rf-ink: #1f1f1f;
+    --rf-yellow: #ffc107;
+    --rf-text-soft: #4b5563;
+    --rf-text-muted: #8892a0;
+    --rf-border: #e7e9ee;
+    --rf-green: #0d8a43;
+    --rf-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 18px 40px -18px rgba(16, 24, 40, 0.28);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
+
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    color: var(--rf-ink);
+    background-color: var(--rf-bg);
+    /* Halo rojo muy suave arriba: da identidad sin volver a copiar el panel. */
+    background-image:
+        radial-gradient(120% 70% at 50% -10%, rgba(225, 23, 30, 0.13) 0%, rgba(225, 23, 30, 0) 60%),
+        radial-gradient(90% 50% at 50% 110%, rgba(255, 193, 7, 0.10) 0%, rgba(255, 193, 7, 0) 55%);
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.rf-page {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ------------------------------------------------------------- tarjeta */
+
+.rf-card {
+    position: relative;
+    width: 100%;
+    background: var(--rf-card);
+    border: 1px solid var(--rf-border);
+    border-radius: 20px;
+    box-shadow: var(--rf-shadow);
+    overflow: hidden;
+}
+
+/* Acento superior: el rojo como detalle, no como fondo. */
+.rf-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--rf-red) 0%, #ff5a3c 55%, var(--rf-yellow) 100%);
+}
+
+.rf-card-body {
+    padding: 34px 38px 32px;
+}
+
+/* ------------------------------------------------- indicador de pasos */
+
+.rf-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.rf-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: bold;
+    color: var(--rf-text-muted);
+    background: var(--rf-bg);
+    border: 1px solid var(--rf-border);
+    border-radius: 999px;
+    padding: 7px 14px 7px 8px;
+}
+
+.rf-step-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--rf-border);
+    color: var(--rf-text-muted);
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.rf-step.is-active {
+    color: var(--rf-red);
+    background: var(--rf-red-soft);
+    border-color: rgba(225, 23, 30, 0.28);
+}
+
+.rf-step.is-active .rf-step-dot {
+    background: var(--rf-red);
+    color: #fff;
+}
+
+.rf-steps-sep {
+    width: 26px;
+    height: 2px;
+    background: var(--rf-border);
+    border-radius: 2px;
+}
+
+/* --------------------------------------------------------- encabezado */
+
+.rf-icon-badge {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 16px;
+    border-radius: 18px;
+    background: var(--rf-red-soft);
+    border: 1px solid rgba(225, 23, 30, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rf-icon-badge img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.rf-title {
+    font-family: 'Agbalumo', cursive;
+    font-size: 27px;
+    line-height: 1.2;
+    text-align: center;
+    margin: 0 0 8px;
+    color: var(--rf-ink);
+}
+
+.rf-lead {
+    text-align: center;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--rf-text-soft);
+    margin: 0 0 26px;
+}
+
+/* ------------------------------------------------------------ formulario */
+
+.rf-field { margin-bottom: 18px; }
+
+.rf-label {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--rf-ink);
+    margin-bottom: 7px;
+}
+
+/* Etiqueta e input apilados: en login el input es una cápsula con icono y
+   divisor, aquí la etiqueta va arriba para que la lectura sea distinta. */
+.rf-input {
+    width: 100%;
+    height: 52px;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 15px;
+    color: var(--rf-ink);
+    background: #fbfbfd;
+    border: 1.5px solid var(--rf-border);
+    border-radius: 12px;
+    padding: 0 15px;
+    outline: none;
+    transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+.rf-input::placeholder { color: var(--rf-text-muted); }
+
+.rf-input:focus {
+    border-color: var(--rf-red);
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(225, 23, 30, 0.12);
+}
+
+.rf-hint {
+    font-size: 12.5px;
+    color: var(--rf-text-muted);
+    margin: 7px 0 0;
+    line-height: 1.5;
+}
+
+/* El JS activa el error con style.display='block'; debe arrancar oculto. */
+#error-msg {
+    display: none;
+    font-size: 13.5px;
+    line-height: 1.5;
+    font-weight: bold;
+    color: var(--rf-red-dark);
+    background: var(--rf-red-soft);
+    border: 1px solid rgba(225, 23, 30, 0.22);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin: 0 0 16px;
+}
+
+/* Altura reservada para que el texto no empuje el botón al aparecer. */
+#mensaje {
+    min-height: 22px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    text-align: center;
+    margin: 14px 0 0;
+}
+
+.rf-btn {
+    width: 100%;
+    height: 52px;
+    border: none;
+    border-radius: 12px;
+    background: var(--rf-red);
+    color: #fff;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: .3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    transition: background-color .18s ease, transform .12s ease, box-shadow .18s ease;
+}
+
+.rf-btn:hover { background: var(--rf-red-dark); }
+
+.rf-btn:active { transform: translateY(1px); }
+
+.rf-btn:focus-visible {
+    outline: 3px solid rgba(225, 23, 30, .35);
+    outline-offset: 2px;
+}
+
+.rf-btn svg { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------------
+   Piezas de la pantalla de NUEVA CONTRASENA (paso 2 del mismo flujo).
+   Comparten tarjeta y pasos con la de recuperar contraseña.
+   ------------------------------------------------------------------ */
+
+.rf-step.is-done {
+    color: var(--rf-green);
+    background: rgba(13, 138, 67, 0.08);
+    border-color: rgba(13, 138, 67, 0.25);
+}
+
+.rf-step.is-done .rf-step-dot {
+    background: var(--rf-green);
+    color: #fff;
+    font-size: 13px;
+}
+
+/* Input con el ojo de mostrar contraseña dentro. */
+.rf-input-wrap { position: relative; }
+
+.rf-input-wrap .rf-input { padding-right: 50px; }
+
+.rf-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--rf-text-muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    transition: color .18s ease, background-color .18s ease;
+}
+
+.rf-eye:hover { color: var(--rf-red); background: var(--rf-red-soft); }
+
+.rf-eye:focus-visible {
+    outline: 2px solid rgba(225, 23, 30, .45);
+    outline-offset: 1px;
+}
+
+/* Enlace que token.js crea tras guardar (clase fija 'login-link'). */
+.login-link {
+    display: block;
+    margin-top: 14px;
+    padding: 13px 16px;
+    border-radius: 12px;
+    background: var(--rf-red);
+    color: #fff;
+    text-align: center;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 14.5px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background-color .18s ease;
+}
+
+.login-link:hover { background: var(--rf-red-dark); }
+
+/* Estado de enlace inválido o expirado. */
+.rf-invalid { text-align: center; }
+
+.rf-invalid-icon {
+    width: 78px;
+    height: 78px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: var(--rf-red-soft);
+    border: 1px solid rgba(225, 23, 30, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.1rem;
+}
+
+.rf-invalid-title {
+    font-family: 'Agbalumo', cursive;
+    font-size: 23px;
+    margin: 0 0 10px;
+    color: var(--rf-ink);
+}
+
+.rf-invalid-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--rf-text-soft);
+    margin: 0 0 18px;
+}
+
+.rf-badge-hours {
+    display: inline-block;
+    background: var(--rf-red-soft);
+    color: var(--rf-red-dark);
+    border: 1px solid rgba(225, 23, 30, 0.22);
+    font-size: 12.5px;
+    font-weight: bold;
+    padding: 6px 13px;
+    border-radius: 999px;
+    margin: 0 0 20px;
+}
+
+/* -------------------------------------------------------------- pie */
+.rf-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 18px;
+    color: var(--rf-text-muted);
+    font-size: 12px;
+}
+
+.rf-divider::before,
+.rf-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rf-border);
+}
+
+.rf-foot {
+    text-align: center;
+    font-size: 14px;
+    color: var(--rf-text-soft);
+}
+
+.rf-foot a,
+.rf-foot a:visited {
+    color: var(--rf-red);
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.rf-foot a:hover { text-decoration: underline; }
+
+.rf-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--rf-text-soft);
+    text-decoration: none;
+}
+
+.rf-back:hover { color: var(--rf-red); text-decoration: underline; }
+
+.rf-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-top: 22px;
+    padding: 13px 15px;
+    background: var(--rf-bg);
+    border: 1px solid var(--rf-border);
+    border-radius: 12px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--rf-text-soft);
+}
+
+.rf-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--rf-red); }
+
+/* --------------------------------------------------------- responsive */
+
+@media (max-width: 520px) {
+    .rf-card-body { padding: 28px 22px 26px; }
+    .rf-title { font-size: 24px; }
+    .rf-steps { gap: 6px; }
+    .rf-step { font-size: 11.5px; padding: 6px 11px 6px 7px; }
+    .rf-steps-sep { width: 14px; }
+}
+
+@media (max-width: 400px) {
+    .rf-step span:not(.rf-step-dot) { display: none; }
+    .rf-step { padding: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rf-input, .rf-btn { transition: none; }
+}
