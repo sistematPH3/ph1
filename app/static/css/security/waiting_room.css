@@ -1,0 +1,78 @@
+.body-waiting { 
+    background-color: #f4f4f4 !important; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    margin: 0;
+}
+
+.card-waiting { 
+    background: white !important; 
+    padding: 40px; 
+    border-radius: 20px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+    text-align: center; 
+    max-width: 450px; 
+}
+
+.body-waiting { 
+    background-color: #f4f4f4; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    min-height: 80vh; 
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+}
+
+.card-waiting { 
+    background: white; 
+    padding: 40px; 
+    border-radius: 20px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+    text-align: center; 
+    max-width: 450px; 
+    width: 100%;
+    margin: auto;
+}
+
+.card-waiting h1 { 
+    font-size: 2rem; 
+    color: #333; 
+    margin-bottom: 15px;
+    line-height: 1.2;
+}
+
+.nombre-usuario {
+    display: inline-block;
+    white-space: nowrap;
+    text-transform: capitalize;
+    color: #be0000;
+}
+
+.status-text { 
+    color: #666; 
+    margin-bottom: 25px; 
+    font-size: 1.1rem; 
+}
+
+.dog-img { 
+    width: 250px; 
+    height: auto; 
+    margin-bottom: 25px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.btn-ph-red { 
+    background-color: #be0000; 
+    color: white; 
+    border-radius: 50px; 
+    padding: 12px 30px; 
+    border: none; 
+    font-weight: bold; 
+    width: 100%;
+    cursor: pointer;
+}

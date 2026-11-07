@@ -1,0 +1,290 @@
+:root {
+    --ph-red: #e1171e;
+    --ph-beige: #fdf5e6; 
+}
+
+.register-page-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    
+    background: radial-gradient(circle, #ffffff 0%, var(--ph-beige) 100%);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+}
+
+
+.register-page-container::before, 
+
+.register-page-container::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; 
+    
+    background-image: 
+        url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png'), /* Arriba Izquierda */
+        url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png'); /* Arriba Derecha */
+    
+    background-position: 
+        -120px -120px,           /* Esquina superior izq (picada) */
+        calc(100% + 100px) -50px; /* Esquina superior der (picada) */
+    
+    background-size: 450px, 300px; /* DISTINTOS TAMAÑOS */
+    background-repeat: no-repeat;
+    filter: blur(5px) rotate(-15deg); /* Difuminado y rotación */
+    opacity: 0.2;
+    z-index: 0;
+}
+/* CAPA DE PIZZAS INFERIORES */
+.register-page-container::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+
+    background-image: 
+        url('../../img/website_icons/security/hero_icons/images__2_-removebg-preview.png');
+    
+    
+    background-position: 105% calc(100% + 150px); 
+    
+    background-size: 450px; 
+    background-repeat: no-repeat;
+    filter: blur(7px) rotate(25deg); /* Rotación para que el borde se vea natural */
+    opacity: 0.15;
+    z-index: 0;
+}
+
+/* SECCIÓN IZQUIERDA Y DERECHA EQUILIBRADAS */
+.brand-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center; /* Cambiamos a centrado para equilibrar con el logo arriba */
+    padding-right: 40px; 
+    position: relative;
+    z-index: 1;
+}
+
+
+.brand-section img[alt="Pizza Hut"] {
+    width: 250px !important;
+    
+    transform: translateX(-10px); 
+    margin-bottom: 40px; /* Más espacio entre el logo y el texto de abajo */
+    display: block;
+}
+
+/* SECCIÓN DERECHA (Formulario) */
+.form-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start; /* Alinea el formulario hacia la izquierda (hacia el logo) */
+    padding-left: 60px;      /* Espacio entre el formulario y el centro */
+    position: relative;
+    z-index: 1;
+}
+
+.unete-banner {
+    background-color: rgba(255, 255, 255, 0.4); /* Un poco más claro */
+    padding: 15px 40px;
+    border-radius: 30px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    transform: none; 
+    margin-left: -60px; 
+    width: calc(100% + 60px); 
+    display: flex;
+    justify-content: center; 
+}
+
+.unete-text {
+    
+    font-family: 'Passion One', sans-serif; 
+    font-size: 3.5rem;
+    color: white; /* Relleno de la letra */
+    line-height: 1.1;
+    margin-left: 300px;
+    text-transform: uppercase;
+    
+    
+    text-shadow: 
+        -3px -3px 0 var(--ph-red),  
+         3px -3px 0 var(--ph-red),
+        -3px  3px 0 var(--ph-red),
+         3px  3px 0 var(--ph-red),
+         6px  6px 0px rgba(0,0,0,0.15); /* Sombra proyectada sutil */
+    
+    
+    -webkit-text-stroke: 1px var(--ph-red);
+}
+
+.pizza-slice-footer {
+    position: absolute;
+    z-index: 2; 
+    bottom: -30px; /* La bajamos más para que no pise las letras */
+    left: 10px;    /* La alejamos un poco del centro */
+    width: 320px;  /* Tamaño consistente con el diseño */
+}
+
+/* TARJETA DE REGISTRO */
+.register-card {
+    background: white;
+    padding: 45px;
+    border-radius: 30px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    width: 85%;
+    max-width: 420px;
+}
+
+.register-card h2 {
+    color: var(--ph-red);
+    font-family: 'Agbalumo', cursive;
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 2.2rem;
+}
+
+/* Inputs y Botones corregidos */
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #000;
+    font-family: 'Agbalumo';
+    src: url('/static/fonts/Agbalumo-Regular.ttf') format('truetype');
+    font-size: 1.1rem; /* Ajuste opcional para que se vea mejor */
+}
+
+.custom-input {
+    width: 100%;
+    padding: 14px 20px;
+    border: 1px solid #ddd;
+    border-radius: 50px;
+    background-color: #f4f4f4;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif; /*Gracias a esto, pude cambiar la fuente legible para el usuario*/
+    font-size: 1rem;
+}
+.custom-input::placeholder {
+    font-family: 'Inter', sans-serif;
+    opacity: 0.6;
+}
+
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.btn-reg {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-family: 'Agbalumo';
+    src: url('/static/fonts/Agbalumo-Regular.ttf') format('truetype');
+}
+.error-hint-diego {
+    color: #e1171e; /* El rojo de Pizza Hut */
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-top: 5px;
+    display: none; /* Ocultos por defecto */
+    padding-left: 10px;
+}
+
+/* Para resaltar el borde del input cuando hay error */
+.input-error-border {
+    border: 2px solid #e1171e !important;
+    background-color: #fff1f1 !important;
+}
+@font-face {
+    font-family: 'Agbalumo';
+    src: url('/static/fonts/Agbalumo-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Fuente Inter (Texto base) */
+@font-face {
+    font-family: 'Inter';
+    src: url('/static/fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('static/fonts/Inter-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+.error-visible {
+    display: block !important;
+}
+.password-wrapper .custom-input {
+    padding-right: 45px; /* Espacio para el icono */
+}
+
+#toggle-password:hover {
+    opacity: 1 !important; /* Resalta al pasar el ratón */
+}
+.btn-cancel { background-color: var(--ph-red); color: white; }
+.btn-submit { background-color: #000; color: white; }
+/* Botón Registrar (Negro) */
+.btn-submit {
+    background-color: #000; color: white;
+    color: #fff;
+    border: 1px solid #000;
+    padding: 14px 20px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-family: 'Agbalumo', sans-serif;
+    font-size: 1.1rem;
+    width: 100%;
+    /* AGREGAR ESTO: */
+    transition: all 0.3s ease; 
+}
+
+/* Botón Cancelar (Transparente) */
+.btn-cancel {
+    background-color: var(--ph-red); color: white;
+    color: #fff;
+    border: 1px solid #e1171e;
+    padding: 14px 20px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-family: 'Agbalumo', sans-serif;
+    font-size: 1.1rem;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    /* AGREGAR ESTO: */
+    transition: all 0.3s ease;
+}
+/* Efecto para el botón Registrar */
+.btn-submit:hover {
+    background-color: #e1171e; /* Cambia a rojo Pizza Hut */
+    color: #fff;
+    border-color: #e1171e;
+    transform: scale(1.03);    /* Un pequeño aumento como el de Mariuska */
+    box-shadow: 0px 4px 15px rgba(225, 23, 30, 0.3); /* Sombra rojiza suave */
+}
+
+/* Efecto para el botón Cancelar */
+.btn-cancel:hover {
+    background-color: #000; /* Un gris muy claro de fondo */
+    color: #e1171e;            /* El texto se pone rojo */
+    border-color: #000;     /* El borde se pone negro */
+    transform: scale(1.03);
+}

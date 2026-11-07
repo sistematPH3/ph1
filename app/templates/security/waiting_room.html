@@ -1,0 +1,36 @@
+{% extends "auth_base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/waiting_room.css') }}">
+
+<div class="body-waiting">
+    <div class="card-waiting">
+        <h1>¡Bienvenido/a,<br>
+            <span class="nombre-usuario">{{ current_user.name }}!</span>
+        </h1>
+        
+        <p class="status-text">
+            Tu status es de <b>invitado</b>, aún no tienes acceso al sistema. 
+            Espera a que un administrador apruebe tu cuenta.
+        </p>
+        
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/perrito_ph.png') }}" 
+             alt="Perrito PH" class="dog-img">
+
+        <button onclick="mostrarAdvertencia()" class="btn-ph-red">Solicitud Enviada</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function mostrarAdvertencia() {
+        Swal.fire({
+            title: 'Solicitud en proceso',
+            text: 'El equipo administrativo de Pizza Hut te dará acceso pronto.',
+            icon: 'info',
+            confirmButtonColor: '#be0000',
+            confirmButtonText: 'Entendido'
+        });
+    }
+</script>
+{% endblock %}

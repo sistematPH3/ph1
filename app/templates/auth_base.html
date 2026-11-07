@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %} - Pizza Hut</title>
+    
+    <!-- Bootstrap Local -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    
+    <!-- Estilos Base de Seguridad (Fuentes y Logo) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
+    
+    <!-- Bloque para que cada uno inserte su propio CSS (Login, Registro, etc.) -->
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="auth-wrapper">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
