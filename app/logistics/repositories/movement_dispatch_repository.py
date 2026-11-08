@@ -301,6 +301,24 @@ class MovementDispatchRepository:
                     f"Cantidad solicitada: {quantity:.2f}."
                 )
 
+            # Validación del lote contra la disponibilidad real por partida.
+            # No se usa dict `reserved` porque get_product_lots_available ya
+            # descuenta los MovementDetail flushed por renglones anteriores
+            # del mismo payload (via salidas_traslado).
+            available_lots = MovementDispatchRepository.get_product_lots_available(origin_id, product_id)[1]
+            matching_lot = next((l for l in available_lots if l['lot_number'] == lot_number), None)
+
+            if not matching_lot:
+                raise ValueError(f"El lote {lot_number} no existe o no posee disponibilidad en la sede origen.")
+
+            lot_disp = Decimal(str(matching_lot['available_quantity']))
+
+            if lot_disp < quantity:
+                raise ValueError(
+                    f"El lote {lot_number} solo dispone de {max(lot_disp, Decimal('0.00')):.2f} unidades. "
+                    f"Cantidad solicitada: {quantity:.2f}."
+                )
+
             # Operación segura
             inventory.current_quantity = curr_qty - quantity
             inventory.transit_quantity = trans_qty + quantity
