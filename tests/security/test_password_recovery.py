@@ -4,7 +4,7 @@ Cada caso cubre un bug corregido:
 - credenciales SMTP hardcodeadas y enlace a 127.0.0.1,
 - UnboundLocalError (500) tras cambiar la contrasena,
 - respuestas 415/400 en HTML que rompian el JS,
-- enumeracion de correos, tokens multiples, tokens huerfanos,
+- correo inexistente rechazado con 404, tokens multiples, tokens huerfanos,
 - zona horaria inconsistente, columna 'used' muerta, sin rollback,
 - validacion de email laxa y acoplamiento con 'dummy123'.
 """
@@ -206,15 +206,32 @@ class TestEnlaceRecuperacion(BaseRecuperacion):
 class TestSolicitud(BaseRecuperacion):
     """Generacion, invalidacion y limpieza de tokens."""
 
-    def test_no_revela_si_el_correo_existe(self):
-        """Mismo status y mismo cuerpo exista o no la cuenta."""
-        r_existe = self.client.post('/auth/forgot-password',
-                                    json={'email': EMAIL_PRUEBA})
-        r_inexiste = self.client.post('/auth/forgot-password',
-                                      json={'email': 'nadie-esta@prueba.test'})
-        self.assertEqual(r_existe.status_code, 200)
-        self.assertEqual(r_inexiste.status_code, 200)
-        self.assertEqual(r_existe.get_json(), r_inexiste.get_json())
+    def test_correo_no_registrado_responde_404(self):
+        """Un correo que no existe no debe simular un envio exitoso."""
+        r = self.client.post('/auth/forgot-password',
+                             json={'email': 'nadie-esta@prueba.test'})
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.get_json()['error'],
+                         'El correo ingresado no existe en el sistema.')
+
+    def test_correo_registrado_envia_y_responde_200(self):
+        """Un correo valido si crea el token y dispara el envio."""
+        r = self.client.post('/auth/forgot-password',
+                             json={'email': EMAIL_PRUEBA})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(self._tokens()), 1)
+
+    def test_error_de_bd_al_guardar_responde_500(self):
+        """Si la BD falla no se puede responder como si el correo salio."""
+        original = svc.guardar_token
+        svc.guardar_token = lambda *args, **kwargs: (False, None)
+        try:
+            r = self.client.post('/auth/forgot-password',
+                                 json={'email': EMAIL_PRUEBA})
+        finally:
+            svc.guardar_token = original
+        self.assertEqual(r.status_code, 500)
+        self.assertIn('problema interno', r.get_json()['error'])
 
     def test_token_unico_invalida_los_anteriores(self):
         self.client.post('/auth/forgot-password', json={'email': EMAIL_PRUEBA})
@@ -246,12 +263,13 @@ class TestSolicitud(BaseRecuperacion):
         self.assertEqual(len(self._tokens()), 0,
                          'el token se elimina si el usuario nunca lo recibio')
 
-    def test_usuario_inactivo_no_recibe_token(self):
+    def test_usuario_inactivo_responde_403_y_no_crea_token(self):
         inactivo = self._crear_usuario('inactivo@prueba.test', activo=False)
         try:
             r = self.client.post('/auth/forgot-password',
                                  json={'email': 'inactivo@prueba.test'})
-            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.status_code, 403)
+            self.assertIn('no está activa', r.get_json()['error'])
             self.assertEqual(
                 PasswordRecovery.query.filter_by(user_id=inactivo.id).count(), 0)
         finally:
@@ -278,6 +296,39 @@ class TestSolicitud(BaseRecuperacion):
         restantes = self._tokens()
         self.assertEqual(len(restantes), 1, 'solo sobrevive el token vigente')
         self.assertFalse(restantes[0].used)
+
+
+class TestConsultaCorreoEnVivo(BaseRecuperacion):
+    """Endpoint que usa token.js para avisar mientras se escribe."""
+
+    def test_correo_existente_y_activo(self):
+        r = self.client.post('/auth/forgot-password/check-email',
+                             json={'email': EMAIL_PRUEBA})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json(), {'existe': True, 'activa': True})
+
+    def test_correo_inexistente(self):
+        r = self.client.post('/auth/forgot-password/check-email',
+                             json={'email': 'nadie-esta@prueba.test'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json(), {'existe': False, 'activa': False})
+
+    def test_correo_existente_pero_inactivo(self):
+        inactivo = self._crear_usuario('inactivo-consulta@prueba.test',
+                                       activo=False)
+        try:
+            r = self.client.post('/auth/forgot-password/check-email',
+                                 json={'email': 'inactivo-consulta@prueba.test'})
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json(), {'existe': True, 'activa': False})
+        finally:
+            db.session.delete(inactivo)
+            db.session.commit()
+
+    def test_formato_invalido_responde_400(self):
+        r = self.client.post('/auth/forgot-password/check-email',
+                             json={'email': 'sinarroba'})
+        self.assertEqual(r.status_code, 400)
 
 
 class TestCambioDePassword(BaseRecuperacion):

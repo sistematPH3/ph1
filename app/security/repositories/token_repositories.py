@@ -27,6 +27,19 @@ def obtener_usuario_por_email(email):
     ).first()
 
 
+def buscar_usuario_por_email(email):
+    """
+    Devuelve el usuario con ese correo, este activo o no.
+
+    Se usa solo al solicitar la recuperacion para poder distinguir "el correo
+    no existe" de "existe pero la cuenta esta inactiva". El resto del flujo
+    sigue usando obtener_usuario_por_email(), que solo devuelve activos.
+    """
+    if not email:
+        return None
+    return User.query.filter(User.email == email.strip()).first()
+
+
 def invalidar_tokens_previos(user_id, excepto_token=None):
     """
     Marca como usados todos los tokens pendientes del usuario.

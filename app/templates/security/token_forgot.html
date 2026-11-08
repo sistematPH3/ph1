@@ -40,7 +40,8 @@
                 </p>
 
                 <!-- El formulario lo envía token.js por fetch: sin action ni method. -->
-                <form id="forgotForm" novalidate>
+                <form id="forgotForm" novalidate
+                      data-check-url="{{ url_for('security.check_recovery_email') }}">
                     <div class="rf-field">
                         <label class="rf-label" for="email">Correo electrónico</label>
                         <input type="email" name="email" id="email" class="rf-input"
@@ -93,6 +94,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/security/email-rules.js') }}?v=1.0"></script>
-    <script src="{{ url_for('static', filename='js/security/token.js') }}?v=3.0"></script>
+    <script src="{{ url_for('static', filename='js/security/token.js') }}?v=4.0"></script>
 </body>
 </html>

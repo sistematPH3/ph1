@@ -36,9 +36,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return { error: 'Respuesta inesperada del servidor.' };
     }
 
-    function mostrarError(errorMsg, texto) {
+    function mostrarError(errorMsg, texto, tipo) {
         errorMsg.innerText = texto;
         errorMsg.style.display = 'block';
+        if (tipo) {
+            errorMsg.dataset.tipo = tipo;
+        } else {
+            delete errorMsg.dataset.tipo;
+        }
+    }
+
+    function ocultarError(errorMsg) {
+        errorMsg.innerText = '';
+        errorMsg.style.display = 'none';
+        delete errorMsg.dataset.tipo;
     }
 
     const forgotForm = document.getElementById('forgotForm');
@@ -46,31 +57,116 @@ document.addEventListener('DOMContentLoaded', function () {
         const emailInput = document.getElementById('email');
         const errorMsg = document.getElementById('error-msg');
         const msj = document.getElementById('mensaje');
+        const checkUrl = forgotForm.dataset.checkUrl
+            || (window.location.pathname.replace(/\/$/, '') + '/check-email');
+
+        let temporizador = null;
+        let controlador = null;
+
+        function cancelarConsulta() {
+            if (temporizador) {
+                clearTimeout(temporizador);
+                temporizador = null;
+            }
+            if (controlador) {
+                controlador.abort();
+                controlador = null;
+            }
+        }
+
+        async function consultarExistencia(email) {
+            if (controlador) controlador.abort();
+            const controladorActual = new AbortController();
+            controlador = controladorActual;
+
+            let respuesta;
+            try {
+                respuesta = await fetch(checkUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email }),
+                    signal: controladorActual.signal
+                });
+            } catch (e) {
+                // Si la consulta falla no se bloquea al usuario: el submit
+                // vuelve a validar contra el servidor.
+                return;
+            } finally {
+                if (controlador === controladorActual) controlador = null;
+            }
+
+            // 429 u otro error de la consulta: se ignora. La validacion
+            // definitiva sigue siendo el submit.
+            if (!respuesta.ok) return;
+
+            let data;
+            try {
+                data = await respuesta.json();
+            } catch (e) {
+                return;
+            }
+
+            // Si el correo cambio mientras llegaba la respuesta, se descarta.
+            if (emailInput.value.trim() !== email) return;
+
+            if (data.existe === false) {
+                mostrarError(errorMsg,
+                    'El correo ingresado no existe en el sistema.', 'existencia');
+            } else if (data.activa === false) {
+                mostrarError(errorMsg,
+                    'Tu cuenta aún no está activa. Contacta al administrador.', 'inactiva');
+            } else if (errorMsg.dataset.tipo === 'existencia'
+                    || errorMsg.dataset.tipo === 'inactiva') {
+                ocultarError(errorMsg);
+            }
+        }
+
+        function programarConsulta(email) {
+            if (temporizador) clearTimeout(temporizador);
+            temporizador = setTimeout(function () {
+                temporizador = null;
+                consultarExistencia(email);
+            }, 500);
+        }
 
         emailInput.addEventListener('input', function () {
-            const email = this.value;
+            const email = this.value.trim();
+            cancelarConsulta();
+            ocultarError(errorMsg);
+
             if (email.length > 0 && !window.EmailRules.esValido(email, emailInput)) {
-                mostrarError(errorMsg, window.EmailRules.mensaje());
-            } else {
-                errorMsg.style.display = 'none';
+                mostrarError(errorMsg, window.EmailRules.mensaje(), 'formato');
+                return;
             }
+            if (!email) return;
+
+            // Formato valido: se consulta la existencia al dejar de escribir.
+            programarConsulta(email);
+        });
+
+        emailInput.addEventListener('blur', function () {
+            const email = this.value.trim();
+            cancelarConsulta();
+            if (!email || !window.EmailRules.esValido(email, emailInput)) return;
+            consultarExistencia(email);
         });
 
         forgotForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+            cancelarConsulta();
             const email = emailInput.value.trim();
             msj.innerText = '';
 
             if (!email) {
-                mostrarError(errorMsg, 'Por favor ingrese su correo.');
+                mostrarError(errorMsg, 'Por favor ingrese su correo.', 'formato');
                 return;
             }
             if (!window.EmailRules.esValido(email, emailInput)) {
-                mostrarError(errorMsg, window.EmailRules.mensaje());
+                mostrarError(errorMsg, window.EmailRules.mensaje(), 'formato');
                 return;
             }
 
-            errorMsg.style.display = 'none';
+            ocultarError(errorMsg);
             msj.innerText = 'Procesando...';
             msj.style.color = '#666';
 
@@ -78,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
             msj.innerText = '';
 
             if (data.error) {
-                mostrarError(errorMsg, data.error);
+                mostrarError(errorMsg, data.error, 'servidor');
             } else {
                 msj.style.color = 'green';
                 msj.innerText = data.message;

@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models import LoginAudit, User
 from app.security.services.token_services import (
     cambiar_password,
+    estado_correo_recuperacion,
     solicitar_recuperacion,
     verificar_vigencia_token,
 )
@@ -28,10 +29,12 @@ def _clave_limite(prefijo, identificador):
     return f"{prefijo}:{identificador}"
 
 
-def _excede_tope(prefijo, identificador):
+def _excede_tope(prefijo, identificador, maximo=None, ventana=None):
     cfg = current_app.config
-    maximo = cfg.get('RECUPERACION_MAX_INTENTOS', 5)
-    ventana = cfg.get('RECUPERACION_VENTANA_SEGUNDOS', 900)
+    if maximo is None:
+        maximo = cfg.get('RECUPERACION_MAX_INTENTOS', 5)
+    if ventana is None:
+        ventana = cfg.get('RECUPERACION_VENTANA_SEGUNDOS', 900)
 
     ahora = time.time()
     clave = _clave_limite(prefijo, identificador)
@@ -54,6 +57,33 @@ def _datos_json():
     return request.get_json(silent=True) or {}
 
 
+@security_bp.route('/forgot-password/check-email', methods=['POST'])
+def check_recovery_email():
+    """
+    Consulta en vivo si un correo existe y si su cuenta esta activa.
+
+    La usa token.js mientras la persona escribe. No crea tokens ni envia
+    correos. Se limita por IP para que no sirva para enumerar cuentas a gran
+    velocidad.
+    """
+    if _excede_tope(
+        'forgot-check',
+        request.remote_addr or 'desconocida',
+        maximo=60,
+        ventana=60,
+    ):
+        return jsonify({
+            "error": "Demasiadas consultas. Intente de nuevo en un momento."
+        }), 429
+
+    datos = _datos_json()
+    es_valido, mensaje_error = validar_solicitud_recuperacion(datos)
+    if not es_valido:
+        return jsonify({"error": mensaje_error}), 400
+
+    return jsonify(estado_correo_recuperacion(datos.get('email'))), 200
+
+
 @security_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'GET':
@@ -65,20 +95,38 @@ def forgot_password():
             "error": "Demasiados intentos. Por favor, espere unos minutos antes de volver a intentar."
         }), 429
 
-    es_valido, mensaje_error = validar_solicitud_recuperacion(_datos_json())
+    datos = _datos_json()
+    es_valido, mensaje_error = validar_solicitud_recuperacion(datos)
     if not es_valido:
         return jsonify({"error": mensaje_error}), 400
 
-    estado = solicitar_recuperacion(_datos_json().get('email'))
+    estado = solicitar_recuperacion(datos.get('email'))
+
+    if estado == "email_no_existe":
+        return jsonify({
+            "error": "El correo ingresado no existe en el sistema."
+        }), 404
+
+    if estado == "cuenta_inactiva":
+        return jsonify({
+            "error": "Tu cuenta aún no está activa. Contacta al administrador."
+        }), 403
+
+    if estado == "error_bd":
+        current_app.logger.error(
+            "Recuperacion: fallo el guardado del token al solicitar el enlace"
+        )
+        return jsonify({
+            "error": "Ocurrió un problema interno al generar el enlace. Intente nuevamente en unos minutos."
+        }), 500
 
     if estado == "error_envio":
         return jsonify({
             "error": "Ocurrió un problema al enviar el correo. Intente nuevamente o contacte al administrador."
         }), 500
 
-    # Mismo mensaje exista o no la cuenta: no se puede enumerar usuarios.
     return jsonify({
-        "message": "Correo comprobado, recibirás un enlace al correo con las siguientes instrucciones que debes seguir."
+        "message": "Te enviamos un enlace de recuperación. Revisa tu bandeja de entrada y la carpeta de spam."
     }), 200
 
 

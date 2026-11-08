@@ -8,6 +8,7 @@ from flask import current_app, url_for
 from app.security.repositories.token_repositories import (
     ahora,
     actualizar_password_con_token,
+    buscar_usuario_por_email,
     consultar_vigencia_token,
     eliminar_token,
     guardar_token,
@@ -99,21 +100,42 @@ def solicitar_recuperacion(email):
     """
     Genera el token, lo guarda y envia el correo.
 
-    Devuelve "ok" exista o no el correo: la respuesta al cliente es siempre
-    identica para no permitir enumerar cuentas. El envio solo se intenta si el
-    usuario existe y esta activo.
+    Devuelve un estado explicito para que la ruta responda con la verdad:
+
+      - "email_no_existe": no hay ninguna cuenta con ese correo.
+      - "cuenta_inactiva": la cuenta existe, pero esta deshabilitada.
+      - "error_bd": la cuenta es valida pero no se pudo guardar el token.
+      - "error_envio": el token se guardo pero el correo no salio.
+      - "ok": token guardado y correo entregado al SMTP.
+
+    Antes cualquier fallo se devolvia como "ok"; por eso la pantalla decia que
+    el correo se habia enviado aunque nunca se hubiera intentado el envio.
     """
+    usuario = buscar_usuario_por_email(email)
+
+    if usuario is None:
+        current_app.logger.info(
+            "Recuperacion: solicitud para un correo no registrado (%s)", email
+        )
+        return "email_no_existe"
+
+    if not usuario.is_active:
+        current_app.logger.info(
+            "Recuperacion: solicitud para una cuenta inactiva (user_id=%s)",
+            usuario.id,
+        )
+        return "cuenta_inactiva"
+
     token_seguro = secrets.token_urlsafe(32)
     horas = current_app.config.get('RECUPERACION_VIGENCIA_HORAS', VIGENCIA_POR_DEFECTO_HORAS)
     expiracion = ahora() + timedelta(hours=horas)
 
     guardado, _user_id = guardar_token(email, token_seguro, expiracion)
     if not guardado:
-        current_app.logger.info(
-            "Recuperacion: solicitud para un correo no registrado o inactivo. "
-            "Se responde igual para no revelar que cuentas existen."
+        current_app.logger.error(
+            "Recuperacion: no se pudo guardar el token (user_id=%s)", usuario.id
         )
-        return "ok"
+        return "error_bd"
 
     if not enviar_correo_recuperacion(email, token_seguro):
         # Sin correo entregado el token no sirve: se elimina para no dejar
@@ -140,6 +162,19 @@ def verificar_vigencia_token(token):
 
 def usuario_existe_y_activo(email):
     return obtener_usuario_por_email(email) is not None
+
+
+def estado_correo_recuperacion(email):
+    """
+    Indica si el correo existe y si su cuenta esta activa.
+
+    La usa la validacion en vivo del formulario de recuperacion. No crea
+    tokens ni envia correos: solo consulta la base de datos.
+    """
+    usuario = buscar_usuario_por_email(email)
+    if usuario is None:
+        return {"existe": False, "activa": False}
+    return {"existe": True, "activa": bool(usuario.is_active)}
 
 
 def purgar_tokens_vencidos():
