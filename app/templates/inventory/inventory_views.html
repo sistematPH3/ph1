@@ -3,7 +3,7 @@
 {% block title %}Control de Inventario | Sistema de Gestión PH{% endblock %}
 
 {% block extra_css %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory_views.css') }}?v=6.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory_views.css') }}?v=6.1">
 {% endblock %}
 
 {% block content %}
@@ -34,77 +34,71 @@
             <button class="btn btn-mariuska-yellow btn-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalConsumoCocina">
                 <i class="bi bi-fire me-1"></i> Consumo de Cocina
             </button>
-            <button class="btn btn-outline-secondary btn-sm btn-pill px-3" disabled>
-                <i class="bi bi-truck me-1"></i> Traslados <span class="badge bg-dark ms-1">Sprint 6</span>
-            </button>
+            <a href="{{ url_for('logistics_list.movement_list') }}" class="btn btn-outline-secondary btn-sm btn-pill px-3">
+                <i class="bi bi-truck me-1"></i> Traslados y Mermas
+            </a>
         </div>
     </div>
 
     <!-- TARJETAS DE ALERTA OPERATIVA -->
-    <!-- TARJETAS DE ALERTA OPERATIVA -->
-<div class="row g-3 mb-4">
-    <div class="col-12 col-md-6">
-        <div class="card card-custom p-3 border-start border-danger border-4 h-100">
-            <div class="d-flex align-items-center mb-2">
-                <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
-                    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6">
+            <div class="card card-custom p-3 border-start border-danger border-4 h-100">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                    </div>
+                    <h6 class="fw-bold mb-0 text-dark">ALERTA STOCK BAJO</h6>
                 </div>
-                <h6 class="fw-bold mb-0 text-dark">ALERTA STOCK BAJO</h6>
-            </div>
-            
-            <div class="d-flex align-items-baseline gap-2">
-                <span class="fs-2 fw-bold text-danger" id="cardLowStockCount">
-                    {% if is_admin %}{{ total_global_alerts }}{% else %}0{% endif %}
-                </span>
-                <span class="text-muted small" id="cardLowStockText">
-                    {% if is_admin %}insumos en total con stock crítico{% else %}insumos bajo stock mínimo{% endif %}
-                </span>
-            </div>
-
-            {% if is_admin %}
-                <!-- Botón Desplegable para Administrador -->
-                <div class="mt-2 text-end">
-                    <button class="btn btn-link text-danger fw-bold small text-decoration-none p-0 border-0" 
-                            type="button" 
-                            data-bs-toggle="collapse" 
-                            data-bs-target="#alertsDetailCollapse" 
-                            aria-expanded="false" 
-                            id="btnToggleAlerts">
-                        <span id="btnToggleAlertsText">Ver Alertas</span> <i class="bi bi-chevron-down ms-1" id="btnToggleAlertsIcon"></i>
-                    </button>
+                
+                <div class="d-flex align-items-baseline gap-2">
+                    <span class="fs-2 fw-bold text-danger" id="cardLowStockCount">
+                        {% if is_admin %}{{ total_global_alerts }}{% else %}0{% endif %}
+                    </span>
+                    <span class="text-muted small" id="cardLowStockText">
+                        {% if is_admin %}insumos en total con stock crítico{% else %}insumos bajo stock mínimo{% endif %}
+                    </span>
                 </div>
 
-            <!-- Lista desplegable interna con Scrollbar -->
-            <div class="collapse mt-3" id="alertsDetailCollapse">
-                <div class="alerts-scroll-container border-top pt-2">
-                    {% if alerts_summary %}
-                        <div class="list-group list-group-flush">
-                            {% for alert in alerts_summary %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-2 bg-transparent border-0">
-                                    <span class="fw-semibold text-dark fs-6">
-                                        <i class="bi bi-building me-2 text-secondary"></i> {{ alert.location_name }}
-                                    </span>
-                                    <span class="badge bg-danger rounded-pill px-3 py-2 fs-7">{{ alert.count }} insumos</span>
+                {% if is_admin %}
+                    <div class="mt-2 text-end">
+                        <button class="btn btn-link text-danger fw-bold small text-decoration-none p-0 border-0" 
+                                type="button" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#alertsDetailCollapse" 
+                                aria-expanded="false" 
+                                id="btnToggleAlerts">
+                            <span id="btnToggleAlertsText">Ver Alertas</span> <i class="bi bi-chevron-down ms-1" id="btnToggleAlertsIcon"></i>
+                        </button>
+                    </div>
+
+                    <div class="collapse mt-3" id="alertsDetailCollapse">
+                        <div class="alerts-scroll-container border-top pt-2">
+                            {% if alerts_summary %}
+                                <div class="list-group list-group-flush">
+                                    {% for alert in alerts_summary %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-2 bg-transparent border-0">
+                                            <span class="fw-semibold text-dark fs-6">
+                                                <i class="bi bi-building me-2 text-secondary"></i> {{ alert.location_name }}
+                                            </span>
+                                            <span class="badge bg-danger rounded-pill px-3 py-2 fs-7">{{ alert.count }} insumos</span>
+                                        </div>
+                                    {% endfor %}
                                 </div>
-                            {% endfor %}
+                            {% else %}
+                                <p class="text-muted small text-center my-2">No hay insumos bajo stock mínimo en ninguna sede.</p>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <p class="text-muted small text-center my-2">No hay insumos bajo stock mínimo en ninguna sede.</p>
-                    {% endif %}
-                </div>
+                    </div>
+                {% else %}
+                    <div class="mt-2 text-end">
+                        <a href="#" id="btnFilterLowStockCard" class="text-danger fw-bold small text-decoration-none">
+                            Ver Alertas <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </div>
+                {% endif %}
             </div>
-            {% else %}
-                <!-- Vista estándar para Gerente de Sede -->
-                <div class="mt-2 text-end">
-                    <a href="#" id="btnFilterLowStockCard" class="text-danger fw-bold small text-decoration-none">
-                        Ver Alertas <i class="bi bi-chevron-right"></i>
-                    </a>
-                </div>
-            {% endif %}
         </div>
-    </div>
-
-    <!-- TARJETA TRASLADOS PENDIENTES ... -->
 
         <div class="col-12 col-md-6">
             <div class="card card-custom p-3 border-start border-secondary border-4 h-100">
@@ -112,14 +106,15 @@
                     <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
                         <i class="bi bi-truck fs-5"></i>
                     </div>
-                    <h6 class="fw-bold mb-0 text-dark">TRASLADOS PENDIENTES</h6>
+                    <h6 class="fw-bold mb-0 text-dark">GESTIÓN LOGÍSTICA</h6>
                 </div>
                 <div class="d-flex align-items-baseline gap-2">
-                    <span class="fs-2 fw-bold text-secondary">0</span>
-                    <span class="text-muted small">solicitudes por recibir</span>
+                    <span class="fs-2 fw-bold text-secondary">Traslados</span>
                 </div>
                 <div class="mt-2 text-end">
-                    <span class="badge bg-light text-muted border">Sprint 6</span>
+                    <a href="{{ url_for('logistics_list.movement_list') }}" class="text-secondary fw-bold small text-decoration-none">
+                        Ir a Traslados <i class="bi bi-arrow-right"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -157,7 +152,7 @@
             <div class="card card-custom p-3">
                 <div class="card-header-red mb-3">
                     <i class="bi bi-geo-alt-fill"></i>
-                    <span>Busqueda por Sede</span>
+                    <span>Búsqueda por Sede</span>
                 </div>
                 
                 <div class="input-group pill-input-group mb-3">
@@ -219,7 +214,16 @@
                                 {% for item in inventory %}
                                 <tr>
                                     <td data-label="SKU" class="fw-bold text-secondary">{{ item.product.sku if item.product else 'N/A' }}</td>
-                                    <td data-label="Producto" class="fw-semibold text-dark">{{ item.product.name if item.product else 'Sin Nombre' }}</td>
+                                    <td data-label="Producto">
+                                        <div class="fw-semibold text-dark">{{ item.product.name if item.product else 'Sin Nombre' }}</div>
+                                        <button type="button" class="btn btn-sm btn-link p-0 text-danger text-decoration-none small fw-semibold btn-view-lots d-inline-flex align-items-center gap-1 mt-1" 
+                                                data-product-id="{{ item.product_id }}" 
+                                                data-location-id="{{ item.location_id }}" 
+                                                data-product-name="{{ item.product.name if item.product else '' }}" 
+                                                data-sku="{{ item.product.sku if item.product else '' }}">
+                                            <i class="bi bi-layers"></i> Ver Lotes
+                                        </button>
+                                    </td>
                                     <td data-label="Ubicación"><span class="badge bg-light text-dark border">{{ item.location.name if item.location else 'Sede' }}</span></td>
                                     <td data-label="Stock Actual" class="text-center fw-bold fs-6">
                                         {{ "%.2f"|format(item.current_quantity or 0) }} 
@@ -260,5 +264,5 @@
 {% endblock %}
 
 {% block extra_js %}
-    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.0"></script>
+    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.1"></script>
 {% endblock %}

@@ -63,5 +63,7 @@ class Inventory(db.Model):
     
     # Manejo de cantidades y alertas
     current_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    # CAMPO AÑADIDO: Saldo retenido en tránsito para custodias físicas
+    transit_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     # CAMPO AÑADIDO: Necesario para que el trigger sepa cuándo lanzar la alerta
     min_stock = db.Column(db.Numeric(10, 2), nullable=False, default=20.00)

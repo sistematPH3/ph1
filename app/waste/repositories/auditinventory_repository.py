@@ -20,15 +20,17 @@ class AuditInventoryRepository:
         return Location.query.filter(Location.is_active == True).all()
 
     @staticmethod
-    def get_audit_logs(allowed_locations=None, location_id_filter=None, severity_filter=None):
+    def get_audit_logs(allowed_locations=None, location_id_filter=None, severity_filter=None, start_date=None, end_date=None):
+        audit_table = db.Model.metadata.tables['audit_logs']
+
         query = db.session.query(
-            db.Model.metadata.tables['audit_logs'],
+            audit_table,
             Location.name.label('location_name'),
             User.name.label('user_name')
         ).outerjoin( 
-            Location, db.Model.metadata.tables['audit_logs'].c.location_id == Location.id
+            Location, audit_table.c.location_id == Location.id
         ).outerjoin( 
-            User, db.Model.metadata.tables['audit_logs'].c.user_id == User.id
+            User, audit_table.c.user_id == User.id
         )
 
         if allowed_locations is not None:
@@ -37,27 +39,70 @@ class AuditInventoryRepository:
             
             if 1 in allowed_locations:
                 query = query.filter(
-                    (db.Model.metadata.tables['audit_logs'].c.location_id.in_(allowed_locations)) |
-                    (db.Model.metadata.tables['audit_logs'].c.location_id.is_(None))
+                    (audit_table.c.location_id.in_(allowed_locations)) |
+                    (audit_table.c.location_id.is_(None))
                 )
             else:
-                query = query.filter(db.Model.metadata.tables['audit_logs'].c.location_id.in_(allowed_locations))
+                query = query.filter(audit_table.c.location_id.in_(allowed_locations))
             
         if location_id_filter is not None and location_id_filter != '':
             if location_id_filter == 1:
                 query = query.filter(
-                    (db.Model.metadata.tables['audit_logs'].c.location_id == 1) | 
-                    (db.Model.metadata.tables['audit_logs'].c.location_id.is_(None))
+                    (audit_table.c.location_id == 1) | 
+                    (audit_table.c.location_id.is_(None))
                 )
             else:
-                query = query.filter(db.Model.metadata.tables['audit_logs'].c.location_id == location_id_filter)
+                query = query.filter(audit_table.c.location_id == location_id_filter)
             
         if severity_filter:
-            query = query.filter(db.Model.metadata.tables['audit_logs'].c.severity == severity_filter)
+            query = query.filter(audit_table.c.severity == severity_filter)
+
+        if start_date:
+            query = query.filter(audit_table.c.timestamp >= f"{start_date} 00:00:00")
+
+        if end_date:
+            query = query.filter(audit_table.c.timestamp <= f"{end_date} 23:59:59")
             
-        query = query.order_by(db.Model.metadata.tables['audit_logs'].c.timestamp.desc())
+        query = query.order_by(audit_table.c.timestamp.desc())
         
         return query.all()
+
+    @staticmethod
+    def get_audit_logs_date_range(allowed_locations=None, location_id_filter=None):
+        """
+        Rango (mín, máx) de fechas donde existen registros de auditoría.
+        Respeta la restricción de sedes pero NO los filtros de severidad/fecha:
+        el calendario debe ofrecer el rango completo disponible.
+        """
+        audit_table = db.Model.metadata.tables['audit_logs']
+        query = db.session.query(
+            db.func.min(audit_table.c.timestamp),
+            db.func.max(audit_table.c.timestamp)
+        ).filter(audit_table.c.timestamp.isnot(None))
+
+        if allowed_locations is not None:
+            if not allowed_locations:
+                return None, None
+
+            if 1 in allowed_locations:
+                query = query.filter(
+                    (audit_table.c.location_id.in_(allowed_locations)) |
+                    (audit_table.c.location_id.is_(None))
+                )
+            else:
+                query = query.filter(audit_table.c.location_id.in_(allowed_locations))
+
+        if location_id_filter is not None and location_id_filter != '':
+            if location_id_filter == 1:
+                query = query.filter(
+                    (audit_table.c.location_id == 1) |
+                    (audit_table.c.location_id.is_(None))
+                )
+            else:
+                query = query.filter(audit_table.c.location_id == location_id_filter)
+
+        min_ts, max_ts = query.first()
+        return min_ts, max_ts
 
     @staticmethod
     def get_audit_log_by_id(log_id):
@@ -74,20 +119,24 @@ class AuditInventoryRepository:
         return result[0] if result else 0.00
 
     @staticmethod
-    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes, original_log_id=None, new_original_severity=None):
+    def register_audit_adjustment(user_id, location_id, action_type, severity, product_id, product_name, prev_qty, new_qty, qty_changed, notes, original_log_id=None, new_original_severity=None, lot_number=None):
         insert_log_query = text("""
             INSERT INTO audit_logs (user_id, location_id, action, severity, timestamp, changed_data)
             VALUES (:user_id, :location_id, :action, :severity, NOW(), :changed_data)
         """)
         
-        changed_data_json = json.dumps({
+        changed_data = {
             'product_id': product_id,
             'product_name': product_name,
             'previous_quantity': prev_qty,
             'new_quantity': new_qty,
             'quantity_changed': qty_changed,
             'notes': notes
-        })
+        }
+        if lot_number:
+            changed_data['lot_number'] = lot_number
+
+        changed_data_json = json.dumps(changed_data)
 
         db.session.execute(insert_log_query, {
             'user_id': user_id,

@@ -81,6 +81,7 @@ def get_details(purchase_id):
                 "foreign_price": float(d.foreign_price) if d.foreign_price is not None else 0.0,
                 "price_bs": float(d.price_bs) if d.price_bs is not None else 0.0,
                 "expiration_date": d.expiration_date.strftime('%Y-%m-%d') if getattr(d, 'expiration_date', None) else "",
+                "lot_number": d.lot_number if getattr(d, 'lot_number', None) else "N/A",
                 "requires_manual_date": bool(requires_manual_date)
             })
 

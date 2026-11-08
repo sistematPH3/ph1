@@ -1,54 +1,45 @@
-import json
 from app.extensions import db
-from app.models.waste_model import AuditLog
+from app.models import Inventory, Product
 from app.models.logistics_model import Location
 from flask_login import current_user
-from sqlalchemy import or_
 
 def obtener_alarmas_para_dashboard():
-    # 1. Consultamos AuditLog haciendo JOIN con Location para traer el nombre de la sede
     query = db.session.query(
-        AuditLog,
+        Inventory,
+        Product.name.label('product_name'),
+        Product.unit_of_measure.label('unit_of_measure'),
         Location.name.label('location_name')
-    ).outerjoin(
-        Location, AuditLog.location_id == Location.id
+    ).join(
+        Product, Inventory.product_id == Product.id
+    ).join(
+        Location, Inventory.location_id == Location.id
     ).filter(
-        # Buscamos por severidad de alerta/crítico sin exigir affected_table
-        AuditLog.severity.in_(['ALERTA', 'CRITICO'])
+        Product.is_active == True,
+        Location.is_active == True,
+        Inventory.current_quantity > 0,
+        Inventory.current_quantity <= Inventory.min_stock
     )
     
-    # 2. Filtrado por las sedes asignadas al usuario (si no es Administrador Global)
-    if not current_user.is_admin:
-        sedes_permitidas = [loc.id for loc in current_user.locations]
+    is_admin = getattr(current_user, 'is_admin', False) or (
+        getattr(current_user, 'role', None) and 'admin' in current_user.role.name.lower()
+    ) or (getattr(current_user, 'role_id', None) == 1)
+    
+    if not is_admin:
+        sedes_permitidas = [loc.id for loc in getattr(current_user, 'locations', [])]
         if not sedes_permitidas:
             return []
-            
-        query = query.filter(
-            or_(
-                AuditLog.location_id.in_(sedes_permitidas),
-                AuditLog.location_id.is_(None)
-            )
-        )
+        query = query.filter(Inventory.location_id.in_(sedes_permitidas))
         
-    resultados = query.order_by(AuditLog.timestamp.desc()).all()
+    resultados = query.order_by(Inventory.current_quantity.asc()).all()
     
-    # 3. Mapeamos la estructura para que el HTML la renderice limpiamente
     alarmas = []
-    for log, loc_name in resultados:
-        data = log.changed_data or {}
-        
-        # Si vino guardado como string JSON, lo parseamos
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except Exception:
-                data = {}
-                
+    for inv, prod_name, unit, loc_name in resultados:
         alarmas.append({
-            'location_name': loc_name or 'Almacén Principal',
-            'product_name': data.get('product_name') or data.get('producto') or 'Insumo sin nombre',
-            'new_quantity': data.get('new_quantity', 0.0),
-            'min_stock': data.get('min_stock', 20.0) # Umbral por defecto
+            'location_name': loc_name,
+            'product_name': prod_name or 'Insumo sin nombre',
+            'new_quantity': float(inv.current_quantity or 0.0),
+            'min_stock': float(inv.min_stock or 20.0),
+            'unit_of_measure': unit or ''
         })
         
     return alarmas

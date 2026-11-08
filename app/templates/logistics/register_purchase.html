@@ -1,7 +1,7 @@
 {% extends 'layout.html' %} 
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}?v=2.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase.css') }}?v=9.0">
 {% endblock %}
 
 {% block content %}
@@ -38,11 +38,15 @@
                         <table class="table align-middle m-0 custom-insumos-table" id="itemsTable">
                             <thead>
                                 <tr>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 35%;">Producto / Insumo</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 15%;">Cantidad</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Vencimiento</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">Precio Extranjero</th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 10%;">Acción</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 25%;">Producto / Insumo</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 17%;">Cantidad</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 20%;">
+                                        <div>N° de Lote</div>
+                                        <div style="font-size: 0.68rem; text-transform: none; font-weight: 400; opacity: 0.85;">Automático o Manual</div>
+                                    </th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 17%;">Vencimiento</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 15%;">Precio Ext.</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 6%;">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="itemsContainer">
@@ -51,9 +55,9 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group mariuska-select-group">
                                                 <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
-                                                    <option value="" disabled selected data-days="0">Seleccione un producto</option>
+                                                    <option value="" disabled selected data-days="0" data-sku="">Seleccione un producto</option>
                                                     {% for p in products %}
-                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}" data-sku="{{ p.sku }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
@@ -62,7 +66,14 @@
                                     <td>
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
-                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" required>
+                                                <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-qty" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field-wrapper">
+                                            <div class="input-group search-input-group">
+                                                <input type="text" maxlength="30" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-lot font-monospace" placeholder="Auto o Manual">
                                             </div>
                                         </div>
                                     </td>
@@ -76,13 +87,13 @@
                                     <td>
                                         <div class="table-field-wrapper">
                                             <div class="input-group search-input-group">
-                                                <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-currency-exchange"></i></span>
-                                                <input type="number" step="0.01" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" required>
+                                                <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-currency-exchange"></i></span>
+                                                <input type="number" step="0.01" min="0.01" max="999999.99" class="form-control border-0 py-2 bg-transparent text-center fw-semibold prod-price" placeholder="0.00" oninput="if(this.value.length > 8) this.value = this.value.slice(0, 8);" required>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove()" title="Eliminar">
+                                        <button type="button" class="btn btn-danger btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background-color: #dc3545; border: none;" onclick="this.closest('tr').remove(); saveDraft();" title="Eliminar">
                                             <i class="bi bi-trash text-white fs-6"></i>
                                         </button>
                                     </td>
@@ -140,7 +151,7 @@
                         <label class="form-label">Tasa de Cambio (BCV)</label>
                         <div class="input-group search-input-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-graph-up-arrow"></i></span>
-                            <input type="number" step="0.01" id="exchange_rate" class="form-control border-0 py-2 bg-transparent text-dark fw-bold" required>
+                            <input type="number" step="0.0001" min="0.01" max="999999.99" id="exchange_rate" class="form-control border-0 py-2 bg-transparent text-dark fw-bold" oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);" required>
                             <button class="btn btn-outline-secondary border-0" type="button" id="refreshRateBtn" title="Actualizar Tasa">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
@@ -190,5 +201,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}"></script>
+<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.0"></script>
 {% endblock %}

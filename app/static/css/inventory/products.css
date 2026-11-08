@@ -18,7 +18,8 @@
 .form-container {
     background-color: #ffffff;
     border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 30px rgba(214, 35, 0, 0.15);
+    border: 1.5px solid rgba(214, 35, 0, 0.35);
     padding: 2.5rem;
     width: 100%;
     max-width: 550px;
@@ -68,7 +69,7 @@
 .form-group input,
 .form-group select {
     padding: 0.85rem 1.25rem;
-    border: 2px solid #e5e7eb;
+    border: 2px solid rgba(214, 35, 0, 0.45);
     border-radius: 50px;
     font-size: 0.95rem;
     color: #333333;
@@ -79,7 +80,7 @@
 
 .form-group textarea {
     padding: 0.85rem 1.25rem;
-    border: 2px solid #e5e7eb;
+    border: 2px solid rgba(214, 35, 0, 0.45);
     border-radius: 20px;
     font-size: 0.95rem;
     color: #333333;

@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="notranslate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
     <title>Pizza Hut - Gestión Administrativa</title>
     
     <!-- CSS -->
@@ -12,6 +13,11 @@
 
 <!-- CSS de Alertas de Stock -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts/alerts_stock.css') }}">
+    
+    {% if can_view_disputes or can_view_responses %}
+    <!-- CSS de Notificaciones (novedades del admin + campana de respuestas) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/notifications.css') }}">
+    {% endif %}
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -27,6 +33,40 @@
    <!-- JS -->
 <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/layout.js') }}"></script>
+
+    {% if can_view_disputes %}
+    <!-- Contenedor de avisos de novedades (dashboard + sidebar en vivo) -->
+    <div id="disputeToastContainer" class="dispute-toast-container"
+         data-poll-url="{{ url_for('movement_dispute.disputes_summary') }}"
+         data-disputes-url="{{ url_for('movement_dispute.list_disputes') }}"
+         data-user-id="{{ current_user_id or '' }}"
+         data-enabled="true"></div>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+    {% endif %}
+
+    {% if can_view_responses %}
+    <!-- Campana de respuestas del administrador (receptores de traslados) -->
+    <div id="responseBell" class="response-bell"
+         data-poll-url="{{ url_for('response_inbox.inbox_summary') }}"
+         data-inbox-url="{{ url_for('response_inbox.admin_responses') }}"
+         data-user-id="{{ current_user_id or '' }}"
+         data-enabled="true">
+        <button type="button" class="response-bell-btn" aria-label="Respuestas de administración">
+            <i class="bi bi-bell"></i>
+            <span class="response-bell-badge" hidden>0</span>
+        </button>
+        <div class="response-bell-panel" hidden>
+            <div class="response-bell-panel-header">
+                <i class="bi bi-inbox-fill me-1"></i> Respuestas de Administración
+            </div>
+            <ul class="response-bell-list"></ul>
+            <a class="response-bell-viewall" href="{{ url_for('response_inbox.admin_responses') }}">
+                Ver todas las respuestas
+            </a>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/response_bell.js') }}"></script>
+    {% endif %}
     
     {% block extra_js %}{% endblock %}
 </body>

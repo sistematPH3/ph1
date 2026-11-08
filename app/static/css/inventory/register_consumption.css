@@ -39,6 +39,8 @@
 .card-custom {
     border-radius: 12px;
     background-color: #ffffff;
+    border: 1.5px solid rgba(176, 18, 26, 0.35);
+    box-shadow: 0 12px 28px rgba(176, 18, 26, 0.14);
 }
 
 @media (min-width: 768px) {
@@ -70,9 +72,16 @@
     background-color: #8c0e14;
 }
 
-.form-control:focus, .form-select:focus {
-    border-color: #b0121a;
-    box-shadow: 0 0 0 0.25rem rgba(176, 18, 26, 0.25);
+.card-custom .form-control,
+.card-custom .form-select,
+.card-custom .form-control:read-only {
+    border: 1.5px solid rgba(176, 18, 26, 0.45) !important;
+}
+
+.card-custom .form-control:focus,
+.card-custom .form-select:focus {
+    border-color: #b0121a !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 26, 0.25) !important;
 }
 
 .select-readonly {

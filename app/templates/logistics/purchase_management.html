@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block extra_css %}
-<link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=1.0"> 
+<link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=1.1"> 
 {% endblock %}
 
 {% block content %}
@@ -160,14 +160,15 @@
                                                     <th>Identificación</th>
                                                     <th>SKU</th>
                                                     <th class="text-center">Cantidad</th>
+                                                    <th class="text-center">N° Lote</th>
                                                     <th class="text-center">Vencimiento</th>
-                                                    <th class="text-end">Precio por cantidad (Divisa Originaria)</th>
+                                                    <th class="text-end">Precio (Divisa)</th>
                                                     <th class="text-end">Total en Bs.</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="collapse-body-{{ purchase.id }}">
                                                 <tr>
-                                                    <td colspan="6" class="text-center py-2 text-muted">
+                                                    <td colspan="7" class="text-center py-2 text-muted">
                                                         <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Cargando renglones...
                                                     </td>
                                                 </tr>
@@ -342,7 +343,7 @@
                 </div>
 
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
-                    <p class="text-muted small m-0">Modifique las cantidades, precios, o añada insumos olvidados a esta compra.</p>
+                    <p class="text-muted small m-0">Modifique las cantidades, precios, lotes o añada insumos olvidados a esta compra.</p>
                     <button type="button" class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm align-self-start align-self-md-auto" id="btnAddRowEdit">
                         <i class="bi bi-plus-lg me-1"></i> Añadir Insumo
                     </button>
@@ -353,9 +354,10 @@
                         <thead class="table-light text-center small text-uppercase fw-bold border-bottom">
                             <tr>
                                 <th class="text-start ps-3">Insumo (SKU)</th>
-                                <th style="width: 120px;">Cantidad</th>
-                                <th style="width: 150px;">Vencimiento</th>
-                                <th style="width: 150px;">Precio (Divisa)</th>
+                                <th style="width: 110px;">Cantidad</th>
+                                <th style="width: 130px;">N° Lote</th>
+                                <th style="width: 140px;">Vencimiento</th>
+                                <th style="width: 140px;">Precio (Divisa)</th>
                             </tr>
                         </thead>
                         <tbody id="edit-table-body">
@@ -384,5 +386,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.0"></script>
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.1"></script>
 {% endblock %}

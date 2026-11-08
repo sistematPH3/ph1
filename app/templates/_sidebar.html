@@ -67,8 +67,6 @@
                 <a class="nav-link sub-link" href="{{ url_for('inventory.list_products') }}">Menú de Insumos</a>
                 <a class="nav-link sub-link" href="{{ url_for('register_consumption.show_consumption_form') }}">Registro de Consumo</a>
                 <a class="nav-link sub-link" href="{{ url_for('inventory.render_inventory_views') }}">Inventario Dual</a>
-                
-                <!-- Solo Admin, Directores, Gerentes, Asistentes y Operaciones ven la gestión de auditoría en INVENTARIO -->
                 <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Gestión y Auditoría de Inventario</a>
             </div>
         </li>
@@ -98,7 +96,28 @@
                 <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
             </a>
             <div class="menu-desplegable">
-                <a class="nav-link sub-link" href="#">Gestión de Traslados</a>
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('logistics.dispatch_bp.dispatch_form_view') }}">Nuevo Traslado</a>
+                {% endif %}
+                <a class="nav-link sub-link" href="/logistics/movements">Listado Operativo de Traslados</a>
+                
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link dispute-sub-link" href="/logistics/movements/admin/disputes">
+                    <span>Arbitraje de Disputas</span>
+                    {% if can_view_disputes %}
+                    <span class="dispute-badge" id="disputeBadge"
+                          data-count="{{ pending_disputes_count or 0 }}"
+                          {% if not pending_disputes_count %}hidden{% endif %}>
+                        {{ pending_disputes_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
+                {% if can_view_responses %}
+                <a class="nav-link sub-link" href="{{ url_for('response_inbox.admin_responses') }}">Respuestas de Administración</a>
+                {% endif %}
+                
                 <a class="nav-link sub-link" href="#">Gestión de Mermas</a>
             </div>
         </li>
@@ -115,8 +134,8 @@
                 <a class="nav-link sub-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
                 <a class="nav-link sub-link" href="{{ url_for('audit_purchase.list_purchase_audits') }}">Auditoría de Compras</a>
+                <a class="nav-link sub-link" href="{{ url_for('logistics_audit.view_movement_audit') }}">Auditoría de Traslados</a>
                 
-                <!-- Finanzas vera la vista de auditoría de inventario únicamente en este bloque -->
                 {% if current_user.is_finance %}
                 <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Auditoría de Inventario</a>
                 {% endif %}

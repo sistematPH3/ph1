@@ -1,8 +1,8 @@
-"""Estructura inicial completa
+"""migracion_inicial
 
-Revision ID: 037aec724840
+Revision ID: 10cae3436d7c
 Revises: 
-Create Date: 2026-07-29 18:38:13.766780
+Create Date: 2026-08-28 20:15:39.182939
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '037aec724840'
+revision = '10cae3436d7c'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -82,8 +82,10 @@ def upgrade():
     sa.Column('action', sa.String(length=50), nullable=True),
     sa.Column('severity', sa.String(length=20), nullable=True),
     sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('location_id', sa.Integer(), nullable=True),
     sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('changed_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -116,12 +118,18 @@ def upgrade():
     sa.Column('destination_location_id', sa.Integer(), nullable=True),
     sa.Column('date', sa.DateTime(), nullable=True),
     sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('status', sa.String(length=20), nullable=True),
+    sa.Column('status', sa.String(length=30), nullable=False),
     sa.Column('received_by_id', sa.Integer(), nullable=True),
-    sa.Column('guide_url', sa.Text(), nullable=True),
+    sa.Column('resolved_by_id', sa.Integer(), nullable=True),
+    sa.Column('resolution_notes', sa.Text(), nullable=True),
+    sa.Column('source_dispute_id', sa.Integer(), nullable=True),
+    sa.Column('return_of_dispute_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['destination_location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['origin_location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['received_by_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['resolved_by_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['return_of_dispute_id'], ['movements.id'], ),
+    sa.ForeignKeyConstraint(['source_dispute_id'], ['movements.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -199,6 +207,7 @@ def upgrade():
     sa.Column('location_id', sa.Integer(), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.Column('current_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('transit_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.Column('min_stock', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
@@ -208,7 +217,11 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('movement_id', sa.Integer(), nullable=True),
     sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('lot_number', sa.String(length=50), nullable=True),
     sa.Column('quantity', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('received_quantity', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('missing_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('expiration_date', sa.Date(), nullable=True),
     sa.ForeignKeyConstraint(['movement_id'], ['movements.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -229,6 +242,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('purchase_id', sa.Integer(), nullable=True),
     sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('lot_number', sa.String(length=50), nullable=True),
     sa.Column('quantity', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.Column('foreign_price', sa.Numeric(precision=15, scale=2), nullable=True),
     sa.Column('price_bs', sa.Numeric(precision=15, scale=2), nullable=True),

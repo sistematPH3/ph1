@@ -140,7 +140,7 @@ function loadCollapseDetails(purchaseId) {
             tbodies.forEach(tbody => {
                 tbody.innerHTML = '';
                 if(data.details.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">No hay insumos registrados en esta compra.</td></tr>`;
                     return;
                 }
 
@@ -151,6 +151,7 @@ function loadCollapseDetails(purchaseId) {
                     const formattedForeignPrice = detail.foreign_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     const formattedSubtotalBs = subtotalBs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     const expDateBadge = detail.expiration_date ? `<span class="badge bg-warning text-dark border"><i class="bi bi-calendar-event me-1"></i>${detail.expiration_date.split('-').reverse().join('/')}</span>` : `<span class="text-muted small">N/A</span>`;
+                    const lotBadge = `<span class="badge bg-light text-dark border font-monospace">${detail.lot_number || 'N/A'}</span>`;
                     
                     let rowHtml = "";
                     if (isMobile) {
@@ -162,7 +163,11 @@ function loadCollapseDetails(purchaseId) {
                                         <span class="text-secondary small fw-bold">#${detail.id}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted">Lote: ${lotBadge}</span>
                                         <span class="small text-muted">Cant: <strong class="text-primary">${detail.quantity}</strong></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted">Vence:</span>
                                         ${expDateBadge}
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mt-2 border-top pt-2">
@@ -178,6 +183,7 @@ function loadCollapseDetails(purchaseId) {
                                 <td class="text-secondary fw-bold">#${detail.id}</td>
                                 <td><span class="badge bg-dark text-white">${detail.product_sku}</span></td>
                                 <td class="text-center fw-bold text-primary">${detail.quantity}</td>
+                                <td class="text-center">${lotBadge}</td>
                                 <td class="text-center">${expDateBadge}</td>
                                 <td class="text-end text-success fw-semibold">${data.currency} ${formattedForeignPrice}</td>
                                 <td class="text-end fw-bold text-dark">Bs. ${formattedSubtotalBs}</td>
@@ -190,7 +196,7 @@ function loadCollapseDetails(purchaseId) {
         })
         .catch(error => {
             tbodies.forEach(tbody => {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}</td></tr>`;
             });
         });
 }
@@ -234,7 +240,7 @@ const handleActionClick = function(e) {
         
         if (editErrorAlert) editErrorAlert.classList.add('d-none');
         if (editReasonInput) editReasonInput.value = '';
-        editTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
+        editTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></td></tr>`;
         modalEdit.show();
 
         fetch(`/logistics/purchases/management/${purchaseId}/details`)
@@ -247,7 +253,7 @@ const handleActionClick = function(e) {
                 currentCurrency = data.currency;
                 
                 if(data.details.length === 0) {
-                    editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
+                    editTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No hay insumos editables.</td></tr>`;
                     return;
                 }
                 data.details.forEach(item => {
@@ -263,6 +269,9 @@ const handleActionClick = function(e) {
                             <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-secondary" data-id="${item.id}" value="${item.quantity}" min="0" step="0.01">
                         </td>
                         <td class="text-center px-2">
+                            <input type="text" class="form-control text-center edit-lot border-secondary text-dark px-1 font-monospace" data-id="${item.id}" value="${item.lot_number === 'N/A' ? '' : item.lot_number}" placeholder="Opcional">
+                        </td>
+                        <td class="text-center px-2">
                             <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${item.expiration_date || ''}">
                         </td>
                         <td class="text-center px-2">
@@ -276,7 +285,7 @@ const handleActionClick = function(e) {
                 });
             })
             .catch(err => {
-                editTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
+                editTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4"><i class="bi bi-x-circle me-1"></i> Error al cargar los datos.</td></tr>`;
             });
     }
 };
@@ -304,6 +313,9 @@ if (btnAddRowEdit) {
             </td>
             <td class="text-center px-2">
                 <input type="number" class="form-control text-center edit-qty fw-bold text-dark border-success" data-id="new_${newRowCounter}" value="1" min="0" step="0.01">
+            </td>
+            <td class="text-center px-2">
+                <input type="text" class="form-control text-center edit-lot border-success text-dark px-1 font-monospace" data-id="new_${newRowCounter}" value="" placeholder="Opcional / Auto">
             </td>
             <td class="text-center px-2">
                 <input type="date" class="form-control text-center edit-exp border-success text-dark px-1" value="">
@@ -341,12 +353,14 @@ if (btnSaveEdit) {
             const qtyInput = row.querySelector('.edit-qty');
             const priceInput = row.querySelector('.edit-price');
             const expInput = row.querySelector('.edit-exp');
+            const lotInput = row.querySelector('.edit-lot');
             const prodSelect = row.querySelector('.edit-prod-id');
             
             if(qtyInput && priceInput) {
                 const rowId = qtyInput.getAttribute('data-id');
                 const qtyVal = parseFloat(qtyInput.value);
                 const priceVal = parseFloat(priceInput.value);
+                const lotVal = lotInput ? lotInput.value.trim() : "";
                 
                 if (rowId.startsWith('new_')) {
                     if (!prodSelect || !prodSelect.value) {
@@ -359,7 +373,8 @@ if (btnSaveEdit) {
                             product_id: parseInt(prodSelect.value),
                             quantity: qtyVal,
                             foreign_price: priceVal,
-                            expiration_date: expInput ? expInput.value : ""
+                            expiration_date: expInput ? expInput.value : "",
+                            lot_number: lotVal
                         });
                     }
                 } else {
@@ -367,7 +382,8 @@ if (btnSaveEdit) {
                         id: rowId,
                         quantity: qtyVal,
                         foreign_price: priceVal,
-                        expiration_date: expInput ? expInput.value : ""
+                        expiration_date: expInput ? expInput.value : "",
+                        lot_number: lotVal
                     });
                 }
             }
