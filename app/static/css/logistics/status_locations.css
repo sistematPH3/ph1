@@ -1,0 +1,35 @@
+/* Estilos para el cambio de estado de sedes */
+.card {
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Animación para el icono de alerta */
+.text-danger i {
+    animation: pulse-red 2s infinite;
+}
+
+.text-success i {
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse-green {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.btn-lg {
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}

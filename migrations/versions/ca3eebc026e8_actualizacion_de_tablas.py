@@ -1,8 +1,8 @@
-"""Migracion inicial limpia
+"""Actualizacion de Tablas
 
-Revision ID: f89803dbec36
+Revision ID: ca3eebc026e8
 Revises: 
-Create Date: 2026-05-11 20:12:25.555787
+Create Date: 2026-05-26 01:29:26.102629
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'f89803dbec36'
+revision = 'ca3eebc026e8'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,7 +26,8 @@ def upgrade():
     op.create_table('locations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('address', sa.Text(), nullable=True),
+    sa.Column('detailed_address', sa.Text(), nullable=True),
+    sa.Column('state', sa.String(length=50), nullable=False),
     sa.Column('phone', sa.String(length=20), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -58,8 +59,8 @@ def upgrade():
     sa.Column('sku', sa.String(length=50), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=True),
     sa.Column('unit_of_measure', sa.String(length=20), nullable=True),
-    sa.Column('minimum_stock', sa.Numeric(precision=10, scale=2), nullable=True),
-    sa.Column('next_expiration_date', sa.Date(), nullable=True),
+    sa.Column('technical_description', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('sku')
@@ -93,6 +94,18 @@ def upgrade():
     sa.Column('current_quantity', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('login_audit',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('location_id', sa.Integer(), nullable=True),
+    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.Column('action', sa.String(length=50), nullable=False),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['location_id'], ['locations.id'], ),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('movements',
@@ -204,6 +217,7 @@ def downgrade():
     op.drop_table('password_recoveries')
     op.drop_table('notifications')
     op.drop_table('movements')
+    op.drop_table('login_audit')
     op.drop_table('inventory')
     op.drop_table('audit_logs')
     op.drop_table('users')

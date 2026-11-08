@@ -1,0 +1,382 @@
+@font-face {
+    font-family: "bootstrap-icons";
+    /* Subimos dos niveles (../../) para salir de 'logistics' y 'css' */
+    src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
+         url("../../fonts/bootstrap-icons.woff") format("woff");
+}
+
+/* 1. Aplicamos Inter solo al texto del encabezado */
+.ph-table-custom thead th {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600;
+    font-size: 0.8rem;
+   color: #000000 !important; /* Negro puro */
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* 2. PROTEGEMOS LOS ICONOS: Forzamos que sigan usando su propia fuente */
+.ph-table-custom thead th i, 
+.ph-table-custom thead th [class^="bi-"], 
+.ph-table-custom thead th [class*=" bi-"] {
+    font-family: "bootstrap-icons" !important; /* Usamos el nombre exacto de tu @font-face */
+    text-transform: none; /* Evita que el uppercase afecte al icono */
+    font-style: normal;
+    font-variant: normal;
+    line-height: 1;
+    display: inline-block;
+    margin-right: 8px; /* Espacio entre icono y texto */
+    vertical-align: middle;
+}
+
+/* Esta clase es la que le dice al navegador cómo dibujar el icono */
+.bi::before, [class^="bi-"]::before, [class*=" bi-"]::before {
+    display: inline-block;
+    font-family: "bootstrap-icons" !important;
+    font-style: normal;
+    font-weight: normal !important;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+    --ph-red: #e31837;
+    --ph-dark: #2d2e2f;
+    --ph-light-gray: #f4f4f4;
+    --ph-border: #ececec;
+}
+
+body.bg-main {
+    background-color: #f8f9fa;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Header */
+.brand-box {
+    background-color: var(--ph-red);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 10px rgba(227, 24, 55, 0.2);
+}
+
+.title-main {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--ph-dark);
+    margin: 0;
+}
+
+.subtitle-main {
+    color: #6c757d;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Botón PH */
+.btn-ph-red {
+    background-color: var(--ph-red);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-ph-red:hover {
+    background-color: #c4122d;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(227, 24, 55, 0.3);
+}
+
+/* Card y Tabla */
+.content-card {
+    background: white;
+    border-radius: 20px;
+    border: 1px solid var(--ph-border);
+    overflow: hidden;
+}
+
+/* Espaciado entre filtros y la tabla roja */
+.table-responsive {
+    margin-top: 35px !important; /* Esto empuja la tabla hacia abajo */
+    min-height: 250px;
+    overflow: visible !important;
+}
+
+.ph-table-custom thead th {
+    background-color: #b62218 !important; /* Rojo Pizza Hut */
+    color: #ffffff !important;           /* Letras blancas para que se lean */
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.85rem;                 /* Subimos un poquito de 0.75 para que en blanco se vea mejor */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 15px;
+    border: none !important;            /* Quitamos el borde gris porque ahora es roja */
+}
+
+/* Forzamos que los iconos dentro del encabezado también sean blancos */
+.ph-table-custom thead th i {
+    color: #ffffff !important;
+    font-family: "bootstrap-icons" !important;
+}
+
+/* Redondeado de las esquinas superiores de la barra roja */
+.ph-table-custom thead tr th:first-child {
+    border-radius: 12px 0 0 0 !important;
+}
+
+.ph-table-custom thead tr th:last-child {
+    border-radius: 0 12px 0 0 !important;
+}
+
+.ph-table-custom tbody tr {
+    border-bottom: 1px solid var(--ph-border);
+    transition: background 0.2s;
+}
+
+.ph-table-custom tbody tr:hover {
+    background-color: #fdfdfd;
+}
+
+/* Para que la dirección no sea tan clara */
+.ph-table-custom .text-muted {
+    color: #5a6268 !important; 
+}
+
+/* Elementos de Tabla */
+.id-badge {
+    background-color: #f0f0f0 !important;
+    color: #555555 !important;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    padding: 2px 6px !important;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+   
+}
+
+.contact-pill {
+    display: inline-block;
+    padding: 6px 12px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #444;
+}
+
+.status-pill {
+    padding: 6px 14px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.status-pill.active { background: #d4edda; color: #155724; }
+.status-pill.inactive { background: #e2e3e5; color: #383d41; }
+
+/* Buscador */
+.search-box {
+    position: relative;
+    max-width: 400px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #aaa;
+}
+
+.form-control-ph {
+    padding: 10px 10px 10px 45px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    background: #fafafa;
+    width: 100%;
+}
+
+.form-control-ph:focus {
+    border-color: var(--ph-red);
+    outline: none;
+    background: white;
+}
+
+.btn-toggle {
+    background: none;
+    border: none;
+    transition: transform 0.2s;
+}
+
+.btn-toggle:hover {
+    transform: scale(1.15);
+}
+/* Efecto para el botón de editar */
+.text-primary.btn-toggle:hover {
+    color: #0d6efd !important;
+    transform: scale(1.2);
+}
+
+/* Para que los iconos en la tabla no se vean amontonados */
+.gap-3 {
+    gap: 1rem !important;
+}
+
+/* Contenedores para posicionar los iconos */
+.search-box-improved, .filter-box-improved {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* Posición de los iconos (Lupa y Embudo) */
+.search-box-improved i, .filter-box-improved i {
+    position: absolute;
+    left: 15px;
+    color: #6c757d;
+    font-size: 0.9rem;
+    z-index: 5;
+}
+
+/* Estilo Small, Redondeado y Gris claro */
+.form-control-ph-sm, .form-select-ph-sm {
+    height: 38px;
+    padding: 5px 15px 5px 40px; /* Espacio para el icono */
+    font-size: 0.85rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 25px; /* Bordes bien redondeados */
+    width: 100%;
+    background-color: #fcfcfc;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Efecto al hacer clic (Rojo Pizza Hut) */
+.form-control-ph-sm:focus, .form-select-ph-sm:focus {
+    border-color: #ee3124;
+    box-shadow: 0 0 0 3px rgba(238, 49, 36, 0.1);
+    outline: none;
+    background-color: #fff;
+}
+
+/* Ajuste para la flecha del select */
+/* El botón que parece un select */
+.form-select-ph-sm {
+    border-radius: 25px !important;
+    background-color: #fcfcfc;
+    border: 1px solid #e0e0e0;
+    width: 100%;
+    text-align: left;
+    padding: 0 15px 0 15px;
+}
+
+/* EL LISTADO DESPLEGABLE: Aquí sí podemos redondear */
+.custom-rounded-menu {
+    z-index: 9999 !important; /* Lo pone al frente de todo */
+    min-width: 100%; /* Para que mida lo mismo que el botón */
+    border-radius: 15px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+}
+/* Redondeado de los items al pasar el mouse */
+.custom-rounded-menu .dropdown-item {
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+/* Las opciones internas */
+.dropdown-item {
+    border-radius: 10px; /* Redondeado al pasar el mouse */
+    transition: 0.2s;
+    font-size: 0.85rem;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(238, 49, 36, 0.1); /* Rojo PH clarito */
+    color: #ee3124;
+}
+
+.table-responsive {
+    min-height: 250px; /* Ajusta este valor según qué tan largo sea tu menú */
+}
+
+.content-card {
+    min-height: 350px; 
+    display: flex;
+    flex-direction: column;
+}
+
+/* Evita que el contenedor corte el menú redondeado */
+.content-card, .table-responsive {
+    overflow: visible !important;
+}
+
+/* 1. Forzar el tamaño del nombre (más pequeño) */
+.ph-table-custom tbody tr td .fw-bold.text-ph-dark {
+    font-size: 0.88rem !important; 
+    font-family: 'Inter', sans-serif !important;
+    color: #212529 !important;
+}
+
+/* 2. Forzar que el resto de datos se vea MÁS (más grandes y oscuros) */
+.ph-table-custom tbody tr td {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.92rem !important; /* Aumentamos el tamaño general */
+    color: #333333 !important; /* Un gris casi negro para que resalte */
+}
+
+/* 3. Ajuste específico para el texto que dice 'Sin dirección asignada' o el teléfono */
+.ph-table-custom tbody tr td .text-muted, 
+.ph-table-custom tbody tr td .contact-pill {
+    font-size: 0.9rem !important;
+    color: #444444 !important; /* Menos gris, más legible */
+}
+
+/* Fila desactivada: Color Naranja/Ámbar suave */
+.row-inactive {
+    background-color: #ecc797 !important; /* Un naranja muy claro de fondo */
+    border-left: 5px solid #ff922b !important; /* Una franja naranja intensa al inicio */
+    transition: all 0.3s ease;
+}
+
+/* Cambiamos el color de los textos para que combinen con el naranja */
+.row-inactive td {
+    color: #d9480f !important; /* Un tono teja/naranja oscuro para el texto */
+    font-weight: 500; /* Un poco más de grosor para que se vea bien */
+}
+
+/* Ajuste para el ID Badge cuando la fila está naranja */
+.row-inactive .id-badge {
+    background-color: #ff922b !important;
+    color: white !important;
+    font-weight: bold !important;
+}
+
+/* El nombre de la sede en la fila naranja */
+.row-inactive .fw-bold.text-ph-dark {
+    color: #af3d01 !important; /* Naranja rojizo oscuro */
+}
+
+/* El contacto pill también cambia para no desentonar */
+.row-inactive .contact-pill {
+    background-color: rgba(255, 146, 43, 0.2) !important;
+    color: #d9480f !important;
+    border: 1px solid #ff922b !important;
+}
+
+.row-inactive .text-muted {
+    color: #e8590c !important; /* Naranja vibrante */
+    opacity: 1; /* Le quitamos la transparencia para que se vea bien */
+}
+.row-inactive .btn-toggle i {
+    color: #d9480f !important; /* Los iconos también se vuelven naranjas */
+}
+

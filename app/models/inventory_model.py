@@ -17,8 +17,8 @@ class Product(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     
     unit_of_measure = db.Column(db.String(20))
-    minimum_stock = db.Column(db.Numeric(10, 2), default=20.00)
-    next_expiration_date = db.Column(db.Date)
+    technical_description = db.Column(db.Text, nullable=True) 
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     inventories = db.relationship('Inventory', backref='product', lazy=True)
 
 class Inventory(db.Model):

@@ -4,27 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PML - Gestión Operativa</title>
-    <!-- Bootstrap 5 local o CDN -->
-   <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <style>
-        .navbar { background-color: rgb(187, 3, 3); } /* Rojo Pizza Hut */
-        .navbar-brand, .nav-link { color: white !important; }
+        /* Fondo de la barra superior */
+        .navbar { background-color: rgb(187, 3, 3); }
+        /* Título de la aplicación */
+        .navbar-brand { color: white !important; }
+        /* 1. SEPARACIÓN: Estilo exclusivo para los botones de arriba a la derecha (Navbar) */
+        .navbar-nav .nav-link { color: white !important; }
+        .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.2); /* Un sutil fondo claro al pasar el mouse arriba */
+            color: white !important; }
+        /* 2. SEPARACIÓN: Estilo exclusivo para los botones de la izquierda (Sidebar) */
         .sidebar { 
             background: #f8f9fa; 
             min-height: 100vh; 
             border-right: 1px solid #dee2e6; 
             padding-top: 20px;
         }
-        .nav-link:hover { background-color: #e9ecef; }
+        .sidebar .nav-link { 
+            color: #333333 !important; /* Color oscuro para contraste con fondo blanco */
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin: 2px 10px;
+            display: block;
+        }
+
+        /* 3. SOLUCIÓN AL HOVER: Cambiar el color del texto a blanco cuando el fondo sea oscuro */
+        .sidebar .nav-link:hover { 
+            background-color: #dee2e6 !important; /* Fondo oscuro */
+            color: #303131 !important;             /* ¡Letras blancas para que no se camuflen! */
+        }
     </style>
 </head>
 <body>
-    <!-- Navbar Superior -->
     <nav class="navbar navbar-expand-lg sticky-top mb-0">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">Pizza Master Logistics</a>
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('security.ver_logs') }}">Auditoría</a></li>
+                <li class="nav-item"><a class="nav-link" href="#">Auditoría</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Cerrar Sesión</a></li>
             </ul>
         </div>
@@ -32,19 +50,18 @@
 
     <div class="container-fluid">
         <div class="row">
-            <!-- Barra Lateral (Sidebar) -->
             <nav class="col-md-3 col-lg-2 d-none d-md-block sidebar">
                 <ul class="nav flex-column">
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('inventory.listar_inventario') }}">📦 Inventario</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('waste.registrar_merma') }}">🗑️ Mermas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('alerts.bandeja_alerts') }}">🔔 Alertas</a></li>
-                    <li class="nav-item"><a class="nav-link text-dark" href="{{ url_for('analytics.dashboard') }}">📊 Analíticas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">📦 Inventario</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">🗑️ Mermas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">🏢 Gestión de Sedes</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">👥 Asignación de Personal</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">🔔 Alertas</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" href="#">📊 Analíticas</a></li>
                 </ul>
             </nav>
             
-            <!-- Contenido Principal -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 pt-4">
-                <!-- Manejo de Mensajes Flash (Corregido) -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
                     {% for category, message in messages %}
@@ -56,7 +73,6 @@
                   {% endif %}
                 {% endwith %}
 
-                <!-- Aquí se inyecta el contenido de cada módulo -->
                 {% block content %}{% endblock %}
             </main>
         </div>

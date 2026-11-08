@@ -15,22 +15,38 @@ def create_app():
     login_manager.login_message_category = "info"
 
     with app.app_context():
-        # ----------------------------------------------------------
-        # REGISTRO DE BLUEPRINTS (MÓDULO 1: SEGURIDAD Y AUDITORÍA)
-        # ----------------------------------------------------------
+        # Importamos y registramos el Blueprint principal de seguridad
         from .security import security_bp
         app.register_blueprint(security_bp, url_prefix='/auth')
-
-        # Registro del Blueprint de Auditoría (Ruta Corregida)
+        
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA (Ruta Corregida)
+        # ==========================================================
+        # Como está dentro de la subcarpeta 'routes', añadimos .routes
         from .security.routes.audit_routes import audit_bp
         app.register_blueprint(audit_bp)
-        # ----------------------------------------------------------
+        # ==========================================================
+        
+        from .logistics import logistics_bp
+        app.register_blueprint(logistics_bp)
+        
+        from .logistics import list_sedes_bp, status_location_bp
+        app.register_blueprint(list_sedes_bp)
+        app.register_blueprint(status_location_bp)
+        
+        from .logistics.routes.location_routes import location_bp
+        app.register_blueprint(location_bp, url_prefix='/logistics')
 
         from . import models 
         from .models.security_model import User
+        from app.models import logistics_model
+        from app.models import inventory_model
         
         @login_manager.user_loader
         def load_user(user_id):
             return User.query.get(int(user_id))
+
+    print("MIRA AQUÍ ABAJO:")
+    print(app.url_map)
 
     return app
