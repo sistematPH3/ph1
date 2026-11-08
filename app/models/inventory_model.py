@@ -42,7 +42,7 @@ class Product(db.Model):
     # RELACIÓN ÚNICA: Conectado al Tipo Operativo para heredar sus reglas
     product_type_id = db.Column(db.Integer, db.ForeignKey('product_types.id'), nullable=True)
     
-    # Campos originales de tu modelo original conservados con precisión:
+    
     quantity = db.Column(db.Integer, nullable=False, default=0) #
     unit_of_measure = db.Column(db.String(20)) #
     technical_description = db.Column(db.Text, nullable=True) #

@@ -27,10 +27,10 @@ def list_users():
 @logistics_users_bp.route('/users/sedes', methods=['GET'])
 def list_sedes():
     try:
-        query = text("SELECT id, name FROM locations WHERE is_active = true")
+        query = text("SELECT id, name, state FROM locations WHERE is_active = true")
         result = db.session.execute(query).fetchall()
         
-        sedes = [{"id": row.id, "name": row.name} for row in result]
+        sedes = [{"id": row.id, "name": row.name, "state": row.state} for row in result]
             
         return jsonify({
             "status": "success",

@@ -9,7 +9,7 @@ def seed_database():
     with app.app_context():
         print("--- Iniciando proceso de carga de datos ---")
         
-        # 1. Cargar Roles (Mantenemos intacta tu estructura original)
+        # 1. Cargar Roles
         roles_data = [
             (0, 'Guest'), (1, 'Administrator'), (2, 'Manager'), 
             (3, 'Assistant Manager'), (4, 'Operations'), 
@@ -26,7 +26,7 @@ def seed_database():
         db.session.commit()
         print("✅ Roles sincronizados.")
 
-        # 2. Cargar Usuario Administrador (Mantenemos intacta tu estructura original)
+        # 2. Cargar Usuario Administrador 
         email_admin = 'sistemat3.ph@gmail.com'
         user_exists = User.query.filter_by(email=email_admin).first()
         
