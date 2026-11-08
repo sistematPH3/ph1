@@ -1,0 +1,212 @@
+{% extends "base_list.html" %}
+
+{% block search_input_id %}userInput{% endblock %}
+{% block search_input_attrs %}onkeyup="filterTable()"{% endblock %}
+{% block search_placeholder %}Buscar por nombre o correo...{% endblock %}
+{% block table_id %}userTable{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}?v=6.0">
+
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <!-- Encabezado corporativo -->
+        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </div>
+                <div>
+                    <h2 class="ph-title mb-1">Gestión de Permisos</h2>
+                    <p class="text-muted mb-0">Revisión de nuevos colaboradores en espera de acceso al sistema</p>
+                </div>
+            </div>
+            <span class="badge badge-module-tag rounded-pill px-3 py-2 fw-semibold shadow-sm align-self-start align-self-md-auto">
+                Módulo Administrativo
+            </span>
+        </div>
+
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap w-100">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="userInput" class="form-control rounded-pill bg-light border-0 ps-5"
+                           onkeyup="filterTable()"
+                           placeholder="Buscar por nombre o correo..." style="height: 36px;">
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-light rounded-pill px-4 d-flex align-items-center justify-content-between fw-medium dropdown-toggle"
+                            type="button"
+                            id="dropdownFilter"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            style="height: 36px;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-sort-down me-2 text-muted"></i>
+                            <span id="selectedFilterLabel">
+                                {% if request.args.get('sort') == 'desc' %}Orden: Z-A{% else %}Ordenar{% endif %}
+                            </span>
+                        </div>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end w-100 shadow-sm border-0 rounded-3" aria-labelledby="dropdownFilter" style="font-size: 0.9rem;">
+                        <li><a class="dropdown-item py-2" href="#" onclick="toggleSort(event)"><i class="bi bi-sort-alpha-down me-2 text-muted"></i>Nombre (A-Z)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card d-none d-md-block">
+                    <table class="table align-middle m-0" id="userTable">
+                        <thead>
+                            <tr class="text-uppercase content-table-header">
+                                <th class="ps-4" style="width: 30%;">Usuario</th>
+                                <th style="width: 35%;">Correo y Registro</th>
+                                <th class="text-center" style="width: 15%;">Estado</th>
+                                <th class="text-center pe-4" style="width: 20%;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            {% for usuario in usuarios_espera %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-circle-red">{{ usuario.name[0] | upper }}</div>
+                                        <span class="ms-3 user-name-text">{{ usuario.name }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="user-email-text fw-medium">{{ usuario.email }}</div>
+                                    <div class="user-id-text">ID de Registro: #{{ usuario.id }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="status-badge-pending">Pendiente</span>
+                                </td>
+                                <td class="pe-4">
+                                    <div class="d-flex gap-3 justify-content-center align-items-center">
+                                        <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="m-0" id="rejectForm_{{ usuario.id }}">
+                                            <button type="button" class="btn-action-square btn-action-reject" title="Rechazar solicitud" onclick="confirmReject('{{ usuario.id }}')">
+                                                <i class="bi bi-x-circle-fill"></i>
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn-action-square btn-action-approve" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}" title="Aprobar y asignar rol">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mobile-cards-container d-block d-md-none mt-3" id="userCardsContainer">
+                    {% for usuario in usuarios_espera %}
+                    <div class="mobile-user-card p-3 mb-3 border rounded-4 shadow-sm">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-circle-red">{{ usuario.name[0] | upper }}</div>
+                            <div class="ms-3">
+                                <div class="user-name-text target-name-mobile">{{ usuario.name }}</div>
+                                <span class="status-badge-pending mt-1">Pendiente</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 py-2 border-top border-bottom">
+                            <div class="user-email-text fw-medium mb-1 target-email-mobile">
+                                <i class="bi bi-envelope me-2 text-muted"></i>{{ usuario.email }}
+                            </div>
+                            <div class="user-id-text">
+                                <i class="bi bi-hash me-2 text-muted"></i>ID Registro: #{{ usuario.id }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 w-100">
+                            <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="flex-fill" id="rejectForm_{{ usuario.id }}">
+                                <button type="button" class="btn btn-outline-danger rounded-pill w-100 py-2 d-flex align-items-center justify-content-center fw-semibold gap-1" onclick="confirmReject('{{ usuario.id }}')">
+                                    <i class="bi bi-x-circle"></i> Rechazar
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-success flex-fill rounded-pill py-2 d-flex align-items-center justify-content-center fw-semibold gap-1" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}">
+                                <i class="bi bi-check-circle"></i> Aprobar
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="noSearchResults" class="text-center py-5 d-none">
+                    <div class="py-4 text-muted">
+                        <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
+                        <h5 class="fw-bold mb-1" style="color: #4a5568;">No se encontraron resultados</h5>
+                        <p class="small mb-0" style="color: #718096;">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
+                    </div>
+                </div>
+
+                {% if not usuarios_espera %}
+                <div class="text-center py-5 text-muted">
+                    <div class="py-4">
+                        <i class="bi bi-shield-slash text-muted mb-3 d-inline-block" style="font-size: 3rem; opacity: 0.5;"></i>
+                        <h5 class="fw-bold text-secondary mb-1">No hay solicitudes pendientes</h5>
+                        <p class="text-muted small mb-0">Todos los accesos de los colaboradores están al día.</p>
+                    </div>
+                </div>
+                {% endif %}
+
+    </div>
+</div>
+
+{% for usuario in usuarios_espera %}
+<div class="modal fade text-start" id="approveModal{{ usuario.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-light py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-shield-check-fill me-2 text-danger"></i>Asignar Credenciales
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" onsubmit="validarFormularioAprobacion(event, this)">
+                <div class="modal-body p-4 text-dark">
+                    <p class="text-muted small">Elige las propiedades de acceso para <strong>{{ usuario.name }}</strong>.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Cargo o Rol</label>
+                        <select class="form-select select-custom-pill" name="role_id" onchange="toggleSedesContainer(this)">
+                            <option value="" selected disabled>Selecciona un rol...</option>
+                            <option value="1">Administrador</option>
+                            <option value="6">Finanzas</option>
+                            <option value="5">Director</option>
+                            <option value="2">Gerente de Sede</option>
+                            <option value="3">Subgerente de Sede</option>
+                            <option value="4">Operaciones</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 location-container-box">
+                        <label class="form-label fw-bold small text-muted text-uppercase d-block mb-2">Sedes Habilitadas</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for sede in sedes %}
+                            <div class="form-check-inline m-0">
+                                <input type="checkbox" class="btn-check" name="location_ids" id="sede_{{ usuario.id }}_{{ sede.id }}" value="{{ sede.id }}" autocomplete="off">
+                                <label class="btn btn-outline-location-pill btn-sm rounded-pill px-3" for="sede_{{ usuario.id }}_{{ sede.id }}">{{ sede.name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 bg-light py-3 px-4 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 m-0" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-confirm-red rounded-pill px-4 text-white fw-bold m-0">Confirmar Acceso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/security/admin_table.js') }}?v=1.9"></script>
+{% endblock %}

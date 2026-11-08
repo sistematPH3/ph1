@@ -1,0 +1,547 @@
+/* =========================================================================
+   PALETA DE COLORES CORPORATIVA (Sincronizada con Personal e Inventario)
+   ========================================================================= */
+:root {
+    --ph-red: #b01212;        /* Rojo exacto de la Pizza Hut */
+    --ph-red-hover: #8c0e0e;  /* Rojo más oscuro para los efectos hover */
+    --ph-red-light: #fdf2f2;  /* Tonalidad clara para alertas o fondos suaves */
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;    /* Fondo grisáceo del sistema */
+    --ph-border-soft: #E2E8F0;
+}
+
+/* Fuentes de iconos de Bootstrap */
+@font-face {
+    font-family: "bootstrap-icons";
+    src: url("../../fonts/bootstrap-icons.woff2") format("woff2"),
+         url("../../fonts/bootstrap-icons.woff") format("woff");
+}
+
+body.bg-main {
+    background-color: var(--ph-bg-main);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--ph-text-main);
+}
+
+/* =========================================================================
+   HEADER & ICONO DEL MÓDULO (Estilo Premium)
+   ========================================================================= */
+.brand-box {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.3rem !important;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
+    flex-shrink: 0 !important;
+}
+
+.title-main {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--ph-text-main);
+    margin: 0;
+}
+
+.subtitle-main {
+    color: var(--ph-text-muted);
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* =========================================================================
+   BOTÓN "NUEVA SUCURSAL" (Estilo Píldora con Aura)
+   ========================================================================= */
+.btn-ph-red {
+    background-color: var(--ph-red) !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 24px !important;
+    border-radius: 50px !important; /* Forma de píldora idéntica a tu diseño premium */
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    transition: all 0.25s ease-in-out !important;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
+}
+
+.btn-ph-red:hover {
+    background-color: var(--ph-red-hover) !important;
+    color: white !important;
+    transform: translateY(-2px) !important;
+    /* Aura/Brillo rojo corporativo al pasar el cursor */
+    box-shadow: 0 6px 16px rgba(176, 18, 18, 0.4) !important; 
+}
+
+/* =========================================================================
+   CONTENEDORES DE ENTRADA (Buscador y Filtro Dropdown)
+   ========================================================================= */
+.search-box-improved, .filter-box-improved {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-box-improved i {
+    position: absolute;
+    left: 16px;
+    color: var(--ph-text-muted);
+    font-size: 1rem;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* =========================================================================
+   CORRECCIÓN DE LA BARRA DE BÚSQUEDA (Sincronizada con Filtros y Productos)
+   ========================================================================= */
+
+/* Estado normal del buscador: Aseguramos el estilo aplicando directamente al ID */
+#searchInput {
+    height: 36px !important;
+    padding: 5px 15px 5px 44px !important;
+    font-size: 0.9rem !important;
+    border: none !important;
+    border-radius: 50px !important;
+    width: 100% !important;
+    background-color: #f8f9fa !important;
+    color: var(--ph-text-soft) !important;
+    transition: all 0.25s ease-in-out !important;
+}
+
+/* Estado de enfoque (Focus): Borde rojo corporativo con brillo de 3px idéntico al filtro */
+#searchInput:focus {
+    border-color: var(--ph-red) !important; /* Rojo Pizza Hut sólido */
+    box-shadow: 0 0 0 3px rgba(176, 18, 18, 0.15) !important; /* Brillo de 3px nítido */
+    background-color: #FFFFFF !important; /* Fondo blanco al escribir */
+    outline: none !important;
+}
+
+/* Botón Dropdown Estilo Píldora */
+/* Botón Dropdown Estilo Píldora - Base General */
+.form-select-ph-sm {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important; /* Distribuye el texto a la izquierda y la flecha a la derecha */
+    height: 44px !important;
+    border-radius: 50px !important;
+    background-color: #F8FAFC !important;
+    border: 1px solid var(--ph-border-soft) !important;
+    color: var(--ph-text-soft) !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    padding: 0 20px !important;
+    width: 100% !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.form-select-ph-sm:focus, .form-select-ph-sm:active {
+    border-color: var(--ph-red) !important;
+    box-shadow: 0 0 0 3px rgba(176, 18, 18, 0.15) !important;
+    background-color: #FFFFFF !important;
+    outline: none !important;
+}
+
+/* Desplegable redondeado elegante */
+.custom-rounded-menu {
+    border: 1px solid var(--ph-border-soft) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+    padding: 6px !important;
+}
+
+.custom-rounded-menu .dropdown-item {
+    border-radius: 10px !important;
+    padding: 8px 14px !important;
+    color: var(--ph-text-soft) !important;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.custom-rounded-menu .dropdown-item:hover {
+    background-color: var(--ph-red-light) !important;
+    color: var(--ph-red) !important;
+}
+
+/* =========================================================================
+   TARJETA CONTENEDORA & TABLA (Adiós a las líneas negras)
+   ========================================================================= */
+.content-card {
+    background: #FFFFFF !important;
+    border-radius: 24px !important;
+    border: 1px solid var(--ph-border-soft) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    padding: 1.5rem !important;
+    overflow: visible !important;
+}
+
+.table-responsive {
+    border-radius: 16px;
+    overflow: visible !important;
+}
+
+#phTableCustom {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+    border: none !important;
+}
+
+/* Cabecera Roja limpia de bordes negros */
+#phTableCustom thead th {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
+    padding: 16px 20px !important;
+    border: none !important;
+}
+
+/* Redondeado de esquinas de la cabecera */
+#phTableCustom thead tr th:first-child {
+    border-radius: 12px 0 0 12px !important;
+}
+#phTableCustom thead tr th:last-child {
+    border-radius: 0 12px 12px 0 !important;
+}
+
+/* Ajustes de celdas y filas */
+#phTableCustom tbody tr {
+    border-bottom: 1px solid var(--ph-border-soft) !important;
+    transition: background-color 0.15s ease;
+}
+
+#phTableCustom tbody tr:hover {
+    background-color: #FAFAFA !important;
+}
+
+#phTableCustom tbody tr:last-child {
+    border-bottom: none !important;
+}
+
+#phTableCustom td {
+    padding: 16px 20px !important;
+    border: none !important; /* Remueve líneas duras por defecto */
+    vertical-align: middle !important;
+    color: var(--ph-text-soft) !important;
+    font-size: 0.92rem !important;
+}
+
+/* Tipografía de Nombre de Sucursal */
+#phTableCustom tbody tr td .fw-bold.text-ph-dark {
+    font-size: 0.92rem !important;
+    font-family: 'Inter', sans-serif !important;
+    color: var(--ph-text-main) !important;
+}
+
+/* =========================================================================
+   COMPONENTES INTERNOS (Pills, Badges y Reseteo del Switch Toggle)
+   ========================================================================= */
+.id-badge {
+    background-color: #F1F5F9 !important;
+    color: var(--ph-text-soft) !important;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--ph-border-soft) !important;
+}
+
+.contact-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background-color: #F8FAFC;
+    border: 1px solid var(--ph-border-soft);
+    border-radius: 50px;
+    font-size: 0.85rem;
+    color: var(--ph-text-soft);
+}
+
+.status-pill {
+    padding: 6px 14px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.status-pill.active { background-color: #D1FAE5; color: #065F46; }
+.status-pill.inactive { background-color: #FEE2E2; color: #991B1B; }
+
+/* RESETEO TOTAL DEL BOTÓN INTERRUPTOR (Para quitar el recuadro gris feo) */
+.btn-toggle {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: transform 0.2s ease-in-out !important;
+}
+
+.btn-toggle:hover {
+    transform: scale(1.18) !important;
+}
+
+/* Efecto hover interactivo para el lápiz de edición */
+.text-primary.btn-toggle:hover {
+    color: var(--ph-red) !important; /* Cambia a rojo corporativo en hover */
+}
+
+/* =========================================================================
+   FILA INACTIVA (Naranja/Ámbar suave al estilo de tu diseño)
+   ========================================================================= */
+.row-inactive {
+    background-color: #FFF9F2 !important; /* Fondo crema/naranja sumamente sutil */
+    transition: all 0.2s ease;
+}
+
+.row-inactive td:first-child {
+    box-shadow: inset 4px 0 0 #F59E0B !important; /* Línea lateral ámbar premium */
+}
+
+.row-inactive td {
+    color: #9A6214 !important; /* Texto en tono ocre perfectamente legible */
+}
+
+.row-inactive .id-badge {
+    background-color: #F59E0B !important;
+    color: #FFFFFF !important;
+    border: none !important;
+}
+
+.row-inactive .fw-bold.text-ph-dark {
+    color: #875103 !important;
+}
+
+.row-inactive .contact-pill {
+    background-color: rgba(245, 158, 11, 0.08) !important;
+    color: #9A6214 !important;
+    border: 1px solid rgba(245, 158, 11, 0.2) !important;
+}
+
+.row-inactive .btn-toggle i {
+    color: #D97706 !important;
+}
+/* ==========================================================================
+   VISTA MÓVIL PERFECCIONADA - SIN HOVER Y FILTROS CENTRADOS
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    
+    /* 1. Forzar alineación vertical perfecta al 100% de ancho */
+    .d-flex.justify-content-between.align-items-center,
+    .d-flex.flex-column.flex-md-row {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 0.75rem !important;
+    }
+
+    /* 2. CORRECCIÓN FILTRO: Centrado absoluto sin rupturas de línea */
+    .custom-ph-dropdown {
+        width: 100% !important;
+        min-width: auto !important; 
+        margin-top: 0.25rem;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* Forzar que el botón interno agrupe el contenido inline en el medio */
+    .form-select-ph-sm, 
+    .custom-ph-dropdown button {
+        width: 100% !important;
+        height: 44px !important;            /* Mantiene la altura limpia de la píldora */
+        display: flex !important;
+        flex-direction: row !important;     /* ¡CLAVE! Contrarresta el choque y lo obliga a ser fila */
+        align-items: center !important;     /* Alineación vertical perfecta */
+        justify-content: center !important; /* Junta el grupo del texto y la flecha en el centro */
+        gap: 4px !important;                /* Separación milimétrica entre el texto y el chevron */
+        text-align: center !important;
+        flex-wrap: nowrap !important;       /* Bloquea por completo cualquier mutación de línea */
+        padding: 0 15px !important;
+    }
+
+    /* Forzar que el texto y el icono del embudo mantengan su flujo flex */
+    .custom-ph-dropdown #selectedStatusText {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;                /* Separación limpia entre el embudo y las palabras */
+        white-space: nowrap !important;
+    }
+
+    /* Evitar desfases visuales con el icono del chevron descendente */
+    .custom-ph-dropdown .bi-chevron-down {
+        display: inline-block !important;
+        margin: 0 !important;
+    }
+
+    /* Forzar que el texto y el icono del embudo mantengan su flujo flex */
+    .custom-ph-dropdown #selectedStatusText {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        white-space: nowrap !important;
+    }
+
+    /* Evitar desfases visuales con el icono del chevron descendente */
+    .custom-ph-dropdown .bi-chevron-down {
+        display: inline-block !important;
+        margin: 0 !important;
+    }
+
+    /* 3. Homologar el tamaño idéntico para todos los controles superiores */
+    .btn-ph-red,
+    .search-box-improved, 
+    #searchInput {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 4. ESTRUCTURA DE TARJETAS (Desarmado de tabla nativa) */
+    #phTableCustom, #phTableCustom tbody,
+    tr.sede-row-mobile, tr.sede-row-mobile td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    #phTableCustom thead {
+        display: none !important;
+    }
+
+    /* CORRECCIÓN HOVER: Anular por completo el fondo gris de Bootstrap al hacer clic o tap */
+    tr.sede-row-mobile,
+    tr.sede-row-mobile:hover,
+    tr.sede-row-mobile:active,
+    tr.sede-row-mobile:focus,
+    tr.sede-row-mobile td,
+    tr.sede-row-mobile td:hover,
+    tr.sede-row-mobile td:active {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* El contenedor blanco interno mantiene su comportamiento limpio */
+    .mobile-card-item {
+        background-color: #ffffff !important;
+        border: 1px solid var(--ph-border-soft);
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    /* Estado Inactivo */
+    tr.row-inactive .mobile-card-item {
+        background-color: #FFF9F2 !important;
+        border-left: 4px solid #F59E0B !important;
+    }
+    
+    tr.row-inactive .mobile-card-item .fw-bold {
+        color: #875103 !important;
+    }
+
+    /* ==========================================================================
+       CUADRITOS DE ACCIÓN MINIMALISTAS (SOLO ICONO)
+       ========================================================================== */
+    .btn-mobile-action {
+        background-color: #ffffff !important;
+        border: 1px solid var(--ph-border-soft) !important;
+        border-radius: 10px !important;
+        height: 40px;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+        padding: 0 !important;
+    }
+    
+    .btn-mobile-action:hover {
+        background-color: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .icon-mobile-edit { color: #0284c7 !important; }
+    .icon-mobile-status-active { color: var(--ph-red) !important; }
+    .icon-mobile-status-inactive { color: #16a34a !important; }
+}
+
+/* ==========================================================================
+   VISTA TABLET OPTIMIZADA (Pantallas medianas 768px - 1024px)
+   Asegura que el listado de PC respire perfecto sin deformar textos ni píldoras
+   ========================================================================== */
+@media (min-width: 768px) {
+    /* Ocultar la fila móvil nativa en tablets y escritorios */
+    tr.sede-row-mobile {
+        display: none !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* 1. Reducir ligeramente el relleno de la tarjeta blanca contenedora */
+    .content-card {
+        padding: 1rem !important;
+    }
+
+    /* 2. Compactar el acolchado (padding) de las celdas para ganar valioso espacio horizontal */
+    #phTableCustom thead th,
+    #phTableCustom tbody td {
+        padding: 12px 10px !important; /* Bajamos de 16px/20px para ensanchar las columnas */
+        font-size: 0.85rem !important;   /* Ajuste milimétrico de fuente */
+    }
+
+    /* Evitar que los nombres largos colapsen en demasiadas líneas */
+    #phTableCustom tbody tr td .fw-bold.text-ph-dark {
+        font-size: 0.85rem !important;
+        display: block;
+        line-height: 1.2;
+    }
+
+    /* 3. Reducir las dimensiones de las píldoras internas */
+    .contact-pill {
+        padding: 4px 10px !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap !important; /* Evita que el teléfono se divida */
+    }
+
+    .status-pill {
+        padding: 4px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* 4. Evitar que la columna de acciones se desborde */
+    #phTableCustom td:last-child {
+        padding-right: 10px !important;
+    }
+    
+    /* Reducir la separación de los iconos de edición y switch */
+    #phTableCustom .gap-3 {
+        gap: 0.5rem !important;
+    }
+    
+    .btn-toggle i.fs-3 {
+        font-size: 1.5rem !important; /* Ajusta levemente el tamaño del interruptor toggle */
+    }
+    .btn-toggle i.fs-4 {
+        font-size: 1.25rem !important; /* Ajusta levemente el tamaño del lápiz */
+    }
+}

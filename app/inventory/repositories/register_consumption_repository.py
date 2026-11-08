@@ -1,0 +1,282 @@
+import json
+from datetime import datetime
+from sqlalchemy import func, or_
+from app.extensions import db
+from app.time_utils import current_ve_time
+from app.models.inventory_model import Inventory, Product
+from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
+from app.models.waste_model import AuditLog, Waste, WasteDetail
+from app.models.security_model import User, user_locations
+
+class RegisterConsumptionRepository:
+    @staticmethod
+    def get_user_by_id(user_id):
+        return User.query.get(user_id)
+
+    @staticmethod
+    def get_all_sedes():
+        return Location.query.filter(Location.is_active == True, Location.id != 1).all()
+
+    @staticmethod
+    def is_valid_sede(location_id):
+        return Location.query.filter(Location.id == location_id, Location.is_active == True, Location.id != 1).first() is not None
+
+    @staticmethod
+    def get_user_locations(user_id):
+        loc_ids_result = db.session.query(user_locations.c.location_id).filter(user_locations.c.user_id == user_id).all()
+        loc_ids = [row[0] for row in loc_ids_result]
+        
+        if not loc_ids:
+            return []
+            
+        return Location.query.filter(Location.id.in_(loc_ids), Location.is_active == True, Location.id != 1).all()
+
+    @staticmethod
+    def get_products_in_inventory(location_id):
+        return db.session.query(Product).join(
+            Inventory, Product.id == Inventory.product_id
+        ).filter(
+            Inventory.location_id == location_id,
+            Inventory.current_quantity > 0,
+            Product.is_active == True
+        ).all()
+
+    @staticmethod
+    def get_inventory_item(product_id, location_id):
+        return Inventory.query.filter_by(
+            product_id=product_id,
+            location_id=location_id
+        ).first()
+
+    @staticmethod
+    def get_product_lots(product_id, location_id):
+        loc_id = int(location_id)
+        prod_id = int(product_id)
+
+        entradas_por_lote = {}
+        salidas_traslados = {}
+        moved_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE',
+                          'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
+
+        if loc_id == 1:
+            compras = db.session.query(
+                PurchaseDetail.lot_number,
+                func.min(PurchaseDetail.expiration_date).label('min_exp'),
+                func.sum(PurchaseDetail.quantity).label('total_qty')
+            ).join(
+                Purchase, PurchaseDetail.purchase_id == Purchase.id
+            ).filter(
+                func.upper(Purchase.status).in_(['COMPLETED', 'COMPLETADO']),
+                PurchaseDetail.product_id == prod_id,
+                PurchaseDetail.lot_number.isnot(None),
+                PurchaseDetail.lot_number != ''
+            ).group_by(PurchaseDetail.lot_number).all()
+
+            devoluciones = db.session.query(
+                MovementDetail.lot_number,
+                func.min(MovementDetail.expiration_date).label('min_exp'),
+                func.sum(func.coalesce(MovementDetail.received_quantity,
+                                       MovementDetail.quantity)).label('total_qty')
+            ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
+                func.upper(Movement.status).in_(moved_statuses),
+                Movement.destination_location_id == 1,
+                Movement.origin_location_id != 1,
+                MovementDetail.product_id == prod_id,
+                MovementDetail.lot_number.isnot(None),
+                MovementDetail.lot_number != ''
+            ).group_by(MovementDetail.lot_number).all()
+
+            for r in list(compras) + list(devoluciones):
+                lot = r.lot_number.strip()
+                prev = entradas_por_lote.get(lot)
+                exps = [e for e in (prev['expiration_date'] if prev else None, r.min_exp) if e]
+                entradas_por_lote[lot] = {
+                    'expiration_date': min(exps) if exps else None,
+                    'total_in': float(r.total_qty or 0.0) + (prev['total_in'] if prev else 0.0),
+                }
+        else:
+            entradas = db.session.query(
+                MovementDetail.lot_number,
+                func.min(MovementDetail.expiration_date).label('min_exp'),
+                func.sum(func.coalesce(MovementDetail.received_quantity,
+                                       MovementDetail.quantity)).label('total_qty')
+            ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
+                func.upper(Movement.status).in_(moved_statuses),
+                Movement.destination_location_id == loc_id,
+                MovementDetail.product_id == prod_id,
+                MovementDetail.lot_number.isnot(None),
+                MovementDetail.lot_number != ''
+            ).group_by(MovementDetail.lot_number).all()
+
+            for r in entradas:
+                lot = r.lot_number.strip()
+                entradas_por_lote[lot] = {
+                    'expiration_date': r.min_exp,
+                    'total_in': float(r.total_qty or 0.0),
+                }
+
+        salidas = db.session.query(
+            MovementDetail.lot_number,
+            func.sum(MovementDetail.quantity).label('total_out')
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == loc_id,
+            Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO', 'CANCELADO_EMISOR']),
+            MovementDetail.product_id == prod_id,
+            MovementDetail.lot_number.isnot(None)
+        ).group_by(MovementDetail.lot_number).all()
+
+        salidas_traslados = {r.lot_number.strip(): float(r.total_out or 0.0) for r in salidas if r.lot_number}
+
+        salidas_consumo = {}
+        audit_records = db.session.query(
+            AuditLog.changed_data
+        ).filter(
+            AuditLog.location_id == loc_id,
+            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA'])
+        ).all()
+
+        for (c_data,) in audit_records:
+            if not c_data:
+                continue
+            if isinstance(c_data, str):
+                try:
+                    c_data = json.loads(c_data)
+                except Exception:
+                    continue
+            if not isinstance(c_data, dict):
+                continue
+
+            try:
+                p_id = int(c_data.get('product_id')) if c_data.get('product_id') is not None else None
+            except (TypeError, ValueError):
+                p_id = None
+            l_num = c_data.get('lot_number')
+            try:
+                qty_change = float(c_data.get('quantity_changed', 0.0))
+            except (TypeError, ValueError):
+                qty_change = 0.0
+
+            if p_id == prod_id and l_num and str(l_num).strip() != 'N/A':
+                l_num_clean = str(l_num).strip()
+                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(qty_change)
+
+        salidas_aprobadas = {}
+        aprobadas = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_mermado')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            Waste.status == 'APROBADO',
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+
+        for r in aprobadas:
+            if r.lot_number and str(r.lot_number).strip() != 'N/A':
+                salidas_aprobadas[str(r.lot_number).strip()] = float(r.total_mermado or 0.0)
+
+        # Mermas PENDIENTES: la cantidad está congelada (reserved_quantity) y no
+        # está disponible para consumo. Se resta de la disponibilidad del lote
+        # para que la UI de consumo nunca muestre Mercancía que no se puede tocar.
+        salidas_pendientes = {}
+        pendientes = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_pend')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            or_(
+                Waste.status == 'PENDIENTE',
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status != 'APROBADO'),
+            ),
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+
+        for r in pendientes:
+            if r.lot_number and str(r.lot_number).strip() != 'N/A':
+                salidas_pendientes[str(r.lot_number).strip()] = float(r.total_pend or 0.0)
+
+        # Disponible agregado de la sede (igual criterio que el consumo):
+        # físico - en tránsito - congelado por mermas.
+        inventory_item = RegisterConsumptionRepository.get_inventory_item(prod_id, loc_id)
+        stock_actual = float(inventory_item.current_quantity) if inventory_item else 0.0
+        reservado = float(inventory_item.reserved_quantity or 0) if inventory_item else 0.0
+        transit = float(inventory_item.transit_quantity or 0) if inventory_item else 0.0
+        disponible_total = max(0.0, stock_actual - transit - reservado)
+
+        lots = []
+        for lot_num, data in entradas_por_lote.items():
+            disponible = (data['total_in']
+                          - salidas_traslados.get(lot_num, 0.0)
+                          - salidas_consumo.get(lot_num, 0.0)
+                          - salidas_aprobadas.get(lot_num, 0.0)
+                          - salidas_pendientes.get(lot_num, 0.0))
+
+            if disponible > 0.001:
+                lots.append({
+                    'lot_number': lot_num,
+                    'expiration_date': data['expiration_date'].strftime('%d/%m/%Y') if data['expiration_date'] else 'Sin vencimiento',
+                    'exp_date_raw': data['expiration_date'],
+                    'disponible': disponible
+                })
+
+        lots.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
+
+        remaining_pool = disponible_total
+        result = []
+        for l in lots:
+            capped_qty = min(l['disponible'], max(0.0, remaining_pool))
+            if capped_qty > 0.001:
+                result.append({
+                    'lot_number': l['lot_number'],
+                    'expiration_date': l['expiration_date'],
+                    'quantity': round(float(capped_qty), 2)
+                })
+                remaining_pool -= capped_qty
+
+        return result
+
+    @staticmethod
+    def record_lot_consumption_audit(inventory_item, lot_number, quantity_consumed, previous_stock, new_stock, user_id=None, notes=None):
+        min_stock = float(getattr(inventory_item, 'min_stock', 20))
+        if new_stock <= 0:
+            severidad = 'CRITICO'
+        elif new_stock <= min_stock:
+            severidad = 'ALERTA'
+        else:
+            severidad = 'NORMAL'
+
+        product_name = inventory_item.product.name if hasattr(inventory_item, 'product') and inventory_item.product else f"Insumo #{inventory_item.product_id}"
+
+        note_text = notes or "Registro de consumo de cocina"
+        if lot_number and lot_number != 'N/A':
+            note_text = f"{note_text} (Lote: {lot_number})"
+
+        changed_data = json.dumps({
+            'product_id': inventory_item.product_id,
+            'product_name': product_name,
+            'lot_number': lot_number or 'N/A',
+            'previous_quantity': float(previous_stock),
+            'new_quantity': float(new_stock),
+            'quantity_changed': -abs(float(quantity_consumed)),
+            'notes': note_text
+        })
+
+        try:
+            user_id_final = int(user_id) if user_id is not None else 1
+        except (ValueError, TypeError):
+            user_id_final = 1
+
+        audit_entry = AuditLog(
+            user_id=user_id_final,
+            location_id=inventory_item.location_id,
+            action='GASTO_COCINA',
+            severity=severidad,
+            timestamp=current_ve_time(),
+            changed_data=changed_data
+        )
+        db.session.add(audit_entry)

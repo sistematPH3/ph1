@@ -1,0 +1,529 @@
+/* =========================================================
+   ESTILOS BASE Y ESTRUCTURA (PROTEGIDOS Y OPTIMIZADOS)
+   ========================================================= */
+html, body { 
+    margin: 0; 
+    padding: 0;
+    height: 100vh; /* Fija el alto al tamaño de la ventana */
+    font-family: 'Segoe UI', Arial, sans-serif; 
+    background-color: #f4f4f9; 
+    overflow: hidden; /* Bloquea el scroll exterior de la pantalla */
+}
+
+.wrapper { 
+    display: flex; 
+    height: 100vh; 
+    width: 100vw;
+    overflow: hidden; 
+}
+
+.sidebar { 
+    width: 275px; 
+    height: 100vh; 
+    background-color: #000000; 
+    color: #ffffff; 
+    flex-shrink: 0; 
+    display: flex; 
+    flex-direction: column;
+    /* Por defecto permitimos que todo sea visible para que floten tus menús */
+    overflow: visible; 
+    position: relative;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ¡LA CLAVE! Forzamos el scroll vertical independiente cuando se activa la búsqueda */
+.sidebar.searching {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none !important; /* Oculta barra en Firefox */
+    -ms-overflow-style: none !important; /* Oculta barra en Edge */
+}
+
+/* Oculta la barra de scroll visual en Chrome y Safari durante la búsqueda */
+.sidebar.searching::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* CORRECTOR DE ALINEACIÓN: Permite que el menú flotante se alinee perfectamente al lado de su botón */
+.sidebar .nav-item {
+    position: relative;
+}
+
+.content { 
+    flex-grow: 1; 
+    flex-shrink: 1;
+    min-width: 0; 
+    height: 100vh; 
+    overflow-y: auto; /* El listado del personal se desplaza de forma independiente */
+    overflow-x: hidden; 
+    padding: 40px; 
+    background-color: #f4f4f9;
+}
+
+/* =========================================================
+   SIDEBAR - COMPONENTES VISUALES
+   ========================================================= */
+.sidebar-header {
+    padding-top: 35px !important;    
+    padding-bottom: 0px !important;  
+    margin-bottom: 0px !important;   
+    transition: padding 0.3s ease, justify-content 0.3s ease;
+}
+
+.logo-hat {
+    max-height: 42px; 
+    object-fit: contain;
+    transition: margin 0.3s ease;
+}
+
+.logo-letters {
+    max-height: 34px; 
+    object-fit: contain;
+}
+
+.toggle-sidebar-btn {
+    position: fixed;
+    top: 40px; 
+    left: 259px; /* Posición exacta en el borde derecho cuando la barra mide 275px (275 - 16) */
+    width: 32px; 
+    height: 32px; 
+    background-color: #e31937;
+    border: 2px solid #0d0e0e; 
+    border-radius: 50%;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1090;
+    transition: background-color 0.2s, transform 0.3s ease, left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.toggle-sidebar-btn i {
+    font-size: 1rem; 
+}
+
+.toggle-sidebar-btn:hover {
+    background-color: #ff2a4b;
+}
+
+.sidebar.collapsed .toggle-sidebar-btn i {
+    transform: rotate(180deg);
+}
+
+/* Cuando se abre un modal de Bootstrap (z-index 1055) la pestaña y la barra
+   lateral deben quedar POR DEBAJO del backdrop (1050) para no tapar el modal. */
+body.modal-open .toggle-sidebar-btn {
+    z-index: 1020;
+}
+
+@media (max-width: 1024px) {
+    body.modal-open .sidebar {
+        z-index: 1020 !important;
+    }
+}
+
+/* =========================================================
+   BUSCADOR OVALADO
+   ========================================================= */
+.sidebar .search-box {
+    background-color: #17191c !important; 
+    border-radius: 30px !important;        
+    border: 2px solid #e31937 !important;  
+    height: 42px !important;               
+    margin: 18px 8px 20px 8px !important;          
+    padding: 0 16px !important;            
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    position: relative !important;
+    transition: width 0.3s ease, margin 0.3s ease, border-radius 0.3s ease, padding 0.3s ease;
+}
+
+.sidebar .search-box .search-icon {
+    color: #6c757d !important;
+    font-weight: 800 !important;
+    font-size: 1rem !important;
+    position: static !important;           
+    margin: 0 !important;
+    margin-right: 10px !important;         
+    flex-shrink: 0 !important;
+    transition: margin 0.3s ease;
+}
+
+.sidebar .search-box .search-input {
+    background: transparent !important;
+    background-color: transparent !important; 
+    border: none !important;                  
+    color: #ffffff !important;                
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    height: 100% !important;
+    outline: none !important;
+    box-shadow: none !important;              
+    padding: 0 !important;                 
+    margin: 0 !important;
+}
+
+/* =========================================================
+   BLOQUES DE OPCIONES PRINCIPALES (MAYÚSCULAS)
+   ========================================================= */
+.sidebar .nav-link.sidebar-toggler {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; 
+    background-color: #1f2429; 
+    color: #ffffff !important; 
+    padding: 14px 16px;
+    margin: 6px 14px; 
+    font-size: 0.92rem;
+    font-weight: 700; 
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    border-radius: 6px; 
+    border: none;
+}
+
+.sidebar .main-icon {
+    font-size: 1.15rem;
+    margin-right: 12px; 
+    flex-shrink: 0;
+    transition: margin 0.3s ease;
+}
+
+.sidebar .nav-link.sidebar-toggler i.chevron-icon {
+    font-weight: 800 !important;
+    font-size: 1.05rem;
+    -webkit-text-stroke: 0.5px currentColor; 
+}
+
+.sidebar .nav-link.sidebar-toggler:hover {
+    background-color: #e31937 !important; 
+    color: #ffffff !important;
+}
+
+/* Sub-enlaces del Menú Desplegable */
+.sub-link { 
+    background-color: #131517; 
+    padding: 10px 25px !important; 
+    font-size: 0.88rem; 
+    font-weight: 600;
+    color: #b0b5bc !important; 
+    margin: 2px 14px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: block;
+}
+
+.sub-link:hover { 
+    background-color: #e31937 !important; 
+    color: #ffffff !important; 
+}
+
+/* =========================================================
+   SECCIÓN DE ACCIONES INFERIORES
+   ========================================================= */
+.sidebar-actions {
+    margin-top: auto; 
+    transition: padding 0.3s ease;
+}
+
+.logout-action {
+    color: #e31937 !important; 
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+    padding: 8px 14px;
+    transition: opacity 0.2s, justify-content 0.3s ease;
+}
+
+.logout-action i {
+    font-weight: 800 !important;
+    -webkit-text-stroke: 0.5px currentColor;
+    margin-right: 12px; 
+}
+
+.logout-action:hover {
+    opacity: 0.8;
+}
+
+.profile-action {
+    color: #8a9099 !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    padding: 8px 14px;
+    transition: color 0.2s, justify-content 0.3s ease;
+}
+
+.profile-action i {
+    margin-right: 12px; 
+}
+
+.profile-action:hover {
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   ESTADO COLAPSADO (.collapsed)
+   ========================================================= */
+.sidebar.collapsed {
+    width: 80px !important; 
+}
+
+/* Mueve el botón fijo a la coordenada correcta cuando la barra pasa a medir 80px (80 - 16) */
+.sidebar.collapsed .toggle-sidebar-btn {
+    left: 64px; 
+}
+
+.sidebar.collapsed .link-text,
+.sidebar.collapsed .chevron-icon,
+.sidebar.collapsed .logo-letters {
+    display: none !important;
+}
+
+/* Si la barra está colapsada, los submenús (incluso los abiertos por una búsqueda)
+   deben permanecer ocultos para que se vea limpia (solo íconos). El estado de la
+   búsqueda no se pierde: al expandir la barra de nuevo, .searching sigue activo
+   y los resultados se vuelven a mostrar automáticamente. */
+.sidebar.collapsed .menu-desplegable {
+    display: none !important;
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.sidebar.collapsed .logo-hat {
+    margin-right: 0 !important;
+}
+
+.sidebar.collapsed .search-box {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    margin: 18px auto 20px auto !important;
+    padding: 0 !important;
+    justify-content: center !important;
+}
+
+.sidebar.collapsed .search-input {
+    display: none !important;
+}
+
+.sidebar.collapsed .search-icon {
+    margin-right: 0 !important;
+}
+
+.sidebar.collapsed .nav-link.sidebar-toggler {
+    justify-content: center !important;
+    padding: 14px 0 !important;
+    margin: 6px 10px !important;
+}
+
+.sidebar.collapsed .main-icon {
+    margin-right: 0 !important;
+}
+
+.sidebar.collapsed .sidebar-actions {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sidebar.collapsed .logout-action,
+.sidebar.collapsed .profile-action {
+    justify-content: center !important;
+    padding: 10px 0 !important;
+    width: 100%;
+}
+
+.sidebar.collapsed .logout-action i,
+.sidebar.collapsed .profile-action i {
+    margin-right: 0 !important; 
+}
+
+/* =========================================================
+   COMPORTAMIENTO DURANTE LA BÚSQUEDA (.searching)
+   ========================================================= */
+.sidebar.searching:not(.collapsed) .menu-desplegable {
+    position: static !important; 
+    display: block !important;   
+    box-shadow: none !important; 
+    background-color: transparent !important; 
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.sidebar.searching:not(.collapsed) .sub-link {
+    margin: 4px 14px 4px 25px !important;
+    background-color: #17191c !important; 
+    border-left: 3px solid #e31937 !important; 
+    border-radius: 0 4px 4px 0 !important;
+}
+
+/* CORRECCIÓN DE SCROLL: Evita que el empuje elástico de Flexbox rompa el scroll vertical interno */
+.sidebar.searching .sidebar-actions {
+    margin-top: 30px !important; 
+}
+
+/* =========================================================
+   COMPORTAMIENTO ESCRITORIO (PC) - HOVER (PANTALLAS > 1024px)
+   ========================================================= */
+@media (min-width: 1025px) {
+    
+    /* CORRECCIÓN EXCLUSIVA PC: Se eliminan por completo las flechitas hacia abajo (barrita) en computadora */
+    .sidebar .nav-link.sidebar-toggler i.chevron-icon {
+        display: none !important;
+    }
+
+    .sidebar:not(.searching) .menu-desplegable {
+        display: none;
+        position: absolute; 
+        top: 0;
+        left: 100%; 
+        min-width: 220px;
+        max-height: calc(100vh - 30px);
+        overflow-y: auto;
+        background-color: #0d0e0e; 
+        border-left: 2px solid #e31937; 
+        border-radius: 0 8px 8px 0;
+        box-shadow: 4px 4px 15px rgba(0,0,0,0.5);
+        z-index: 1050;
+        padding: 5px 0;
+        scrollbar-width: none;
+    }
+
+    .sidebar:not(.searching) .menu-desplegable::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Si el submenú se saldría por abajo, se abre hacia arriba */
+    .sidebar:not(.searching) .menu-desplegable.menu-flip-up {
+        top: auto;
+        bottom: 0;
+    }
+
+    /* Mostrar el menú desplegable al hacer hover SOLO si la barra no está buscando y NO está colapsada */
+    .sidebar:not(.searching):not(.collapsed) .nav-item:hover .menu-desplegable {
+        display: block !important;
+    }
+
+    .sidebar.collapsed { width: 80px !important; }
+    .sidebar.collapsed .link-text, .sidebar.collapsed .logo-letters { display: none !important; }
+    .sidebar.collapsed .sidebar-header { justify-content: center !important; padding: 0 !important; }
+    .sidebar.collapsed .logo-hat { margin-right: 0 !important; }
+    .sidebar.collapsed .search-box { width: 42px !important; height: 42px !important; border-radius: 50% !important; margin: 18px auto 20px auto !important; padding: 0 !important; justify-content: center !important; }
+    .sidebar.collapsed .search-input { display: none !important; }
+    .sidebar.collapsed .search-icon { margin-right: 0 !important; }
+    .sidebar.collapsed .nav-link.sidebar-toggler { justify-content: center !important; padding: 14px 0 !important; margin: 6px 10px !important; }
+    .sidebar.collapsed .main-icon { margin-right: 0 !important; }
+    .sidebar.collapsed .sidebar-actions { padding: 0 !important; display: flex; flex-direction: column; align-items: center; }
+    .sidebar.collapsed .logout-action, .sidebar.collapsed .profile-action { justify-content: center !important; padding: 10px 0 !important; width: 100%; }
+    .sidebar.collapsed .logout-action i, .sidebar.collapsed .profile-action i { margin-right: 0 !important; }
+    .sidebar.collapsed .toggle-sidebar-btn i { transform: rotate(180deg); }
+}
+
+/* =========================================================
+   COMPORTAMIENTO MÓVIL Y TABLET (PANTALLAS <= 1024px)
+   ========================================================= */
+@media (max-width: 1024px) {
+    .sidebar {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 1200;
+        width: 275px !important; 
+        transform: translateX(0); 
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+        overflow: visible !important;
+    }
+
+    .sidebar.searching {
+        overflow: visible !important;
+    }
+
+    .sidebar.collapsed {
+        width: 275px !important; 
+        transform: translateX(-100%) !important;
+    }
+
+    .sidebar.collapsed .toggle-sidebar-btn {
+        left: auto !important; 
+        right: -40px !important; 
+        width: 40px;
+        height: 40px;
+        border-radius: 0 8px 8px 0; 
+        background-color: #e31937;
+        border: none;
+    }
+
+    .sidebar.collapsed .toggle-sidebar-btn i {
+        transform: rotate(180deg);
+    }
+
+    /* --- CONTROL ABSOLUTO DEL ACORDEÓN POR CLASE .open --- */
+    /* --- CONTROL ABSOLUTO Y FORZADO DEL ACORDEÓN --- */
+    .menu-desplegable {
+        display: none !important;
+        position: static !important;
+        box-shadow: none !important;
+        background-color: #0d0e0e !important;
+    }
+
+    /* Solo se muestra si tiene la clase .open inyectada por JS */
+    .menu-desplegable.open {
+        display: block !important;
+    }
+
+    .sidebar .nav-link.sidebar-toggler.active i.chevron-icon {
+        transform: rotate(180deg);
+        transition: transform 0.2s ease;
+    }
+    /* ------------------------------------------------------- */
+    /* ------------------------------------------------------- */
+
+    .content {
+        padding: 20px; 
+    }
+}
+
+/* =========================================================
+   MENÚ ALTO (.sidebar-tall): cuando la barra lateral desborda
+   la pantalla se permite scroll de página; el contenido queda
+   fijo y "Cerrar Sesión" queda anclado abajo. Los submenús
+   flotantes a un lado se conservan intactos.
+   ========================================================= */
+body.sidebar-tall .wrapper {
+    overflow-y: auto;
+}
+/* El contenido fijo solo aplica sin modales abiertos: `position: sticky`
+   crea un contexto de apilamiento que pondría el modal POR DEBAJO del
+   backdrop de Bootstrap (pantalla oscura bloqueada). */
+body.sidebar-tall:not(.modal-open) .content {
+    position: sticky;
+    top: 0;
+}
+.sidebar-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1060;
+    background-color: #000000;
+    padding-top: 6px;
+}
+
+/* Con un modal abierto, "Cerrar Sesión" queda por debajo del backdrop (1050)
+   para no tapar ni bloquear la ventana flotante. */
+body.modal-open .sidebar-actions {
+    z-index: 1020;
+}

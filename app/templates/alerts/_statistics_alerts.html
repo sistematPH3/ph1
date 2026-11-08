@@ -1,0 +1,44 @@
+{% if alertas_estadisticas %}
+{% set iconos_estadisticas = {
+    'PURCHASES': 'bi-cart3',
+    'KITCHEN_CONSUMPTION': 'bi-egg-fried',
+    'WASTE': 'bi-trash3',
+    'TRANSFERS': 'bi-truck',
+} %}
+<div class="stats-alert-wrapper">
+    <div class="stats-alert-header">
+        <h3 class="stats-alert-title">
+            <span class="stats-alert-icon">
+                <i class="bi bi-graph-up-arrow"></i>
+            </span>
+            Alertas de Irregularidad
+        </h3>
+        <span class="stats-alert-badge-count">
+            {{ alertas_estadisticas|length }} {% if alertas_estadisticas|length == 1 %}alerta{% else %}alertas{% endif %}
+        </span>
+    </div>
+
+    <div class="stats-alert-grid">
+        {% for alerta in alertas_estadisticas %}
+        {% set icono_pub = iconos_estadisticas.get(alerta.metric, 'bi-graph-up-arrow') %}
+        <div class="stats-alert-item">
+            <div class="stats-alert-info">
+                <span class="stats-alert-metric">
+                    <i class="bi {{ icono_pub }}"></i>{{ alerta.metric_label }}
+                </span>
+                <span class="stats-alert-location">
+                    <i class="bi bi-building"></i> {{ alerta.location_name }}
+                </span>
+            </div>
+            <div class="stats-alert-metrics">
+                <span class="stats-val-current">${{ alerta.valor_usd|ph_amount }}</span>
+                <span class="stats-val-min">
+                    Promedio 3 previos: ${{ alerta.promedio_usd|ph_amount }}
+                    <span class="stats-variacion">+{{ alerta.variacion_pct }}%</span>
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

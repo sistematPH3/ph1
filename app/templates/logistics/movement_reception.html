@@ -1,0 +1,284 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=93">
+
+<div class="reception-page-wrapper">
+    <div class="ph-card">
+        
+        <div class="ph-card-header">
+            <div class="header-left">
+                <div class="header-icon-box">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                        <path d="m3.3 7 8.7 5 8.7-5"/>
+                        <path d="M12 22V12"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="ph-title">Recepción Física de Traslado</h1>
+                    <p class="ph-subtitle">Inspección de carga en muelle, evaluación cualitativa por insumo e ingreso a estantería</p>
+                </div>
+            </div>
+            <div class="header-badge-tag">
+                Guía #{{ movement.id }}
+            </div>
+        </div>
+
+        <div class="route-hero-card">
+            <div class="route-node">
+                <div class="node-icon-wrapper">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 21h18M3 7v14M21 7v14M6 11h4M6 15h4M14 11h4M14 15h4M9 3h6v4H9z"/>
+                    </svg>
+                </div>
+                <div class="node-content">
+                    <span class="node-label node-label-origin">Sede Remitente (Origen)</span>
+                    <span class="node-name">{{ movement.origin_name }}</span>
+                </div>
+            </div>
+
+            <div class="route-connector">
+                <span class="connector-line"></span>
+                <div class="connector-pill">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <span class="connector-line"></span>
+            </div>
+
+            <div class="route-node">
+                <div class="node-icon-wrapper node-dest">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l1.5-6h15L21 9v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/>
+                        <path d="M3 9h18"/>
+                        <path d="M9 22V12h6v10"/>
+                    </svg>
+                </div>
+                <div class="node-content">
+                    <span class="node-label node-label-dest">Sede Receptora (Destino)</span>
+                    <span class="node-name">{{ movement.destination_name }}</span>
+                </div>
+            </div>
+        </div>
+
+        <form id="receptionForm" data-movement-id="{{ movement.id }}" data-origin-name="{{ movement.origin_name }}" data-destination-name="{{ movement.destination_name }}">
+            
+            <div class="table-container">
+                <table class="ph-table">
+                    <thead>
+                        <tr>
+                            <th>Insumo / SKU</th>
+                            <th>Lote y Vencimiento Guía</th>
+                            <th class="text-right">Despachado</th>
+                            <th class="text-right">Recibido Conforme ✎</th>
+                            <th class="text-right">Diferencia</th>
+                            <th>Condición del Insumo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in details %}
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-origin-stock="{{ item.origin_stock | default(0) }}">
+                            <td data-label="Insumo">
+                                <div class="product-cell">
+                                    <span class="product-title">{{ item.product_name }}</span>
+                                    <span class="product-sku-code">{{ item.sku }}</span>
+                                </div>
+                            </td>
+                            <td data-label="Lote / Fecha">
+                                <div class="lot-cell">
+                                    <span class="lot-pill">{{ item.lot_number or 'S/L' }}</span>
+                                    <span class="date-text">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                </div>
+                            </td>
+                            <td class="text-right font-semibold" data-label="Despachado">
+                                <span class="qty-dispatched-val">{{ "%.2f"|format(item.quantity) }}</span>
+                                <span class="unit-tag">{{ item.unit_of_measure }}</span>
+                            </td>
+                            <td class="text-right" data-label="Recibido">
+                                <div class="qty-input-wrapper">
+                                    <div class="input-editable-box">
+                                        <svg class="edit-hint-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                        </svg>
+                                        <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0" 
+                                            class="ph-input-number input-received" 
+                                            value="{{ "%.2f"|format(item.quantity) }}"
+                                            required
+                                        >
+                                    </div>
+                                    <span class="input-unit">{{ item.unit_of_measure }}</span>
+                                </div>
+                            </td>
+                            <td class="text-right" data-label="Diferencia">
+                                <span class="diff-badge diff-ok">0.00</span>
+                            </td>
+                            <td data-label="Condición">
+                                <div class="item-condition-wrapper">
+                                    <select class="form-select form-select-sm select-item-condition">
+                                        <option value="CONFORME" selected>Conforme (Buen Estado)</option>
+                                        <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre)</option>
+                                        <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
+                                        <option value="INCIDENCIA_TEMPERATURA">Ruptura Cadena de Frío</option>
+                                        <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
+                                        <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
+                                        <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
+                                        <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Espacio</option>
+                                    </select>
+                                    <div class="row-lot-mismatch hidden mt-1">
+                                        <div class="single-lot-field">
+                                            <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real del insumo que se queda...">
+                                            <div class="lot-exp-lookup hidden mt-1">
+                                                <span class="lot-exp-label">Venc. del lote:</span>
+                                                <input type="date" class="form-control form-control-sm input-row-exp font-monospace" placeholder="AAAA-MM-DD">
+                                                <span class="lot-exp-hint text-muted small"></span>
+                                            </div>
+                                        </div>
+                                        <div class="surplus-lots hidden">
+                                            <button type="button" class="btn btn-sm btn-outline-primary w-100 d-flex justify-content-between align-items-center btn-toggle-surplus-lots">
+                                                <span class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-box-seam"></i> Lote(s) del sobrante
+                                                </span>
+                                                <i class="bi bi-chevron-down surplus-caret"></i>
+                                            </button>
+                                            <div class="surplus-lot-body mt-1">
+                                                <div class="surplus-lot-guide small text-muted">
+                                                    <i class="bi bi-info-circle me-1"></i>
+                                                    Escriba el lote real del sobrante; el sistema lo reconoce y toma su fecha de vencimiento.
+                                                </div>
+                                                <div class="surplus-summary small"></div>
+                                                <div class="surplus-lot-list d-flex flex-column gap-1 mt-1"></div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-add-surplus-lot mt-1">
+                                                    + Agregar otro lote del sobrante
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="novelty-interactive-panel" id="smartNoveltyPanel">
+                <div class="panel-header-row">
+                    <div class="panel-title-with-icon">
+                        <div class="panel-mini-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="panel-subtitle">Diagnóstico y Justificación de Muelle</h2>
+                            <span class="panel-desc">Resumen consolidado generado a partir de la inspección por renglón</span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" id="btnShowErroneous" class="btn btn-sm btn-outline-danger rounded-pill fw-bold">
+                            <i class="bi bi-box-seam me-1"></i> Registrar Insumo Entregado por Error
+                        </button>
+                        <span id="noveltyStatusBadge" class="status-pill pill-ok">Recepción Conforme</span>
+                    </div>
+                </div>
+                
+                <div class="form-grid-2col">
+                    <div class="input-card-box">
+                        <label class="ph-label" for="noveltyType">Clasificación General del Despacho</label>
+                        <select id="noveltyType" class="ph-select">
+                            <option value="CONFORME">Recepción Conforme (Sin Discrepancia)</option>
+                            <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre Físico)</option>
+                            <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
+                            <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
+                            <option value="INCIDENCIA_TEMPERATURA">Ruptura de Cadena de Frío</option>
+                            <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
+                            <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
+                            <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
+                            <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Falta de Espacio</option>
+                            <option value="INCIDENCIA_MIXTA">Incidencia Mixta (Múltiples Novedades)</option>
+                        </select>
+                        <span class="field-help-text" id="noveltyHelpText">Carga completa y en condiciones óptimas. Se acredita en destino.</span>
+                    </div>
+
+                    <div class="input-card-box">
+                        <label class="ph-label" for="receptionNotes">
+                            Notas de Muelle / Justificación
+                            <span id="notesRequiredFlag" class="flag-required hidden">* (Obligatorio por novedad detectada)</span>
+                        </label>
+                        <textarea 
+                            id="receptionNotes" 
+                            class="ph-textarea" 
+                            placeholder="Observaciones generales de recepción (opcional)..."
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div id="dynamicProtocolGuideBox" class="protocol-guide-box card-ok-guide mt-3">
+                    <div class="protocol-guide-title" id="protocolGuideTitle">
+                        <i class="bi bi-info-circle-fill"></i> Protocolo Operativo: Recepción Conforme
+                    </div>
+                    <div class="protocol-guide-body" id="protocolGuideBody">
+                        Todos los renglones coinciden exactamente con la orden digital. La totalidad de los insumos ingresará de inmediato al disponible operativo de la sede.
+                    </div>
+                </div>
+
+                <div id="erroneousProductSection" class="erroneous-section-card hidden mt-3 p-3 border rounded-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <h6 class="fw-bold text-danger mb-0">
+                            <i class="bi bi-box-seam me-1"></i> Insumos Físicos No Solicitados (Entregados por Error)
+                        </h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill fw-bold" id="btnAddErroneousItem">
+                            <i class="bi bi-plus-lg me-1"></i> Agregar Insumo Erróneo
+                        </button>
+                    </div>
+
+                    <div id="erroneousItemsList" class="d-flex flex-column gap-2 mb-2">
+                    </div>
+
+                    <small class="text-muted d-block mt-1">
+                        * Nota: Toda mercancía no solicitada permanecerá en resguardo temporal sin ingresar a producción hasta que el Administrador dicte su retorno formal a Central[cite: 4].
+                    </small>
+                </div>
+            </div>
+
+            <div id="receptionAlertBox" class="alert-box hidden"></div>
+
+            <div class="form-actions">
+                <a href="/logistics/movements" class="btn-ph-secondary">Cancelar</a>
+                <button type="submit" id="btnSubmitReception" class="btn-ph-primary">Confirmar y Asentar Stock</button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<select id="catalogOptionsTemplate" class="d-none">
+    <option value="" selected disabled>-- Seleccione el producto entregado --</option>
+    {% for prod in catalog_products %}
+    <option value="{{ prod.id }}" data-sku="{{ prod.sku }}" data-unit="{{ prod.unit_of_measure }}">{{ prod.name }} ({{ prod.sku }})</option>
+    {% endfor %}
+</select>
+
+<div id="confirmModal" class="modal-backdrop-custom hidden">
+    <div class="modal-card-custom">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+            <h3 class="modal-title-custom mb-0">
+                <i class="bi bi-shield-check text-danger me-2"></i>Certificación de Descarga en Muelle
+            </h3>
+        </div>
+        <div class="modal-body-custom" id="confirmModalContent">
+        </div>
+        <div class="modal-actions-custom border-top pt-3 mt-3">
+            <button type="button" id="btnCancelModal" class="btn-ph-secondary">Revisar Nuevamente</button>
+            <button type="button" id="btnAcceptModal" class="btn-ph-primary">Certificar y Asentar Stock</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=96"></script>
+{% endblock %}

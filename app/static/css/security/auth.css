@@ -1,0 +1,24 @@
+/* FUENTES COMPARTIDAS */
+@font-face {
+    font-family: 'Agbalumo';
+    src: url("../../fonts/Agbalumo-Regular.ttf") format('truetype');
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url("../../fonts/Inter-Regular.ttf") format('truetype');
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url("../../fonts/Inter-Bold.ttf") format('truetype');
+    font-weight: bold;
+}
+
+/* RESET BÁSICO */
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}

@@ -1,0 +1,85 @@
+from datetime import datetime
+
+# La sede Central (id fijo 1) es la única que compra y despacha a las sedes.
+# Las demás sedes SOLO RECIBEN: únicamente se permite que devuelvan mercancía
+# al Almacén Central (regla de negocio).
+CENTRAL_LOCATION_ID = 1
+
+class MovementDispatchValidator:
+
+    @staticmethod
+    def validate_dispatch_payload(data):
+        errors = []
+
+        if not data or not isinstance(data, dict):
+            return False, ["No se recibieron datos válidos en la solicitud."]
+
+        origin_id = data.get('origin_location_id')
+        destination_id = data.get('destination_location_id')
+        items = data.get('items', [])
+
+        if not origin_id or not str(origin_id).isdigit() or int(origin_id) <= 0:
+            errors.append("Debe seleccionar una sede de origen válida.")
+
+        if not destination_id or not str(destination_id).isdigit() or int(destination_id) <= 0:
+            errors.append("Debe seleccionar una sede de destino válida.")
+
+        if (not errors and origin_id and destination_id
+                and str(origin_id).isdigit() and str(destination_id).isdigit()
+                and int(origin_id) == int(destination_id)):
+            errors.append("La sede de origen y la sede de destino no pueden ser la misma.")
+
+        # REGLA DE NEGOCIO: solo la Central despacha. Una sede común no puede
+        # enviar a otra sede; solo está permitida la devolución hacia el Central.
+        if (not errors and origin_id and destination_id
+                and str(origin_id).isdigit() and str(destination_id).isdigit()):
+            origin_int = int(origin_id)
+            destination_int = int(destination_id)
+            if origin_int != CENTRAL_LOCATION_ID and destination_int != CENTRAL_LOCATION_ID:
+                errors.append(
+                    "Solo el Almacén Central despacha mercancía entre sedes. "
+                    "Una sede solamente puede devolver productos al Almacén Central.")
+
+        # Campo opcional: si el despacho se genera como reposición complementaria
+        # desde una disputa, debe venir un identificador numérico válido.
+        source_dispute_id = data.get('source_dispute_id')
+        if source_dispute_id is not None:
+            if not str(source_dispute_id).isdigit() or int(source_dispute_id) <= 0:
+                errors.append("El identificador de la disputa de origen no es válido.")
+
+        if not items or not isinstance(items, list) or len(items) == 0:
+            errors.append("El despacho debe incluir al menos un producto en el detalle.")
+        elif len(items) > 25:
+            errors.append("El despacho no puede exceder los 25 renglones por orden.")
+        else:
+            for index, item in enumerate(items, start=1):
+                product_id = item.get('product_id')
+                quantity = item.get('quantity')
+                lot_number = item.get('lot_number')
+                expiration_date = item.get('expiration_date')
+
+                if not product_id or not str(product_id).isdigit() or int(product_id) <= 0:
+                    errors.append(f"Línea {index}: Debe seleccionar un producto válido.")
+
+                try:
+                    qty = float(quantity)
+                    if qty <= 0.001:
+                        errors.append(f"Línea {index}: La cantidad debe ser mayor a cero.")
+                    elif qty > 999999.99:
+                        errors.append(f"Línea {index}: La cantidad excede el límite numérico permitido.")
+                except (ValueError, TypeError):
+                    errors.append(f"Línea {index}: La cantidad especificada no es un número válido.")
+
+                if not lot_number or not isinstance(lot_number, str) or not lot_number.strip():
+                    errors.append(f"Línea {index}: El número de lote es obligatorio.")
+
+                if expiration_date:
+                    try:
+                        datetime.strptime(expiration_date, '%Y-%m-%d')
+                    except ValueError:
+                        errors.append(f"Línea {index}: La fecha de vencimiento debe tener formato AAAA-MM-DD.")
+
+        if errors:
+            return False, errors
+
+        return True, None

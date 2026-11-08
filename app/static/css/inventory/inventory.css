@@ -1,0 +1,359 @@
+:root {
+    --ph-red: #b01212;
+    --ph-red-hover: #8c0e0e;
+    --ph-red-light: #fdf2f2;
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-bg-main: #F1F5F9;
+    --ph-border-soft: #E2E8F0;
+}
+
+.container-fluid {
+    background-color: var(--ph-bg-main) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.custom-card-list {
+    background-color: #FFFFFF !important;
+    border-radius: 24px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    padding: 2rem !important;
+}
+
+.brand-icon-box {
+    background-color: var(--ph-red) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(176, 18, 18, 0.2) !important;
+}
+
+.module-title-text {
+    font-size: 1.75rem;
+}
+
+.btn-mariuska-red {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.btn-mariuska-red:hover {
+    background-color: var(--ph-red-hover) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 0 14px rgba(176, 18, 18, 0.45) !important; 
+}
+
+.btn-action-edit {
+    height: 36px;
+    padding: 0 16px;
+    background-color: #f8f9fa;
+    color: var(--ph-text-soft, #4B5563);
+    border: 1px solid var(--ph-border-soft, #E2E8F0);
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+}
+
+.btn-action-edit:hover {
+    background-color: var(--ph-red-light, #fdf2f2) !important;
+    color: var(--ph-red, #b01212) !important;
+    border-color: rgba(176, 18, 18, 0.2) !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 8px rgba(176, 18, 18, 0.08);
+}
+
+.btn-action-edit i {
+    line-height: 1;
+}
+
+#genericTable {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+}
+
+#genericTable .content-table-header th {
+    background-color: var(--ph-red) !important;
+    color: #FFFFFF !important;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.5px;
+    padding: 14px 16px !important;
+    border-bottom: 2px solid var(--ph-border-soft) !important;
+    text-transform: uppercase;
+}
+
+#genericTable .content-table-header th:first-child {
+    border-top-left-radius: 14px !important;
+}
+#genericTable .content-table-header th:last-child {
+    border-top-right-radius: 14px !important;
+}
+
+#genericTable td {
+    padding: 16px !important;
+    border-bottom: 1px solid var(--ph-border-soft) !important;
+    color: var(--ph-text-main) !important;
+    font-size: 0.88rem;
+    background-color: #FFFFFF;
+}
+
+#genericTable td .badge {
+    font-size: 0.82rem !important;
+    padding: 6px 14px !important;
+}
+
+.main-product-row {
+    transition: background-color 0.15s ease;
+}
+.main-product-row:hover td {
+    background-color: #F8FAFC !important;
+}
+
+.main-product-row.row-inhabilitada td {
+    background-color: #FAFAFA !important;
+    color: var(--ph-text-muted) !important;
+}
+
+.main-product-row.row-inhabilitada td:first-child {
+    box-shadow: inset 4px 0 0 #D97706 !important;
+}
+
+.row-inhabilitada .badge.bg-light {
+    opacity: 0.6;
+}
+
+.row-technical-details td {
+    background-color: #F8FAFC !important;
+    border-bottom: 1px solid var(--ph-border-soft) !important;
+}
+
+.row-technical-details div {
+    border-left: 4px solid var(--ph-red) !important;
+}
+
+.mariuska-custom-switch:checked {
+    background-color: var(--ph-red) !important;
+    border-color: var(--ph-red) !important;
+}
+.mariuska-custom-switch:focus {
+    box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.15) !important;
+}
+
+.mariuska-select-group {
+    border: 1px solid var(--ph-border-soft) !important;
+    background-color: #FFFFFF !important;
+    border-radius: 50px !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.mariuska-select-group:focus-within {
+    border-color: var(--ph-red) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
+}
+
+.product-clickable-cell {
+    cursor: pointer;
+}
+
+#categorySearchInput, #searchInput {
+    border: none !important;
+    background-color: #f8f9fa !important;
+    transition: all 0.3s ease-in-out !important;
+    color: var(--ph-text-main, #1F2937) !important;
+}
+
+#categorySearchInput:focus, #searchInput:focus {
+    border-color: var(--ph-red, #b01212) !important;
+    box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
+    background-color: #ffffff !important;
+    outline: none !important;
+}
+
+/* ==========================================================================
+   BUSCADOR + FILTRO LADO A LADO (Cintillo de Gestión de Insumos)
+   Mantiene buscador y filtro en una sola fila incluso en móvil.
+   ========================================================================== */
+.ph-filters-cintillo .d-flex.justify-content-between {
+    flex-wrap: nowrap !important;
+}
+
+@media (max-width: 767.98px) {
+    .ph-filters-cintillo .d-flex.justify-content-between {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        flex: 1 1 auto !important;
+    }
+
+    .ph-filters-cintillo .mariuska-select-group {
+        min-width: 0 !important;
+        width: auto !important;
+        flex: 0 0 auto !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .ph-filters-cintillo .mariuska-select-group select {
+        max-width: 130px;
+        text-overflow: ellipsis;
+    }
+}
+
+/* ==========================================================================
+   VISTA DE TELÉFONO - SE ACTIVA EN PANTALLAS MENORES A 768px
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .module-title-text {
+        font-size: 1.4rem !important;
+        line-height: 1.2;
+    }
+    
+    .brand-icon-box {
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0.5rem !important;
+    }
+    
+    .brand-icon-box i {
+        font-size: 1.25rem !important;
+    }
+    
+    .btn-mariuska-red {
+        width: 100% !important;
+        justify-content: center !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .mariuska-select-group {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .content-table-header {
+        display: none !important;
+    }
+    
+    #genericTable, #genericTable tbody,
+    #genericTable tr.d-md-none, #genericTable tr.d-md-none td,
+    .alert-row, .alert-row td,
+    .generic-pagination-row, .generic-pagination-row td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    .mobile-card-item {
+        background-color: #ffffff;
+        border: 1px solid var(--ph-border-soft);
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-card-item.row-inhabilitada {
+        background-color: #FAFAFA !important;
+        opacity: 0.85;
+        border-left: 4px solid #D97706 !important;
+    }
+}
+
+/* ==========================================================================
+   VISTA DE PC - SE ACTIVA EN PANTALLAS GRANDES DESDE 768px
+   ========================================================================== */
+@media (min-width: 768px) {
+    /* Ajuste de Barra de Filtro (Píldora fija, protegida contra aplastamiento y desplazada) */
+    .mariuska-select-group {
+        width: 240px !important; /* Ancho fijo perfecto para que el texto nunca se corte */
+        flex-shrink: 0 !important; /* Evita que el buscador gigante lo comprima */
+        margin-left: auto !important; /* Lo empuja hacia el lado derecho */
+        margin-right: 5rem !important; /* ¡CORRECCIÓN! Lo separa del borde y lo mueve a la izquierda */
+    }
+
+    /* Ajuste de Botones superiores (Más grandes y alineación derecha) */
+    .btn-mariuska-red {
+        font-size: 0.96rem !important;
+        padding: 0.55rem 1.7rem !important;
+        width: auto !important;
+    }
+}
+
+/* Limpieza de la fila de paginación para eliminar hovers fantasmas */
+#genericTable .generic-pagination-row td {
+    padding: 0 !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+#genericTable .generic-pagination-row:hover td {
+    background-color: transparent !important;
+}
+/* ==========================================================================
+   VISTA TABLET - OPTIMIZACIÓN COMPACTA PARA GESTIÓN DE INSUMOS
+   ========================================================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .custom-card-list {
+        padding: 1.25rem !important;
+    }
+
+    /* Píldora estable: subimos a 220px y evitamos que colapse */
+    .mariuska-select-group {
+        width: 220px !important;
+        flex-shrink: 0 !important;
+        margin-right: 7rem !important;
+    }
+
+    /* Protegemos el texto y la flecha internamente */
+    .mariuska-select-group .form-select {
+        font-size: 0.82rem !important; /* Letra ligeramente más compacta */
+        padding-right: 2rem !important; /* Espacio exclusivo para que la flecha no toque el texto */
+    }
+
+    .btn-mariuska-red {
+        font-size: 0.84rem !important;
+        padding: 0.45rem 1.1rem !important;
+    }
+
+    #genericTable td, 
+    #genericTable .content-table-header th {
+        padding: 10px 8px !important;
+        font-size: 0.80rem !important;
+    }
+
+    #genericTable .content-table-header th {
+        font-size: 0.72rem !important;
+    }
+
+    #genericTable td .badge {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+    }
+
+    .btn-action-edit {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 0.78rem;
+    }
+}

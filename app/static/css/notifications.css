@@ -1,0 +1,379 @@
+/* =========================================================
+   NOTIFICACIONES DE NOVEDADES / ARBITRAJE
+   - Círculo rojo del sidebar ("Arbitraje de Disputas")
+   - Avisos emergentes del dashboard (toasts)
+   ========================================================= */
+
+/* --- Círculo rojo del sidebar --- */
+.dispute-sub-link {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dispute-badge {
+    flex-shrink: 0;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background-color: #e31937;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #131517, 0 0 6px rgba(227, 25, 55, 0.7);
+    animation: dispute-badge-pop 0.35s ease;
+}
+
+.dispute-badge[hidden] {
+    display: none !important;
+}
+
+@keyframes dispute-badge-pop {
+    0%   { transform: scale(0.2); }
+    70%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
+/* --- Contenedor de toasts (fijo, arriba a la derecha) --- */
+.dispute-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2050; /* por encima de la barra lateral (1200) */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: min(380px, calc(100vw - 40px));
+}
+
+/* --- Tarjeta del aviso --- */
+.dispute-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background-color: #ffffff;
+    color: #212529;
+    border: 1px solid #e9ecef;
+    border-left: 5px solid #e31937;
+    border-radius: 12px;
+    padding: 14px 14px 14px 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    overflow: hidden;
+    animation: dispute-toast-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1);
+}
+
+.dispute-toast.is-leaving {
+    animation: dispute-toast-out 0.4s ease forwards;
+}
+
+@keyframes dispute-toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(120%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes dispute-toast-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(120%);
+    }
+}
+
+.dispute-toast-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #fde7ea;
+    color: #e31937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+}
+
+.dispute-toast-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.dispute-toast-title {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #1f2429;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.dispute-toast-message {
+    font-size: 0.84rem;
+    color: #5c636a;
+    line-height: 1.35;
+    word-wrap: break-word;
+}
+
+.dispute-toast-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #8a9099;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.dispute-toast-close:hover {
+    color: #e31937;
+    background-color: #f8f9fa;
+}
+
+.dispute-toast-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background-color: #e31937;
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+    .dispute-toast-container {
+        top: 80px;
+        right: 12px;
+        max-width: calc(100vw - 24px);
+    }
+}
+
+/* =========================================================
+   CAMPANA DE RESPUESTAS DEL ADMINISTRADOR (RECEPTORES)
+   ========================================================= */
+.response-bell {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 2040;
+}
+
+.response-bell-btn {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background-color: #1f2429;
+    color: #ffffff;
+    font-size: 1.45rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    transition: background-color 0.2s, transform 0.15s;
+}
+
+.response-bell-btn:hover {
+    background-color: #e31937;
+    transform: scale(1.05);
+}
+
+/* Sacudida breve cuando llega una respuesta nueva */
+.response-bell-btn.bell-shake {
+    animation: response-bell-shake 0.6s ease;
+    background-color: #e31937;
+}
+
+@keyframes response-bell-shake {
+    0%   { transform: rotate(0deg); }
+    20%  { transform: rotate(-14deg); }
+    40%  { transform: rotate(12deg); }
+    60%  { transform: rotate(-9deg); }
+    80%  { transform: rotate(6deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Pulso suave cuando hay respuestas sin leer */
+.response-bell-btn.has-unread::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid #e31937;
+    animation: response-bell-ring 2s ease-out infinite;
+}
+
+@keyframes response-bell-ring {
+    0%   { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.45); opacity: 0; }
+}
+
+.response-bell-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background-color: #e31937;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    border: 2px solid #ffffff;
+}
+
+.response-bell-badge[hidden] {
+    display: none !important;
+}
+
+/* --- Panel desplegable --- */
+.response-bell-panel {
+    position: absolute;
+    bottom: 68px;
+    right: 0;
+    width: min(360px, calc(100vw - 48px));
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: response-bell-in 0.25s ease;
+}
+
+.response-bell-panel[hidden] {
+    display: none !important;
+}
+
+@keyframes response-bell-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.response-bell-panel-header {
+    display: flex;
+    align-items: center;
+    background-color: #1f2429;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 12px 16px;
+}
+
+.response-bell-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.response-bell-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f3f5;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.response-bell-item:hover {
+    background-color: #fde7ea;
+}
+
+.response-bell-item-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #1f2429;
+}
+
+.response-bell-item-tag {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #b18721;
+    background-color: #fdf3d1;
+    border-radius: 999px;
+    padding: 1px 8px;
+    vertical-align: middle;
+}
+
+.response-bell-item-totals {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1f2429;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin-top: 6px;
+}
+
+.response-bell-item-sub {
+    font-size: 0.78rem;
+    color: #5c636a;
+    margin: 2px 0;
+}
+
+.response-bell-item-notes {
+    font-size: 0.78rem;
+    color: #8a9099;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.response-bell-empty {
+    padding: 22px 16px;
+    text-align: center;
+    color: #8a9099;
+    font-size: 0.85rem;
+}
+
+.response-bell-empty i {
+    font-size: 1.4rem;
+    display: block;
+    margin-bottom: 6px;
+    color: #c3c9d0;
+}
+
+.response-bell-viewall {
+    display: block;
+    text-align: center;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    color: #e31937;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    border-top: 1px solid #f1f3f5;
+}
+
+.response-bell-viewall:hover {
+    background-color: #fde7ea;
+    color: #e31937;
+}

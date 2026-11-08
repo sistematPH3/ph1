@@ -1,0 +1,219 @@
+{% extends 'base_list.html' %} 
+
+{% block title %}Insumos | Sistema de Gestion PH{% endblock %}
+
+{% block extra_css %}
+    {{ super() }}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.1">
+{% endblock %}
+
+{% block search_input_id %}searchInput{% endblock %}
+{% block search_placeholder %}Buscar por nombre o SKU...{% endblock %}
+
+{% block icon_class %}bi-boxes{% endblock %}
+
+{% block title_list %}
+    Menú de Insumos
+{% endblock %}
+
+{% block flash_messages %}{% endblock %}
+
+
+{% block actions_top %}
+    <div class="d-flex flex-column flex-md-row justify-content-md-end gap-2 w-100 w-md-auto">
+        <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-mariuska-red d-flex align-items-center justify-content-center gap-2">
+            <i class="bi bi-tags"></i> Ver Categorías
+        </a>
+        <a href="{{ url_for('inventory.create_product') }}" class="btn btn-mariuska-red d-flex align-items-center justify-content-center gap-2">
+            <i class="bi bi-plus-lg"></i> Nuevo Insumo
+        </a>
+    </div>
+{% endblock %}
+
+{% block actions_filter %}
+    <div class="input-group mariuska-select-group bg-white px-3 py-1">
+        <span class="input-group-text bg-transparent border-0 text-muted ps-1 pe-1">
+            <i class="bi bi-funnel"></i>
+        </span>
+        <select id="statusSelect" class="form-select border-0 py-1 ps-1 pe-3 bg-transparent cursor-pointer text-muted" style="font-size: 0.88rem; outline: none; box-shadow: none;">
+            <option value="all">Todos los estatus</option>
+            <option value="active">Operativa</option>
+            <option value="inactive">Inactiva</option>
+        </select>
+    </div>
+{% endblock %}
+
+{% block table_head %}
+    <th class="text-center text-uppercase tracking-wider">SKU</th>
+    <th class="text-center text-uppercase tracking-wider">Nombre del Insumo</th>
+    <th class="text-center text-uppercase tracking-wider">Categoría</th>
+    <th class="text-center text-uppercase tracking-wider">U. Medida</th>
+    <th class="text-center text-uppercase tracking-wider">Límite de Merma</th>
+    <th class="text-center text-uppercase tracking-wider">Estatus Operativo</th>
+    <th class="text-center pe-4 text-uppercase tracking-wider" style="width: 140px;">Acciones</th>
+{% endblock %}
+
+{% block table_body %}
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <tr class="border-0 alert-row d-md-table-row">
+                    <td colspan="7" class="border-0 p-2 d-block d-md-table-cell">
+                        <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-2 py-2" role="alert">
+                            <small class="fw-semibold">{{ message }}</small>
+                            <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <tr id="noResultsRow" style="display: none;">
+        <td colspan="7" class="text-center text-muted py-5 bg-white border-0">
+            <div class="py-4">
+                <div class="mb-3">
+                    <i class="bi bi-exclamation-triangle display-4 text-warning opacity-75"></i>
+                </div>
+                <span class="fs-5 fw-bold text-secondary d-block mb-1">Insumo o SKU no registrado</span>
+                <span class="fs-6 text-muted d-block font-weight-normal">Verifica el nombre o asegúrate de registrar este nuevo insumo.</span>
+            </div>
+        </td>
+    </tr>
+
+    {% if products %}
+        {% for product in products %}
+            <tr class="main-product-row d-none d-md-table-row {% if not product.is_active %}row-inhabilitada{% endif %} border-bottom" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
+                <td class="text-center product-clickable-cell">
+                    <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold fs-7">{{ product.sku }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <span class="fw-bold text-dark fs-6">{{ product.name }}</span>
+                        {% if product.technical_description %}
+                            <i class="bi bi-chevron-compact-down text-muted info-indicator-icon"></i>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <span class="text-secondary fs-6">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    <span class="badge bg-light text-secondary border px-2 py-1 fs-7">{{ product.unit_of_measure }}</span>
+                </td>
+                <td class="text-center product-clickable-cell">
+                    {% if product.waste_limit is not none %}
+                        <span class="badge bg-light text-dark border px-2 py-1 fs-7">{{ product.waste_limit }} {{ product.unit_of_measure }}</span>
+                    {% else %}
+                        <span class="text-muted fs-7">—</span>
+                    {% endif %}
+                </td>
+                <td class="text-center status-badge-cell product-clickable-cell">
+                    {% if product.is_active %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Operativa</span>
+                    {% else %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1 font-weight-medium fs-7 status-badge">Inactiva</span>
+                    {% endif %}
+                </td>
+                <td class="text-center pe-4" style="width: 140px; white-space: nowrap;">
+                    <div class="d-flex justify-content-center align-items-center gap-3 flex-nowrap">
+                        <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn-action-edit d-inline-flex align-items-center text-decoration-none" title="Editar Insumo">
+                            <i class="bi bi-pencil-square fs-5"></i>
+                        </a>
+                        <div class="form-check form-switch m-0 p-0 d-inline-flex align-items-center">
+                            <input class="form-check-input mariuska-custom-switch toggle-status-switch cursor-pointer m-0" 
+                                type="checkbox" 
+                                role="switch" 
+                                data-url="{{ url_for('inventory.toggle_product_status', product_id=product.id) }}"
+                                {% if product.is_active %}checked{% endif %}>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+
+            <tr id="tech-desc-{{ product.id }}" class="collapse row-technical-details d-none d-md-table-row bg-light-subtle">
+                <td colspan="7" class="p-0">
+                    <div class="px-5 py-3 border-start border-4 border-mariuska text-dark animate-fade-in">
+                        <div class="fw-bold mb-1 text-uppercase text-secondary fs-7 tracking-wider">
+                            <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica y Preservación:
+                        </div>
+                        <p class="m-0 text-muted fs-6 lh-base">
+                            {{ product.technical_description if product.technical_description else 'No se ha registrado ninguna especificación técnica de almacenamiento para este insumo.' }}
+                        </p>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+
+        <tr class="d-md-none p-0 border-0 bg-transparent">
+            <td colspan="7" class="p-0 border-0 bg-transparent">
+                <div id="mobileProductsContainer">
+                    {% for product in products %}
+                    <div class="mobile-card-item main-product-row-mobile {% if not product.is_active %}row-inhabilitada{% endif %}" data-id="{{ product.id }}" data-status="{{ 'active' if product.is_active else 'inactive' }}">
+                        <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+                            <div>
+                                <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1 font-monospace fw-bold mb-1">{{ product.sku }}</span>
+                                <h6 class="fw-bold text-dark m-0">{{ product.name }}</h6>
+                                <span class="text-secondary small">{{ product.product_type.name if product.product_type else 'Sin Categoría' }}</span>
+                                {% if product.waste_limit is not none %}
+                                    <span class="d-block text-secondary small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Límite de merma: <strong>{{ product.waste_limit }} {{ product.unit_of_measure }}</strong></span>
+                                {% endif %}
+                            </div>
+                            <div class="status-badge-cell-mobile">
+                                {% if product.is_active %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 status-badge" style="font-size: 0.75rem;">Operativa</span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1 status-badge" style="font-size: 0.75rem;">Inactiva</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                            <button class="btn btn-sm btn-light border flex-grow-1 text-muted fw-bold" data-bs-toggle="collapse" data-bs-target="#tech-desc-mobile-{{ product.id }}">
+                                <i class="bi bi-info-circle"></i> Info
+                            </button>
+                            <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-sm btn-light border flex-grow-1 text-muted fw-bold">
+                                <i class="bi bi-pencil-square"></i> Editar
+                            </a>
+                            <div class="form-check form-switch m-0 d-flex align-items-center justify-content-center border rounded px-3 bg-light">
+                                <input class="form-check-input mariuska-custom-switch toggle-status-switch m-0 cursor-pointer" 
+                                    type="checkbox" 
+                                    role="switch" 
+                                    data-url="{{ url_for('inventory.toggle_product_status', product_id=product.id) }}"
+                                    {% if product.is_active %}checked{% endif %}>
+                            </div>
+                        </div>
+
+                        <div id="tech-desc-mobile-{{ product.id }}" class="collapse mt-3 row-technical-details-mobile">
+                            <div class="p-3 bg-light-subtle border-start border-4 border-mariuska rounded">
+                                <div class="fw-bold mb-1 text-uppercase text-secondary" style="font-size: 0.7rem;">
+                                    <i class="bi bi-shield-exclamation me-1"></i> Especificación Técnica
+                                </div>
+                                <p class="m-0 text-muted small lh-base">
+                                    {{ product.technical_description if product.technical_description else 'No se ha registrado ninguna especificación técnica de almacenamiento para este insumo.' }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </td>
+        </tr>
+    {% endif %}
+
+    <tr class="border-0 generic-pagination-row d-md-table-row d-block">
+        <td colspan="7" class="border-0 bg-transparent p-0 d-block d-md-table-cell">
+            <div id="paginationWrapper" class="d-flex flex-column align-items-center justify-content-center mt-4 mb-3 gap-2" style="display: none !important;">
+                <nav aria-label="Paginación de insumos">
+                    <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+                </nav>
+                <div class="text-muted fs-7 fw-medium text-center" id="paginationInfo"></div>
+            </div>
+        </td>
+    </tr>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{{ url_for('static', filename='js/inventory/list_products.js') }}?v=3.0"></script>
+{% endblock %}

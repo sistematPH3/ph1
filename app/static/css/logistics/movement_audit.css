@@ -1,0 +1,378 @@
+/* ==========================================================================
+   AUDITORÍA FORENSE DE TRASLADOS - TARJETAS Y LÍNEA DE TIEMPO
+   ========================================================================== */
+
+/* --- Tarjetas (traslados y bajas) --- */
+.ph-audit-card {
+    border-left: 4px solid #af1515;
+    transition: box-shadow 0.2s ease;
+}
+
+.ph-audit-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06) !important;
+}
+
+.ph-audit-card.is-return     { border-left-color: #fd7e14; }
+.ph-audit-card.is-cancelled  { border-left-color: #6c757d; }
+.ph-audit-card.is-baja       { border-left-color: #dc3545; }
+
+/* Círculo con el número de traslado/baja */
+.ph-audit-num {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 50%;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.ph-audit-num.dark   { background-color: #212529; }
+.ph-audit-num.ret    { background-color: #fd7e14; }
+.ph-audit-num.cancel { background-color: #6c757d; }
+.ph-audit-num.baja   { background-color: #dc3545; }
+
+/* --- Línea de tiempo --- */
+.ph-timeline {
+    position: relative;
+    padding-left: 34px;
+}
+
+.ph-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.ph-tl-event {
+    position: relative;
+    margin-bottom: 1.15rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.55rem;
+    border-left: 3px solid transparent;
+    transition: box-shadow 0.2s ease;
+}
+
+.ph-tl-event:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05); }
+
+/* Tinte de fondo por tipo de evento (más color) */
+.ph-tl-event.tint-info      { background: #e7f1ff; border-left-color: #0d6efd; }
+.ph-tl-event.tint-success   { background: #d1e7dd; border-left-color: #198754; }
+.ph-tl-event.tint-warning   { background: #ffe8cc; border-left-color: #fd7e14; }
+.ph-tl-event.tint-danger    { background: #f8d7da; border-left-color: #dc3545; }
+.ph-tl-event.tint-secondary { background: #f1f3f5; border-left-color: #6c757d; }
+
+.ph-tl-dot {
+    position: absolute;
+    left: -34px;
+    top: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.7rem;
+    box-shadow: 0 0 0 4px #fff;
+}
+
+.ph-tl-dot.info      { background-color: #0d6efd; }
+.ph-tl-dot-success   { background-color: #198754; }
+.ph-tl-dot.warning   { background-color: #fd7e14; }
+.ph-tl-dot.danger    { background-color: #dc3545; }
+.ph-tl-dot.secondary { background-color: #6c757d; }
+
+/* Badge de severidad compacto */
+.ph-sev-badge {
+    font-size: 0.68rem;
+}
+
+/* Badge "aviso" (naranja) en lugar del amarillo Bootstrap */
+.ph-badge-warning {
+    background-color: #fd7e14;
+    color: #ffffff;
+}
+
+/* Texto "aviso" naranja en lugar del amarillo Bootstrap */
+.ph-text-warning {
+    color: #fd7e14;
+    font-weight: 600;
+}
+
+.ph-filters-cintillo {
+    background: linear-gradient(90deg, #af1515 0%, #8c1111 100%);
+    border-radius: 0.55rem;
+    padding: 0.7rem 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Badge "Completado": verde sólido (no el verde claro de movement_list) */
+.ph-audit-card .ph-badge-success {
+    background-color: #198754;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.4em 1em;
+    border-radius: 20px;
+}
+
+/* Caja interna de detalle de un evento */
+.ph-tl-detail {
+    background-color: #fafbfc;
+    border-left: 4px solid #af1515;
+    border-radius: 0.5rem;
+}
+
+/* ==========================================================================
+   RESPONSIVE - tablet (<=991.98px): solo compactación. Las tablas siguen
+   enteras y se desplazan horizontalmente dentro de su caja.
+   ========================================================================== */
+@media (max-width: 991.98px) {
+    .container-fluid {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    .ph-card {
+        padding: 1.25rem 1rem;
+        border-radius: 16px;
+    }
+
+    .ph-icon-box {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+
+    .ph-title {
+        font-size: 1.25rem;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE - móvil (<=767.98px): apilado limpio y ordenado
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    .ph-card {
+        padding: 1.1rem 0.85rem;
+    }
+
+    .ph-title {
+        font-size: 1.15rem;
+    }
+
+    /* Recuadro del icono: cuadrado y más grande en móvil */
+    .ph-icon-box {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+        flex-shrink: 0;
+        font-size: 1.5rem;
+    }
+
+    /* ---- Cintillo de filtros: un control por línea, ancho completo ---- */
+    .ph-filters-cintillo {
+        padding: 0.85rem;
+    }
+
+    .ph-filters-cintillo .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        width: 100%;
+        max-width: none !important;
+    }
+
+    .ph-filters-cintillo form {
+        width: 100%;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.6rem !important;
+    }
+
+    .ph-filters-cintillo form > * {
+        width: 100%;
+    }
+
+    .ph-filters-cintillo form > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.15rem !important;
+    }
+
+    .ph-filters-cintillo form a {
+        text-align: center;
+    }
+
+    /* ---- Pestañas: dos botones de ancho igual, sin scroll ---- */
+    .ph-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .ph-tabs .nav-link {
+        width: 100%;
+        text-align: center;
+        white-space: normal;
+    }
+
+    /* ---- Tarjeta de auditoría ---- */
+    .ph-audit-card {
+        padding: 1rem !important;
+    }
+
+    /* Cabecera: título abajo, y estado + última actividad en fila */
+    .ph-audit-card > .d-flex.justify-content-between {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+
+    .ph-audit-card .d-flex.flex-column.align-items-end {
+        flex-direction: row !important;
+        justify-content: space-between;
+        align-items: center !important;
+        width: 100%;
+    }
+
+    .ph-audit-card .btn-ph-info {
+        width: 100%;
+    }
+
+    /* ---- Línea de tiempo ---- */
+    .ph-timeline {
+        padding-left: 26px;
+    }
+
+    .ph-tl-event {
+        margin-bottom: 0.85rem;
+        padding: 0.6rem 0.7rem;
+    }
+
+    .ph-tl-event > .d-flex.justify-content-between {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+    }
+
+    /* Severidad + "Ver Datos" en una sola fila (botón estirable) */
+    .ph-tl-event .d-flex.align-items-center.gap-2 {
+        width: 100%;
+        gap: 0.5rem !important;
+    }
+
+    .ph-tl-event .d-flex.align-items-center.gap-2 .badge {
+        flex: 0 0 auto;
+    }
+
+    .ph-tl-event .btn-outline-dark {
+        flex: 1 1 auto;
+    }
+
+    /* ---- Tablas de detalle: tarjetas con filas etiqueta | valor ---- */
+    .ph-tl-detail .table-responsive,
+    .ph-audit-card .table-responsive {
+        overflow: visible;
+    }
+
+    .ph-tl-detail table, .ph-tl-detail thead, .ph-tl-detail tbody,
+    .ph-tl-detail th, .ph-tl-detail td, .ph-tl-detail tr,
+    .ph-audit-card table, .ph-audit-card thead, .ph-audit-card tbody,
+    .ph-audit-card th, .ph-audit-card td, .ph-audit-card tr {
+        display: block;
+    }
+
+    .ph-tl-detail table,
+    .ph-audit-card table {
+        width: 100% !important;
+    }
+
+    .ph-tl-detail thead,
+    .ph-audit-card thead {
+        display: none;
+    }
+
+    .ph-tl-detail tbody tr,
+    .ph-audit-card tbody tr {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.8rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .ph-tl-detail tbody td,
+    .ph-audit-card tbody td {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 0.3rem 0 !important;
+        border: none !important;
+        text-align: left !important;
+    }
+
+    .ph-tl-detail tbody td::before,
+    .ph-audit-card tbody td::before {
+        flex: 0 0 auto;
+        font-weight: 700;
+        font-size: 0.7rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .ph-tl-detail td[colspan],
+    .ph-audit-card td[colspan] {
+        justify-content: center !important;
+    }
+
+    .ph-tl-detail td[colspan]::before,
+    .ph-audit-card td[colspan]::before {
+        display: none;
+    }
+
+    /* Etiquetas por columna según el tipo de tabla */
+    .ph-tl-detail table.ph-tbl-despacho td:nth-child(1)::before { content: "SKU"; }
+    .ph-tl-detail table.ph-tbl-despacho td:nth-child(2)::before { content: "Producto"; }
+    .ph-tl-detail table.ph-tbl-despacho td:nth-child(3)::before { content: "Lote"; }
+    .ph-tl-detail table.ph-tbl-despacho td:nth-child(4)::before { content: "Vencimiento"; }
+    .ph-tl-detail table.ph-tbl-despacho td:nth-child(5)::before { content: "Cant. Despachada"; }
+
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(1)::before { content: "Producto"; }
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(2)::before { content: "Lote"; }
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(3)::before { content: "Despachada"; }
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(4)::before { content: "Recibida"; }
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(5)::before { content: "Faltante"; }
+    .ph-tl-detail table.ph-tbl-recepcion td:nth-child(6)::before { content: "Novedad"; }
+
+    .ph-tl-detail table.ph-tbl-resolucion td:nth-child(1)::before { content: "Lote"; }
+    .ph-tl-detail table.ph-tbl-resolucion td:nth-child(2)::before { content: "Acción"; }
+    .ph-tl-detail table.ph-tbl-resolucion td:nth-child(3)::before { content: "Acreditado en destino"; }
+    .ph-tl-detail table.ph-tbl-resolucion td:nth-child(4)::before { content: "Devuelto al origen"; }
+    .ph-tl-detail table.ph-tbl-resolucion td:nth-child(5)::before { content: "Dado de baja / Extraviado"; }
+
+    .ph-audit-card table.ph-tbl-baja td:nth-child(1)::before { content: "SKU"; }
+    .ph-audit-card table.ph-tbl-baja td:nth-child(2)::before { content: "Producto"; }
+    .ph-audit-card table.ph-tbl-baja td:nth-child(3)::before { content: "Lote"; }
+    .ph-audit-card table.ph-tbl-baja td:nth-child(4)::before { content: "Vencimiento"; }
+    .ph-audit-card table.ph-tbl-baja td:nth-child(5)::before { content: "Cant. Devuelta"; }
+}

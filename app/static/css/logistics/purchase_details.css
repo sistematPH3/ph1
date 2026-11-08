@@ -1,0 +1,29 @@
+.mariuska-tasa-card {
+    border-radius: 20px !important;
+    border-left: 8px solid #B31F24 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+    background-color: #ffffff !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-right: none !important;
+}
+
+.mariuska-tasa-card .card-body {
+    padding: 1.5rem !important;
+}
+
+.mobile-item-card {
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+@media (max-width: 767.98px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}

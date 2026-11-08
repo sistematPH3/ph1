@@ -1,0 +1,39 @@
+{% if alarmas %}
+<div class="stock-alert-wrapper">
+    <!-- Encabezado con ícono y contador de insumos críticos -->
+    <div class="stock-alert-header">
+        <h3 class="stock-alert-title">
+            <span class="stock-alert-icon">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </span>
+            Alertas de Stock Crítico
+        </h3>
+        <span class="stock-alert-badge-count">
+            {{ alarmas|length }} {% if alarmas|length == 1 %}Insumo{% else %}Insumos{% endif %}
+        </span>
+    </div>
+
+    <!-- Lista estilizada de alertas -->
+    <div class="stock-alert-grid">
+        {% for alerta in alarmas %}
+        <div class="stock-alert-item">
+            <div class="stock-alert-info">
+                <span class="stock-alert-product">{{ alerta.product_name }}</span>
+                <span class="stock-alert-location">
+                    <i class="bi bi-building"></i> {{ alerta.location_name }}
+                </span>
+            </div>
+            
+            <div class="stock-alert-metrics">
+                <span class="stock-val-current">
+                    Stock: {{ alerta.new_quantity }}
+                </span>
+                <span class="stock-val-min">
+                    (Mín: {{ alerta.min_stock }})
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

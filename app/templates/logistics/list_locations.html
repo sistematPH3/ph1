@@ -1,0 +1,202 @@
+{% extends "base_list.html" %}
+
+{% block extra_css %}
+    {{ super() }}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/list_locations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+{% endblock %}
+
+{% block icon_class %}bi-geo-alt-fill{% endblock %}
+
+{% block title_list %}
+    Gestión de Sedes
+{% endblock %}
+
+{% block subtitle_list %}Control y estado de sucursales a nivel nacional{% endblock %}
+
+{% block actions_top %}
+    <button class="btn btn-ph-red" onclick="location.href='/logistics/locations'">
+        <i class="bi bi-plus-circle me-2"></i>Nueva Sucursal
+    </button>
+{% endblock %}
+
+{% block search_input_id %}searchInput{% endblock %}
+{% block search_placeholder %}Buscar por nombre o ubicación...{% endblock %}
+
+{% block actions_filter %}
+    <div class="dropdown custom-ph-dropdown" style="min-width: 200px;">
+        <button class="form-select-ph-sm w-100" 
+                type="button" id="statusDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <span id="selectedStatusText">
+                <i class="bi bi-funnel me-2"></i> Todos los estatus
+            </span>
+            <i class="bi bi-chevron-down small ms-2"></i>
+        </button>
+        <ul class="dropdown-menu shadow-sm custom-rounded-menu w-100">
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('all', 'Todos los estatus')">Todos los estatus</a></li>
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('active', 'Solo Operativas')">Solo Operativas</a></li>
+            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="updateFilter('inactive', 'Fuera de Servicio')">Fuera de Servicio</a></li>
+        </ul>
+        <input type="hidden" id="statusFilter" value="all">
+    </div>
+{% endblock %}
+
+{% block table_id %}phTableCustom{% endblock %}
+
+{% block table_head %}
+    <th class="ps-4">Código / Nombre</th>
+    <th>Dirección Sucursal</th>
+    <th>Contacto Directo</th>
+    <th>Estatus Operativo</th>
+    <th class="text-center pe-4">Acciones</th>
+{% endblock %}
+
+{% block table_body %}
+    {% for location in locations %}
+    <tr class="sede-row d-none d-md-table-row {{ 'row-inactive' if not location.is_active }}">
+        <td class="ps-4">
+            <div class="d-flex align-items-center">
+                <span class="id-badge">{{ location.id }}</span>
+                <span class="ms-3 fw-bold text-ph-dark">{{ location.name }}</span>
+            </div>
+        </td>
+        <td class="text-muted small">{{ location.address or 'Sin dirección asignada' }}</td>
+        <td>
+            <div class="contact-pill">
+                <i class="bi bi-phone me-2"></i>{{ location.phone or 'S/N' }}
+            </div>
+        </td>
+        <td>
+            {% if location.is_active %}
+                <span class="status-pill active">Operativa</span>
+            {% else %}
+                <span class="status-pill inactive">Fuera de Servicio</span>
+            {% endif %}
+        </td>
+        <td class="text-center pe-4">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <a href="{{ url_for('locations.edit_location', location_id=location.id) }}" class="btn-toggle text-primary" title="Editar Sede">
+                    <i class="bi bi-pencil-square fs-4"></i>
+                </a>
+                
+                {% if location.id == 1 %}
+                <button type="button" class="btn-toggle text-muted" style="cursor: not-allowed; opacity: 0.5;" title="Sede Principal (No se puede desactivar)" disabled>
+                    <i class="bi bi-toggle-on fs-3"></i>
+                </button>
+                {% else %}
+                <button type="button" 
+                    class="btn-toggle {{ 'text-danger' if location.is_active else 'text-muted' }}"
+                    data-id="{{ location.id }}"
+                    data-name="{{ location.name }}"
+                    data-active="{{ 'true' if location.is_active else 'false' }}"
+                    onclick="prepararModal(this)">
+                    <i class="bi {{ 'bi-toggle-on' if location.is_active else 'bi-toggle-off' }} fs-3"></i>
+                </button>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+
+    <tr class="sede-row sede-row-mobile d-md-none {{ 'row-inactive' if not location.is_active }}" style="background: transparent !important; border: none !important;">
+        <td colspan="5" class="p-0 border-0 bg-transparent">
+            <div class="mobile-card-item">
+                
+                <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+                    <div>
+                        <span class="id-badge mb-1 d-inline-block">#{{ location.id }}</span>
+                        <h6 class="fw-bold text-dark m-0">{{ location.name }}</h6>
+                    </div>
+                    <div>
+                        {% if location.is_active %}
+                            <span class="status-pill active badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; font-weight: 700;">Operativa</span>
+                        {% else %}
+                            <span class="status-pill inactive badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; font-weight: 700;">Fuera de Servicio</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <span class="text-muted small fw-bold d-block mb-1">Dirección Sucursal:</span>
+                    <span class="text-muted small d-block lh-sm">{{ location.address or 'Sin dirección asignada' }}</span>
+                </div>
+
+                <div class="mb-3">
+                    <span class="text-muted small fw-bold d-block mb-1">Contacto Directo:</span>
+                    <div class="contact-pill py-1 px-3 d-inline-flex" style="font-size: 0.85rem;">
+                        <i class="bi bi-phone me-2"></i>{{ location.phone or 'S/N' }}
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                    <a href="{{ url_for('locations.edit_location', location_id=location.id) }}" class="btn-mobile-action flex-grow-1" title="Editar Sede">
+                        <i class="bi bi-pencil-square icon-mobile-edit fs-5"></i>
+                    </a>
+                    
+                    {% if location.id == 1 %}
+                    <button type="button" class="btn-mobile-action flex-grow-1" style="cursor: not-allowed; opacity: 0.5; background-color: #f8f9fa !important;" title="Sede Principal (No se puede desactivar)" disabled>
+                        <i class="bi bi-toggle-on text-muted fs-4"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" 
+                        class="btn-mobile-action flex-grow-1"
+                        data-id="{{ location.id }}"
+                        data-name="{{ location.name }}"
+                        data-active="{{ 'true' if location.is_active else 'false' }}"
+                        onclick="prepararModal(this)"
+                        title="Cambiar Estado">
+                        <i class="bi {{ 'bi-toggle-on icon-mobile-status-active' if location.is_active else 'bi-toggle-off icon-mobile-status-inactive' }} fs-4"></i>
+                    </button>
+                    {% endif %}
+                </div>
+
+            </div>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="5" class="text-center py-5">
+            <div class="text-muted">
+                <i class="bi bi-search fs-1 d-block mb-3"></i>
+                <h5 class="fw-bold">No hay sedes registradas</h5>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+    
+    <tr id="noResultsRow" style="display: none;">
+        <td colspan="5" class="text-center py-5">
+            <div class="text-muted">
+                <i class="bi bi-search fs-1 d-block mb-3"></i>
+                <h5 class="fw-bold">No se encontraron resultados</h5>
+            </div>
+        </td>
+    </tr>
+
+    <div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 25px; border: none; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.2);">
+                <div id="modalAccentBar" style="height: 8px; transition: 0.3s;"></div>
+                <div class="modal-body p-5 text-center">
+                    <div id="modalIconContainer" class="display-1 mb-4"></div>
+                    <h3 class="fw-bold text-dark" id="modalTitle">¿Cambiar Estatus?</h3>
+                    <p class="text-muted mt-3" id="modalMessage"></p>
+                    <div class="d-grid gap-2 mt-4">
+                        <form id="confirmStatusForm" method="POST">
+                            <input type="hidden" name="current_status" id="modalCurrentStatus">
+                            <button type="submit" id="modalConfirmBtn" class="btn btn-lg w-100 mb-2 shadow-sm text-white" style="border-radius: 15px; font-weight: 600;">
+                                Confirmar
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">
+                            <i class="bi bi-arrow-left"></i> Cancelar y volver
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/logistics/list_locations.js') }}"></script>
+{% endblock %}

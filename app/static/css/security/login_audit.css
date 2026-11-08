@@ -1,0 +1,264 @@
+
+
+:root {
+    --brand-primary-red: #b01212;
+    --brand-icon-bg: #d61c2c;
+    --interface-bg-light: #f8f9fa;
+    --interface-text-dark: #1a1a1a;
+    --interface-border-color: #eaeaea;
+    --font-family-body: 'Inter', sans-serif;
+}
+
+.login-audit-container {
+    font-family: var(--font-family-body);
+    background-color: var(--interface-bg-light);
+    min-height: 100vh;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.module-header .icon-wrapper {
+    background-color: var(--brand-icon-bg);
+    color: #ffffff;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 4px 10px rgba(214, 28, 44, 0.2);
+}
+
+.module-header .page-title {
+    font-family: var(--font-family-body);
+    font-weight: 700;
+    font-size: 1.75rem;
+    color: var(--interface-text-dark);
+    letter-spacing: -0.3px;
+}
+
+.module-header .page-subtitle {
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
+.toolbar-card, .table-card {
+    border-radius: 12px !important;
+    background-color: #ffffff;
+}
+
+.table-card {
+    overflow: hidden !important;
+}
+
+.search-icon-position, .filter-icon-position {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #a3a3a3;
+    font-size: 1rem;
+    z-index: 5;
+}
+
+.toolbar-card .form-control,
+.toolbar-card .form-select {
+    border: 1px solid var(--interface-border-color);
+    border-radius: 20px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 0.88rem;
+    color: var(--interface-text-dark);
+    transition: all 0.2s ease-in-out;
+    background-color: #fcfcfc;
+}
+
+.toolbar-card .form-control:focus,
+.toolbar-card .form-select:focus {
+    border-color: var(--brand-icon-bg);
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(214, 28, 44, 0.1);
+}
+
+#auditDataTable th {
+    background-color: var(--brand-primary-red) !important;
+    font-family: var(--font-family-body);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #ffffff !important;
+    letter-spacing: 0.5px;
+    padding: 12px 16px !important;
+    text-transform: uppercase;
+    border: none !important;
+}
+
+#auditDataTable th:first-child {
+    border-top-left-radius: 12px !important;
+}
+#auditDataTable th:last-child {
+    border-top-right-radius: 12px !important;
+}
+
+#auditDataTable td {
+    padding: 10px 16px !important;
+    border-bottom: 1px solid var(--interface-border-color);
+    font-size: 0.88rem;
+}
+
+.audit-data-row:hover {
+    background-color: rgba(214, 28, 44, 0.01) !important;
+}
+
+#noResultsRow:hover {
+    background-color: #ffffff !important;
+}
+#noResultsRow td {
+    border: none !important;
+}
+
+.user-name-text {
+    font-size: 0.9rem;
+    letter-spacing: -0.1px;
+}
+
+.email-subtext {
+    font-size: 0.78rem;
+    margin-top: -1px;
+}
+
+.id-column-width {
+    width: 80px;
+}
+
+.time-subtext {
+    font-size: 0.82rem;
+}
+
+.role-badge {
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+.status-badge {
+    font-size: 0.78rem;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    font-weight: 600;
+}
+
+.text-warning-dark {
+    color: #856404 !important;
+}
+
+.time-filter-container {
+    min-width: 150px;
+}
+
+.time-filter-container input[type="time"] {
+    height: 38px;
+    cursor: pointer;
+}
+
+.btn-clear-time {
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+    z-index: 5;
+}
+
+.btn-clear-time:hover {
+    color: var(--brand-icon-bg) !important;
+}
+
+.filters-responsive-wrapper {
+    width: auto;
+}
+
+/* ==========================================
+   VISTA RESPONSIVE (CELULARES) - OPTIMIZADA
+   ========================================== */
+@media (max-width: 767.98px) {
+    /* OCULTAR COMPLETAMENTE las filas de escritorio para evitar duplicaciones */
+    #auditDataTable thead,
+    tr.audit-data-row {
+        display: none !important;
+    }
+
+    #auditDataTable, 
+    #auditDataTable tbody {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    /* Aseguramos que la fila que envuelve a las tarjetas móviles no tenga bordes raros */
+    tr.d-md-none,
+    tr.d-md-none td {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        background-color: transparent !important;
+        padding: 0 !important;
+    }
+
+    .filters-responsive-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+
+    #locationFilter, 
+    #dateFilter, 
+    #hourFilter {
+        width: 100% !important;
+    }
+
+    .mobile-audit-container {
+        padding: 10px 0 !important;
+    }
+
+    /* Estilo premium e idéntico de tarjetas para móviles */
+    .mobile-audit-card {
+        border: 1px solid var(--interface-border-color) !important;
+        background-color: #ffffff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+        padding: 1.25rem !important;
+        transition: transform 0.2s ease;
+    }
+
+    .mobile-audit-card .user-name-text {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+    }
+
+    .mobile-audit-card .email-subtext {
+        font-size: 0.85rem !important;
+        color: #6c757d !important;
+    }
+
+    /* Estilo píldora para los badges */
+    .mobile-audit-card .role-badge {
+        font-size: 0.8rem !important;
+        padding: 4px 12px !important;
+        background-color: #f1f3f5 !important;
+        border-radius: 30px !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+
+    .mobile-audit-card .status-badge {
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 4px 12px !important;
+        border-radius: 30px !important;
+    }
+}

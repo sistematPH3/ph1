@@ -1,0 +1,102 @@
+{% extends "auth_base.html" %}
+
+{% block title %}Registro - Pizza Hut{% endblock %}
+
+{% block extra_css %}
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/register.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/password-rules.css') }}?v=1.0">
+{% endblock %}
+
+{% block content %}
+<div class="register-page-container">
+
+    <div class="brand-section">
+        <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Pizza Hut" style="width: 200px;">
+
+        <div class="unete-banner">
+            <h1 class="unete-text">UNETE A<br>NOSOTROS</h1>
+        </div>
+
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/pizza.png') }}" class="pizza-slice-footer" alt="Pizza">
+    </div>
+
+    <div class="form-section">
+    <div class="register-card">
+    <h2>Crea tu cuenta</h2>
+
+    <form action="{{ url_for('security.register') }}" method="POST" novalidate
+          class="on-light"
+          data-password-min="{{ reglas_password.min_length }}"
+          data-password-max="{{ reglas_password.max_length }}"
+          data-password-require-upper="{{ 'true' if reglas_password.require_upper else 'false' }}"
+          data-password-require-special="{{ 'true' if reglas_password.require_special else 'false' }}">
+
+    {# Antes este bloque descartaba los avisos de contrasena y de formato:
+       el usuario veia un formulario vacio sin saber que fallo. #}
+    {% with messages = get_flashed_messages(category_filter=["warning", "danger"]) %}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="error-hint-diego error-visible" style="text-align: center; margin-bottom: 15px;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+    <div class="form-group">
+    <label>Nombre</label>
+    <input type="text" name="name" id="name-input" class="custom-input" placeholder="Máximo 40 caracteres" maxlength="40"
+       value="{{ request.form.get('name') or '' }}" required>
+       <div id="name-error" class="error-hint-diego"></div>
+</div>
+
+    <div class="form-group">
+    <label>Correo</label>
+    <input type="email" name="email" id="email-input"
+           data-url="{{ url_for('security.check_email') }}"
+           data-email-pattern="{{ patron_email }}"
+           class="custom-input"
+           placeholder="Ingrese su correo electrónico"
+       value="{{ request.form.get('email') or '' }}" required>
+    <div id="email-error" class="error-hint-diego"></div>
+</div>
+
+    <div class="form-group">
+    <label>Contraseña</label>
+    <div class="password-wrapper" style="position: relative;">
+        <input type="password" name="password" id="password-input"
+               class="custom-input" placeholder="Ingrese su contraseña" maxlength="12" required>
+
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}"
+             id="toggle-password"
+             alt="Mostrar/Ocultar"
+             data-eye-open="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_abierto.png') }}"
+             data-eye-closed="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}"
+             style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; width: 20px;">
+    </div>
+
+    {# Las 3 reglas visibles desde el inicio; se marcan solas al cumplirse. #}
+    <ul class="pw-rules" id="password-rules" aria-live="polite">
+        <li data-rule="length"><span data-rule-text>Entre {{ reglas_password.min_length }} y {{ reglas_password.max_length }} caracteres</span></li>
+        {% if reglas_password.require_upper %}<li data-rule="upper">Al menos una letra mayúscula</li>{% endif %}
+        {% if reglas_password.require_special %}<li data-rule="special">Al menos un carácter especial</li>{% endif %}
+    </ul>
+    <span class="pw-counter" id="password-counter">0/{{ reglas_password.max_length }}</span>
+
+    <div id="password-error-slot"></div>
+</div>
+
+                <div class="button-group">
+                    <a href="{{ url_for('security.login') }}" class="btn-reg btn-cancel">Cancelar</a>
+                    <button type="submit" class="btn-reg btn-submit">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/security/password-rules.js') }}?v=1.0"></script>
+<script src="{{ url_for('static', filename='js/security/email-rules.js') }}?v=1.0"></script>
+<script src="{{ url_for('static', filename='js/security/register.js') }}?v=3.0" defer></script>
+{%endblock%}

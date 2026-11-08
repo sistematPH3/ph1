@@ -1,0 +1,191 @@
+/* ==========================================================================
+   AUDITORÍA DE INVENTARIO - INGRESOS / EGRESOS (estilo movement_audit)
+   ========================================================================== */
+
+/* --- Tarjetas: borde izquierdo según el sentido del movimiento --- */
+.ph-audit-card.is-ingreso { border-left-color: #198754; }
+.ph-audit-card.is-egreso  { border-left-color: #dc3545; }
+
+/* Círculo con el ID del log (ingreso verde, egreso rojo) */
+.ph-audit-num.ingreso { background-color: #198754; }
+.ph-audit-num.egreso  { background-color: #dc3545; }
+
+/* Badge grande de cantidad (derecha de la cabecera) */
+.ph-qty-badge {
+    font-size: 1.15rem;
+    font-weight: 800;
+    padding: 0.2em 0.9em;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.ph-qty-ingreso {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.ph-qty-egreso {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+/* Píldora de acción en la cabecera */
+.badge-action-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.725rem;
+    font-weight: 600;
+    display: inline-block;
+    border: 1px solid transparent;
+}
+
+.action-blue {
+    border-color: #bfdbfe;
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
+.action-red-light {
+    border-color: #fecaca;
+    color: #dc2626;
+    background-color: #fef2f2;
+}
+
+/* ==========================================================================
+   DESBORDAMIENTO DE TEXTO: evita que notas/badges/productos largos
+   rompan el ancho de la tarjeta en móviles (el texto debe cortarse y
+   saltar de línea, nunca salirse del contenedor)
+   ========================================================================== */
+.ph-audit-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ph-audit-card .d-flex > div {
+    min-width: 0;
+}
+
+.ph-audit-card .collapse,
+.ph-audit-card .ph-tl-detail {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ph-audit-card .alert {
+    overflow-wrap: anywhere;
+}
+
+.ph-audit-card .alert > div {
+    min-width: 0;
+}
+
+.ph-audit-card h5 {
+    overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+   CINTILLO DE FILTROS: compacto en altura para evitar espacio sobrante
+   ========================================================================== */
+.ph-filters-cintillo {
+    padding: 0.5rem 1rem !important;
+    margin-bottom: 1rem !important;
+}
+
+/* ==========================================================================
+   FILTROS EN PC Y TABLET (>=768px): orden limpio y uniforme.
+   La búsqueda va en su propia línea y los filtros se reparten en una
+   cuadrícula de celdas de igual ancho (nada de elementos sueltos).
+   ========================================================================== */
+@media (min-width: 768px) {
+    .ph-filters-cintillo {
+        padding: 0.7rem 1rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    .ph-filters-cintillo > .d-flex {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 1rem !important;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        max-width: 340px !important;
+    }
+
+    .ph-filters-cintillo form {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+}
+
+    .ph-filters-cintillo > .d-flex {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.25rem !important;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        width: 100%;
+        max-width: none !important;
+    }
+
+    .ph-filters-cintillo #auditSearchInput {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+    }
+
+    .ph-filters-cintillo form {
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.25rem 0.75rem;
+        align-items: end;
+    }
+
+    .ph-filters-cintillo form > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .ph-filters-cintillo form .d-flex {
+        flex-wrap: nowrap !important;
+    }
+
+    .ph-filters-cintillo form a {
+        justify-self: center;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE - tablet (<=991.98px): solo compactación (heredada de
+   movement_audit.css para .ph-card/.ph-icon-box)
+   ========================================================================== */
+
+/* ==========================================================================
+   RESPONSIVE - móvil (<=767.98px): apilado de la cabecera de la tarjeta
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .ph-audit-card > .d-flex.justify-content-between {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+
+    .ph-audit-card .d-flex.flex-column.align-items-end {
+        flex-direction: row !important;
+        justify-content: space-between;
+        align-items: center !important;
+        width: 100%;
+    }
+
+    .ph-qty-badge {
+        font-size: 1rem;
+    }
+
+    .ph-audit-card {
+        padding: 1rem !important;
+    }
+}

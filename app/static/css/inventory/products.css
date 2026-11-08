@@ -1,0 +1,273 @@
+/* ==========================================================================
+   ESTILOS DEL FORMULARIO DE PRODUCTOS Y MODAL DE CATEGORÍAS
+   ========================================================================== */
+
+/* Fuente base unificada para formularios, modales, campos y botones */
+.form-container,
+.modal-card,
+.form-group input,
+.form-group select,
+.form-group textarea,
+.btn {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   CONTENEDOR DEL FORMULARIO PRINCIPAL
+   -------------------------------------------------------------------------- */
+.form-container {
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(214, 35, 0, 0.15);
+    border: 1.5px solid rgba(214, 35, 0, 0.35);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 550px;
+    margin: 3rem auto;
+    position: relative;
+    z-index: 10;
+}
+
+/* Estilos unificados para títulos (Formulario Principal y Modal) */
+.form-container h2,
+.modal-card h2 {
+    color: #d62300;
+    text-align: center;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: -0.5px;
+    margin: 0 auto;
+}
+
+.form-container h2 {
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+}
+
+.modal-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   GRUPOS DE FORMULARIO, CAMPOS E INPUTS
+   -------------------------------------------------------------------------- */
+.form-group {
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 0.4rem;
+    font-weight: 800;
+    color: #000000;
+    font-size: 0.9rem;
+    margin-left: 10px;
+}
+
+.form-group input,
+.form-group select {
+    padding: 0.85rem 1.25rem;
+    border: 2px solid rgba(214, 35, 0, 0.45);
+    border-radius: 50px;
+    font-size: 0.95rem;
+    color: #333333;
+    background-color: #f9fafb;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+}
+
+.form-group textarea {
+    padding: 0.85rem 1.25rem;
+    border: 2px solid rgba(214, 35, 0, 0.45);
+    border-radius: 20px;
+    font-size: 0.95rem;
+    color: #333333;
+    background-color: #f9fafb;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+    resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    background-color: #ffffff;
+    border-color: #d62300;
+    outline: none;
+    box-shadow: 0 0 10px rgba(214, 35, 0, 0.1);
+}
+
+.form-group input[readonly] {
+    background-color: #e5e7eb;
+    cursor: not-allowed;
+    color: #6b7280;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.sku-input-wrapper {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sku-input-wrapper input {
+    flex-grow: 1;
+}
+
+.btn-lock {
+    background-color: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 50px;
+    padding: 0 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.btn-lock:hover {
+    background-color: #e5e7eb;
+}
+
+.btn-lock svg {
+    width: 20px;
+    height: 20px;
+    color: #000000;
+}
+
+/* --------------------------------------------------------------------------
+   MENSAJES DE ERROR Y ALERTAS
+   -------------------------------------------------------------------------- */
+.error-text {
+    color: #d62300;
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.alert-error {
+    background-color: #fef2f2;
+    color: #991b1b;
+    padding: 1rem 1.25rem;
+    border-radius: 15px;
+    margin-bottom: 1.5rem;
+    border: 1px solid #fecaca;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   BOTONES
+   -------------------------------------------------------------------------- */
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn {
+    flex: 1;
+    padding: 0.85rem 1.5rem;
+    border: none;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background-color: #333333;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: #d62300;
+    color: #ffffff;
+}
+
+.btn-secondary:hover {
+    background-color: #b01d00;
+    transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   ESTILOS PARA EL MODAL DE NUEVA CATEGORÍA
+   ========================================================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-card {
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    padding: 2rem;
+    width: 90%;
+    max-width: 450px;
+    position: relative;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: transparent;
+    border: none;
+    font-size: 1.8rem;
+    color: #6b7280;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-close-btn:hover {
+    color: #d62300;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.d-none {
+    display: none !important;
+}
+/* ==========================================================================
+   LAYOUT CENTRADO PARA PÁGINAS INDEPENDIENTES (SIN LAYOUT BASE)
+   ========================================================================== */
+body.centered-form-page {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;     /* Centra la tarjeta verticalmente */
+    justify-content: center; /* Centra la tarjeta horizontalmente */
+    background-color: #f8fafc;
+}
+
+body.centered-form-page .form-container {
+    margin: 0 auto; /* Desactiva el margin top/bottom para que Flexbox controle el centrado exacto */
+}

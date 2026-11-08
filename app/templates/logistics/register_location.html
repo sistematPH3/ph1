@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
+
+{% block extra_css %}
+    {{ super() }}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/register_location.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+
+<div class="container mt-0 pt-0">
+    <div class="register-wrapper">
+        <div class="form-card-premium">
+            
+            <h2>Registro de Nueva Sede</h2>
+            
+            <form method="POST" action="" id="registerLocationForm" 
+                  data-check-name-url="{{ url_for('locations.check_name') }}"
+                  data-check-phone-url="{{ url_for('locations.check_phone') }}"
+                  data-redirect-url="{{ url_for('list_sedes_bp.list_sedes') }}"
+                  data-success="{{ 'true' if success else 'false' }}" novalidate>
+                
+                {{ form.hidden_tag() }}
+                
+                <div class="form-group-premium">
+                    <label>{{ form.name.label }}</label>
+                    {{ form.name(class="form-control", id="name", placeholder="Ingrese un nombre") }}
+                    {% for error in form.name.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-group-premium">
+                    <label>{{ form.state.label }}</label>
+                    {{ render_venezuela_states() }}
+                    {% for error in form.state.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-group-premium">
+                    <label>{{ form.address.label }}</label>
+                    {{ form.address(class="form-control", rows="3", placeholder="Ingrese la dirección detallada") }}
+                    {% for error in form.address.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-group-premium">
+                    <label>{{ form.phone.label }}</label>
+                    {{ form.phone(class="form-control", placeholder="Ingrese un numero telefonico", maxlength="11") }}
+                    {% for error in form.phone.errors %}
+                        <small class="error-feedback-premium d-block">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-actions-premium">
+                    <a href="{{ url_for('list_sedes_bp.list_sedes') }}" class="btn-premium btn-premium-secondary">Cancelar</a>
+                    <button type="submit" class="btn-premium btn-premium-primary">Guardar Sede</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="successModal" class="custom-modal">
+    <div class="custom-modal-content">
+        <div class="success-icon-wrapper">
+            <div class="success-checkmark animate-check">
+                <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" fill="currentColor" class="bi bi-check-lg text-success" viewBox="0 0 16 16">
+                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
+                </svg>
+            </div>
+        </div>
+        <h3>¡Sede Registrada!</h3>
+        <p>La información de la sede se ha guardado de forma exitosa.</p>
+        
+        <div class="modal-actions-wrapper mt-3">
+            <button id="btnAceptarSuccess" class="btn-premium btn-premium-primary w-100">Aceptar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/logistics/register_location.js') }}" defer></script>
+{% endblock %}

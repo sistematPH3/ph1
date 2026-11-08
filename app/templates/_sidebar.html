@@ -1,0 +1,192 @@
+<nav class="sidebar d-flex flex-column">
+    <button id="toggle-btn" class="toggle-sidebar-btn">
+        <i class="bi bi-chevron-left"></i>
+    </button>
+
+    <div class="sidebar-header d-flex align-items-center px-4">
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/sombrero.png') }}" alt="Logo" class="img-fluid logo-hat me-2">
+        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/letra_logo.png') }}" alt="Pizza Hut" class="img-fluid logo-letters">
+    </div>
+
+    <div class="sidebar-search">
+        <div class="search-box">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Buscar...">
+        </div>
+    </div>
+
+    <ul class="nav flex-column sidebar-menu">
+        
+        {% if not current_user.is_guest %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="{{ url_for('dashboard.index') }}">
+                <i class="bi bi-house-door main-icon"></i>
+                <span class="link-text">PANEL</span>
+            </a>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-people main-icon"></i>
+                <span class="link-text">USUARIOS</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('security.admin_pending_requests') }}">Gestión de Permisos</a>
+                <a class="nav-link sub-link" href="{{ url_for('staff.list_staff') }}">Gestión de Usuarios</a>
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-building main-icon"></i>
+                <span class="link-text">SEDES</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('locations.register_location') }}">Registro de Sedes</a>
+                <a class="nav-link sub-link" href="{{ url_for('list_sedes_bp.list_sedes') }}">Gestión de Sedes</a>
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-box-seam main-icon"></i>
+                <span class="link-text">INVENTARIO</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+                <a class="nav-link sub-link" href="{{ url_for('inventory.list_categories') }}">Categorías</a>
+                <a class="nav-link sub-link" href="{{ url_for('inventory.create_product') }}">Registro de Insumos</a>
+                <a class="nav-link sub-link" href="{{ url_for('inventory.list_products') }}">Menú de Insumos</a>
+                <a class="nav-link sub-link" href="{{ url_for('register_consumption.show_consumption_form') }}">Registro de Consumo</a>
+                <a class="nav-link sub-link" href="{{ url_for('inventory.render_inventory_views') }}">Inventario Dual</a>
+                {% endif %}
+                {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager %}
+                <a class="nav-link sub-link" href="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}">Gestión y Auditoría de Gastos de Cocina</a>
+                {% endif %}
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-cart main-icon"></i>
+                <span class="link-text">COMPRAS</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('purchase_routes.new_purchase_form') }}">Nueva Compra</a>
+                <a class="nav-link sub-link" href="{{ url_for('purchase_management.index') }}">Gestión de Compras</a>
+                <a class="nav-link sub-link" href="{{ url_for('supplier_list.register_supplier_view') }}">Nuevo Proveedor</a>
+                <a class="nav-link sub-link" href="{{ url_for('supplier_list.index') }}">Proveedores</a>
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-truck main-icon"></i>
+                <span class="link-text">TRASLADOS</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('logistics.dispatch_bp.dispatch_form_view') }}">Nuevo Traslado</a>
+                {% endif %}
+                <a class="nav-link sub-link" href="/logistics/movements">Listado Operativo de Traslados</a>
+
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link dispute-sub-link" href="/logistics/movements/admin/disputes">
+                    <span>Arbitraje de Disputas</span>
+                    {% if can_view_disputes %}
+                    <span class="dispute-badge" id="disputeBadge"
+                          data-count="{{ pending_disputes_count or 0 }}"
+                          {% if not pending_disputes_count %}hidden{% endif %}>
+                        {{ pending_disputes_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% endif %}
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin or current_user.is_management or current_user.is_manager or current_user.is_assistant_manager or current_user.is_operations %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-recycle main-icon"></i>
+                <span class="link-text">MERMAS</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('register_waste.nueva_merma') }}">Nueva Merma</a>
+                <a class="nav-link sub-link" href="{{ url_for('merma_list.mis_pendientes') }}">Mermas Pendientes</a>
+                <a class="nav-link sub-link dispute-sub-link" href="{{ url_for('waste_approvals.bandeja_aprobaciones') }}">
+                    <span>Gestión de Mermas</span>
+                    {% if can_view_waste_approvals %}
+                    <span class="dispute-badge" id="wastePendingBadge"
+                          data-count="{{ pending_waste_approvals_count or 0 }}"
+                          {% if not pending_waste_approvals_count %}hidden{% endif %}>
+                        {{ pending_waste_approvals_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('waste_config.configuracion') }}">Configuración de Mermas</a>
+                {% endif %}
+            </div>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin or current_user.is_finance %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="{{ url_for('analysis_reports.reports_page') }}">
+                <i class="bi bi-graph-up main-icon"></i>
+                <span class="link-text">ESTADÍSTICAS</span>
+            </a>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_admin or current_user.is_finance %}
+        <li class="nav-item">
+            <a class="nav-link sidebar-toggler" href="javascript:void(0)">
+                <i class="bi bi-shield-lock main-icon"></i>
+                <span class="link-text">AUDITORÍA</span>
+                <i class="bi bi-chevron-down ms-auto chevron-icon"></i>
+            </a>
+            <div class="menu-desplegable">
+                <a class="nav-link sub-link" href="{{ url_for('audit.ver_auditoria_accesos') }}">Auditoría de Accesos</a>
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('audit_user.list_user_audits') }}">Auditoría de Personal</a>
+                {% endif %}
+                {% if current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('audit_purchase.list_purchase_audits') }}">Auditoría de Compras</a>
+                {% endif %}
+                <a class="nav-link sub-link" href="{{ url_for('logistics_audit.view_movement_audit') }}">Auditoría de Traslados</a>
+                <a class="nav-link sub-link" href="{{ url_for('waste_audit.ver_auditoria') }}">Auditoría de Mermas</a>
+                <a class="nav-link sub-link" href="{{ url_for('auditinventory_bp.view_audit_page') }}">Auditoría de Inventario</a>
+                {% if current_user.is_finance and not current_user.is_admin %}
+                <a class="nav-link sub-link" href="{{ url_for('kitchen_expense_audit.view_kitchen_expense_audit') }}">Auditoría de Gastos de Cocina</a>
+                {% endif %}
+            </div>
+        </li>
+        {% endif %}
+    </ul>
+
+    <div class="sidebar-actions mt-3 px-3 pb-4">
+        <a class="nav-link logout-action d-flex align-items-center" href="{{ url_for('security.logout') }}">
+            <i class="bi bi-box-arrow-left main-icon"></i>
+            <span class="link-text">Cerrar Sesión</span>
+        </a>
+    </div>
+</nav>

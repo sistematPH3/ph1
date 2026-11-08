@@ -1,0 +1,229 @@
+:root {
+    --ph-red-solid: #b01212;
+    --ph-red-icon: #bf1616;
+    --ph-text-dark: #2c2c2c;
+    --ph-text-soft: #7f8c8d;
+    --ph-border-light: #e8ebed;
+    --ph-bg-light: #f8f9fa;
+    --ph-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.main-white-panel {
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: var(--ph-shadow-card);
+    border: none;
+}
+
+.icon-box-red {
+    background-color: var(--ph-red-icon);
+    color: #ffffff;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 1.25rem;
+}
+
+.module-title {
+    color: var(--ph-red-solid) !important;
+    font-weight: 700;
+}
+
+.text-subtitle {
+    color: var(--ph-text-soft);
+    font-size: 0.95rem;
+}
+
+.badge-module-tag {
+    background-color: #fef2f2;
+    color: var(--ph-red-solid);
+    border: 1px solid #fecaca;
+}
+
+.search-box-container input {
+    height: 45px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.search-box-container input:focus {
+    background-color: #ffffff !important;
+    border: 1px solid var(--ph-red-solid) !important;
+    box-shadow: 0 0 0 0.2rem rgba(176, 18, 18, 0.1) !important;
+}
+
+.table-responsive {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--ph-border-light);
+}
+
+.content-table-header {
+    background-color: var(--ph-red-solid) !important;
+}
+
+.content-table-header th {
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 16px 20px;
+    border: none !important;
+}
+
+.avatar-circle-red {
+    width: 38px;
+    height: 38px;
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.user-name-text {
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.user-email-text {
+    color: #475569;
+    font-size: 0.88rem;
+}
+
+.user-id-text {
+    color: #94a3b8;
+    font-size: 0.78rem;
+}
+
+.status-badge-pending {
+    background-color: #fef3c7;
+    color: #d97706;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 30px;
+    display: inline-block;
+}
+
+.btn-action-square {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.btn-action-square:hover {
+    background-color: #f8fafc;
+    transform: translateY(-2px);
+}
+
+.btn-action-approve {
+    color: #10b981;
+}
+
+.btn-action-approve:hover {
+    border-color: #10b981;
+    background-color: #ecfdf5;
+}
+
+.btn-action-reject {
+    color: #ef4444;
+}
+
+.btn-action-reject:hover {
+    border-color: #ef4444;
+    background-color: #fef2f2;
+}
+
+.btn-confirm-red {
+    background-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+    border: none !important;
+    transition: background-color 0.2s ease;
+}
+
+.btn-confirm-red:hover {
+    background-color: #8c0e0e !important;
+    color: #ffffff !important;
+}
+
+.btn-outline-location-pill {
+    border: 1px solid #ced4da !important;
+    color: #495057 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-outline-location-pill:hover {
+    border-color: var(--ph-red-solid) !important;
+    color: var(--ph-red-solid) !important;
+}
+
+.btn-check:checked + .btn-outline-location-pill {
+    background-color: var(--ph-red-solid) !important;
+    border-color: var(--ph-red-solid) !important;
+    color: #ffffff !important;
+}
+
+/* ==========================================================================
+   MEDIA QUERIES (TABLET Y MÓVIL) - MANTENIDOS INTACTOS
+   ========================================================================== */
+@media (max-width: 992px) {
+    /* Ajustes para Tablet */
+    .main-white-panel {
+        padding: 1.5rem !important;
+    }
+    .module-title {
+        font-size: 1.5rem;
+    }
+    .text-subtitle {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Ajustes para Teléfonos */
+    .main-white-panel {
+        padding: 1rem !important;
+        border-radius: 15px;
+    }
+    .d-flex.flex-column.flex-md-row {
+        align-items: stretch !important;
+    }
+    .badge-module-tag {
+        align-self: flex-start;
+        margin-top: 0.5rem;
+    }
+    .search-box-container {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    .table-responsive {
+        border: none;
+    }
+    .content-table-header {
+        display: none; /* Ocultar cabecera en móvil si se usan tarjetas */
+    }
+    .btn-action-square {
+        width: 40px;
+        height: 40px;
+    }
+}
