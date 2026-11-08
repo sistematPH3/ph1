@@ -20,10 +20,12 @@ def forgot_password():
         return jsonify({"error": mensaje_error}), 400
         
     email = data.get('email')
-    exito = solicitar_recuperacion(email)
+    estado = solicitar_recuperacion(email)
     
-    if exito:
+    if estado == "ok":
         return jsonify({"message": "Correo comprobado, recibirás un enlace al correo con las siguientes instrucciones que debes seguir."}), 200
+    elif estado == "error_envio":
+        return jsonify({"error": "Ocurrió un problema al enviar el correo. Intente nuevamente o contacte al administrador."}), 500
     else:
         return jsonify({"error": "El correo ingresado no existe en el sistema."}), 404
 

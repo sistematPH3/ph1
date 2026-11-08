@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from app.time_utils import current_ve_time
 from app.extensions import db
 from app.models.inventory_model import Inventory
 from sqlalchemy.orm.attributes import flag_modified
@@ -26,7 +26,7 @@ def procesar_edicion_movimiento(movimiento_id, nueva_cantidad_editada, motivo_ed
     movimiento.changed_data['quantity_subtracted'] = nueva_cantidad_editada
     movimiento.changed_data['edit_reason'] = motivo_edicion
     movimiento.changed_data['edited_by_user_id'] = usuario.id
-    movimiento.changed_data['edited_at'] = datetime.now(timezone.utc).isoformat()
+    movimiento.changed_data['edited_at'] = current_ve_time().isoformat()
     
     movimiento.severity = 'EDITADO'
     

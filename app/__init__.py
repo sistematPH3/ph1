@@ -13,6 +13,24 @@ def ph_qty(value):
         return str(int(num))
     return ("%f" % num).rstrip("0").rstrip(".")
 
+def ph_amount(value, decimals=2):
+    """Formatea montos en formato venezolano: miles con punto, decimal con coma.
+    Ej: 1824.79 -> '1.824,79' | tasa 36.5356 -> '36,5356'."""
+    try:
+        from decimal import Decimal, ROUND_HALF_UP
+        num = Decimal(str(value))
+    except Exception:
+        return value
+    try:
+        dec = int(decimals)
+    except (TypeError, ValueError):
+        dec = 2
+    if dec < 0 or dec > 6:
+        dec = 2
+    q = num.quantize(Decimal(1).scaleb(-dec), rounding=ROUND_HALF_UP)
+    s = f"{q:,.{dec}f}"
+    return s.replace(",", "\u00a0").replace(".", ",").replace("\u00a0", ".")
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -57,6 +75,24 @@ def create_app():
         # ==========================================================
         from .waste.routes.auditinventory_routes import auditinventory_bp
         app.register_blueprint(auditinventory_bp)
+
+        # MÓDULO WASTE: BANDEJA DE APROBACIÓN DE MERMAS
+        from .waste.routes.waste_approvals_routes import waste_approvals_bp
+        app.register_blueprint(waste_approvals_bp)
+
+        # MÓDULO WASTE: MIS MERMAS PENDIENTES (EDICIÓN/CANCELACIÓN DEL AUTOR)
+        from .waste.routes.merma_list_routes import merma_list_bp
+        app.register_blueprint(merma_list_bp)
+        # ==========================================================
+
+        # ==========================================================
+        # MÓDULO 7: REGISTRO DE MERMA (PARTE 1)
+        # ==========================================================
+        from .waste.routes.register_waste_routes import register_waste_bp
+        app.register_blueprint(register_waste_bp)
+
+        from .waste.routes.waste_edit_routes import waste_edit_bp
+        app.register_blueprint(waste_edit_bp)
         # ==========================================================
         
         from .logistics import logistics_bp
@@ -136,12 +172,21 @@ def create_app():
         from app.logistics.routes.movement_reception_routes import movement_reception_bp
         app.register_blueprint(movement_reception_bp)
         # ==========================================================
+        #modulo 7
+        from app.waste.routes.waste_audit_routes import waste_audit_bp
+        # Registrar el blueprint en la app
+        app.register_blueprint(waste_audit_bp)
+    
 
         from app.logistics.routes.response_inbox_routes import inbox_bp
         app.register_blueprint(inbox_bp)
 
         from app.logistics.routes.movement_audit_routes import logistics_audit_bp
         app.register_blueprint(logistics_audit_bp)
+
+        # --- REGISTRO DE CONFIGURACIÓN DE MERMAS ---
+        from app.waste.routes.waste_config_routes import waste_config_bp
+        app.register_blueprint(waste_config_bp)
 
         from . import models 
         from .models.security_model import User
@@ -153,6 +198,7 @@ def create_app():
             return User.query.get(int(user_id))
 
         app.jinja_env.filters['ph_qty'] = ph_qty
+        app.jinja_env.filters['ph_amount'] = ph_amount
 
         # ==========================================================
         # CONTEXTO GLOBAL PARA EL SIDEBAR Y LOS AVISOS DE NOVEDADES
@@ -175,9 +221,19 @@ def create_app():
                     count = get_pending_disputes_count()
                 except Exception:
                     count = 0
+            # Mermas pendientes de resolución (círculo rojo del sidebar).
+            waste_count = 0
+            if can_view:
+                try:
+                    from app.waste.services.waste_approvals_service import get_pending_waste_summary
+                    waste_count = get_pending_waste_summary(current_user.id)['pending_count']
+                except Exception:
+                    waste_count = 0
             return {
                 'pending_disputes_count': count,
                 'can_view_disputes': can_view,
+                'pending_waste_approvals_count': waste_count,
+                'can_view_waste_approvals': can_view,
                 # Roles que pueden consultar las respuestas del administrador
                 # (además de ser los receptores de traslados que usan la
                 # campana de notificaciones).

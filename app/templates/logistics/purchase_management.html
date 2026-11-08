@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block extra_css %}
-<link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=1.1"> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=1.1"> 
 {% endblock %}
 
 {% block content %}
@@ -67,6 +67,7 @@
                         <th>Proveedor</th>
                         <th>Fecha de Compra</th>
                         <th>Monto Total</th>
+                        <th>Total en Bs.</th>
                         <th>Moneda</th>
                         <th>Tasa Aplicada</th>
                         <th>Estado</th>
@@ -85,9 +86,10 @@
                             <td class="fw-bold text-secondary">#{{ purchase.id }}</td>
                             <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
                             <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
-                            <td class="fw-bold text-danger">Bs. {{ "{:,.2f}".format(purchase.total_amount * purchase.exchange_rate) }}</td>
+                            <td class="fw-bold text-dark">{{ purchase.total_amount|ph_amount }} <span class="text-muted small">{{ purchase.currency }}</span></td>
+                            <td class="fw-bold text-danger">Bs. {{ purchase.total_bs|ph_amount }}</td>
                             <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
-                            <td>Bs. {{ "{:,.4f}".format(purchase.exchange_rate) }}</td>
+                            <td>Bs. {{ purchase.exchange_rate|ph_amount(4) }}</td>
                             <td>
                                 {% if purchase.status == 'COMPLETED' %}
                                 <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
@@ -129,7 +131,7 @@
                         </tr>
 
                         <tr id="details-row-desktop-{{ purchase.id }}" class="collapse detail-row-container" data-purchase-id="{{ purchase.id }}">
-                            <td colspan="8" class="bg-light p-4" style="border-left: 4px solid #b0121a;">
+                            <td colspan="9" class="bg-light p-4" style="border-left: 4px solid #b0121a;">
                                 <div class="container-fluid">
                                     <div class="row mb-3 pb-2 border-bottom">
                                         <div class="col-md-6">
@@ -211,11 +213,15 @@
                     <div class="bg-light p-3 rounded-3 mb-3 border">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted small fw-bold text-uppercase">Monto Total</span>
-                            <span class="fw-bold text-danger fs-6">Bs. {{ "{:,.2f}".format(purchase.total_amount * purchase.exchange_rate) }}</span>
+                            <span class="fw-bold text-dark fs-6">{{ purchase.total_amount|ph_amount }} {{ purchase.currency }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small fw-bold text-uppercase">Total en Bs.</span>
+                            <span class="fw-bold text-danger">Bs. {{ purchase.total_bs|ph_amount }}</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="text-muted small fw-bold text-uppercase">Tasa & Moneda</span>
-                            <span class="fw-semibold text-dark small">{{ purchase.currency }} | Bs. {{ "{:,.4f}".format(purchase.exchange_rate) }}</span>
+                            <span class="fw-semibold text-dark small">{{ purchase.currency }} | Bs. {{ purchase.exchange_rate|ph_amount(4) }}</span>
                         </div>
                     </div>
 
@@ -358,6 +364,7 @@
                                 <th style="width: 130px;">N° Lote</th>
                                 <th style="width: 140px;">Vencimiento</th>
                                 <th style="width: 140px;">Precio (Divisa)</th>
+                                <th style="width: 60px;">Eliminar</th>
                             </tr>
                         </thead>
                         <tbody id="edit-table-body">
@@ -386,5 +393,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.1"></script>
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.3"></script>
 {% endblock %}

@@ -87,6 +87,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (pwd.length > 0 && (pwd.length < 6 || pwd.length > 12)) {
                 errorMsg.innerText = `La contraseña debe tener entre 6 y 12 caracteres (actualmente tiene ${pwd.length}).`;
                 errorMsg.style.display = 'block';
+            } else if (pwd.length >= 6 && !/[^A-Za-z0-9]/.test(pwd)) {
+                errorMsg.innerText = "Esta contraseña debe incluir caracteres especiales.";
+                errorMsg.style.display = 'block';
+            } else if (pwd.length >= 6 && !/[A-Z]/.test(pwd)) {
+                errorMsg.innerText = "Esta contraseña debe incluir al menos una letra mayúscula.";
+                errorMsg.style.display = 'block';
             } else {
                 errorMsg.style.display = 'none';
             }
@@ -110,6 +116,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (pwd.length < 6 || pwd.length > 12) {
                 errorMsg.innerText = `La contraseña debe tener entre 6 y 12 caracteres (actualmente tiene ${pwd.length}).`;
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (!/[^A-Za-z0-9]/.test(pwd)) {
+                errorMsg.innerText = "Esta contraseña debe incluir caracteres especiales.";
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (!/[A-Z]/.test(pwd)) {
+                errorMsg.innerText = "Esta contraseña debe incluir al menos una letra mayúscula.";
                 errorMsg.style.display = 'block';
                 return;
             }

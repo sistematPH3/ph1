@@ -19,10 +19,10 @@ class ResponseInboxService:
         return base
 
     @staticmethod
-    def _serialize(mov):
-        """Serializa un movimiento-respuesta para el JSON de la campana."""
-        origin_name = getattr(mov.origin_location, "name", None) or f"Sede #{mov.origin_location_id}"
-        dest_name = getattr(mov.destination_location, "name", None) or f"Sede #{mov.destination_location_id}"
+    def _serialize(resp):
+        """Serializa una respuesta de TRASLADO para el JSON de la campana."""
+        origin_name = getattr(resp.origin_location, "name", None) or f"Sede #{resp.origin_location_id}"
+        dest_name = getattr(resp.destination_location, "name", None) or f"Sede #{resp.destination_location_id}"
 
         products = [
             {
@@ -33,10 +33,10 @@ class ResponseInboxService:
                 "missing_qty": it.get("missing_qty"),
                 "specific_novelty": it.get("specific_novelty"),
             }
-            for it in mov.novedad_items
+            for it in resp.novedad_items
         ]
 
-        summary = mov.resolution_summary or {}
+        summary = resp.resolution_summary or {}
         totals = {
             "credited": summary.get("credited_total", 0),
             "returned": summary.get("returned_total", 0),
@@ -44,42 +44,89 @@ class ResponseInboxService:
         }
 
         return {
-            "id": mov.id,
-            "status": mov.status,
-            "is_read": bool(getattr(mov, "is_read", True)),
+            "id": resp.id,
+            "response_type": getattr(resp, "response_type", None) or "TRASLADO",
+            "status": resp.status,
+            "is_read": bool(getattr(resp, "is_read", True)),
             "origin": origin_name,
             "destination": dest_name,
-            "movement_date": mov.date.strftime("%Y-%m-%d") if mov.date else None,
-            "novedad": getattr(mov, "novedad_label", None) or "Novedad",
-            "novedad_type": getattr(mov, "novedad_type", None),
+            "movement_date": resp.date.strftime("%Y-%m-%d") if resp.date else None,
+            "novedad": getattr(resp, "novedad_label", None) or "Novedad",
+            "novedad_type": getattr(resp, "novedad_type", None),
             "products": products,
             "product_count": len(products),
-            "resolution_date": mov.response_date.isoformat() if mov.response_date else None,
+            "resolution_date": resp.response_date.isoformat() if resp.response_date else None,
             "resolution_totals": totals,
-            "notes": (mov.resolution_notes or "")[:160],
-            "resolved_by": getattr(mov.response_by, "name", None) or "Administración",
-            "reported_by": getattr(mov.reported_by, "name", None),
+            "notes": (resp.resolution_notes or "")[:160],
+            "resolved_by": getattr(resp.response_by, "name", None) or "Administración",
+            "reported_by": getattr(resp.reported_by, "name", None),
+        }
+
+    @staticmethod
+    def _serialize_waste(resp):
+        """Serializa una respuesta de MERMA para el JSON de la campana."""
+        loc = getattr(resp, "location", None)
+        products = [
+            {
+                "product_name": it.get("product_name"),
+                "lot_number": it.get("lot_number"),
+                "quantity": it.get("quantity"),
+            }
+            for it in getattr(resp, "waste_details", []) or []
+        ]
+        return {
+            "id": resp.id,
+            "response_type": "MERMA",
+            "status": resp.decision,
+            "is_read": bool(getattr(resp, "is_read", True)),
+            "origin": getattr(loc, "name", None) or f"Sede #{getattr(resp, 'location_id', None)}",
+            "destination": "",
+            "movement_date": resp.date.strftime("%Y-%m-%d") if resp.date else None,
+            "novedad": getattr(resp, "decision_label", None) or "Merma",
+            "novedad_type": getattr(resp, "novedad_type", None),
+            "products": products,
+            "product_count": len(products),
+            "resolution_date": resp.response_date.isoformat() if resp.response_date else None,
+            "resolution_totals": {},
+            "notes": (
+                (resp.rejection_reason or resp.waste_notes or "")[:160]
+            ),
+            "resolved_by": getattr(resp.response_by, "name", None) or "Administrador",
+            "reported_by": getattr(resp.reported_by, "name", None),
+            "total_quantity": float(getattr(resp, "total_quantity", 0) or 0),
+            "waste_type_name": getattr(resp, "waste_type_name", None),
         }
 
     @staticmethod
     def get_inbox_summary(user, limit=50):
-        """Resumen JSON para la campana de los receptores de traslados.
+        """Resumen JSON para la campana (traslados + mermas).
 
         Devuelve las respuestas más recientes (ligeras, sin datos sensibles)
         junto con el contador de pendientes de leer calculado en el servidor
         (tabla notifications). El estado "leído" ya NO vive en el navegador.
         """
-        responses = ResponseInboxRepository.get_admin_responses(user, limit=limit)
+        responses = ResponseInboxRepository.get_admin_responses(user)
+        items = []
+        for resp in responses[:limit]:
+            if getattr(resp, "response_type", None) == "MERMA":
+                items.append(ResponseInboxService._serialize_waste(resp))
+            else:
+                items.append(ResponseInboxService._serialize(resp))
         return {
             "total": len(responses),
             "unread_count": ResponseInboxRepository.get_unread_count(user),
-            "items": [ResponseInboxService._serialize(mov) for mov in responses],
+            "items": items,
         }
 
     @staticmethod
     def mark_as_read(user, movement_id):
         """Marca leída la respuesta de un traslado para el usuario."""
         return ResponseInboxRepository.mark_as_read(user, movement_id)
+
+    @staticmethod
+    def mark_waste_as_read(user, waste_id):
+        """Marca leída la respuesta de una merma para el usuario."""
+        return ResponseInboxRepository.mark_waste_as_read(user, waste_id)
 
     @staticmethod
     def mark_all_as_read(user):

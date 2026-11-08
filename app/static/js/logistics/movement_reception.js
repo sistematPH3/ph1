@@ -30,6 +30,26 @@ document.addEventListener("DOMContentLoaded", () => {
     let userManuallyChangedNovelty = false;
     let pendingReception = null;
 
+    // Productos que YA vienen en la guía del traslado (renglones autorizados). Un
+    // insumo que está en la guía nunca puede declararse como "entregado por error":
+    // si va en la guía fue solicitado y, a lo sumo, puede estar completo, faltante o
+    // sobrante. Se usa para bloquearlo como erróneo sin consultar al servidor.
+    const manifestedProductIds = Array.from(rows).map(r => parseInt(r.dataset.productId, 10));
+
+    // Stock físico actual del PRODUCTO en la sede ORIGEN (current_quantity). Se usa
+    // como tope contra cantidades absurdas al declarar un insumo erróneo: el sistema
+    // no lleva stock por lote, así que el único límite razonable es lo que el origen
+    // conserva de ese producto. Proviene del atributo data-origin-stock de cada fila.
+    const originStockMap = {};
+    Array.from(rows).forEach(r => {
+        const pid = parseInt(r.dataset.productId, 10);
+        const stock = parseFloat(r.dataset.originStock);
+        if (Number.isFinite(pid) && Number.isFinite(stock)) {
+            originStockMap[pid] = stock;
+        }
+    });
+
+
     const NOVELTY_TITLES = {
         CONFORME: "Recepción Conforme al 100%",
         FALTANTE_CONTEO: "Faltante Físico de Conteo",
@@ -201,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div>
                 <div class="input-group input-group-sm">
-                    <input type="number" step="0.01" min="0.01" class="form-control err-qty-input" placeholder="0.00" required>
+                    <input type="number" step="0.01" min="0.01" max="1000000" class="form-control err-qty-input" placeholder="0.00" required>
                     <span class="input-group-text err-unit-tag">UN</span>
                 </div>
             </div>
@@ -217,10 +237,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="input-group input-group-sm mt-1">
                     <span class="input-group-text" title="Fecha de vencimiento del lote">Venc.</span>
-                    <input type="date" class="form-control err-exp-input font-monospace" placeholder="AAAA-MM-DD">
+                    <input type="date" class="form-control err-exp-input font-monospace" placeholder="AAAA-MM-DD" readonly>
                 </div>
-                <div class="err-exp-hint mt-1"></div>
+<div class="err-exp-hint mt-1"></div>
             </div>
+            <div class="err-validation-hint d-none mt-1 w-100 small text-danger"></div>
         `;
 
         const select = rowDiv.querySelector(".err-product-select");
@@ -228,6 +249,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const unitTag = rowDiv.querySelector(".err-unit-tag");
         const btnRemove = rowDiv.querySelector(".btn-remove-erroneous");
         const lotInput = rowDiv.querySelector(".err-lot-input");
+        const qtyInput = rowDiv.querySelector(".err-qty-input");
+        const validationHint = rowDiv.querySelector(".err-validation-hint");
 
         select.addEventListener("change", function() {
             const opt = this.options[this.selectedIndex];
@@ -236,20 +259,338 @@ document.addEventListener("DOMContentLoaded", () => {
                 unitTag.textContent = opt.dataset.unit || "UN";
             }
             handleErroneousLotLookup(rowDiv);
+            validateErroneousRow(rowDiv);
         });
 
+        // Debounce para no lanzar un fetch por cada tecla al escribir el lote:
+        // escribir "L-1000" disparaba hasta 6 consultas seguidas y ponía lenta la
+        // página. Ahora solo consulta tras 300 ms de pausa de escritura.
+        let erroneousLotDebounce = null;
         lotInput.addEventListener("input", () => {
             hideAlert();
-            handleErroneousLotLookup(rowDiv);
+            clearTimeout(erroneousLotDebounce);
+            erroneousLotDebounce = setTimeout(() => {
+                handleErroneousLotLookup(rowDiv);
+                validateErroneousRow(rowDiv);
+            }, 300);
         });
+
+        qtyInput.addEventListener("input", () => validateErroneousRow(rowDiv));
 
         btnRemove.addEventListener("click", function() {
             rowDiv.remove();
             checkAndAutoCategorize();
+            // Tras eliminar una fila duplicada, refrescar la validación de las restantes.
+            document.querySelectorAll(".err-row-grid").forEach(vr => validateErroneousRow(vr));
         });
 
         erroneousItemsList.appendChild(rowDiv);
         checkAndAutoCategorize();
+        validateErroneousRow(rowDiv);
+    }
+
+    // Valida una fila de insumo erróneo y muestra feedback inmediato (rojo) sin esperar
+    // al submit. Chequea: (1) producto que ya viene en la guía, (2) cantidad que supera
+    // el stock físico del producto en la sede ORIGEN (tope), (3) duplicados de
+    // "producto + lote" contra otras filas erróneas. Cumple las reglas que ya aplica el
+    // backend al guardar.
+    function validateErroneousRow(rowDiv) {
+        const select = rowDiv.querySelector(".err-product-select");
+        const qtyInput = rowDiv.querySelector(".err-qty-input");
+        const lotInput = rowDiv.querySelector(".err-lot-input");
+        const hint = rowDiv.querySelector(".err-validation-hint");
+        if (!select || !hint) return;
+
+        // Tope de cordura absoluto: nunca se aceptan cantidades absurdas aunque el
+        // origen no tenga inventario registrado o aún no llegue la consulta de stock.
+        const MAX_ERRONEOUS_QTY = 1000000;
+
+        const productId = select.value;
+        const qty = parseFloat(qtyInput && qtyInput.value);
+        const lot = (lotInput && lotInput.value || "").trim().toLowerCase();
+        const messages = [];
+        let isError = false;
+
+        if (!productId) {
+            select.classList.add("is-invalid");
+        } else {
+            select.classList.remove("is-invalid");
+            // (1) Producto que ya viene en la guía no puede declararse como erróneo.
+            if (manifestedProductIds.indexOf(parseInt(productId, 10)) > -1) {
+                messages.push({
+                    text: "Este producto YA viene en la guía; no puede declararse como erróneo.",
+                    icon: "bi-x-octagon-fill",
+                    kind: "danger"
+                });
+                select.classList.add("is-invalid");
+                isError = true;
+            }
+            // (2) Tope de cordura absoluto: solo bloquea cantidades absurdas/irreales
+            // (p. ej. 99999999999) sin comparar contra stock, para no confundir al
+            // operario. El flujo de "disponible por lote" se decide aparte con Mariuska.
+            if (qty && Number.isFinite(qty) && qty > MAX_ERRONEOUS_QTY) {
+                messages.push({
+                    text: `La cantidad (${qty}) es irreal para un insumo recibido por error.`,
+                    icon: "bi-exclamation-octagon-fill",
+                    kind: "danger"
+                });
+                if (qtyInput) qtyInput.classList.add("is-invalid");
+                isError = true;
+            } else if (qtyInput) {
+                qtyInput.classList.remove("is-invalid");
+            }
+        }
+
+        // (3) Duplicados de producto + lote contra otras filas erróneas.
+        if (productId && lot) {
+            document.querySelectorAll(".err-row-grid").forEach(other => {
+                if (other === rowDiv) return;
+                const oSel = other.querySelector(".err-product-select");
+                const oLot = other.querySelector(".err-lot-input");
+                if (oSel && oLot && oSel.value === productId
+                    && oLot.value.trim().toLowerCase() === lot) {
+                    messages.push({
+                        text: `"${oSel.options[oSel.selectedIndex].text}" con lote "${lot}" ya está declarado en otra fila.`,
+                        icon: "bi-files",
+                        kind: "warning"
+                    });
+                    isError = true;
+                }
+            });
+        }
+
+        // Cantidad inválida o no positiva cuando SÍ se eligió producto: un insumo
+        // erróneo debe declarar una cantidad mayor a cero. Antes este bloque era
+        // inalcanzable (let/const + cortocircuito), así que la fila solo se
+        // bloqueaba al enviar; ahora también marca la carpeta roja en vivo.
+        if (!isError && productId && qtyInput &&
+            (!Number.isFinite(qty) || qty <= 0)) {
+            qtyInput.classList.add("is-invalid");
+            isError = true;
+            messages.push({
+                text: "La cantidad debe ser un número mayor a cero.",
+                icon: "bi-exclamation-circle-fill",
+                kind: "warning"
+            });
+        }
+
+        if (isError) {
+            renderValidationHints(hint, messages);
+            hint.classList.remove("d-none");
+        } else {
+            hint.innerHTML = "";
+            hint.classList.add("d-none");
+            // Restaurar el badge de estado del lote que oculta renderValidationHints
+            // mientras hay errores, para volver a la vista normal.
+            const lotBadge = rowDiv.querySelector(".err-exp-hint");
+            if (lotBadge) lotBadge.classList.remove("d-none");
+        }
+        return !isError;
+    }
+
+    // Pinta cada mensaje de validación del insumo erróneo como una tarjeta de alerta
+    // compacta y tipada (danger/warning) con su icono. Mucho más legible que un
+    // párrafo de texto plano concatenado.
+    function renderValidationHints(container, items) {
+        container.innerHTML = items.map(m => `
+            <div class="err-alert err-alert-${m.kind || "danger"}">
+                <i class="bi ${m.icon || "bi-exclamation-circle-fill"} err-alert-icon"></i>
+                <span>${m.text}</span>
+            </div>
+        `).join("");
+        // Mientras haya un error de validación, oculto el badge de estado del lote
+        // (".err-exp-hint": "lote detectado / no está en el sistema") para que las
+        // tarjetas de advertencia no se vean encima ni junto a él. Si el lote se
+        // corrige, el row vuelve a mostrarlo en el flujo normal.
+        const row = container.closest(".err-row-grid");
+        const lotBadge = row && row.querySelector(".err-exp-hint");
+        if (lotBadge) lotBadge.classList.add("d-none");
+    }
+
+    // venir de varios lotes; el operario agrega un renglón por lote real del sobrante.
+    // Al escribir el LOTE, el sistema lo reconoce y AUTOMÁTICAMENTE toma la fecha de
+    // vencimiento (igual que el insumo erróneo). El operario no define el vencimiento:
+    // lo saca el sistema del lote ya registrado.
+    function addSurplusLotRow(row, index) {
+        const list = row.querySelector(".surplus-lot-list");
+        if (!list) return;
+        const lotRow = document.createElement("div");
+        lotRow.className = "surplus-lot-row w-100";
+        lotRow.innerHTML = `
+            <div class="surplus-lot-head">
+                <span class="surplus-lot-num" data-surplus-index=""></span>
+                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-surplus-lot" title="Quitar lote">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </div>
+            <label class="surplus-field">
+                <span>Lote</span>
+                <input type="text" class="form-control form-control-sm input-surplus-lot font-monospace"
+                       placeholder="Lote real del sobrante...">
+            </label>
+            <div class="surplus-field-row">
+                <label class="surplus-field">
+                    <span>Vencimiento (lo pone el sistema)</span>
+                    <input type="date" class="form-control form-control-sm input-surplus-exp font-monospace" readonly>
+                </label>
+                <label class="surplus-field">
+                    <span>Cantidad</span>
+                    <input type="number" step="0.01" min="0" class="form-control form-control-sm input-surplus-qty font-monospace"
+                           placeholder="0.00" aria-label="Cantidad del lote">
+                </label>
+            </div>
+            <div class="surplus-lot-hint mt-1"></div>
+        `;
+        const numEl = lotRow.querySelector(".surplus-lot-num");
+        numEl.textContent = `Lote del sobrante ${(index || 0) + 1}`;
+        const btnRemove = lotRow.querySelector(".btn-remove-surplus-lot");
+        btnRemove.addEventListener("click", () => {
+            lotRow.remove();
+            renumberSurplusRows(row);
+        });
+        const lotInput = lotRow.querySelector(".input-surplus-lot");
+        // Debounce: al escribir el lote no se lanza una consulta por cada tecla,
+        // solo tras 300 ms de pausa (igual que el insumo erróneo).
+        let surplusLotDebounce = null;
+        lotInput.addEventListener("input", () => {
+            hideAlert();
+            clearTimeout(surplusLotDebounce);
+            surplusLotDebounce = setTimeout(() => handleSurplusLotLookup(lotRow, row), 300);
+        });
+        // Al cambiar la cantidad de un lote se refresca el resumen en vivo (cuánto va
+        // y cuánto falta por repartir del sobrante total).
+        const qtyInputRow = lotRow.querySelector(".input-surplus-qty");
+        if (qtyInputRow) {
+            qtyInputRow.addEventListener("input", () => updateSurplusSummary(row));
+        }
+        list.appendChild(lotRow);
+        renumberSurplusRows(row);
+    }
+
+    // Renumera las filas de lote del sobrante ("Lote 1", "Lote 2"...).
+    function renumberSurplusRows(row) {
+        const list = row.querySelector(".surplus-lot-list");
+        if (!list) return;
+        list.querySelectorAll(".surplus-lot-row").forEach((lr, i) => {
+            const num = lr.querySelector(".surplus-lot-num");
+            if (num) num.textContent = `Lote del sobrante ${i + 1}`;
+        });
+        updateSurplusSummary(row);
+    }
+
+    // Resumen en vivo del PANEL "Lote(s) del sobrante": muestra cuál es el excedente
+    // total que hay que repartir entre los lotes y cuánto falta por asignar, para que
+    // el operario entienda exactamente qué cantidad debe escribir en cada lote.
+    // La regla es: la SUMA de las cantidades de los lotes debe cuadrar EXACTAMENTE
+    // con el sobrante total (recibido - despachado). Esto evita la confusión de
+    // "escribo 60 pero pone cualquier número y me marca error".
+    function updateSurplusSummary(row) {
+        const summaryEl = row.querySelector(".surplus-summary");
+        if (!summaryEl) return;
+
+        const unit = row.dataset.unit || "UN";
+        const input = row.querySelector(".input-received");
+        const dispatched = parseFloat(row.dataset.dispatched) || 0;
+        let received = parseFloat(input && input.value);
+        if (isNaN(received) || received < 0) received = 0;
+
+        const target = received - dispatched;
+        const surplusBox = row.querySelector(".surplus-lots");
+        if (!(target > 0.001) || (surplusBox && surplusBox.classList.contains("hidden"))) {
+            summaryEl.innerHTML = "";
+            return;
+        }
+
+        let sum = 0;
+        row.querySelectorAll(".input-surplus-qty").forEach(q => {
+            const v = parseFloat(q.value);
+            if (!isNaN(v) && v > 0) sum += v;
+        });
+
+        const remaining = target - sum;
+        const pending = remaining > 0.01 ? remaining : 0;
+        const over = remaining < -0.01 ? -remaining : 0;
+
+        const ok = Math.abs(remaining) <= 0.01;
+        const statusClass = ok ? "surplus-sum-ok" : (sum > 0 ? "surplus-sum-wait" : "surplus-sum-empty");
+        const statusIcon = ok ? "bi-check-circle-fill" : (sum > 0 ? "bi-hourglass-split" : "bi-pencil-fill");
+
+        summaryEl.className = `surplus-summary small ${statusClass}`;
+        summaryEl.innerHTML = `
+            <i class="bi ${statusIcon}"></i>
+            <span>
+                <strong>Sobrante total: ${target} ${unit}</strong>
+                ${ok
+                    ? `<span class="surplus-sum-msg"> — ¡Cuadra! Los lotes suman ${sum} ${unit}.</span>`
+                    : over > 0
+                        ? `<span class="surplus-sum-msg"> — Le sobra ${over} ${unit}: los lotes suman ${sum} ${unit}, más de lo declarado. Reduzca o ajuste una cantidad.</span>`
+                        : `<span class="surplus-sum-msg"><br>Reparta esta cantidad entre el/los lote(s). Van ${sum} ${unit}; faltan <strong>${pending} ${unit}</strong>.</span>`}
+            </span>`;
+    }
+
+    // Consulta compartida del lote EN EL SISTEMA (producto + lote). Devuelve
+    // Promise de null (no consultable) o { exists, expiration_date }.
+    // Unifica los tres casos (lote del renglón, lote del sobrante, lote del
+    // insumo erróneo) para no duplicar el fetch y el manejo de errores.
+    function fetchLotExpiration(productId, lot) {
+        const pid = parseInt(productId);
+        const l = String(lot || "").trim();
+        if (!pid || !l) return Promise.resolve(null);
+        const url = `/logistics/movements/reception/lot-expiration?product_id=${encodeURIComponent(pid)}&lot_number=${encodeURIComponent(l)}`;
+        return fetch(url, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(res => res.json().catch(() => ({})))
+            .then(data => (data && data.success) ? data : null)
+            .catch(() => null);
+    }
+
+    // Reconocimiento del lote del sobrante EN EL SISTEMA: al escribir el lote, se
+    // consulta el histórico (igual que el insumo erróneo) y se autocompleta el
+    // vencimiento + un badge que indica si existe o no en el sistema.
+    function handleSurplusLotLookup(lotRow, row) {
+        const lotInput = lotRow.querySelector(".input-surplus-lot");
+        const expInput = lotRow.querySelector(".input-surplus-exp");
+        const hint = lotRow.querySelector(".surplus-lot-hint");
+        const productId = parseInt(row.dataset.productId);
+        const lot = lotInput.value.trim();
+
+        if (!productId || !lot) {
+            if (expInput) expInput.value = "";
+            if (hint) hint.innerHTML = "";
+            lotInput.dataset.verified = "";
+            return;
+        }
+
+        fetchLotExpiration(productId, lot).then(data => {
+            if (!data) {
+                if (hint) hint.innerHTML = "";
+                return;
+            }
+            if (data.exists === false) {
+                if (expInput) expInput.value = "";
+                lotInput.dataset.verified = "no";
+                hint.innerHTML = `
+                    <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                        <i class="bi bi-search me-1"></i> Este registro de lote no se encuentra en el sistema
+                    </span>`;
+                return;
+            }
+            lotInput.dataset.verified = "1";
+            if (data.expiration_date) {
+                if (expInput) expInput.value = data.expiration_date;
+                hint.innerHTML = `
+                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
+                        <i class="bi bi-check-circle me-1"></i> Lote y vencimiento detectados
+                    </span>`;
+            } else {
+                if (expInput) expInput.value = "";
+                hint.innerHTML = `
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
+                        <i class="bi bi-check2 me-1"></i> Lote registrado, sin vencimiento conocido
+                    </span>`;
+            }
+        });
     }
 
     function handleErroneousLotLookup(rowDiv) {
@@ -267,57 +608,50 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const url = `/logistics/movements/reception/lot-expiration?product_id=${encodeURIComponent(productId)}&lot_number=${encodeURIComponent(lot)}`;
-
-        fetch(url, {
-            headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-            .then(res => res.json().catch(() => ({})))
-            .then(data => {
-                if (!data || !data.success) {
-                    expInput.value = "";
-                    if (hint) hint.innerHTML = "";
-                    expInput.dataset.verified = "";
-                    return;
-                }
-                if (data.exists === false) {
-                    expInput.value = "";
-                    expInput.dataset.verified = "";
-                    if (hint) {
-                        hint.className = "err-exp-hint";
-                        hint.innerHTML = `
-                            <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
-                                <i class="bi bi-search me-1"></i> Este registro de lote no se encuentra en el sistema
-                            </span>`;
-                    }
-                    return;
-                }
-                if (data.expiration_date) {
-                    expInput.value = data.expiration_date;
-                    if (hint) {
-                        hint.className = "err-exp-hint";
-                        hint.innerHTML = `
-                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
-                                <i class="bi bi-check-circle me-1"></i> Lote y vencimiento detectados
-                            </span>`;
-                    }
-                    expInput.dataset.verified = "1";
-                } else {
-                    expInput.value = "";
-                    expInput.dataset.verified = "";
-                    if (hint) {
-                        hint.className = "err-exp-hint";
-                        hint.innerHTML = `
-                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
-                                <i class="bi bi-check2 me-1"></i> Lote registrado, sin vencimiento conocido
-                            </span>`;
-                    }
-                }
-            })
-            .catch(() => {
+        fetchLotExpiration(productId, lot).then(data => {
+            if (!data) {
                 expInput.value = "";
                 if (hint) hint.innerHTML = "";
-            });
+                expInput.dataset.verified = "";
+                return;
+            }
+            if (data.exists === false) {
+                expInput.value = "";
+                expInput.dataset.verified = "";
+                if (hint) {
+                    hint.className = "err-exp-hint";
+                    hint.innerHTML = `
+                        <div class="err-alert err-alert-warning">
+                            <i class="bi bi-search err-alert-icon"></i>
+                            <span>Este registro de lote no se encuentra en el sistema</span>
+                        </div>`;
+                }
+                return;
+            }
+            if (data.expiration_date) {
+                expInput.value = data.expiration_date;
+                if (hint) {
+                    hint.className = "err-exp-hint";
+                    hint.innerHTML = `
+                        <div class="err-alert err-alert-success">
+                            <i class="bi bi-check-circle err-alert-icon"></i>
+                            <span>Lote y vencimiento detectados</span>
+                        </div>`;
+                }
+                expInput.dataset.verified = "1";
+            } else {
+                expInput.value = "";
+                expInput.dataset.verified = "";
+                if (hint) {
+                    hint.className = "err-exp-hint";
+                    hint.innerHTML = `
+                        <div class="err-alert err-alert-info">
+                            <i class="bi bi-check2 err-alert-icon"></i>
+                            <span>Lote registrado, sin vencimiento conocido</span>
+                        </div>`;
+                }
+            }
+        });
     }
 
 
@@ -354,6 +688,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (btnShowErroneous) {
         btnShowErroneous.addEventListener("click", revealErroneousPanel);
+    }
+
+    // Cuenta SOLO las filas de insumo no solicitado que realmente se completaron
+    // (producto elegido + cantidad > 0). Una fila vacía agregada por error al tocar
+    // "Registrar Insumo Entregado por Error" no debe forzar la sección abierta ni
+    // interferir con una novedad como el Sobrante.
+    function countMeaningfulErroneousRows() {
+        if (!erroneousItemsList) return 0;
+        let count = 0;
+        erroneousItemsList.querySelectorAll(".err-row-grid").forEach(er => {
+            const sel = er.querySelector(".err-product-select");
+            const qtyInput = er.querySelector(".err-qty-input");
+            const prodId = parseInt(sel ? sel.value : 0);
+            const qty = qtyInput ? parseFloat(qtyInput.value) : NaN;
+            if (prodId > 0 && qty > 0) count++;
+        });
+        return count;
     }
 
     function updateBadgeAndGuidance() {
@@ -393,16 +744,24 @@ document.addEventListener("DOMContentLoaded", () => {
         btnSubmit.textContent = guide.buttonText;
         btnSubmit.className = guide.buttonAlert ? "btn-ph-primary btn-alert-state" : "btn-ph-primary";
 
-        // La declaración de insumos no solicitados (erróneos) se muestra cuando la
-        // novedad es "Producto Erróneo"/"Incidencia Mixta" O mientras existan filas
-        // ya cargadas. Nunca se vacían las filas al cambiar de novedad: el auto
-        // diagnóstico re-deriva la clasificación con lo que ya está capturado.
-        const hasErroneousRows = erroneousItemsList && erroneousItemsList.children.length > 0;
-        const showUnsolicited = novelty === "PRODUCTO_ERRONEO" || novelty === "INCIDENCIA_MIXTA" || hasErroneousRows;
+        // La declaración de insumos no solicitados (erróneos) solo se muestra cuando
+        // la novedad es "Producto Erróneo"/"Incidencia Mixta" O mientras existan filas
+        // COMPLETADAS de insumos no solicitados. Los renglones vacíos (agregados por
+        // error al tocar el botón) ya no mantienen la sección abierta: si el operario
+        // pasa a declarar un Sobrante/Faltante, la sección se cierra y no persiste el
+        // "agregar un insumo más" contradictorio.
+        const hasMeaningfulErroneousRows = countMeaningfulErroneousRows() > 0;
+        const showUnsolicited = novelty === "PRODUCTO_ERRONEO" || novelty === "INCIDENCIA_MIXTA" || hasMeaningfulErroneousRows;
         if (erroneousSection) {
             if (showUnsolicited) {
                 erroneousSection.classList.remove("hidden");
-                if (!hasErroneousRows && novelty === "PRODUCTO_ERRONEO") {
+                // Solo se auto-agrega una fila guía cuando NO hay NINGUNA fila aún
+                // (ni siquiera vacía). Usar "sin filas completadas" aquí provocaba un
+                // BUCLE INFINITO: addErroneousItemRow llama a checkAndAutoCategorize,
+                // que llama a updateBadgeAndGuidance, que de nuevo agregaba una fila
+                // vacía (nunca "completa") -> la página se colgaba. Con children.length
+                // === 0 el ciclo se corta tras la primera fila.
+                if (erroneousItemsList && erroneousItemsList.children.length === 0 && novelty === "PRODUCTO_ERRONEO") {
                     addErroneousItemRow();
                 }
             } else {
@@ -473,20 +832,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateLotExpiration(row, null);
 
-        const url = `/logistics/movements/reception/lot-expiration?product_id=${encodeURIComponent(productId)}&lot_number=${encodeURIComponent(lot)}`;
-
-        fetch(url, {
-            headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-            .then(res => res.json().catch(() => ({})))
-            .then(data => {
-                if (data && data.success) {
-                    updateLotExpiration(row, data.expiration_date || null, data.exists);
-                } else {
-                    updateLotExpiration(row, null);
-                }
-            })
-            .catch(() => updateLotExpiration(row, null));
+        fetchLotExpiration(productId, lot).then(data => {
+            if (data) {
+                updateLotExpiration(row, data.expiration_date || null, data.exists);
+            } else {
+                updateLotExpiration(row, null);
+            }
+        });
     }
 
     function checkAndAutoCategorize(applyToSelect = true) {
@@ -500,6 +852,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const condSelect = row.querySelector(".select-item-condition");
             const lotBox = row.querySelector(".row-lot-mismatch");
             const lotExpBox = row.querySelector(".lot-exp-lookup");
+            const singleLotField = row.querySelector(".single-lot-field");
+            const surplusLotsBox = row.querySelector(".surplus-lots");
+            const surplusLotList = row.querySelector(".surplus-lot-list");
 
             let received = parseFloat(input.value);
             if (isNaN(received) || received < 0) received = 0;
@@ -512,22 +867,81 @@ document.addEventListener("DOMContentLoaded", () => {
             // cantidad vuelve a coincidir se restaura a Conforme. Si el operario
             // eligió la condición manualmente, se respeta su decisión.
             const conditionWasManual = condSelect ? row.dataset.condManual === "1" : true;
-            if (condSelect && !conditionWasManual) {
-                if (diff < -0.001) condSelect.value = "FALTANTE_CONTEO";
-                else if (diff > 0.001) condSelect.value = "SOBRANTE_EXCEDENTE";
-                else condSelect.value = "CONFORME";
+            if (condSelect) {
+                if (!conditionWasManual) {
+                    if (diff < -0.001) condSelect.value = "FALTANTE_CONTEO";
+                    else if (diff > 0.001) condSelect.value = "SOBRANTE_EXCEDENTE";
+                    else condSelect.value = "CONFORME";
+                } else {
+                    // Condiciones DE CANTIDAD elegidas a mano deben respaldarse con el
+                    // conteo real. Si declaraste SOBRANTE pero recibiste igual o menos,
+                    // (o FALTANTE pero recibiste igual o más), la cantidad contradice la
+                    // condición: se corrige sola para no mostrar un "sobrante/faltante"
+                    // inexistente en el formulario. Las condiciones de CALIDAD (lote,
+                    // temperatura, custodia...) NO dependen de la cantidad y se respetan.
+                    const manualCond = condSelect.value;
+                    if (manualCond === "SOBRANTE_EXCEDENTE" && diff <= 0.001) {
+                        condSelect.value = diff < -0.001 ? "FALTANTE_CONTEO" : "CONFORME";
+                        row.dataset.condManual = "";
+                    } else if (manualCond === "FALTANTE_CONTEO" && diff >= -0.001) {
+                        condSelect.value = diff > 0.001 ? "SOBRANTE_EXCEDENTE" : "CONFORME";
+                        row.dataset.condManual = "";
+                    }
+                }
             }
 
             const condition = condSelect ? condSelect.value : "CONFORME";
 
+            const isSurplus = diff > 0.001;
+
             if (lotBox) {
-                if (condition === "LOTE_NO_COINCIDE") {
+                // El lote se pide tanto cuando el lote no coincide (LOTE_NO_COINCIDE)
+                // como cuando hay un SOBRANTE: el excedente físico también debe indicar a
+                // qué lote(es) pertenece. Sin esto el sobrante quedaría sin trazabilidad.
+                const needsSingleLot = condition === "LOTE_NO_COINCIDE";
+                if (needsSingleLot || isSurplus) {
                     lotBox.classList.remove("hidden");
+                    // Lote no coincide: pide el lote físico real único del producto que
+                    // se queda (obligatorio). Si además hay sobrante, se aclara que el
+                    // excedente se registra por separado en el panel "Lote(s) del sobrante"
+                    // (dos conceptos distintos: lo que se queda vs. el excedente a arbitraje).
+                    if (needsSingleLot && singleLotField) {
+                        singleLotField.classList.remove("hidden");
+                        const lotRealInput = singleLotField.querySelector(".input-row-lot");
+                        if (lotRealInput) {
+                            lotRealInput.placeholder = isSurplus
+                                ? "Lote físico real del insumo que se queda (el sobrante va más abajo)"
+                                : "Lote físico real del insumo que se queda...";
+                        }
+                    }
+                    else if (singleLotField) singleLotField.classList.add("hidden");
+                    if (isSurplus) {
+                        // Caso SOBRANTE (solo o combinado con lote no coincide): el
+                        // excedente puede venir de 1..N lotes. Se muestra el panel
+                        // "Lote(s) del sobrante" siempre que haya excedente físico,
+                        // para que el backend nunca bloquee con un error que la UI no
+                        // puede resolver. Mientras no haya lote declarado el panel se
+                        // mantiene abierto (auto); luego respeta el colapso manual.
+                        if (surplusLotsBox) surplusLotsBox.classList.remove("hidden");
+                        if (surplusLotList && surplusLotList.children.length === 0) {
+                            const sb = row.querySelector(".surplus-lot-body");
+                            if (sb) sb.classList.remove("hidden");
+                            const caret = row.querySelector(".surplus-caret");
+                            if (caret) caret.classList.add("open");
+                            addSurplusLotRow(row);
+                        }
+                    } else if (surplusLotsBox) {
+                        surplusLotsBox.classList.add("hidden");
+                    }
                 } else {
                     lotBox.classList.add("hidden");
                     if (lotExpBox) lotExpBox.classList.add("hidden");
                 }
             }
+
+            // Refrescar el resumen en vivo del panel "Lote(s) del sobrante" cuando
+            // cambia la cantidad recibida (y por tanto el excedente total a repartir).
+            updateSurplusSummary(row);
 
             diffBadge.className = "diff-badge";
             row.classList.remove("row-ok", "row-missing", "row-surplus", "row-warning");
@@ -651,15 +1065,66 @@ document.addEventListener("DOMContentLoaded", () => {
             condSelect.addEventListener("change", () => {
                 row.dataset.condManual = "1";
                 hideAlert();
+                // Al marcar una condición específica en un renglón (p. ej. LOTE_NO_COINCIDE),
+                // la clasificación general se sincroniza con esa condición en lugar de
+                // quedarse clavada en una elección previa.
+                userManuallyChangedNovelty = false;
+
+                // Aviso claro cuando una condición DE CANTIDAD no está respaldada por el
+                // conteo real. En lugar de solo re-categorizar en silencio, se le dice al
+                // operario qué cantidad debe poner. callcheckAndAutoCategorize lo corrige.
+                const chosen = condSelect.value;
+                const dispatched = parseFloat(row.dataset.dispatched) || 0;
+                const rcv = parseFloat(input.value);
+                const diff = (isNaN(rcv) ? 0 : rcv) - dispatched;
+
+                if (chosen === "SOBRANTE_EXCEDENTE" && diff <= 0.001) {
+                    showAlert(
+                        diff < -0.001
+                            ? "Indicó 'Sobrante', pero la cantidad recibida es MENOR a la despachada. Un sobrante exige recibir más de lo despachado."
+                            : "Indicó 'Sobrante', pero la cantidad recibida es IGUAL a la despachada. Para declarar un sobrante debe escribir una cantidad MAYOR a la despachada."
+                    );
+                } else if (chosen === "FALTANTE_CONTEO" && diff >= -0.001) {
+                    showAlert(
+                        diff > 0.001
+                            ? "Indicó 'Faltante', pero la cantidad recibida es MAYOR a la despachada. Un faltante exige recibir menos de lo despachado."
+                            : "Indicó 'Faltante', pero la cantidad recibida es IGUAL a la despachada. Para declarar un faltante debe escribir una cantidad MENOR a la despachada."
+                    );
+                }
+
                 checkAndAutoCategorize();
             });
         }
 
         const lotInput = row.querySelector(".input-row-lot");
         if (lotInput) {
+            // Debounce: al escribir el lote (insumo o excedente del sobrante) no se
+            // lanza un fetch por cada tecla, solo tras 300 ms de pausa. Evita saturar
+            // el servidor y la lentitud al teclear.
+            let rowLotDebounce = null;
             lotInput.addEventListener("input", () => {
                 hideAlert();
-                handleLotLookup(row);
+                clearTimeout(rowLotDebounce);
+                rowLotDebounce = setTimeout(() => handleLotLookup(row), 300);
+            });
+        }
+
+        const btnAddSurplus = row.querySelector(".btn-add-surplus-lot");
+        if (btnAddSurplus) {
+            btnAddSurplus.addEventListener("click", () => addSurplusLotRow(row));
+        }
+
+        // Toggle del panel "Lote(s) del sobrante": colapsa/expande el cuerpo. El
+        // panel existe para que el usuario sepa que el sobrante exige declarar su
+        // lote; al marcarlo como sobrante se abre solo (ver checkAndAutoCategorize).
+        const btnToggleSurplus = row.querySelector(".btn-toggle-surplus-lots");
+        const surplusBody = row.querySelector(".surplus-lot-body");
+        const surplusCaret = row.querySelector(".surplus-caret");
+        if (btnToggleSurplus && surplusBody) {
+            btnToggleSurplus.addEventListener("click", () => {
+                const willOpen = surplusBody.classList.contains("hidden");
+                surplusBody.classList.toggle("hidden", !willOpen);
+                if (surplusCaret) surplusCaret.classList.toggle("open", willOpen);
             });
         }
     });
@@ -672,7 +1137,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let missingLotField = false;
 
         rows.forEach(row => {
-            const detailId = parseInt(row.dataset.detailId);
+            const detailId = parseInt(row.dataset.detailId, 10);
+            if (!Number.isFinite(detailId)) return;
             const dispatched = parseFloat(row.dataset.dispatched) || 0;
             const input = row.querySelector(".input-received");
             const condSelect = row.querySelector(".select-item-condition");
@@ -683,11 +1149,90 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
 
             const condition = condSelect ? condSelect.value : "CONFORME";
-            const observedLot = (lotInput && condition === "LOTE_NO_COINCIDE") ? lotInput.value.trim() : null;
+            // Mismo umbral de tolerancia que checkAndAutoCategorize (0.001): una
+            // diferencia minúscula dentro del ruido no debe tratarse como sobrante,
+            // para que la UI (que muestra el panel de lotes) y este payload coincidan.
+            const isSurplus = (receivedQty - dispatched) > 0.001;
+            // El lote del SOBRANTE se captura para trazabilidad (va a la auditoría y al
+            // arbitraje), pero NO bloquea el envío: el sobrante legítimo sin lote debe
+            // poder ir a disputa. Solo LOTE_NO_COINCIDE exige lote de forma bloqueante.
+            const observedLot = (lotInput && condition === "LOTE_NO_COINCIDE")
+                ? lotInput.value.trim()
+                : null;
 
             if (condition === "LOTE_NO_COINCIDE" && !observedLot) {
                 missingLotField = true;
             }
+
+            // El excedente puede venir de 1..N lotes: se captura cada fila (lote +
+            // cantidad + vencimiento) que el operario agregó en la lista de lotes del
+            // sobrante. Cada lote se reconoce en el sistema (consulta lot-expiration).
+            const surplusLots = [];
+            let surplusSumQty = 0;
+            let hasLotWithOutQty = false;
+            let hasQtyWithoutLot = false;
+            let surplusHasAnyLot = false;
+            let surplusHasUnrecognizedLot = false;
+            row.querySelectorAll(".surplus-lot-row").forEach(sr => {
+                const sLot = sr.querySelector(".input-surplus-lot");
+                const sExp = sr.querySelector(".input-surplus-exp");
+                const sQty = sr.querySelector(".input-surplus-qty");
+                const lotVal = sLot ? sLot.value.trim() : "";
+                const lotVerified = sLot ? sLot.dataset.verified : "";
+                const qtyVal = sQty ? parseFloat(sQty.value) : NaN;
+                const qty = (isNaN(qtyVal) || qtyVal < 0) ? 0 : qtyVal;
+                if (!lotVal && qty > 0) {
+                    // Cantidad declarada sin lote: el backend solo suma lotes con nombre
+                    // (named_lots), así que esta cantidad NO puede cuadrar el excedente.
+                    // Se marca para obligar a escribir el lote (o vaciar la cantidad) y
+                    // evitar que se pierda en silencio con una suma aparente correcta.
+                    hasQtyWithoutLot = true;
+                }
+                if (lotVal || qty > 0) {
+                    if (lotVal) {
+                        surplusHasAnyLot = true;
+                        // Solo un lote CONFIRMADO como inexistente debe bloquear. Si la
+                        // consulta aún no respondió (verified vacío), NO se marca: el
+                        // backend valida lot_exists como red de seguridad, evitando el
+                        // falso bloqueo cuando el operario confirma justo al teclear.
+                        if (lotVerified === "no") surplusHasUnrecognizedLot = true;
+                        // Suma SOLO los lotes con nombre, igual que el backend (el
+                        // excedente debe trazarse a lotes reconocidos del sistema).
+                        if (qty === 0) hasLotWithOutQty = true;
+                        else surplusSumQty += qty;
+                    }
+                    surplusLots.push({
+                        lot: lotVal,
+                        expiration_date: (lotVal && sExp && sExp.value) ? sExp.value : null,
+                        quantity: qty
+                    });
+                }
+            });
+
+            // Techo de sobrante: el excedente no debería superar el stock físico del
+            // producto en el ORIGEN (el sistema no lleva stock por lote, así que el
+            // límite razonable es el stock del producto). Solo es ADVERTENCIA.
+            const originStock = parseFloat(row.dataset.originStock) || 0;
+            const extraUnits = isSurplus ? (receivedQty - dispatched) : 0;
+            const exceedsOriginStock = extraUnits > originStock + 0.001;
+
+            // Regla: un SOBRANTE es obligatorio declarar a qué lote(s) del sistema
+            // pertenece el excedente. Sin al menos un lote escrito, se bloquea el
+            // envío (igual que LOTE_NO_COINCIDE exige lote).
+            const missingSurplusLot = isSurplus && !surplusHasAnyLot;
+
+            // El lote del sobrante debe EXISTIR en el sistema (no es un dato libre).
+            // Solo se bloquea cuando el sistema lo confirmó como inexistente (la
+            // existencia se verifica de nuevo en el backend al procesar).
+            const unrecognizedSurplusLot = isSurplus && surplusHasUnrecognizedLot;
+
+            // Coherencia de cantidades: la suma de las cantidades de los lotes del
+            // sobrante debe cuadrar con el excedente total recibido. Tanto un lote
+            // sin cantidad como una cantidad sin lote se marcan para pedir que se
+            // complete/corrija; el backend descarta las cantidades sin lote, así que
+            // ambas señales evitan una suma aparente correcta que luego no cuadre.
+            const surplusQtyMismatch = isSurplus && surplusHasAnyLot &&
+                (hasLotWithOutQty || hasQtyWithoutLot || Math.abs(surplusSumQty - extraUnits) > 0.01);
 
             items.push({
                 detail_id: detailId,
@@ -700,7 +1245,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 observed_physical_lot: observedLot,
                 observed_physical_expiration: (observedLot && expInput && expInput.value)
                     ? expInput.value
-                    : null
+                    : null,
+                surplus_lots: surplusLots,
+                extra_units: extraUnits,
+                origin_stock: originStock,
+                exceeds_origin_stock: exceedsOriginStock,
+                missing_surplus_lot: missingSurplusLot,
+                unrecognized_surplus_lot: unrecognizedSurplusLot,
+                surplus_qty_mismatch: surplusQtyMismatch
             });
         });
 
@@ -737,13 +1289,18 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        return { items, erroneous, missingLotField, errInvalid };
+        const missingSurplusLot = items.some(it => it.missing_surplus_lot);
+        const unrecognizedSurplusLot = items.some(it => it.unrecognized_surplus_lot);
+        const surplusQtyMismatch = items.some(it => it.surplus_qty_mismatch);
+
+        return { items, erroneous, missingLotField, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch };
     }
 
     form.addEventListener("submit", (e) => {
         e.preventDefault();
         hideAlert();
 
+        try {
         const { hasAnyIssue, rowsAffected } = checkAndAutoCategorize();
         const noveltyType = noveltySelect.value;
         const notes = notesTextarea.value.trim();
@@ -784,12 +1341,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const { items, erroneous, missingLotField, errInvalid } = buildReceptionPayload();
+        const { items, erroneous, missingLotField, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch } = buildReceptionPayload();
         const itemsPayload = items;
         const erroneousPayload = erroneous;
 
         if (missingLotField) {
             showAlert("Debe ingresar el lote físico real impreso en el empaque para el insumo marcado con Lote no coincide.");
+            return;
+        }
+
+        if (missingSurplusLot) {
+            showAlert("Debe declarar de qué lote del sistema proviene el sobrante. Escriba el lote en la fila de lote del sobrante para poder continuar.");
+            return;
+        }
+
+        if (unrecognizedSurplusLot) {
+            showAlert("El lote del sobrante debe estar registrado en el sistema. Escriba un lote existente (el sistema reconoce el lote y su vencimiento) antes de continuar.");
+            return;
+        }
+
+        if (surplusQtyMismatch) {
+            showAlert("La suma de las cantidades de los lotes del sobrante no coincide con el excedente total. Complete la cantidad de cada lote de modo que sumen exactamente el sobrante recibido.");
             return;
         }
 
@@ -801,6 +1373,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (errInvalid) {
             showAlert("Complete todos los campos del insumo no solicitado con cantidades válidas mayores a cero.");
             return;
+        }
+
+        // Bloquea filas erróneas con problemas detectados al momento de enviar:
+        // producto que ya viene en la guía, cantidad que supera el stock del origen
+        // (tope) o duplicados de producto+lote. La carpeta roja ya se muestra en vivo.
+        if (erroneousPayload.length > 0) {
+            let erroneousBlocked = false;
+            document.querySelectorAll(".err-row-grid").forEach(vr => {
+                if (!validateErroneousRow(vr)) erroneousBlocked = true;
+            });
+            if (erroneousBlocked) {
+                showAlert("Corrija la fila de insumo erróneo marcada en rojo (producto ya en la guía, cantidad que supera el stock del origen o lote duplicado).");
+                return;
+            }
         }
 
         // Guarda el contenido exacto que se certificará; el botón del modal hará el
@@ -848,6 +1434,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 diffText = `<span class="text-primary fw-bold">+${diff.toFixed(2)} ${it.unit} (Sobrante)</span>`;
             }
 
+            // Desglose por lote del sobrante (el excedente puede venir de varios lotes).
+            // Solo se listan las entradas que tienen lote; una sin lote no debe
+            // imprimirse como "(sin lote)" (los guards ya bloquean ese caso antes).
+            let surplusLotsHtml = "";
+            const namedSurplusLots = (it.surplus_lots || []).filter(sl => sl.lot);
+            if (namedSurplusLots.length > 0) {
+                const lotsDetail = namedSurplusLots
+                    .map(sl => {
+                        const qtyText = (sl.quantity > 0) ? ` — ${sl.quantity.toFixed(2)} ${it.unit}` : " — (sin cantidad)";
+                        const expText = (sl.expiration_date) ? ` · vence ${sl.expiration_date}` : "";
+                        return `<span class="text-muted small d-block">· Lote ${sl.lot}${expText}${qtyText}</span>`;
+                    })
+                    .join("");
+                surplusLotsHtml = `<div class="mt-1">${lotsDetail}</div>`;
+            }
+
+            // Aviso (NO bloqueo) cuando el sobrante supera el stock físico del origen.
+            let surplusWarnHtml = "";
+            if (it.exceeds_origin_stock) {
+                surplusWarnHtml = `
+                    <div class="mt-1 text-danger small fw-bold" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        El sobrante (+${it.extra_units.toFixed(2)} ${it.unit}) supera el stock disponible del producto en el origen
+                        (${it.origin_stock || 0} ${it.unit} de ese producto, sin desglose por lote). Verifique que el excedente físico realmente exista.
+                    </div>`;
+            }
+
             listItemsHtml += `
                 <li class="modal-breakdown-item">
                     <div>
@@ -857,6 +1470,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         ${diffText}
                         ${conditionTag}
                     </div>
+                    ${surplusWarnHtml}
+                    ${surplusLotsHtml}
                 </li>
             `;
         });
@@ -885,10 +1500,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
         confirmModalContent.innerHTML = modalHtml;
         confirmModal.classList.remove("hidden");
+        // Se deshabilita el botón de envío mientras el modal está abierto, para
+        // evitar el doble envío si el operario vuelve a hacer clic en "Confirmar"
+        // (dos modales / dos POST concurrentes). Se rehabilita al cancelar.
+        btnSubmit.disabled = true;
+        } catch (err) {
+            console.error("Error al procesar la recepción:", err);
+            showAlert("Ocurrió un error inesperado al confirmar. Revise los datos e intente de nuevo.");
+            btnSubmit.disabled = false;
+            updateBadgeAndGuidance();
+        }
     });
 
     btnCancelModal.addEventListener("click", () => {
         confirmModal.classList.add("hidden");
+        btnSubmit.disabled = false;
+        updateBadgeAndGuidance();
     });
 
     btnAcceptModal.addEventListener("click", async () => {
@@ -901,6 +1528,26 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         const payload = pendingReception;
+
+        // Aviso de techo (NO bloqueo): si algún sobrante supera el stock físico del
+        // producto en el origen, se pide una confirmación explícita del operario antes
+        // de asentar. El excedente igual queda para arbitraje (no se acredita de más),
+        // pero evita confirmar "a ciegas" un excedente que físicamente no cabe.
+        const exceedsOrigin = (payload.items || []).filter(it => it.exceeds_origin_stock);
+        if (exceedsOrigin.length > 0) {
+            const names = exceedsOrigin.map(it => it.product_name).join(", ");
+            const okToProceed = window.confirm(
+                `Atención: el sobrante de ${names} supera el stock disponible del producto en el origen. ` +
+                "(El inventario se mide por producto, sin desglose por lote.) " +
+                "Verifique que el excedente físico realmente exista antes de confirmar. ¿Desea continuar?"
+            );
+            if (!okToProceed) {
+                confirmModal.classList.remove("hidden");
+                btnSubmit.disabled = false;
+                updateBadgeAndGuidance();
+                return;
+            }
+        }
 
         btnSubmit.disabled = true;
         btnSubmit.textContent = "Procesando...";

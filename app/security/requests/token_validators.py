@@ -1,4 +1,5 @@
 from app.security.requests.auth_validators import validar_credenciales_login
+import re
 
 def validar_solicitud_recuperacion(data):
     """Valida que el correo exista y usa la validación del equipo para el formato."""
@@ -21,5 +22,11 @@ def validar_nueva_password(data):
     
     if not validar_credenciales_login("correo@valido.com", nueva_password):
         return False, "La contraseña debe tener entre 6 y 12 caracteres."
+
+    if not re.search(r"[^A-Za-z0-9]", nueva_password):
+        return False, "Esta contraseña debe incluir caracteres especiales."
+
+    if not re.search(r"[A-Z]", nueva_password):
+        return False, "Esta contraseña debe incluir al menos una letra mayúscula."
         
     return True, None

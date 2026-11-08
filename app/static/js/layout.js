@@ -124,4 +124,41 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         });
     }
+
+    // =========================================================
+    // 4. AJUSTE VERTICAL DE SUBMENÚS (no se salen de la pantalla)
+    // =========================================================
+    // En PC los submenús vuelan a la derecha y se alinean con el tope del
+    // botón. Si el botón está cerca del borde inferior, el submenú se
+    // recortaba: ahora se abre hacia arriba (clase .menu-flip-up).
+    if (window.innerWidth > 1024) {
+        document.querySelectorAll(".sidebar .nav-item").forEach(function (item) {
+            const dropdown = item.querySelector(".menu-desplegable");
+            if (!dropdown) return;
+
+            function applyFlip() {
+                const rect = dropdown.getBoundingClientRect();
+                if (rect.bottom > (window.innerHeight - 8)) {
+                    dropdown.classList.add("menu-flip-up");
+                } else {
+                    dropdown.classList.remove("menu-flip-up");
+                }
+            }
+
+            item.addEventListener("mouseenter", function () {
+                requestAnimationFrame(applyFlip);
+            });
+            item.addEventListener("mouseleave", function () {
+                dropdown.classList.remove("menu-flip-up");
+            });
+        });
+
+        // Recalcula al redimensionar la ventana.
+        window.addEventListener("resize", function () {
+            document.querySelectorAll(".sidebar .nav-item").forEach(function (item) {
+                const dropdown = item.querySelector(".menu-desplegable");
+                if (dropdown) dropdown.classList.remove("menu-flip-up");
+            });
+        });
+    }
 });

@@ -187,6 +187,7 @@ def create_purchase():
         expiration_dates = request.form.getlist('expiration_date[]')
         
         items = []
+        date_errors = []
         for i in range(len(product_ids)):
             product_id_val = int(product_ids[i]) if product_ids[i] else None
             exp_date_obj = None
@@ -195,7 +196,7 @@ def create_purchase():
                 try:
                     exp_date_obj = datetime.strptime(expiration_dates[i].strip(), '%Y-%m-%d').date()
                 except ValueError:
-                    pass
+                    date_errors.append(f"fila {i + 1}: fecha de vencimiento inválida '{expiration_dates[i].strip()}' (formato esperado AAAA-MM-DD)")
             
             if not exp_date_obj and product_id_val:
                 product = db.session.query(Product).get(product_id_val)
@@ -205,6 +206,8 @@ def create_purchase():
                         exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
 
             lot_val = lot_numbers[i].strip() if i < len(lot_numbers) and lot_numbers[i] else None
+            if lot_val and len(lot_val) > 50:
+                lot_val = lot_val[:50]
 
             items.append({
                 'product_id': product_id_val,
@@ -213,6 +216,9 @@ def create_purchase():
                 'expiration_date': exp_date_obj,
                 'lot_number': lot_val
             })
+
+        if date_errors:
+            return jsonify({"error": "Error al procesar los campos del formulario.", "details": {"expiration_date": date_errors}}), 400
         
         data = {
             'supplier_id': request.form.get('supplier_id', type=int),
@@ -232,6 +238,19 @@ def create_purchase():
     is_valid, errors = PurchaseValidator.validate_create(data)
     if not is_valid:
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
+
+    # Valida que el proveedor y los productos existan y estén activos.
+    supplier = Supplier.query.get(data['supplier_id'])
+    if not supplier or str(supplier.status or '').upper() not in ('ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA'):
+        return jsonify({"error": "Datos inválidos", "details": {"supplier_id": "El proveedor no existe o no está activo."}}), 400
+
+    missing_products = []
+    for item in items:
+        prod = db.session.query(Product).get(item['product_id'])
+        if not prod or not prod.is_active:
+            missing_products.append(item['product_id'])
+    if missing_products:
+        return jsonify({"error": "Datos inválidos", "details": {"product_id": f"Los siguientes productos no existen o están inactivos: {missing_products}"}}), 400
 
     result = PurchaseService.register_purchase(data)
 

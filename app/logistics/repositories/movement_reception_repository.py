@@ -3,6 +3,7 @@ from datetime import datetime
 from threading import Lock
 from sqlalchemy import text
 from app import db
+from app.models.inventory_model import Product
 
 
 # Candado en proceso que serializa "buscar + crear" en get_or_create_inventory.
@@ -149,17 +150,41 @@ class MovementReceptionRepository:
             }).mappings().first()
 
             if not inv:
+                _min = Decimal('20.00')
+                _prod = db.session.get(Product, product_id)
+                if _prod is not None and _prod.min_stock is not None:
+                    _min = Decimal(str(_prod.min_stock))
                 insert_sql = text("""
-                    INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity)
-                    VALUES (:location_id, :product_id, 0.00, 20.00, 0.00)
+                    INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity, reserved_quantity)
+                    VALUES (:location_id, :product_id, 0.00, :min_stock, 0.00, 0.00)
                     RETURNING id, location_id, product_id, current_quantity, min_stock, transit_quantity
                 """)
                 inv = db.session.execute(insert_sql, {
                     "location_id": location_id,
-                    "product_id": product_id
+                    "product_id": product_id,
+                    "min_stock": _min
                 }).mappings().first()
 
         return inv
+
+    @staticmethod
+    def get_inventory_quantity(location_id, product_id):
+        """Stock físico actual (current_quantity) de un producto en una sede.
+
+        Solo lectura. Se usa para el 'techo' de sobrante en la recepción: un
+        excedente físico no puede superar lo que el origen conserva del producto.
+        No modifica nada del flujo de Mariuska (retornos/selector/disputa).
+        """
+        sql = text("""
+            SELECT current_quantity
+            FROM inventory
+            WHERE location_id = :location_id AND product_id = :product_id
+        """)
+        row = db.session.execute(sql, {
+            "location_id": location_id,
+            "product_id": product_id
+        }).mappings().first()
+        return Decimal(str(row["current_quantity"])) if row else Decimal("0.00")
 
     @staticmethod
     def update_origin_transit(location_id, product_id, decrement_transit):

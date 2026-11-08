@@ -1,6 +1,26 @@
 import re
+from decimal import Decimal
 from app.inventory.repositories.products_repository import ProductRepository
-from app.models.inventory_model import Product
+from app.models.inventory_model import Product, Inventory
+
+
+def _clean_waste_limit(raw):
+    if raw is None or str(raw).strip() == '':
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_min_stock(raw):
+    if raw is None or str(raw).strip() == '':
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
 
 class ProductService:
 
@@ -31,6 +51,8 @@ class ProductService:
             product_type_id=data.get('product_type_id'),
             unit_of_measure=data.get('unit_of_measure', '').strip(),
             technical_description=data.get('technical_description', '').strip(),
+            waste_limit=_clean_waste_limit(data.get('waste_limit')),
+            min_stock=_clean_min_stock(data.get('min_stock')),
             is_active=True
         )
 
@@ -60,8 +82,17 @@ class ProductService:
         product.unit_of_measure = unit_of_measure
         product.sku = cleaned_sku
         product.technical_description = tech_desc
+        product.waste_limit = _clean_waste_limit(data.get('waste_limit'))
+        product.min_stock = _clean_min_stock(data.get('min_stock'))
         
         if 'is_active' in data:
             product.is_active = data.get('is_active') in ['True', True, 1, '1']
+
+        # Sincronizar el mínimo en los inventarios existentes del insumo para
+        # que el valor configurado aplique en todas las sedes (NULL = 20.00).
+        Inventory.query.filter_by(product_id=product.id).update(
+            {Inventory.min_stock: Decimal(str(product.min_stock_efectivo))},
+            synchronize_session=False,
+        )
 
         return ProductRepository.save(product)

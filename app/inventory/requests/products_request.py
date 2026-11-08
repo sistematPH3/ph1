@@ -45,6 +45,32 @@ def validate_product_form(data, current_product_id=None):
 
     technical_description = data.get('technical_description', '').strip()
 
+    # Validación del límite de merma (OPCIONAL: vacío = sin límite de cantidad;
+    # si se llena, debe ser un número mayor a 0 en la unidad del producto).
+    raw_waste_limit = data.get('waste_limit', '').strip()
+    waste_limit = None
+    if raw_waste_limit:
+        try:
+            waste_limit = float(raw_waste_limit)
+            if waste_limit <= 0:
+                errors['waste_limit'] = 'El límite de merma debe ser mayor a 0.'
+        except ValueError:
+            errors['waste_limit'] = 'El límite de merma debe ser un número válido.'
+
+    # Validación del mínimo de stock (OPCIONAL: vacío = usar el valor por
+    # defecto 20.00; si se llena, debe ser un número mayor o igual a 0 en la
+    # unidad del producto: si la unidad es KG, 15 = 15 kilogramos; si es LT,
+    # 15 = 15 litros; si es GRAMOS, 15 = 15 gramos).
+    raw_min_stock = data.get('min_stock', '').strip()
+    min_stock = None
+    if raw_min_stock:
+        try:
+            min_stock = float(raw_min_stock)
+            if min_stock < 0:
+                errors['min_stock'] = 'El mínimo de stock no puede ser negativo.'
+        except ValueError:
+            errors['min_stock'] = 'El mínimo de stock debe ser un número válido.'
+
     # NUEVA VALIDACIÓN: Procesar los cuadritos de fecha de manera unificada
     day = data.get('date_day')
     month = data.get('date_month')
@@ -73,6 +99,8 @@ def validate_product_form(data, current_product_id=None):
         'product_type_id': int(product_type_id) if product_type_id and str(product_type_id).isdigit() else None,
         'unit_of_measure': unit_of_measure if is_valid else '',
         'technical_description': technical_description,
+        'waste_limit': waste_limit,
+        'min_stock': min_stock,
         'expiration_date': expiration_date,  # Se inyecta la fecha limpia calculada
         'is_active': True
     }

@@ -73,13 +73,19 @@ nameInput.addEventListener('input', function() {
 
     emailInput.addEventListener('input', () => ocultarError(emailInput, emailError));
 
-    // Contraseña: Límite de 12 y longitud mínima
+    // Contraseña: Límite de 12, longitud mínima, carácter especial y mayúscula obligatorios
     passwordInput.addEventListener('input', function() {
         const pass = passwordInput.value;
+        const tieneEspecial = /[^A-Za-z0-9]/.test(pass);
+        const tieneMayuscula = /[A-Z]/.test(pass);
         if (pass.length === 0) {
             ocultarError(passwordInput, passError);
         } else if (pass.length < 6) {
             mostrarError(passwordInput, passError, "La contraseña debe tener mínimo 6 caracteres.");
+        } else if (!tieneEspecial) {
+            mostrarError(passwordInput, passError, "Esta contraseña debe incluir caracteres especiales.");
+        } else if (!tieneMayuscula) {
+            mostrarError(passwordInput, passError, "Esta contraseña debe incluir al menos una letra mayúscula.");
         } else if (pass.length === 12) {
             mostrarError(passwordInput, passError, "Has alcanzado el límite de 12 caracteres.");
         } else {

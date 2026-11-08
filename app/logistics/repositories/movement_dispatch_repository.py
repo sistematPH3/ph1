@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import func, case
 from app import db
@@ -25,6 +26,9 @@ class MovementDispatchRepository:
         ).first()
 
         total_stock = float(inventory.current_quantity) if inventory else 0.0
+        # No se ofrece stock congelado por mermas pendientes de aprobación.
+        if inventory:
+            total_stock -= float(inventory.reserved_quantity or 0.0)
         if total_stock <= 0:
             return total_stock, []
 
@@ -247,7 +251,7 @@ class MovementDispatchRepository:
             destination_location_id=destination_id,
             status='EN_TRANSITO',
             user_id=created_by_id,
-            date=datetime.now(),
+            date=current_ve_time(),
             source_dispute_id=source_dispute_id
         )
         db.session.add(movement)
@@ -272,9 +276,30 @@ class MovementDispatchRepository:
             # Saneamiento de variables nulas antes de operar con Decimal
             curr_qty = Decimal(str(inventory.current_quantity or '0.00'))
             trans_qty = Decimal(str(inventory.transit_quantity or '0.00'))
+            res_qty = Decimal(str(inventory.reserved_quantity or '0.00'))
 
-            if curr_qty < quantity:
-                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {curr_qty}, Solicitado: {quantity}")
+            disponible = curr_qty - res_qty
+
+            if disponible < quantity:
+                raise ValueError(f"Stock insuficiente para el insumo ID {product_id}. Disponible: {disponible}, Solicitado: {quantity}")
+
+            # Validación del lote contra la disponibilidad real por partida.
+            # No se usa dict `reserved` porque get_product_lots_available ya
+            # descuenta los MovementDetail flushed por renglones anteriores
+            # del mismo payload (via salidas_traslado).
+            available_lots = MovementDispatchRepository.get_product_lots_available(origin_id, product_id)[1]
+            matching_lot = next((l for l in available_lots if l['lot_number'] == lot_number), None)
+
+            if not matching_lot:
+                raise ValueError(f"El lote {lot_number} no existe o no posee disponibilidad en la sede origen.")
+
+            lot_disp = Decimal(str(matching_lot['available_quantity']))
+
+            if lot_disp < quantity:
+                raise ValueError(
+                    f"El lote {lot_number} solo dispone de {max(lot_disp, Decimal('0.00')):.2f} unidades. "
+                    f"Cantidad solicitada: {quantity:.2f}."
+                )
 
             # Validación del lote contra la disponibilidad real por partida.
             # No se usa dict `reserved` porque get_product_lots_available ya
@@ -340,7 +365,7 @@ class MovementDispatchRepository:
                 'origin_transit_delta': float(total_dispatched)
             },
             'user_id': created_by_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': current_ve_time().isoformat()
         }
 
         audit_entry = AuditLog(
@@ -349,7 +374,7 @@ class MovementDispatchRepository:
             severity='NORMAL',
             user_id=created_by_id,
             location_id=origin_id,
-            timestamp=datetime.now(),
+            timestamp=current_ve_time(),
             changed_data=changed_data
         )
         db.session.add(audit_entry)
@@ -404,7 +429,7 @@ class MovementDispatchRepository:
                 'origin_transit_delta': -float(total_reverted)
             },
             'user_id': user_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': current_ve_time().isoformat()
         }
 
         audit_entry = AuditLog(
@@ -413,7 +438,7 @@ class MovementDispatchRepository:
             severity='ALERTA',
             user_id=user_id,
             location_id=movement.origin_location_id,
-            timestamp=datetime.now(),
+            timestamp=current_ve_time(),
             changed_data=changed_data
         )
         db.session.add(audit_entry)

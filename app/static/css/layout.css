@@ -112,6 +112,18 @@ html, body {
     transform: rotate(180deg);
 }
 
+/* Cuando se abre un modal de Bootstrap (z-index 1055) la pestaña y la barra
+   lateral deben quedar POR DEBAJO del backdrop (1050) para no tapar el modal. */
+body.modal-open .toggle-sidebar-btn {
+    z-index: 1020;
+}
+
+@media (max-width: 1024px) {
+    body.modal-open .sidebar {
+        z-index: 1020 !important;
+    }
+}
+
 /* =========================================================
    BUSCADOR OVALADO
    ========================================================= */
@@ -379,12 +391,25 @@ html, body {
         top: 0;
         left: 100%; 
         min-width: 220px;
+        max-height: calc(100vh - 30px);
+        overflow-y: auto;
         background-color: #0d0e0e; 
         border-left: 2px solid #e31937; 
         border-radius: 0 8px 8px 0;
         box-shadow: 4px 4px 15px rgba(0,0,0,0.5);
         z-index: 1050;
         padding: 5px 0;
+        scrollbar-width: none;
+    }
+
+    .sidebar:not(.searching) .menu-desplegable::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Si el submenú se saldría por abajo, se abre hacia arriba */
+    .sidebar:not(.searching) .menu-desplegable.menu-flip-up {
+        top: auto;
+        bottom: 0;
     }
 
     /* Mostrar el menú desplegable al hacer hover SOLO si la barra no está buscando y NO está colapsada */

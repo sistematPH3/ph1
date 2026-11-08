@@ -58,8 +58,8 @@ class PurchaseValidator:
             qty_raw = item.get('quantity')
             try:
                 qty = Decimal(str(qty_raw))
-                if qty <= Decimal('0.00'):
-                    errors[f'item_{index}_quantity'] = "La cantidad debe ser mayor a 0."
+                if qty < Decimal('0.01'):
+                    errors[f'item_{index}_quantity'] = "La cantidad mínima es 0.01."
                 elif qty > Decimal('999999.99'):
                     errors[f'item_{index}_quantity'] = "La cantidad excede el límite permitido (máx 999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
@@ -68,13 +68,58 @@ class PurchaseValidator:
             price_raw = item.get('foreign_price')
             try:
                 price = Decimal(str(price_raw))
-                if price <= Decimal('0.00'):
-                    errors[f'item_{index}_foreign_price'] = "El precio debe ser mayor a 0."
+                if price < Decimal('0.01'):
+                    errors[f'item_{index}_foreign_price'] = "El precio mínimo es 0.01."
                 elif price > Decimal('999999.99'):
                     errors[f'item_{index}_foreign_price'] = "El precio excede el límite permitido (máx 999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
                 errors[f'item_{index}_foreign_price'] = "Precio numérico inválido."
                 
+        return errors
+
+    @staticmethod
+    def validate_edit_items(items):
+        errors = {}
+
+        if not isinstance(items, list) or len(items) == 0:
+            return {"items": "Debe enviar al menos un insumo para la edición."}
+
+        for index, item in enumerate(items):
+            item_id = item.get('id')
+            if not item_id:
+                errors[f'item_{index}_id'] = "Identificador de insumo faltante."
+
+            if str(item_id).startswith('new_'):
+                prod_id_raw = item.get('product_id')
+                if not prod_id_raw:
+                    errors[f'item_{index}_product_id'] = "Debes seleccionar un producto para el nuevo insumo."
+                else:
+                    try:
+                        if int(prod_id_raw) <= 0:
+                            errors[f'item_{index}_product_id'] = "Identificador de producto inválido."
+                    except (ValueError, TypeError):
+                        errors[f'item_{index}_product_id'] = "El producto debe ser un número entero."
+
+            qty_raw = item.get('quantity')
+            try:
+                qty = Decimal(str(qty_raw))
+                if qty < Decimal('0.01'):
+                    errors[f'item_{index}_quantity'] = "La cantidad mínima es 0.01."
+                elif qty > Decimal('999999.99'):
+                    errors[f'item_{index}_quantity'] = "La cantidad excede el límite permitido (máx 999,999.99)."
+            except (InvalidOperation, TypeError, ValueError):
+                errors[f'item_{index}_quantity'] = "Cantidad numérica inválida."
+
+            price_raw = item.get('foreign_price')
+            try:
+                price = Decimal(str(price_raw))
+                if price < Decimal('0.01'):
+                    errors[f'item_{index}_foreign_price'] = "El precio mínimo es 0.01."
+                elif price > Decimal('999999.99'):
+                    errors[f'item_{index}_foreign_price'] = "El precio excede el límite permitido (máx 999,999.99)."
+            except (InvalidOperation, TypeError, ValueError):
+                errors[f'item_{index}_foreign_price'] = "Precio numérico inválido."
+
         return errors
 
     @classmethod

@@ -100,9 +100,8 @@
                             <tbody>
                                 {% set total_bs = namespace(value=0) %}
                                 {% for item, product_name, product_sku in details %}
-                                    {% set item_price_bs = item.foreign_price * purchase.exchange_rate %}
-                                    {% set subtotal_row_bs = item.quantity * item_price_bs %}
-                                    {% set total_bs.value = total_bs.value + subtotal_row_bs %}
+                                    {% set item_price_bs = item.quantity * item.foreign_price * purchase.exchange_rate %}
+                                    {% set total_bs.value = total_bs.value + item_price_bs %}
                                     <tr>
                                         <td class="ps-4 py-3">
                                             <strong class="text-dark">{{ product_name }}</strong>
@@ -110,7 +109,7 @@
                                                 <small class="text-muted d-block font-monospace">{{ product_sku }}</small>
                                             {% endif %}
                                         </td>
-                                        <td class="text-center py-3 fw-semibold">{{ "{:,.2f}".format(item.quantity) }}</td>
+                                        <td class="text-center py-3 fw-semibold">{{ item.quantity|ph_amount }}</td>
                                         <td class="text-center py-3">
                                             <span class="badge bg-light text-dark border font-monospace">{{ item.lot_number if item.lot_number else 'N/A' }}</span>
                                         </td>
@@ -121,14 +120,14 @@
                                                 <span class="text-muted small">N/A</span>
                                             {% endif %}
                                         </td>
-                                        <td class="text-center text-primary fw-bold py-3">{{ "{:,.2f}".format(item.foreign_price) }}</td>
-                                        <td class="text-center fw-bold pe-4 py-3">Bs. {{ "{:,.2f}".format(subtotal_row_bs) }}</td>
+                                        <td class="text-center text-primary fw-bold py-3">{{ item.foreign_price|ph_amount }}</td>
+                                        <td class="text-center fw-bold pe-4 py-3">Bs. {{ item_price_bs|ph_amount }}</td>
                                     </tr>
                                 {% endfor %}
                                 <tr class="table-light">
                                     <td colspan="4" class="text-end fw-bold p-3 align-middle">Monto Total Facturado:</td>
-                                    <td class="text-center text-primary fw-bold fs-5 p-3 align-middle">{{ "{:,.2f}".format(purchase.total_amount) }} <span class="fs-6">{{ purchase.currency }}</span></td>
-                                    <td class="text-center text-danger fw-bold fs-5 p-3 pe-4 align-middle">Bs. {{ "{:,.2f}".format(total_bs.value) }}</td>
+                                    <td class="text-center text-primary fw-bold fs-5 p-3 align-middle">{{ purchase.total_amount|ph_amount }} <span class="fs-6">{{ purchase.currency }}</span></td>
+                                    <td class="text-center text-danger fw-bold fs-5 p-3 pe-4 align-middle">Bs. {{ total_bs.value|ph_amount }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -138,9 +137,8 @@
                 <div class="card-body p-3 bg-white d-block d-md-none">
                     {% set total_bs_mobile = namespace(value=0) %}
                     {% for item, product_name, product_sku in details %}
-                        {% set item_price_bs = item.foreign_price * purchase.exchange_rate %}
-                        {% set subtotal_row_bs = item.quantity * item_price_bs %}
-                        {% set total_bs_mobile.value = total_bs_mobile.value + subtotal_row_bs %}
+                        {% set item_price_bs = item.quantity * item.foreign_price * purchase.exchange_rate %}
+                        {% set total_bs_mobile.value = total_bs_mobile.value + item_price_bs %}
                         
                         <div class="mobile-item-card">
                             <h6 class="fw-bold text-dark border-bottom pb-2 mb-2">
@@ -151,7 +149,7 @@
                             </h6>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-muted small">Cantidad:</span>
-                                <span class="fw-bold text-primary">{{ "{:,.2f}".format(item.quantity) }}</span>
+                                <span class="fw-bold text-primary">{{ item.quantity|ph_amount }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-muted small">N° Lote:</span>
@@ -169,11 +167,11 @@
                             </div>
                             <div class="d-flex justify-content-between align-items-center mb-2 border-top pt-2">
                                 <span class="text-muted small">Precio Unit. ({{ purchase.currency }}):</span>
-                                <span class="text-success fw-bold">{{ "{:,.2f}".format(item.foreign_price) }}</span>
+                                <span class="text-success fw-bold">{{ item.foreign_price|ph_amount }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mt-2">
                                 <span class="text-dark small fw-bold">Subtotal:</span>
-                                <span class="fw-bold text-dark">Bs. {{ "{:,.2f}".format(subtotal_row_bs) }}</span>
+                                <span class="fw-bold text-dark">Bs. {{ item_price_bs|ph_amount }}</span>
                             </div>
                         </div>
                     {% endfor %}
@@ -181,8 +179,8 @@
                     <div class="mt-4 p-3 rounded-3" style="background-color: #fef2f2; border: 1px solid #fca5a5;">
                         <span class="d-block text-danger fw-bold text-uppercase small mb-2">Monto Total Facturado</span>
                         <div class="d-flex flex-column gap-1">
-                            <span class="d-block text-primary fw-bold fs-5">{{ "{:,.2f}".format(purchase.total_amount) }} {{ purchase.currency }}</span>
-                            <span class="d-block text-danger fw-bold fs-4">Bs. {{ "{:,.2f}".format(total_bs_mobile.value) }}</span>
+                            <span class="d-block text-primary fw-bold fs-5">{{ purchase.total_amount|ph_amount }} {{ purchase.currency }}</span>
+                            <span class="d-block text-danger fw-bold fs-4">Bs. {{ total_bs_mobile.value|ph_amount }}</span>
                         </div>
                     </div>
                 </div>
@@ -242,7 +240,7 @@
                 <div class="card-body text-center text-md-start">
                     <h6 class="text-muted text-uppercase fw-bold small mb-2">Tasa Aplicada</h6>
                     <h3 class="fw-bold text-dark m-0 fs-2 fs-md-3">
-                        1 {{ purchase.currency }} = <span class="d-block d-sm-inline mt-1 mt-sm-0">{{ "{:,.2f}".format(purchase.exchange_rate) }} Bs.</span>
+                        1 {{ purchase.currency }} = <span class="d-block d-sm-inline mt-1 mt-sm-0">{{ purchase.exchange_rate|ph_amount(4) }} Bs.</span>
                     </h3>
                 </div>
             </div>
@@ -257,7 +255,7 @@
                             {% for history in rate_history %}
                                 <div class="list-group-item p-3">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="fw-bold text-success">Bs. {{ "{:,.2f}".format(history.rate) }}</span>
+                                        <span class="fw-bold text-success">Bs. {{ history.rate|ph_amount(4) }}</span>
                                         <span class="badge bg-secondary rounded-pill" style="font-size: 0.75rem;">{{ history.source }}</span>
                                     </div>
                                 </div>

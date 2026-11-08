@@ -1,3 +1,4 @@
+from decimal import Decimal
 from app.extensions import db
 
 class Category(db.Model):
@@ -46,10 +47,22 @@ class Product(db.Model):
     product_type_id = db.Column(db.Integer, db.ForeignKey('product_types.id'), nullable=True)
     
     unit_of_measure = db.Column(db.String(20))
+    # CAMPO AÑADIDO: Límite de merma en la unidad del producto (se configura en product_form)
+    waste_limit = db.Column(db.Numeric(10, 2))
+    # CAMPO AÑADIDO: Mínimo de stock en la unidad del producto (se configura en
+    # product_form; NULL = usar el valor por defecto 20.00 al auto-crear inventario).
+    min_stock = db.Column(db.Numeric(10, 2), nullable=True)
     technical_description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
     inventories = db.relationship('Inventory', backref='product', lazy=True)
+
+    @property
+    def min_stock_efectivo(self):
+        """Mínimo de stock efectivo del producto: el configurado, o 20 por defecto."""
+        if self.min_stock is None:
+            return Decimal('20.00')
+        return Decimal(str(self.min_stock))
 
 
 class Inventory(db.Model):
@@ -65,5 +78,14 @@ class Inventory(db.Model):
     current_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     # CAMPO AÑADIDO: Saldo retenido en tránsito para custodias físicas
     transit_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    # CAMPO AÑADIDO: Stock congelado por mermas PENDIENTES de aprobación.
+    # No se resta de current_quantity: se compromete para que cocina/traslados/
+    # ediciones no lo consuman hasta que el Admin decida.
+    reserved_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00, server_default='0.00')
     # CAMPO AÑADIDO: Necesario para que el trigger sepa cuándo lanzar la alerta
     min_stock = db.Column(db.Numeric(10, 2), nullable=False, default=20.00)
+
+    def available_quantity(self):
+        """Stock realmente disponible para gastar/mover: físico menos lo que
+        ya está en tránsito y lo congelado por mermas pendientes."""
+        return Decimal(str(self.current_quantity or 0)) - Decimal(str(self.transit_quantity or 0)) - Decimal(str(self.reserved_quantity or 0))

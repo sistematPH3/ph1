@@ -1,14 +1,15 @@
 import smtplib
 from email.message import EmailMessage
 import secrets
+import os
 from datetime import datetime, timedelta
 
 # Importamos las funciones del repositorio, incluyendo la nueva consultar_vigencia_token
 from app.security.repositories.token_repositories import guardar_token, actualizar_password_con_token, consultar_vigencia_token
 
 def enviar_correo_recuperacion(email_destino, token):
-    email_emisor = "sistemat3.ph@gmail.com"
-    password_emisor = "xephkblwzhjownnz" 
+    email_emisor = os.getenv('MAIL_USERNAME', 'sistemat3.ph@gmail.com')
+    password_emisor = os.getenv('MAIL_PASSWORD', 'xephkblwzhjownnz')
 
     msg = EmailMessage()
     msg['Subject'] = 'Recuperación de Contraseña - Sistema Pizza Hut'
@@ -33,22 +34,30 @@ def enviar_correo_recuperacion(email_destino, token):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(email_emisor, password_emisor)
             smtp.send_message(msg)
+        return True
     except Exception as e:
         print(f"Error al enviar el correo: {e}")
+        return False
 
 def solicitar_recuperacion(email):
     """
     Genera el token, calcula la expiración, lo guarda en la nueva tabla 
     y dispara el correo.
+    Devuelve:
+        - "ok":             token guardado y correo enviado.
+        - "email_no_existe": el correo no está registrado.
+        - "error_envio":     el token se guardó pero el correo falló.
     """
     token_seguro = secrets.token_urlsafe(32)
     expiracion = datetime.now() + timedelta(hours=1) 
     
     if not guardar_token(email, token_seguro, expiracion):
-        return False
+        return "email_no_existe"
         
-    enviar_correo_recuperacion(email, token_seguro)
-    return True
+    if not enviar_correo_recuperacion(email, token_seguro):
+        return "error_envio"
+
+    return "ok"
 
 def cambiar_password(token, nueva_password):
     """

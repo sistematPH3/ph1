@@ -1,16 +1,17 @@
 /* =========================================================
-   NOTIFICACIONES DE NOVEDADES / ARBITRAJE
+   NOTIFICACIONES DE NOVEDADES / ARBITRAJE / MERMAS
    -----------------------------------------------------------------
    Mantiene en vivo:
-     1. El círculo rojo del sidebar (nº de novedades pendientes).
+     1. Círculo rojo del sidebar (novedades pendientes + mermas
+        pendientes de resolución).
      2. Avisos emergentes (toasts) que se muestran unos segundos y
         desaparecen cuando llega una novedad nueva a la bandeja.
    -----------------------------------------------------------------
    Como se recuerda lo ya visto:
-     - Se guarda una lista de IDs de nas novedades ya anunciadas en
-       localStorage, separada por usuario. Solo disparan toast los IDs
-       que todavía no se habían anunciado (novedad "recién llegada").
-   -----------------------------------------------------------------
+     - Se guarda una lista de IDs de las novedades ya anunciadas en
+       localStorage, separada por usuario y por tipo (disputas/mermas).
+       Solo disparan toast los IDs que todavía no se habían anunciado
+       (novedad "recién llegada").
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -22,48 +23,57 @@ document.addEventListener("DOMContentLoaded", function () {
     const TOAST_DURATION_MS = 6000;   // el aviso se esconde solo a los 6s
     const MAX_VISIBLE_TOASTS = 3;
 
-    const pollUrl = container.dataset.pollUrl;
+const pollUrl = container.dataset.pollUrl;
     const disputesUrl = container.dataset.disputesUrl;
+    const wasteUrl = container.dataset.wasteUrl;
+    const wastesUrl = container.dataset.wastesUrl;
     const userId = container.dataset.userId || "anon";
     const STORAGE_KEY = "ph_disputes_seen_" + userId;
+    const WASTE_STORAGE_KEY = "ph_wastes_seen_" + userId;
 
     const badge = document.getElementById("disputeBadge");
+    const wasteBadge = document.getElementById("wastePendingBadge");
 
     // El aviso por "pendientes" al abrir el dashboard solo aplica en /dashboard/*
     function isOnDashboard() {
         return window.location.pathname.indexOf("/dashboard") === 0;
     }
 
-    /* ---------- Acceso a localStorage (soportado por todos) ---------- */
-    function getSeen() {
+/* ---------- Acceso a localStorage (soportado por todos) ---------- */
+    function getSeen(key) {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = localStorage.getItem(key);
             return raw ? JSON.parse(raw) : [];
         } catch (e) {
             return [];
         }
     }
 
-    function setSeen(ids) {
+    function setSeen(key, ids) {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+            localStorage.setItem(key, JSON.stringify(ids));
         } catch (e) { /* almacenamiento no disponible: ignoramos */ }
     }
 
-    /* ---------- Círculo rojo del sidebar ---------- */
-    function updateBadge(count) {
-        if (!badge) return;
+/* ---------- Círculo rojo del sidebar ---------- */
+    function setBadge(badgeEl, count) {
+        if (!badgeEl) return;
         if (count > 0) {
-            badge.textContent = count;
-            badge.setAttribute("data-count", String(count));
-            badge.removeAttribute("hidden");
+            badgeEl.textContent = count;
+            badgeEl.setAttribute("data-count", String(count));
+            badgeEl.removeAttribute("hidden");
         } else {
-            badge.setAttribute("hidden", "");
+            badgeEl.setAttribute("hidden", "");
         }
     }
 
-    /* ---------- Creación de toasts ---------- */
-    function showToast(title, message, badgeCount) {
+    function updateBadge(count) {
+        setBadge(badge, count);
+    }
+
+/* ---------- Creación de toasts ---------- */
+    function showToast(title, message, badgeCount, targetUrl) {
+        const destination = targetUrl || disputesUrl;
         // No apilar demasiados avisos: descartar los más viejos si hace falta.
         while (container.children.length >= MAX_VISIBLE_TOASTS) {
             const oldest = container.firstElementChild;
@@ -81,10 +91,10 @@ document.addEventListener("DOMContentLoaded", function () {
             '</div>' +
             '<button class="dispute-toast-close" title="Cerrar"><i class="bi bi-x-lg"></i></button>';
 
-        // Clic en la tarjeta => bandeja de arbitraje de disputas.
+        // Clic en la tarjeta => destino según el tipo de aviso.
         toast.addEventListener("click", function (e) {
             if (e.target.closest(".dispute-toast-close")) return;
-            window.location.href = disputesUrl;
+            window.location.href = destination;
         });
 
         toast.querySelector(".dispute-toast-close").addEventListener("click", function (e) {
@@ -125,10 +135,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if (!data) return;
 
-        const count = data.pending_count || 0;
+const count = data.pending_count || 0;
         const items = data.items || [];
         const ids = items.map(function (i) { return String(i.id); });
-        const seen = getSeen();
+        const seen = getSeen(STORAGE_KEY);
         const seenSet = new Set(seen);
 
         updateBadge(count);
@@ -141,11 +151,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 const summary = count === 1
                     ? "Tienes 1 novedad pendiente de resolución en la bandeja de arbitraje de disputas."
                     : "Tienes " + count + " novedades pendientes de resolución en la bandeja de arbitraje de disputas.";
-                showToast("Novedades pendientes de arbitraje", summary, count);
+showToast("Novedades pendientes de arbitraje", summary, count);
             }
 
             // Todo lo que ya estaba pendiente no vuelve a anunciarse.
-            setSeen(ids);
+            setSeen(STORAGE_KEY, ids);
             return;
         }
 
@@ -154,9 +164,9 @@ document.addEventListener("DOMContentLoaded", function () {
             return !seenSet.has(String(i.id));
         });
 
-        if (newItems.length > 0) {
+if (newItems.length > 0) {
             const merged = Array.from(new Set(seen.concat(ids)));
-            setSeen(merged);
+            setSeen(STORAGE_KEY, merged);
 
             newItems.forEach(function (item) {
                 const where = item.origin + " \u2192 " + item.destination;
@@ -169,7 +179,73 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+/* ---------- Mermas pendientes de resolución ---------- */
+    let firstWasteFetch = true;
+
+    async function pollWaste() {
+        if (!wasteBadge || !wasteUrl) return;
+        let data;
+        try {
+            const res = await fetch(wasteUrl, {
+                headers: { "Accept": "application/json" },
+                cache: "no-store",
+                credentials: "same-origin"
+            });
+            if (!res.ok) return;
+            const text = await res.text();
+            data = text ? JSON.parse(text) : null;
+        } catch (e) {
+            return; // siguiente ciclo
+        }
+        if (!data || typeof data.pending_count !== "number") return;
+
+        const count = data.pending_count || 0;
+        const items = data.items || [];
+        const ids = items.map(function (i) { return String(i.id); });
+        const seen = getSeen(WASTE_STORAGE_KEY);
+        const seenSet = new Set(seen);
+
+        setBadge(wasteBadge, count);
+
+        if (firstWasteFetch) {
+            firstWasteFetch = false;
+
+            if (isOnDashboard() && count > 0) {
+                const summary = count === 1
+                    ? "Tienes 1 merma pendiente de resolución en la bandeja de Gestión de Mermas."
+                    : "Tienes " + count + " mermas pendientes de resolución en la bandeja de Gestión de Mermas.";
+                showToast("Mermas pendientes de resolución", summary, count, wastesUrl);
+            }
+
+            // Lo que ya estaba pendiente no vuelve a anunciarse.
+            setSeen(WASTE_STORAGE_KEY, ids);
+            return;
+        }
+
+        // Ciclos posteriores: solo avisan las mermas nuevas.
+        const newItems = items.filter(function (i) {
+            return !seenSet.has(String(i.id));
+        });
+
+        if (newItems.length > 0) {
+            const merged = Array.from(new Set(seen.concat(ids)));
+            setSeen(WASTE_STORAGE_KEY, merged);
+
+            newItems.forEach(function (item) {
+                showToast(
+                    "Nueva merma pendiente \u00b7 #" + item.id,
+                    item.type_name + " \u00b7 " + (item.location_name || "Sede desconocida"),
+                    newItems.length > 1 ? newItems.length : null,
+                    wastesUrl
+                );
+            });
+        }
+    }
+
     // Arranque casi inmediato y luego cada intervalo.
     setTimeout(poll, 1200);
     setInterval(poll, POLL_INTERVAL_MS);
+
+    setTimeout(pollWaste, 1600);
+    setInterval(pollWaste, POLL_INTERVAL_MS);
 });

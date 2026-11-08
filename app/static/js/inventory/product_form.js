@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unitSelect = document.getElementById('unit_of_measure_select');
     const unitCustomInput = document.getElementById('unit_of_measure_custom');
     const skuInput = document.getElementById('sku');
+    const wasteLimitInput = document.getElementById('waste_limit');
 
     // Fechas y avisos
     const expirationDateGroup = document.getElementById('expiration-date-group');
@@ -126,6 +127,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
+    function validateWasteLimit() {
+        if (!wasteLimitInput) return true;
+        const raw = wasteLimitInput.value.trim();
+        if (raw === '') {
+            showFieldError(wasteLimitInput, 'El límite de merma es obligatorio.');
+            return false;
+        }
+        const value = parseFloat(raw);
+        if (isNaN(value) || value < 0) {
+            showFieldError(wasteLimitInput, 'El límite de merma debe ser un número mayor o igual a 0.');
+            return false;
+        }
+        clearFieldError(wasteLimitInput);
+        return true;
+    }
+
     function validatePrimaryExpirationDate() {
         if (expirationDateGroup && expirationDateGroup.style.display !== 'none') {
             const day = parseInt(dayInput.value, 10);
@@ -152,6 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         skuInput.addEventListener('blur', validateSKU);
         skuInput.addEventListener('input', () => { if (skuInput.value.trim()) clearFieldError(skuInput); });
     }
+    if (wasteLimitInput) {
+        wasteLimitInput.addEventListener('blur', validateWasteLimit);
+        wasteLimitInput.addEventListener('input', () => { if (wasteLimitInput.value.trim()) clearFieldError(wasteLimitInput); });
+    }
 
     [dayInput, monthInput, yearInput].forEach(input => {
         if (input) input.addEventListener('input', validatePrimaryExpirationDate);
@@ -164,8 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const isUnitValid = validateUnit();
             const isSkuValid = validateSKU();
             const isDateValid = validatePrimaryExpirationDate();
+            const isWasteLimitValid = validateWasteLimit();
 
-            if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid || !isDateValid) {
+            if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid || !isDateValid || !isWasteLimitValid) {
                 e.preventDefault();
                 const firstError = document.querySelector('.js-validation-error');
                 if (firstError) {

@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from app.models.inventory_model import db, Inventory, Product
 from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
-from app.models.waste_model import AuditLog
+from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.security_model import User, user_locations
 
 class RegisterConsumptionRepository:
@@ -53,11 +53,13 @@ class RegisterConsumptionRepository:
 
         entradas_por_lote = {}
         salidas_traslados = {}
+        moved_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE',
+                          'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
 
         if loc_id == 1:
-            purchase_records = db.session.query(
+            compras = db.session.query(
                 PurchaseDetail.lot_number,
-                PurchaseDetail.expiration_date,
+                func.min(PurchaseDetail.expiration_date).label('min_exp'),
                 func.sum(PurchaseDetail.quantity).label('total_qty')
             ).join(
                 Purchase, PurchaseDetail.purchase_id == Purchase.id
@@ -66,66 +68,73 @@ class RegisterConsumptionRepository:
                 PurchaseDetail.product_id == prod_id,
                 PurchaseDetail.lot_number.isnot(None),
                 PurchaseDetail.lot_number != ''
-            ).group_by(
-                PurchaseDetail.lot_number,
-                PurchaseDetail.expiration_date
-            ).all()
+            ).group_by(PurchaseDetail.lot_number).all()
 
-            for r in purchase_records:
-                lot = r.lot_number.strip()
-                entradas_por_lote[lot] = {
-                    'expiration_date': r.expiration_date,
-                    'total_in': float(r.total_qty or 0.0)
-                }
-
-            movements_out = db.session.query(
+            devoluciones = db.session.query(
                 MovementDetail.lot_number,
-                func.sum(MovementDetail.quantity).label('total_out')
-            ).join(
-                Movement, MovementDetail.movement_id == Movement.id
-            ).filter(
-                Movement.origin_location_id == 1,
-                Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO', 'CANCELADO_EMISOR']),
+                func.min(MovementDetail.expiration_date).label('min_exp'),
+                func.sum(func.coalesce(MovementDetail.received_quantity,
+                                       MovementDetail.quantity)).label('total_qty')
+            ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
+                func.upper(Movement.status).in_(moved_statuses),
+                Movement.destination_location_id == 1,
+                Movement.origin_location_id != 1,
                 MovementDetail.product_id == prod_id,
-                MovementDetail.lot_number.isnot(None)
+                MovementDetail.lot_number.isnot(None),
+                MovementDetail.lot_number != ''
             ).group_by(MovementDetail.lot_number).all()
 
-            salidas_traslados = {r.lot_number.strip(): float(r.total_out or 0.0) for r in movements_out if r.lot_number}
-
+            for r in list(compras) + list(devoluciones):
+                lot = r.lot_number.strip()
+                prev = entradas_por_lote.get(lot)
+                exps = [e for e in (prev['expiration_date'] if prev else None, r.min_exp) if e]
+                entradas_por_lote[lot] = {
+                    'expiration_date': min(exps) if exps else None,
+                    'total_in': float(r.total_qty or 0.0) + (prev['total_in'] if prev else 0.0),
+                }
         else:
-            valid_statuses = ['COMPLETED', 'COMPLETADO', 'NOVEDAD_FALTANTE', 'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
-            movement_records = db.session.query(
+            entradas = db.session.query(
                 MovementDetail.lot_number,
-                MovementDetail.expiration_date,
-                func.sum(func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity)).label('total_qty')
-            ).join(
-                Movement, MovementDetail.movement_id == Movement.id
-            ).filter(
-                func.upper(Movement.status).in_(valid_statuses),
+                func.min(MovementDetail.expiration_date).label('min_exp'),
+                func.sum(func.coalesce(MovementDetail.received_quantity,
+                                       MovementDetail.quantity)).label('total_qty')
+            ).join(Movement, MovementDetail.movement_id == Movement.id).filter(
+                func.upper(Movement.status).in_(moved_statuses),
                 Movement.destination_location_id == loc_id,
                 MovementDetail.product_id == prod_id,
                 MovementDetail.lot_number.isnot(None),
                 MovementDetail.lot_number != ''
-            ).group_by(
-                MovementDetail.lot_number,
-                MovementDetail.expiration_date
-            ).all()
+            ).group_by(MovementDetail.lot_number).all()
 
-            for r in movement_records:
+            for r in entradas:
                 lot = r.lot_number.strip()
                 entradas_por_lote[lot] = {
-                    'expiration_date': r.expiration_date,
-                    'total_in': float(r.total_qty or 0.0)
+                    'expiration_date': r.min_exp,
+                    'total_in': float(r.total_qty or 0.0),
                 }
 
+        salidas = db.session.query(
+            MovementDetail.lot_number,
+            func.sum(MovementDetail.quantity).label('total_out')
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == loc_id,
+            Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO', 'CANCELADO_EMISOR']),
+            MovementDetail.product_id == prod_id,
+            MovementDetail.lot_number.isnot(None)
+        ).group_by(MovementDetail.lot_number).all()
+
+        salidas_traslados = {r.lot_number.strip(): float(r.total_out or 0.0) for r in salidas if r.lot_number}
+
+        salidas_consumo = {}
         audit_records = db.session.query(
             AuditLog.changed_data
         ).filter(
             AuditLog.location_id == loc_id,
-            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA', 'MERMA'])
+            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA'])
         ).all()
 
-        salidas_consumo = {}
         for (c_data,) in audit_records:
             if not c_data:
                 continue
@@ -136,33 +145,44 @@ class RegisterConsumptionRepository:
                     continue
             if not isinstance(c_data, dict):
                 continue
-                
-            p_id = c_data.get('product_id')
+
+            try:
+                p_id = int(c_data.get('product_id')) if c_data.get('product_id') is not None else None
+            except (TypeError, ValueError):
+                p_id = None
             l_num = c_data.get('lot_number')
             try:
                 qty_change = float(c_data.get('quantity_changed', 0.0))
             except (TypeError, ValueError):
                 qty_change = 0.0
 
-            matches_product = False
-            if p_id is not None:
-                try:
-                    matches_product = int(p_id) == prod_id
-                except (TypeError, ValueError):
-                    matches_product = False
-
-            if matches_product and l_num and l_num != 'N/A':
+            if p_id == prod_id and l_num and str(l_num).strip() != 'N/A':
                 l_num_clean = str(l_num).strip()
                 salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(qty_change)
 
+        salidas_aprobadas = {}
+        aprobadas = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_mermado')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            Waste.status == 'APROBADO',
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+
+        for r in aprobadas:
+            if r.lot_number and str(r.lot_number).strip() != 'N/A':
+                salidas_aprobadas[str(r.lot_number).strip()] = float(r.total_mermado or 0.0)
+
         lots = []
         for lot_num, data in entradas_por_lote.items():
-            total_in = data['total_in']
-            total_out_traslados = salidas_traslados.get(lot_num, 0.0)
-            total_out_consumos = salidas_consumo.get(lot_num, 0.0)
-            
-            disponible = total_in - total_out_traslados - total_out_consumos
-            
+            disponible = (data['total_in']
+                          - salidas_traslados.get(lot_num, 0.0)
+                          - salidas_consumo.get(lot_num, 0.0)
+                          - salidas_aprobadas.get(lot_num, 0.0))
+
             if disponible > 0.001:
                 lots.append({
                     'lot_number': lot_num,
@@ -172,10 +192,10 @@ class RegisterConsumptionRepository:
                 })
 
         lots.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
-        
+
         for l in lots:
             l.pop('exp_date_raw', None)
-            
+
         return lots
 
     @staticmethod
