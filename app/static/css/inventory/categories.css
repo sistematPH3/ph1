@@ -186,7 +186,7 @@
 }
 
 #categorySearchInput {
-    border: 1px solid var(--ph-border-soft, #dee2e6) !important;
+    border: none !important;
     background-color: #f8f9fa !important;
     transition: all 0.3s ease-in-out !important;
     color: var(--ph-text-main, #1F2937) !important;

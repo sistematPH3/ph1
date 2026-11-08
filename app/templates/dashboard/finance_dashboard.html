@@ -1,53 +1,470 @@
 {% extends "layout.html" %}
 
+{% set fin_iconos = {
+    'compras': 'bi-cart3',
+    'consumo_cocina': 'bi-fire',
+    'mermas': 'bi-bounding-box',
+    'traslados': 'bi-truck',
+    'costo_operativo': 'bi-wallet2',
+} %}
+{% set fin_tonos = {
+    'compras': 'rojo',
+    'consumo_cocina': 'naranja',
+    'mermas': 'ambar',
+    'traslados': 'verde',
+    'costo_operativo': 'azul',
+} %}
+{% set fin_roles = {
+    'Finance': 'Finanzas',
+    'Administrator': 'Administrador',
+    'Manager': 'Gerente',
+    'Assistant Manager': 'Subgerente',
+    'Operations': 'Operaciones',
+    'Management': 'Dirección',
+    'Guest': 'Invitado',
+} %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;900&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/finance_dashboard.css') }}?v=42">
+{% endblock %}
+
 {% block content %}
-<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/finance_dashboard.css') }}">
 
-<header class="dashboard-header">
-    <h1>Panel de Finanzas</h1>
-    <p>Bienvenido al módulo financiero, <strong>{{ current_user.name }}</strong>.</p>
+<!-- Cabecera con identidad corporativa -->
+<div class="fin-hero-wrap">
+<header class="dashboard-header fin-hero">
+    <div class="fin-hero-texto">
+        <p class="fin-hero-kicker"><i class="bi bi-cash-stack me-1"></i>Módulo financiero &middot; Sistema PH</p>
+        <h1>Panel de Finanzas</h1>
+        <p>Supervisa los indicadores del mes y descarga tus reportes del período vigente.</p>
+    </div>
+    <div class="fin-hero-aside">
+        <div class="fin-hero-perfil">
+            <div class="fin-avatar">{{ current_user.name[:1]|upper }}</div>
+            <div class="fin-avatar-copy">
+                <div class="fin-avatar-nombre">{{ current_user.name }}</div>
+                <div class="fin-avatar-rol">{% if current_user.role %}{{ fin_roles.get(current_user.role.name, current_user.role.name) }}{% endif %}</div>
+            </div>
+        </div>
+        <div class="fin-hero-badge">
+            {% if kpis_mes %}
+            <i class="bi bi-calendar3"></i>
+            <div class="fin-hero-badge-copy">
+                <span class="fin-hero-badge-t">Período vigente</span>
+                <span class="fin-hero-badge-v">{{ kpis_mes.period.label }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </header>
-
-<!-- Grid superior con las 2 tarjetas de auditoría (más grandes y espaciosas) -->
-<div class="metrics-grid finance-metrics">
-    <a href="{{ url_for('audit.ver_auditoria_accesos') }}" class="metric-card">
-        <div class="metric-info">
-            <h3>Auditoría de Accesos</h3>
-            <div class="subtitle-desc">Monitoreo de entradas y sesiones</div>
-        </div>
-        <div class="metric-icon">
-            <i class="fas fa-shield-alt"></i>
-        </div>
-    </a>
-
-    <a href="{{ url_for('audit_user.list_user_audits') }}" class="metric-card">
-        <div class="metric-info">
-            <h3>Auditoría de Personal</h3>
-            <div class="subtitle-desc">Control y trazabilidad de acciones</div>
-        </div>
-        <div class="metric-icon">
-            <i class="fas fa-user-shield"></i>
-        </div>
-    </a>
 </div>
 
-<!-- Panel inferior extendido para Reportes -->
-<div class="dashboard-content-single">
-    <div class="panel">
-        <div class="panel-header">
-            <h2>Reportes Financieros</h2>
-            <a href="#" class="panel-link">Ver Detalles</a>
+<!-- Filtros del panel: sede (si hay más de una) y período a consultar -->
+<section class="fin-filtros" aria-label="Filtros del panel">
+    <form method="get" action="{{ url_for('dashboard.finance_dashboard') }}"
+          class="fin-filtros-form">
+        <div class="fin-filtros-titulo">
+            <i class="bi bi-funnel me-1"></i>
+            <span>Filtros</span>
         </div>
-        <div class="report-card-body" onclick="location.href='#'" title="Click para ver reportes">
-            <div class="report-content-placeholder">
-                <i class="fas fa-chart-line report-large-icon"></i>
-                <div>
-                    <h4>Generación y análisis de informes</h4>
-                    <p>Visualiza balances generales, ingresos, gastos y estadísticas de caja.</p>
+        {% if es_multisede %}
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finSede">Sede</label>
+            <select id="finSede" name="sede" class="form-select form-select-sm">
+                <option value="" {% if not sede_actual %}selected{% endif %}>
+                    Todas las sedes{% if not sede_actual %} · activo{% endif %}
+                </option>
+                {% for opt in sedes_opciones %}
+                <option value="{{ opt.id }}"{% if sede_actual == opt.id %} selected{% endif %}>
+                    {{ opt.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finPeriodo">Período</label>
+            <select id="finPeriodo" name="periodo" class="form-select form-select-sm">
+                <option value="" {% if not periodo_actual %}selected{% endif %}>
+                    Período actual{% if not periodo_actual %} · vigente{% endif %}
+                </option>
+                {% for periode in periodos_mes %}
+                <option value="{{ periode.valor }}"{% if periodo_actual == periode.valor %} selected{% endif %}>
+                    {{ periode.etiqueta }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finAplicar">Consultar</label>
+            <button id="finAplicar" type="submit" class="btn btn-fin-primary btn-sm">
+                <i class="bi bi-arrow-repeat me-1"></i> Aplicar
+            </button>
+        </div>
+    </form>
+</section>
+
+<!-- KPIs del mes -->
+<section class="fin-tarjetas" aria-label="Indicadores del mes">
+    <div class="fin-seccion-head">
+        <h2 class="fin-seccion-titulo">
+            <span class="fin-seccion-ico"><i class="bi bi-speedometer2"></i></span>
+            Indicadores del mes
+        </h2>
+        <span class="fin-seccion-leyenda">
+            <i class="bi bi-circle-fill fin-leyenda-dot"></i>
+            {% if kpis_mes %}{{ kpis_mes.moneda }} · {{ kpis_mes.period.label }}{% endif %}
+        </span>
+    </div>
+    <div class="fin-kpi-grid">
+        {% if kpis_mes %}
+        {% set claves_fin = (['compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo']
+                             if ver_compras
+                             else ['consumo_cocina', 'mermas', 'traslados', 'costo_operativo']) %}
+        {% for clave in claves_fin %}
+        {% set kpi = kpis_mes.kpis[clave] %}
+        <div class="fin-kpi-card fin-kpi--{{ fin_tonos[clave] }}">
+            <div class="fin-kpi-ico"><i class="bi {{ fin_iconos[clave] }}"></i></div>
+            <div class="fin-kpi-etiqueta">{{ kpi.label }}</div>
+            <div class="fin-kpi-valor">{{ kpi.actual | ph_amount }}</div>
+            {% if clave == 'traslados' and kpi.conteo is defined %}
+            <div class="fin-kpi-detalle">
+                <i class="bi bi-box-seam me-1"></i>{{ kpi.conteo }} traslados &middot; {{ kpi.quantity | ph_qty }} uds.
+            </div>
+            {% endif %}
+            <div class="fin-kpi-pie">
+                {% if kpi.pct is not none %}
+                <span class="fin-pill fin-pill--{{ kpi.direccion }}">
+                    <i class="bi {{ 'bi-arrow-up-right' if kpi.direccion == 'up'
+                                       else ('bi-arrow-down-right' if kpi.direccion == 'down' else 'bi-dash') }}"></i>
+                    {{ (kpi.pct | ph_amount) ~ '%' }}
+                </span>
+                <span class="fin-kpi-vs">vs {{ kpis_mes.period.previous_label }}</span>
+                {% else %}<span class="fin-kpi-sin">— sin comparativo</span>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-light border text-muted small mb-0 col-12">
+            Aún no hay indicadores disponibles para el período actual.
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Mini estadísticas: dos pantallas lado a lado -->
+{% if kpis_mes %}
+{% set claves_g = (['compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo']
+                   if ver_compras
+                   else ['consumo_cocina', 'mermas', 'traslados', 'costo_operativo']) %}
+{% set comp = kpis_mes.kpis['compras'] if ver_compras else kpis_mes.kpis['traslados'] %}
+{% set panel_titulo = 'Compras del mes' if ver_compras else 'Traslados del mes' %}
+{% set panel_marca = 'COMPRAS' if ver_compras else 'TRASLADOS' %}
+{% set bm = namespace(max=0) %}
+{% if comp.anterior|float > bm.max %}{% set bm.max = comp.anterior|float %}{% endif %}
+{% if comp.actual|float > bm.max %}{% set bm.max = comp.actual|float %}{% endif %}
+{% set cm = namespace(max=0, total=0) %}
+{% for c2 in claves_g %}
+    {% set v2 = kpis_mes.kpis[c2].actual|float %}
+    {% if v2 > cm.max %}{% set cm.max = v2 %}{% endif %}
+    {% set cm.total = cm.total + v2 %}
+{% endfor %}
+<div class="fin-pantallas">
+    <!-- Pantalla 1: flujo principal del mes (compras o traslados según Central) -->
+    <div class="panel fin-est">
+        <div class="panel-header">
+            <h2><i class="bi bi-bar-chart me-2"></i>{{ panel_titulo }}</h2>
+            <span class="fin-est-marca">{{ panel_marca }} / {{ kpis_mes.moneda }}</span>
+        </div>
+        <div class="fin-grafica">
+            <div class="fin-grafica-col">
+                <div class="fin-grafica-barra fin-grafica-barra--anterior"
+                     style="height: {{ ((comp.anterior|float / bm.max * 100) if bm.max else 0) }}%"></div>
+                <div class="fin-grafica-val">{{ comp.anterior | ph_amount }}</div>
+                <div class="fin-grafica-nom">{{ kpis_mes.period.previous_label }}</div>
+            </div>
+            <div class="fin-grafica-col">
+                <div class="fin-grafica-barra fin-grafica-barra--actual"
+                     style="height: {{ ((comp.actual|float / bm.max * 100) if bm.max else 0) }}%"></div>
+                <div class="fin-grafica-val">{{ comp.actual | ph_amount }}</div>
+                <div class="fin-grafica-nom">Mes actual</div>
+            </div>
+        </div>
+        <div class="fin-grafica-note">
+            {% if comp.pct is not none %}
+            <i class="bi {{ 'bi-arrow-up-right text-danger' if comp.direccion == 'up'
+                           else ('bi-arrow-down-right text-success' if comp.direccion == 'down' else 'bi-dash') }}"></i>
+            {{ comp.pct | ph_amount }}% frente a {{ kpis_mes.period.previous_label }}
+            {% else %}<span class="text-muted">— sin comparativo</span>{% endif %}
+        </div>
+        {% if traslados_mes %}
+        {% set dir_ppal = traslados_direccion_principal %}
+        {% set dd = traslados_mes[dir_ppal] %}
+        {% set dir_iconos = {'enviados': 'bi-arrow-up-circle',
+                             'recibidos': 'bi-arrow-down-circle',
+                             'internos': 'bi-arrow-left-right'} %}
+        <div class="fin-direccional-head">
+            <span><i class="bi bi-arrow-down-circle me-2"></i>Flujo de traslados (recibidos)</span>
+            <span class="fin-est-marca">MERCANCÍA Y COSTO · {{ traslados_mes.moneda }}</span>
+        </div>
+        <div class="fin-direccional">
+            <div class="fin-dir-card fin-dir-card--principal">
+                <div class="fin-dir-head-col">
+                    <div class="fin-dir-head">
+                        <i class="bi {{ dir_iconos[dir_ppal] }}"></i>
+                        <span class="fin-dir-propio">
+                            {{ 'Recibidos' if dir_ppal == 'recibidos'
+                               else ('Enviados' if dir_ppal == 'enviados' else 'Internos') }}
+                        </span>
+                        <span class="fin-dir-foco">tu flujo</span>
+                    </div>
+                </div>
+                <div class="fin-dir-metricas">
+                    <div class="fin-dir-conteo">{{ dd.conteo }}<span class="fin-dir-txt">traslados</span></div>
+                    <div class="fin-dir-fila">
+                        <span>Mercancía</span><strong>{{ dd.quantity | ph_qty }} uds.</strong>
+                    </div>
+                    <div class="fin-dir-fila">
+                        <span>Costo</span><strong>{{ dd.cost | ph_amount }}</strong>
+                    </div>
                 </div>
             </div>
         </div>
+        <div class="fin-grafica-note">
+            <i class="bi bi-info-circle me-1"></i>
+            Traslados del mes: <strong>{{ traslados_mes.total.conteo }}</strong> movimientos por
+            <strong>{{ traslados_mes.total.cost | ph_amount }}</strong>.
+            {% if traslados_mes.perdidas %}Pérdidas valorizadas:
+            <strong>{{ traslados_mes.perdidas | ph_amount }}</strong>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    <!-- Pantalla 2: composición del gasto -->
+    <div class="panel fin-est">
+        <div class="panel-header">
+            <h2><i class="bi bi-pie-chart me-2"></i>Composición del gasto</h2>
+            <span class="fin-est-marca">{{ kpis_mes.period.label }}</span>
+        </div>
+        <div class="fin-composicion">
+            {% for c2 in claves_g %}
+            {% set kv = kpis_mes.kpis[c2] %}
+            <div class="fin-barra-fila">
+                <span class="fin-barra-nom"><i class="bi {{ fin_iconos[c2] }}"></i>{{ kv.label }}</span>
+                <div class="fin-barra-track">
+                    <div class="fin-barra-fill fin-barra-fill--{{ fin_tonos[c2] }}"
+                         style="width: {{ ((kv.actual|float / cm.max * 100) if cm.max else 0) }}%"></div>
+                </div>
+                <span class="fin-barra-monto">{{ kv.actual | ph_amount }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="fin-composicion-total">
+            <span>Total del mes</span>
+            <strong>{{ cm.total | round(2) | ph_amount }}</strong>
+        </div>
     </div>
 </div>
+{% endif %}
+
+<!-- Panorama del período: evolución, resumen general y compras por categoría -->
+<section class="fin-extra{{ '' if ver_compras else ' fin-extra--dos' }}" aria-label="Panorama del período">
+    <div class="panel fin-evo-wrap">
+        <div class="panel-header">
+            <h2><i class="bi bi-graph-up me-2"></i>Evolución de egresos</h2>
+            <span class="fin-est-marca">ÚLTIMOS 6 MESES · USD{% if ver_compras %} · INCL. COMPRAS{% endif %}</span>
+        </div>
+        {% set evo_max = namespace(max=0) %}
+        {% for evola in evolucion_mes %}
+            {% if evola.monto | float > evo_max.max %}{% set evo_max.max = evola.monto | float %}{% endif %}
+        {% endfor %}
+        {% if evolucion_mes|length > 0 %}
+        {% set evo_l = namespace(puntos='', n=evolucion_mes|length, max=evo_max.max) %}
+        {% set evo_step = (88 / (evo_l.n - 1)) if evo_l.n > 1 else 0 %}
+        {% for evola in evolucion_mes %}
+            {% set evo_x = 6 + (loop.index0 * evo_step) %}
+            {% set evo_pct = ((evola.monto | float / evo_l.max * 100) if evo_l.max else 0) %}
+            {% set evo_y = 100 - evo_pct %}
+            {% if loop.first %}
+                {% set evo_l.puntos = "M " ~ evo_x ~ " " ~ evo_y %}
+            {% else %}
+                {% set evo_l.puntos = evo_l.puntos ~ " L " ~ evo_x ~ " " ~ evo_y %}
+            {% endif %}
+        {% endfor %}
+        {% set evo_l.ultimo = 6 + ((evo_l.n - 1) * evo_step) %}
+        {% endif %}
+        <div class="fin-evo-linea">
+            {% if evolucion_mes|length > 0 %}
+            <svg class="fin-evo-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                    <linearGradient id="evograd" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#e31937" stop-opacity=".3"/>
+                        <stop offset="100%" stop-color="#e31937" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <path d="{{ evo_l.puntos ~ ' L ' ~ evo_l.ultimo ~ ' 100 L 6 100 Z' }}"
+                      fill="url(#evograd)"/>
+                <path d="{{ evo_l.puntos }}" fill="none" stroke="#c8102e" stroke-width="2.5"
+                      stroke-linecap="round" stroke-linejoin="round"
+                      vector-effect="non-scaling-stroke"/>
+            </svg>
+            {% for evola in evolucion_mes %}
+            <div class="fin-evo-col" style="left: {{ 6 + loop.index0 * evo_step }}%;"
+                 title="{{ evola.etiqueta }}: {{ evola.monto | ph_amount }}">
+                <span class="fin-evo-dot"
+                      style="bottom: {{ ((evola.monto | float / evo_l.max * 100) if evo_l.max else 0) }}%;"></span>
+                <span class="fin-evo-monto"
+                      style="bottom: calc({{ ((evola.monto | float / evo_l.max * 100) if evo_l.max else 0) }}% + 12px);">{{ evola.monto | ph_amount }}</span>
+                <span class="fin-evo-nom">{{ evola.etiqueta }}</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="fin-extra-note">Sin egresos registrados en los últimos meses.</p>
+            {% endif %}
+        </div>
+        <p class="fin-extra-note">Total gastado por mes según los registros reales del sistema.</p>
+    </div>
+
+    <div class="panel fin-resumen-wrap">
+        <div class="panel-header">
+            <h2><i class="bi bi-clipboard-data me-2"></i>Resumen del período</h2>
+            {% if kpis_mes %}<span class="fin-est-marca">{{ kpis_mes.period.label }}</span>{% endif %}
+        </div>
+        <div class="fin-resumen">
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-calendar-range"></i> Días del período</span>
+                <strong>{{ resumen_mes.dias }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-speedometer"></i> Egreso promedio diario</span>
+                <strong>{{ resumen_mes.promedio_diario | ph_amount }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-bounding-box"></i> Mermas sobre el egreso</span>
+                <strong>{% if resumen_mes.mermas_pct is not none %}{{ resumen_mes.mermas_pct | ph_amount }}%{% else %}—{% endif %}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-truck"></i> Costo por traslado</span>
+                <strong>{{ resumen_mes.costo_por_traslado | ph_amount }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-exclamation-triangle"></i> Alertas de stock</span>
+                <strong>{{ resumen_mes.alarmas }}</strong>
+            </div>
+            <div class="fin-resumen-fila">
+                <span><i class="bi bi-hourglass-split"></i> Lotes por vencer (90 días)</span>
+                <strong>{{ resumen_mes.lotes.count }}{% if resumen_mes.lotes.proximo %} · {{ resumen_mes.lotes.dias_proximo }} días{% endif %}</strong>
+            </div>
+        </div>
+    </div>
+
+    {% if ver_compras %}
+    <div class="panel fin-cat-wrap">
+        <div class="panel-header">
+            <h2><i class="bi bi-pie-chart-fill me-2"></i>Compras por categoría</h2>
+            <span class="fin-est-marca">TOP 5 · USD</span>
+        </div>
+        {% set cat_max = namespace(max=0) %}
+        {% for cat in categorias_mes %}
+            {% if cat.monto | float > cat_max.max %}{% set cat_max.max = cat.monto | float %}{% endif %}
+        {% endfor %}
+        {% if categorias_mes %}
+        <div class="fin-categorias">
+            {% for cat in categorias_mes %}
+            <div class="fin-categoria-fila">
+                <div class="fin-categoria-nom">{{ cat.category }}</div>
+                <div class="fin-barra-track">
+                    <div class="fin-barra-fill fin-barra-fill--rojo"
+                         style="width: {{ ((cat.monto | float / cat_max.max * 100) if cat_max.max else 0) }}%"></div>
+                </div>
+                <div class="fin-categoria-monto">{{ cat.monto | ph_amount }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small">Aún no hay compras registradas para este mes.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+<!-- Ranking y reportes -->
+<div class="fin-fila{{ '' if es_multisede else ' fin-fila--solo' }}">
+    {% if es_multisede %}
+    <div class="panel fin-panel-ranking">
+        <div class="panel-header">
+            <h2><i class="bi bi-trophy me-2"></i>{{ 'Ranking de traslados entre sedes' if not ver_compras else 'Ranking de compras entre sedes' }}</h2>
+            <div class="fin-est-head-right">
+                {% if kpis_mes %}<span class="fin-est-marca">TOP 3 · {{ kpis_mes.moneda }}</span>{% endif %}
+                <a class="panel-link" href="{{ url_for('analysis_reports.reports_page', metric='TRANSFERS' if not ver_compras else 'PURCHASES') }}">Ver Detalles</a>
+            </div>
+        </div>
+        {% if ranking_mes %}
+        {% set ns = namespace(maximo=0) %}
+        {% for renglon in ranking_mes %}
+            {% if renglon.total_base and renglon.total_base | float > ns.maximo %}
+                {% set ns.maximo = renglon.total_base | float %}
+            {% endif %}
+        {% endfor %}
+        <ol class="fin-ranking">
+            {% for renglon in ranking_mes %}
+            {% set total_ranking = renglon.total_base or 0 %}
+            {% set ancho_barra = ((total_ranking | float / ns.maximo * 100) | round(1)) if ns.maximo > 0 else 0 %}
+            <li class="fin-ranking-item position-{{ loop.index }}">
+                <span class="fin-ranking-num">{{ loop.index }}</span>
+                <div class="fin-ranking-cuerpo">
+                    <div class="fin-ranking-fila">
+                        <div class="fin-ranking-nombre">
+                            <i class="bi bi-geo-alt-fill"></i>
+                            {{ renglon.location_name }}
+                        </div>
+                        <div class="fin-ranking-total">{{ renglon.total_base | ph_amount }}</div>
+                    </div>
+                    <div class="fin-ranking-track"><span class="fin-ranking-fill" style="width: {{ ancho_barra }}%"></span></div>
+                    <div class="text-muted small">
+                        {% if renglon.pct is not none %}
+                        <span class="fin-rank-pct"><i class="bi {{ 'bi-arrow-up-right' if renglon.direccion == 'up'
+                                                                 else ('bi-arrow-down-right' if renglon.direccion == 'down' else 'bi-dash') }}"></i>{{ (renglon.pct | ph_amount) ~ '%' }}</span>
+                        vs mes anterior
+                        {% else %}sin comparativo previo{% endif %}
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-muted small py-3">{{ 'Aún no hay traslados registrados para este mes.' if not ver_compras else 'Aún no hay compras registradas para este mes.' }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="panel fin-panel-acciones">
+        <div class="panel-header">
+            <h2><i class="bi bi-file-earmark-spreadsheet me-2"></i>Reportes Financieros</h2>
+        </div>
+        <p class="text-muted small">
+            {% if es_multisede %}Exporta la sede seleccionada{% else %}Exporta el consolidado del período vigente{% endif %}
+            completo: compras, gastos de cocina, mermas y traslados.
+            El período se toma de los filtros superiores.
+        </p>
+
+        <div class="fin-export-grid">
+            <a id="finExportPdf" class="fin-export-card fin-export-card--pdf" href="#">
+                <span class="fin-export-tipo"><i class="bi bi-file-earmark-pdf"></i> PDF</span>
+                <span class="fin-export-accion">Exportar PDF</span>
+            </a>
+            <a id="finExportExcel" class="fin-export-card fin-export-card--excel" href="#">
+                <span class="fin-export-tipo"><i class="bi bi-file-earmark-excel"></i> Excel</span>
+                <span class="fin-export-accion">Exportar Excel</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>window.FIN_PANEL_METRIC = 'CONSOLIDATED';</script>
+<script src="{{ url_for('static', filename='js/dashboard/finance_dashboard.js') }}?v=8"></script>
 {% endblock %}

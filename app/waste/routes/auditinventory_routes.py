@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, abort, session
 from flask_login import login_required, current_user
+from app.decorators.roles import require_roles, require_roles_api
 from app.waste.services.auditinventory_service import (
     get_audit_view_data,
     fetch_filtered_audit_logs,
@@ -10,6 +11,10 @@ from app.waste.services.auditinventory_service import (
 from app.waste.requests.auditinventory_validators import validate_audit_action
 
 auditinventory_bp = Blueprint('auditinventory_bp', __name__)
+
+INVENTORY_AUDIT_VIEW_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
+INVENTORY_AUDIT_WRITE_ROLES = ('admin', 'management', 'manager', 'assistant_manager')
+
 
 def _inventory_filters_and_permissions():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
@@ -32,6 +37,7 @@ def _inventory_filters_and_permissions():
 
 @auditinventory_bp.route('/waste/audit', methods=['GET'])
 @login_required
+@require_roles(*INVENTORY_AUDIT_VIEW_ROLES)
 def view_audit_page():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
     is_admin = (role_id == 1)
@@ -82,7 +88,7 @@ def view_audit_page():
     )
 
 @auditinventory_bp.route('/api/waste/audit', methods=['GET'])
-@login_required
+@require_roles_api(*INVENTORY_AUDIT_VIEW_ROLES)
 def get_audit_api():
     role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
     user_location_id = getattr(current_user, 'location_id', None) or session.get('location_id')
@@ -108,14 +114,8 @@ def get_audit_api():
     return jsonify({'success': True, 'logs': logs})
 
 @auditinventory_bp.route('/api/waste/audit/action', methods=['POST'])
-@login_required
+@require_roles_api(*INVENTORY_AUDIT_WRITE_ROLES)
 def execute_audit_action():
-    role_id = getattr(current_user, 'role_id', None) or session.get('role_id')
-    
-    # Bloqueo explícito de escritura para Operaciones (4) y Finanzas (6)
-    if role_id in [4, 6]:
-        return jsonify({'success': False, 'message': 'Operación denegada. Su perfil no tiene permisos de escritura en este módulo.'}), 403
-
     data = request.get_json()
     
     validation = validate_audit_action(data)

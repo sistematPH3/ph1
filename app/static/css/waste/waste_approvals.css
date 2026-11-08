@@ -18,6 +18,7 @@ body {
 
 /* ---------- Tarjeta principal ---------- */
 .ph-card {
+    position: relative;
     background-color: #ffffff;
     border-radius: var(--ph-border-radius);
     padding: 2rem;
@@ -45,6 +46,46 @@ body {
     font-size: 1.6rem;
     letter-spacing: -0.5px;
     text-shadow: 2px 2px 4px rgba(175, 21, 21, 0.25);
+}
+
+/* ---------- Acciones de cabecera: esquina superior derecha (Mermas Pendientes) ---------- */
+.merma-header-actions {
+    z-index: 3;
+}
+
+@media (min-width: 768px) {
+    .merma-header-actions {
+        position: absolute;
+        top: 2rem;
+        right: 2rem;
+        flex-direction: row;
+        align-items: center;
+    }
+
+    #mermaPendingHeader {
+        padding-right: 320px;
+    }
+}
+
+.btn-merma-red {
+    background-color: #af1515 !important;
+    border: 1px solid #af1515 !important;
+    color: #ffffff !important;
+    font-size: 0.95rem;
+}
+
+.btn-merma-red:hover,
+.btn-merma-red:focus,
+.btn-merma-red:active {
+    background-color: #8f1111 !important;
+    border-color: #8f1111 !important;
+    color: #ffffff !important;
+}
+
+.merma-red-badge {
+    background-color: #af1515 !important;
+    color: #ffffff !important;
+    font-size: 0.95rem;
 }
 
 /* ---------- Tabla tipo listado ---------- */
@@ -212,6 +253,14 @@ body {
     padding: 0.3rem 0.85rem;
     font-weight: 700;
     font-size: 0.85rem;
+}
+
+/* ---------- Cintillo de filtros (barra roja corporativa) ---------- */
+.ph-filters-cintillo {
+    background: linear-gradient(90deg, #af1515 0%, #8c1111 100%);
+    border-radius: 0.55rem;
+    padding: 0.7rem 1.1rem;
+    margin-bottom: 1.5rem;
 }
 
 /* ---------- Barra de filtros ---------- */
@@ -596,10 +645,30 @@ body.ph-confirm-blur .wrapper {
         align-self: flex-start;
     }
 
+    .merma-header-actions {
+        position: static;
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
     /* Barra de búsqueda: input ancho completo */
     .ph-filter-bar .input-group {
         max-width: 100% !important;
         width: 100%;
+    }
+
+    /* Cintillo de filtros: buscador a lo ancho */
+    .ph-filters-cintillo > .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.6rem;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        max-width: none !important;
     }
 
     /* Acciones: botones apilados full-width */

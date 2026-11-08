@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Alarma de vencidos: prefill bloqueado ---
+    const ALARM_PREFILL = window.ALARM_PREFILL || null;
+    const ALARM_MODE = !!window.__ALARM_MODE__ || !!ALARM_PREFILL;
+    if (ALARM_PREFILL) {
+        // Guardar datos de la alarma para validación en POST
+        document.body.dataset.alarmOrigin = 'alarma_vencido';
+        document.body.dataset.alarmLocationId = ALARM_PREFILL.location_id;
+        document.body.dataset.alarmProductId = ALARM_PREFILL.product_id;
+        document.body.dataset.alarmLotNumber = ALARM_PREFILL.lot_number;
+        document.body.dataset.alarmQuantity = ALARM_PREFILL.quantity;
+        // Marcar modo alarma global
+        window.__ALARM_MODE__ = true;
+    }
+
     const locationElement = document.getElementById('location_id');
     const itemTypeSelect = document.getElementById('item_type_id');
     const productSelect = document.getElementById('product_id');
@@ -135,6 +149,90 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         itemTypeSelect.disabled = false;
     };
+
+    // --- Alarma: deshabilitar UI para modo mono-ítem ---
+    function disableAlarmMode() {
+        // Disable "add to list" button behavior - just submit directly
+        if (btnAddToList) {
+            btnAddToList.style.display = 'none';
+        }
+        // Change submit button text to "Registrar merma"
+        if (btnSubmitMerma) {
+            btnSubmitMerma.innerHTML = '<i class="bi bi-check-all me-1"></i> Registrar merma';
+        }
+        // Disable quantity steppers
+        if (qtyMinus) qtyMinus.disabled = true;
+        if (qtyPlus) qtyPlus.disabled = true;
+        // Las fotos por ítem no aplican a un ítem precargado desde la alarma;
+        // la foto general de la merma (opcional) sí se mantiene habilitada.
+        if (itemDropzone) itemDropzone.style.display = 'none';
+        if (itemPhotoInput) itemPhotoInput.disabled = true;
+        // Disable "add more items" feedback
+        if (addFeedback) addFeedback.style.display = 'none';
+        // Disable location change hint (already shown by applyAlarmPrefill)
+        if (locationLockHint) locationLockHint.classList.remove('d-none');
+        // Disable "add to list" badge in ticket
+        if (cartCountBadge) cartCountBadge.style.display = 'none';
+        // Disable "add to list" button in ticket
+        const addToListBtn = document.getElementById('btnAddToList');
+        if (addToListBtn) addToListBtn.style.display = 'none';
+    }
+
+    // --- Alarma de vencidos: aplicar prefill y bloquear campos ---
+    function applyAlarmPrefill(prefill) {
+        // 1. Lock location
+        if (locationElement) {
+            locationElement.value = prefill.location_id;
+            locationElement.disabled = true;
+            if (locationLockHint) locationLockHint.classList.remove('d-none');
+        }
+
+        // 2. Load waste types for that location (sync call, we need the types to find VENCIDO)
+        loadWasteTypes(prefill.location_id).then(() => {
+            // 2. Select waste type VENCIDO
+            if (itemTypeSelect) {
+                itemTypeSelect.value = String(prefill.waste_type_id);
+                itemTypeSelect.disabled = true;
+            }
+            // 3. Load expired lots of the location, then products filtered by them
+            loadVencidos(prefill.location_id).then(() => {
+                loadProducts(prefill.location_id, true).then(() => {
+                    // 4. Select product
+                    if (productSelect) {
+                        productSelect.value = prefill.product_id;
+                        productSelect.disabled = true;
+                    }
+                    // 4b. Load lots for that product
+                    loadLots(prefill.location_id, prefill.product_id).then(() => {
+                        // 5. Select lot
+                        if (lotSelect) {
+                            lotSelect.value = prefill.lot_number;
+                            lotSelect.disabled = true;
+                        }
+                        // 6. Set quantity
+                        if (quantityInput) {
+                            quantityInput.value = String(prefill.quantity);
+                            quantityInput.disabled = true;
+                        }
+                        // 7. Populate cartItems with the alarm prefill data
+                        cartItems = [{
+                            product_id: prefill.product_id,
+                            product_name: prefill.product_name || '',
+                            lot_number: prefill.lot_number,
+                            quantity: prefill.quantity,
+                            waste_type_id: prefill.waste_type_id,
+                            expiration_date: prefill.expiration_date || null,
+                            evidence_urls: [],
+                            evidence_url: null
+                        }];
+                        renderCards();
+                        // 7. Disable "add more" functionality
+                        disableAlarmMode();
+                    });
+                });
+            });
+        });
+    }
 
     const hasExpiredDate = (expirationDateText) => {
         if (!expirationDateText) return false;
@@ -876,6 +974,11 @@ document.addEventListener('DOMContentLoaded', () => {
         loadWasteTypes(currentLocationId()).then(() => refreshProducts(currentLocationId()));
     }
 
+    // --- Alarma de vencidos: inicializar modo bloqueado ---
+    if (ALARM_MODE && ALARM_PREFILL) {
+        applyAlarmPrefill(ALARM_PREFILL);
+    }
+
     btnSubmitMerma.addEventListener('click', async () => {
         if (submitAlert) submitAlert.innerHTML = '';
 
@@ -909,7 +1012,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 waste_type_id: (item.waste_type_id != null) ? item.waste_type_id : null,
                 evidence_urls: (item.evidence_urls && item.evidence_urls.length) ? item.evidence_urls : null,
                 evidence_url: item.evidence_url || null
-            }))
+            })),
+            origin: document.body.dataset.alarmOrigin || null
         };
 
         try {

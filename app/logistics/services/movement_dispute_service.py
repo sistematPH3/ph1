@@ -464,6 +464,12 @@ def resolve_dispute(movement_id, payload, user_id):
                 current_origin = _to_decimal(inv_origin.current_quantity)
                 inv_origin.current_quantity = current_origin + qty_missing
 
+        # La pérdida efectiva queda escrita en el detalle: tras resolver, el
+        # snapshot de traslados debe reflejar la decisión (0 si se acreditó o
+        # reintegró; el faltante real si hubo baja/extravío/merma sanitaria) y
+        # no seguir contando el missing_quantity original como pérdida.
+        detail.missing_quantity = lost_qty
+
         resolution_items.append({
             "detail_id": detail.id,
             "product_id": detail.product_id,
@@ -585,7 +591,7 @@ def _notify_response_resolved(movement, resolver_user_id):
     verá la respuesta del Administrador en la bandeja.
 
     Destinatarios: los usuarios asignados a las sedes del traslado (origen o
-    destino) y todos los admin/finanzas (que ven la bandeja global). Se
+    destino) y todos los admin (Administrator/Admin, bandeja global). Se
     incluye también al usuario que emitió el dictamen: los admins reciben
     TODAS las respuestas, aunque las hayan resuelto ellos mismos. El estado
     "leído" (is_read) queda en el servidor, por lo que NO depende del
@@ -601,7 +607,7 @@ def _notify_response_resolved(movement, resolver_user_id):
         ).all():
             recipients[user.id] = user
     for user in User.query.filter(
-        User.role.has(Role.name.in_(['Administrator', 'Finance']))
+        User.role.has(Role.name.in_(['Administrator', 'Admin']))
     ).all():
         recipients[user.id] = user
 

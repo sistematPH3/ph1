@@ -3,24 +3,21 @@
 {% block title %}Insumos | Sistema de Gestion PH{% endblock %}
 
 {% block extra_css %}
+    {{ super() }}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/base_list.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.1">
 {% endblock %}
 
 {% block search_input_id %}searchInput{% endblock %}
 {% block search_placeholder %}Buscar por nombre o SKU...{% endblock %}
 
+{% block icon_class %}bi-boxes{% endblock %}
+
 {% block title_list %}
-    <div class="d-flex align-items-center">
-        <div class="bg-mariuska-red text-white p-2 me-3 d-flex align-items-center justify-content-center brand-icon-box" style="width: 45px; height: 45px; border-radius: 10px;">
-            <i class="bi bi-boxes fs-4"></i>
-        </div>
-        <span class="module-title-text" style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px;">Menú de Insumos</span>
-    </div>
+    Menú de Insumos
 {% endblock %}
+
+{% block flash_messages %}{% endblock %}
 
 
 {% block actions_top %}
@@ -35,7 +32,7 @@
 {% endblock %}
 
 {% block actions_filter %}
-    <div class="input-group mariuska-select-group bg-white px-3 py-1 w-100 mt-3 mt-md-0">
+    <div class="input-group mariuska-select-group bg-white px-3 py-1">
         <span class="input-group-text bg-transparent border-0 text-muted ps-1 pe-1">
             <i class="bi bi-funnel"></i>
         </span>

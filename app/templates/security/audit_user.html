@@ -1,177 +1,220 @@
-{% extends "base_list.html" %}
+{% extends "layout.html" %}
+
+{% block title %}Auditoría de Personal | Pizza Hut{% endblock %}
 
 {% block extra_css %}
     {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/audit_user.css', v=2) }}">
 {% endblock %}
 
-{% block title_list %}
-    <span class="d-flex align-items-center gap-3">
-        <div style="background-color: #b71c1c; color: #ffffff; width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(183, 28, 28, 0.2);">
-            <i class="bi bi-shield-lock-fill fs-5"></i>
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <!-- Encabezado corporativo -->
+        <div class="d-flex align-items-center mb-1">
+            <div class="ph-icon-box me-3 shadow-sm">
+                <i class="bi bi-person-badge"></i>
+            </div>
+            <div>
+                <h2 class="ph-title mb-1">Auditoría de Personal</h2>
+                <p class="text-muted mb-0">Registro de actividades y modificaciones de usuarios.</p>
+            </div>
         </div>
-        <span>Auditoría de Personal</span>
-    </span>
-{% endblock %}
 
-{% block subtitle_list %}Registro de actividades y modificaciones de usuarios{% endblock %}
+        {% set export_base_url = url_for('audit_exports.descargar_usuarios') %}
+        {% set export_sin_fechas = True %}
+        {% include 'reports/audit_export_toolbar.html' %}
 
-{% block search_placeholder %}Buscar por nombre, correo o acción...{% endblock %}
-
-{% block table_head %}
-    <th class="ps-3">Responsable</th>
-    <th>Acción</th>
-    <th>Usuario Afectado</th>
-    <th>Detalles de Modificación</th>
-    <th>Fecha y Hora</th>
-{% endblock %}
-
-{% block table_body %}
-    {% for audit in audits %}
-    <tr class="audit-data-row d-none d-md-table-row">
-        <td class="ps-3">
-            <div class="d-flex align-items-center">
-                <div class="avatar-ph me-3 shadow-sm">
-                    {{ audit.responsible_user.name[:1]|upper }}
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-nowrap">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="genericSearchInput" class="form-control rounded-pill bg-light border-0 ps-5" style="height: 36px;"
+                           placeholder="Buscar por nombre, correo o acción...">
                 </div>
-                <div>
-                    <span class="d-block fw-bold text-dark">{{ audit.responsible_user.name }}</span>
-                    <small class="text-muted">{{ audit.role.name }}</small>
+                <div class="d-flex align-items-center gap-2 flex-nowrap">
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="start_date" class="small text-white fw-semibold text-nowrap mb-0">Desde</label>
+                        <input type="date" id="start_date" class="form-control form-control-sm border-0 bg-light rounded-pill" style="height: 36px; width: 130px;" title="Filtrar eventos a partir de esta fecha">
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="end_date" class="small text-white fw-semibold text-nowrap mb-0">Hasta</label>
+                        <input type="date" id="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill" style="height: 36px; width: 130px;" title="Filtrar eventos hasta esta fecha">
+                    </div>
                 </div>
             </div>
-        </td>
-        
-        <td>
-            {% if audit.action == 'ACTIVATE' %}
-                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2">Activación</span>
-            {% elif audit.action == 'DEACTIVATE' %}
-                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-3 py-2">Inactivación</span>
-            {% elif audit.action == 'UPDATE' %}
-                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-3 py-2">Edición</span>
-            {% elif audit.action == 'CREATE' %}
-                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-2">Creación</span>
-            {% else %}
-                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-3 py-2">{{ audit.action }}</span>
-            {% endif %}
-        </td>
-        
-        <td>
-            <span class="d-block fw-medium text-dark">{{ audit.target_user.name }}</span>
-            <small class="text-muted">{{ audit.target_user.email }}</small>
-        </td>
-        
-        <td>
-            {% if audit.changed_data %}
-                <ul class="list-unstyled mb-0 small text-muted">
-                {% for field, values in audit.changed_data.items() %}
-                    <li class="mb-1">
-                        <strong class="text-dark">{{ field|capitalize }}:</strong> 
-                        <span class="text-decoration-line-through">{{ values.old }}</span> 
-                        <i class="bi bi-arrow-right text-primary mx-1"></i> 
-                        <span class="fw-bold text-dark">{{ values.new }}</span>
-                    </li>
-                {% endfor %}
-                </ul>
-            {% else %}
-                <span class="text-muted fst-italic">N/A</span>
-            {% endif %}
-        </td>
-        
-        <td>
-            <div class="text-muted small">
-                <span class="d-block fw-medium text-dark">{{ audit.timestamp.strftime('%d/%m/%Y') }}</span>
-                <span>{{ audit.timestamp.strftime('%I:%M %p') }}</span>
-            </div>
-        </td>
-    </tr>
-    {% endfor %}
+        </div>
 
-    <tr class="d-md-none p-0 border-0 bg-transparent">
-        <td colspan="5" class="p-0 border-0 bg-transparent">
-            <div class="mobile-audit-container py-2" id="auditCardsContainer">
-                {% for audit in audits %}
-                <div class="mobile-audit-card mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="avatar-ph" style="width: 32px; height: 32px; font-size: 0.85rem;">
-                                {{ audit.responsible_user.name[:1]|upper }}
+        <!-- Tabla de eventos -->
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card">
+            <table id="genericTable" class="table align-middle table-hover mb-0">
+                <thead class="text-uppercase text-muted content-table-header">
+                    <tr>
+                        <th class="ps-3">Responsable</th>
+                        <th>Acción</th>
+                        <th>Usuario Afectado</th>
+                        <th>Detalles de Modificación</th>
+                        <th>Fecha y Hora</th>
+                    </tr>
+                </thead>
+                <tbody class="border-0">
+                    {% for audit in audits %}
+                    <tr class="audit-data-row d-none d-md-table-row" data-date="{{ audit.timestamp.strftime('%Y-%m-%d') }}">
+                        <td class="ps-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-ph me-3 shadow-sm">
+                                    {{ audit.responsible_user.name[:1]|upper }}
+                                </div>
+                                <div>
+                                    <span class="d-block fw-bold text-dark">{{ audit.responsible_user.name }}</span>
+                                    <small class="text-muted">{{ audit.role.name }}</small>
+                                </div>
                             </div>
-                            <div class="d-flex flex-column">
-                                <span class="fw-bold text-dark" style="font-size: 0.9rem;">{{ audit.responsible_user.name }}</span>
-                                <span class="text-muted" style="font-size: 0.75rem;">{{ audit.role.name }}</span>
-                            </div>
-                        </div>
-                        <div>
+                        </td>
+                        
+                        <td>
                             {% if audit.action == 'ACTIVATE' %}
-                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">Activación</span>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2">Activación</span>
                             {% elif audit.action == 'DEACTIVATE' %}
-                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2 py-1" style="font-size: 0.7rem;">Inactivación</span>
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-3 py-2">Inactivación</span>
                             {% elif audit.action == 'UPDATE' %}
-                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">Edición</span>
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-3 py-2">Edición</span>
                             {% elif audit.action == 'CREATE' %}
-                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">Creación</span>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-2">Creación</span>
                             {% else %}
-                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ audit.action }}</span>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-3 py-2">{{ audit.action }}</span>
                             {% endif %}
-                        </div>
-                    </div>
+                        </td>
+                        
+                        <td>
+                            <span class="d-block fw-medium text-dark">{{ audit.target_user.name }}</span>
+                            <small class="text-muted">{{ audit.target_user.email }}</small>
+                        </td>
+                        
+                        <td>
+                            {% if audit.changed_data %}
+                                <ul class="list-unstyled mb-0 small text-muted">
+                                {% for field, values in audit.changed_data.items() %}
+                                    <li class="mb-1">
+                                        <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                                        <span class="text-decoration-line-through">{{ values.old }}</span> 
+                                        <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                                        <span class="fw-bold text-dark">{{ values.new }}</span>
+                                    </li>
+                                {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-muted fst-italic">N/A</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            <div class="text-muted small">
+                                <span class="d-block fw-medium text-dark">{{ audit.timestamp.strftime('%d/%m/%Y') }}</span>
+                                <span>{{ audit.timestamp.strftime('%I:%M %p') }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
 
-                    <div class="mb-3">
-                        <span class="d-block fw-bold text-dark user-name-text mb-1">{{ audit.target_user.name }}</span>
-                        <span class="d-block text-muted email-subtext">{{ audit.target_user.email }}</span>
-                    </div>
+                    <tr class="d-md-none p-0 border-0 bg-transparent">
+                        <td colspan="5" class="p-0 border-0 bg-transparent">
+                            <div class="mobile-audit-container py-2" id="auditCardsContainer">
+                                {% for audit in audits %}
+                                <div class="mobile-audit-card mb-3" data-date="{{ audit.timestamp.strftime('%Y-%m-%d') }}">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="avatar-ph" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                                {{ audit.responsible_user.name[:1]|upper }}
+                                            </div>
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold text-dark" style="font-size: 0.9rem;">{{ audit.responsible_user.name }}</span>
+                                                <span class="text-muted" style="font-size: 0.75rem;">{{ audit.role.name }}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            {% if audit.action == 'ACTIVATE' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">Activación</span>
+                                            {% elif audit.action == 'DEACTIVATE' %}
+                                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2 py-1" style="font-size: 0.7rem;">Inactivación</span>
+                                            {% elif audit.action == 'UPDATE' %}
+                                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">Edición</span>
+                                            {% elif audit.action == 'CREATE' %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">Creación</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ audit.action }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
 
-                    <div class="mb-3 bg-light p-2 rounded-3 border" style="border-color: #f1f5f9;">
-                        {% if audit.changed_data %}
-                            <ul class="list-unstyled mb-0 text-muted" style="font-size: 0.8rem;">
-                            {% for field, values in audit.changed_data.items() %}
-                                <li class="mb-1">
-                                    <strong class="text-dark">{{ field|capitalize }}:</strong> 
-                                    <span class="text-decoration-line-through">{{ values.old }}</span> 
-                                    <i class="bi bi-arrow-right text-primary mx-1"></i> 
-                                    <span class="fw-bold text-dark">{{ values.new }}</span>
-                                </li>
-                            {% endfor %}
-                            </ul>
-                        {% else %}
-                            <span class="text-muted fst-italic small">N/A</span>
-                        {% endif %}
-                    </div>
+                                    <div class="mb-3">
+                                        <span class="d-block fw-bold text-dark user-name-text mb-1">{{ audit.target_user.name }}</span>
+                                        <span class="d-block text-muted email-subtext">{{ audit.target_user.email }}</span>
+                                    </div>
 
-                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-calendar3 me-1.5 text-muted"></i>
-                            <span>{{ audit.timestamp.strftime('%d/%m/%Y') }}</span>
-                        </div>
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-clock me-1.5 text-muted"></i>
-                            <span>{{ audit.timestamp.strftime('%I:%M %p') }}</span>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </td>
-    </tr>
+                                    <div class="mb-3 bg-light p-2 rounded-3 border" style="border-color: #f1f5f9;">
+                                        {% if audit.changed_data %}
+                                            <ul class="list-unstyled mb-0 text-muted" style="font-size: 0.8rem;">
+                                            {% for field, values in audit.changed_data.items() %}
+                                                <li class="mb-1">
+                                                    <strong class="text-dark">{{ field|capitalize }}:</strong> 
+                                                    <span class="text-decoration-line-through">{{ values.old }}</span> 
+                                                    <i class="bi bi-arrow-right text-primary mx-1"></i> 
+                                                    <span class="fw-bold text-dark">{{ values.new }}</span>
+                                                </li>
+                                            {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <span class="text-muted fst-italic small">N/A</span>
+                                        {% endif %}
+                                    </div>
 
-    <tr id="noResultsRow" style="display: none;">
-        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
-            <i class="bi bi-search fs-1 d-block mb-2" style="opacity: 0.5;"></i>
-            No se encontraron registros.
-        </td>
-    </tr>
+                                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar3 me-1.5 text-muted"></i>
+                                            <span>{{ audit.timestamp.strftime('%d/%m/%Y') }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-clock me-1.5 text-muted"></i>
+                                            <span>{{ audit.timestamp.strftime('%I:%M %p') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
 
-    {% if not audits %}
-    <tr class="original-empty-row">
-        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
-            <i class="bi bi-shield-lock fs-1 d-block mb-2"></i>
-            No hay registros de auditoría de gestión de personal.
-        </td>
-    </tr>
-    {% endif %}
+                    <tr id="noResultsRow" style="display: none;">
+                        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
+                            <i class="bi bi-search fs-1 d-block mb-2" style="opacity: 0.5;"></i>
+                            No se encontraron registros.
+                        </td>
+                    </tr>
+
+                    {% if not audits %}
+                    <tr class="original-empty-row">
+                        <td colspan="5" class="text-center text-muted py-5 border-0 bg-transparent">
+                            <i class="bi bi-shield-lock fs-1 d-block mb-2"></i>
+                            No hay registros de auditoría de gestión de personal.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
     {{ super() }}
+    <script src="{{ url_for('static', filename='js/audit/audit_export.js') }}?v=1"></script>
     <script src="{{ url_for('static', filename='js/security/audit_user.js') }}"></script>
 {% endblock %}

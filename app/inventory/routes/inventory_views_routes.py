@@ -1,11 +1,15 @@
 from flask import render_template, jsonify, request
 from flask_login import login_required, current_user
+from app.decorators.roles import require_roles, require_roles_api
 from app.inventory import inventory_bp
 from app.inventory.requests.inventory_views_validators import InventoryViewRequest
 from app.inventory.services.inventory_views_service import InventoryViewService
 
+OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
+
 @inventory_bp.route('/views', methods=['GET'])
 @login_required
+@require_roles(*OPERATIVE_ROLES)
 def render_inventory_views():
     filter_params = InventoryViewRequest.get_filter_params() if hasattr(InventoryViewRequest, 'get_filter_params') else {
         'location_id': request.args.get('location_id'),
@@ -15,7 +19,7 @@ def render_inventory_views():
     return render_template('inventory/inventory_views.html', **context)
 
 @inventory_bp.route('/api/list', methods=['GET'])
-@login_required
+@require_roles_api(*OPERATIVE_ROLES)
 def get_inventory_api():
     try:
         filter_params = InventoryViewRequest.get_filter_params() if hasattr(InventoryViewRequest, 'get_filter_params') else {
@@ -38,6 +42,9 @@ def get_inventory_api():
             
             curr_qty = float(item.current_quantity) if item and item.current_quantity is not None else 0.0
             min_stock = float(item.min_stock) if item and item.min_stock is not None else 0.0
+            transit_qty = float(item.transit_quantity or 0) if item else 0.0
+            reserved_qty = float(item.reserved_quantity or 0) if item else 0.0
+            available_qty = round(max(0.0, curr_qty - transit_qty - reserved_qty), 2)
 
             items.append({
                 'product_id': prod_id,
@@ -47,8 +54,11 @@ def get_inventory_api():
                 'unit': prod_unit,
                 'location_name': loc_name,
                 'current_quantity': curr_qty,
+                'transit_quantity': transit_qty,
+                'reserved_quantity': reserved_qty,
+                'available_quantity': available_qty,
                 'min_stock': min_stock,
-                'is_low_stock': curr_qty <= min_stock
+                'is_low_stock': available_qty <= min_stock
             })
             
         return jsonify({
@@ -65,7 +75,7 @@ def get_inventory_api():
         }), 500
 
 @inventory_bp.route('/api/lots', methods=['GET'])
-@login_required
+@require_roles_api(*OPERATIVE_ROLES)
 def get_product_lots_api():
     try:
         location_id = request.args.get('location_id', type=int)

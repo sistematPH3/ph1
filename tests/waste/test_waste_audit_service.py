@@ -57,6 +57,42 @@ class TestWasteAuditService(unittest.TestCase):
     def setUp(self):
         self.admin_user = DummyUser(is_admin=True)
 
+    @patch('app.waste.services.waste_audit_service.WasteAuditRepository.get_merma_audit_date_range')
+    def test_merma_date_range_admin_sin_restriccion_de_sedes(self, mock_range):
+        """Admin ve el rango completo (sin filtrar por sedes), como Traslados."""
+        mock_range.return_value = ('2026-01-01', '2026-12-31')
+        resultado = WasteAuditService.get_merma_audit_date_range(self.admin_user)
+        self.assertEqual(resultado, ('2026-01-01', '2026-12-31'))
+        mock_range.assert_called_once_with(location_ids=None)
+
+    @patch('app.waste.services.waste_audit_service.WasteAuditRepository.get_merma_audit_date_range')
+    def test_merma_date_range_finance_sin_restriccion_de_sedes(self, mock_range):
+        """Finanzas (al igual que en la pantalla de mermas) ve todas las sedes."""
+        fin = DummyUser(is_admin=False)
+        fin.is_finance = True
+        WasteAuditService.get_merma_audit_date_range(fin)
+        mock_range.assert_called_once_with(location_ids=None)
+
+    @patch('app.waste.services.waste_audit_service.WasteAuditRepository.get_merma_audit_date_range')
+    def test_merma_date_range_rol_con_sedes_limita_por_ubicacion(self, mock_range):
+        """Un rol con sedes asignadas limita el calendario a sus ubicaciones."""
+        class Sede:
+            def __init__(self, id_):
+                self.id = id_
+        ops = DummyUser(is_admin=False)
+        ops.locations = [Sede(2), Sede(3)]
+        WasteAuditService.get_merma_audit_date_range(ops)
+        mock_range.assert_called_once_with(location_ids=[2, 3])
+
+    @patch('app.waste.services.waste_audit_service.WasteAuditRepository.get_merma_audit_date_range')
+    def test_merma_date_range_sin_sedes_devuelve_none(self, mock_range):
+        """Sin sedes permitidas no hay rango que acotar."""
+        ops = DummyUser(is_admin=False)
+        min_ts, max_ts = WasteAuditService.get_merma_audit_date_range(ops)
+        self.assertIsNone(min_ts)
+        self.assertIsNone(max_ts)
+        mock_range.assert_not_called()
+
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
     @patch('app.models.waste_model.Waste.query')
     def test_audit_trail_creation_event_is_pending(self, mock_waste_query, mock_get_logs):

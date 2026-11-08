@@ -46,6 +46,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from app import create_app, db
 from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Product, Purchase, PurchaseDetail, Role, Supplier, User
 from app.logistics.repositories.movement_dispatch_repository import MovementDispatchRepository
+from app.logistics.requests.movement_dispatch_validators import MovementDispatchValidator
 from app.logistics.services.movement_dispatch_service import MovementDispatchService
 
 
@@ -467,6 +468,39 @@ class MovementDispatchTest(unittest.TestCase):
 
         db.session.refresh(mov)
         self.assertEqual(mov.status, "CANCELADO_EMISOR")
+
+    # =========================================================================
+    # REGLA DE NEGOCIO: solo la Central despacha; las sedes solo reciben y
+    # únicamente pueden devolver mercancía al Almacén Central.
+    # =========================================================================
+
+    def test_validator_rechaza_despacho_entre_sedes_no_centrales(self):
+        items = [{"product_id": 1, "quantity": 10.00, "lot_number": "L-1"}]
+        ok, errors = MovementDispatchValidator.validate_dispatch_payload({
+            "origin_location_id": 555,
+            "destination_location_id": 556,
+            "items": items,
+        })
+        self.assertFalse(ok)
+        self.assertTrue(any("Almacén Central" in e for e in errors))
+
+    def test_validator_permite_despacho_desde_la_central(self):
+        items = [{"product_id": 1, "quantity": 10.00, "lot_number": "L-1"}]
+        ok, errors = MovementDispatchValidator.validate_dispatch_payload({
+            "origin_location_id": 1,
+            "destination_location_id": 556,
+            "items": items,
+        })
+        self.assertTrue(ok, errors)
+
+    def test_validator_permite_devolucion_de_sede_a_la_central(self):
+        items = [{"product_id": 1, "quantity": 10.00, "lot_number": "L-1"}]
+        ok, errors = MovementDispatchValidator.validate_dispatch_payload({
+            "origin_location_id": 555,
+            "destination_location_id": 1,
+            "items": items,
+        })
+        self.assertTrue(ok, errors)
 
 
 if __name__ == "__main__":

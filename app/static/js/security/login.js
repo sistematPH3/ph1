@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!errorDiv || !container) return;
 
-            if (this.value.trim() !== "" && !this.value.includes('@')) {
+            if (this.value.trim() !== "" && !window.EmailRules.esValido(this.value, this)) {
                 errorDiv.style.display = 'block';
                 container.style.borderColor = '#ff4444';
             } else {

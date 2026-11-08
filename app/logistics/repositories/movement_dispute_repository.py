@@ -5,7 +5,19 @@ from app.models import Movement, MovementDetail
 from sqlalchemy.orm import joinedload
 
 class MovementDisputeRepository:
-    
+    PENDING_DISPUTE_STATUSES = [
+        'FALTANTE_CONTEO',
+        'SOBRANTE_EXCEDENTE',
+        'PRODUCTO_ERRONEO',
+        'VIOLACION_CUSTODIA',
+        'INCIDENCIA_TEMPERATURA',
+        'VENCIMIENTO_PROXIMO',
+        'LOTE_NO_COINCIDE',
+        'RECHAZO_POR_ESPACIO',
+        'RETORNO_EMERGENCIA',
+        'NOVEDAD_FALTANTE',
+    ]
+
     @staticmethod
     def get_pending_disputes():
         """
@@ -16,18 +28,7 @@ class MovementDisputeRepository:
         queries N+1 y mostrar nombres en lugar de IDs.
         """
         return Movement.query.filter(
-            Movement.status.in_([
-                'FALTANTE_CONTEO',
-                'SOBRANTE_EXCEDENTE',
-                'PRODUCTO_ERRONEO',
-                'VIOLACION_CUSTODIA',
-                'INCIDENCIA_TEMPERATURA',
-                'VENCIMIENTO_PROXIMO',
-                'LOTE_NO_COINCIDE',
-                'RECHAZO_POR_ESPACIO',
-                'RETORNO_EMERGENCIA',
-                'NOVEDAD_FALTANTE'
-            ])
+            Movement.status.in_(MovementDisputeRepository.PENDING_DISPUTE_STATUSES)
         ).options(
             joinedload(Movement.origin_location),
             joinedload(Movement.destination_location),

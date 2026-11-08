@@ -1,12 +1,16 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
+from app.decorators.roles import require_roles
 from app.inventory.repositories.inventory_movement_repository import obtener_movimientos_resta
 from app.inventory.services.inventory_movement_service import procesar_edicion_movimiento
 
 inventory_movements_bp = Blueprint('inventory_movements', __name__, url_prefix='/inventory/movements')
 
+OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
+
 @inventory_movements_bp.route('/subtractions', methods=['GET'])
 @login_required
+@require_roles(*OPERATIVE_ROLES)
 def listar_restas():
     # El repositorio ya se encarga de filtrar automáticamente según el rol
     movimientos = obtener_movimientos_resta()
@@ -14,6 +18,7 @@ def listar_restas():
 
 @inventory_movements_bp.route('/subtractions/edit/<int:movimiento_id>', methods=['POST'])
 @login_required
+@require_roles(*OPERATIVE_ROLES)
 def editar_resta(movimiento_id):
     nueva_cantidad = request.form.get('nueva_cantidad', type=float)
     motivo = request.form.get('motivo_edicion')

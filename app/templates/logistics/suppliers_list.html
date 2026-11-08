@@ -1,118 +1,100 @@
 {% extends "base_list.html" %}
 
-{% block search_input_id %}autoSearch{% endblock %}
-{% block search_input_attrs %}{% endblock %}
-{% block search_placeholder %}Buscar por nombre o RIF...{% endblock %}
-{% block table_id %}suppliersTable{% endblock %}
-
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier_list.css') }}?v=1.5">
 
-<div class="container-fluid py-4 px-2 px-md-4">
-    <div class="main-white-panel p-3 p-md-5">
-        
-        <!-- ENCABEZADO RESPONSIVO MEJORADO -->
-        <div class="d-flex justify-content-between align-items-start mb-4 header-responsive-wrapper">
-            <div class="d-flex align-items-start gap-3">
-                <div class="icon-box-red">
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
+
+        <!-- Encabezado corporativo -->
+        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <div class="ph-icon-box me-3 shadow-sm">
                     <i class="bi bi-shop"></i>
                 </div>
                 <div>
-                    <h3 class="module-title m-0">Gestión de Proveedores</h3>
-                    <p class="text-subtitle m-0">Control, estatus y compras consolidadas a nivel nacional</p>
+                    <h2 class="ph-title mb-1">Gestión de Proveedores</h2>
+                    <p class="text-muted mb-0">Control, estatus y compras consolidadas a nivel nacional</p>
                 </div>
             </div>
-            
             <a href="{{ url_for('supplier_list.register_supplier_view') }}" class="btn btn-add-supplier rounded-pill px-4 text-white shadow-sm d-inline-flex align-items-center text-decoration-none">
                 <i class="bi bi-plus-lg me-1"></i> Nuevo Proveedor
             </a>
         </div>
 
-        <!-- CONTENEDOR PRINCIPAL DE BÚSQUEDA Y FILTROS -->
-        <div class="filters-section-container mb-4">
-            <div class="row g-3">
-                <div class="col-12 col-md-8">
-                    <div class="search-box-container w-100" style="position: relative;">
-                        <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
-                        <input type="text" id="autoSearch" class="form-control search-input" 
-                               placeholder="Buscar por nombre o RIF..." 
-                               style="padding-left: 40px; border-radius: 50px; height: 48px;">
-                    </div>
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap w-100">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="autoSearch" class="form-control rounded-pill bg-light border-0 ps-5"
+                           placeholder="Buscar por nombre o RIF..." style="height: 36px;">
                 </div>
-
-                <div class="col-12 col-md-4">
-                    <div class="filter-box-container w-100" style="position: relative;">
-                        <i class="bi bi-funnel search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
-                        <select id="statusFilter" class="form-select filter-select" style="padding-left: 40px; border-radius: 50px; height: 48px;">
-                            <option value="">Todos los estados</option>
-                            <option value="ACTIVE">Activos</option>
-                            <option value="INACTIVE">Inactivos</option>
-                        </select>
-                    </div>
-                </div>
+                <select id="statusFilter" class="form-select rounded-pill bg-light border-0 fw-medium"
+                        style="height: 36px; width: auto; min-width: 170px;">
+                    <option value="">Todos los estados</option>
+                    <option value="ACTIVE">Activos</option>
+                    <option value="INACTIVE">Inactivos</option>
+                </select>
             </div>
         </div>
 
         <!-- VISTA DE ESCRITORIO (TABLA INTACTA) -->
-        <div class="card card-ph-clean d-none d-md-block">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle m-0" id="suppliersTable">
-                        <thead>
-                            <tr>
-                                <th class="ps-4" style="width: 25%;">RIF / Tax ID</th>
-                                <th style="width: 35%;">Nombre del Proveedor</th>
-                                <th class="text-center" style="width: 20%;">Estatus Operativo</th>
-                                <th class="text-center" style="width: 20%;">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for s in suppliers %}
-                            {% set is_active = s.status.upper() == 'ACTIVE' or s.status.upper() == 'OPERATIVA' %}
-                            <tr class="supplier-row {{ 'row-inactive' if not is_active }}" 
-                                data-status="{{ 'ACTIVE' if is_active else 'INACTIVE' }}"
-                                data-name="{{ s.name }}"
-                                data-taxid="{{ s.tax_id }}"
-                                data-contact="{{ s.contact_name }}"
-                                data-phone="{{ s.phone }}"
-                                data-email="{{ s.email }}"
-                                data-date="{% if s.last_purchase_date %}{{ s.last_purchase_date.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}Ninguna compra registrada{% endif %}">
-                                
-                                <td class="ps-4 supplier-tax-id clickable-trigger" style="cursor: pointer;">{{ s.tax_id }}</td>
-                                <td class="clickable-trigger" style="cursor: pointer;">
-                                    <span class="supplier-name text-dark h6">{{ s.name }}</span> 
-                                    <i class="bi bi-window-fullscreen ms-1 text-muted small" title="Ver detalles"></i>
-                                </td>
-                                <td class="text-center">
-                                    {% if is_active %}
-                                        <span class="badge badge-ph-active">Operativa</span>
-                                    {% else %}
-                                        <span class="badge badge-ph-inactive">Inactivo</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    <div class="d-flex align-items-center justify-content-center">
-                                        <button class="btn btn-action-edit p-1 me-3" title="Editar Proveedor" data-id="{{ s.id }}">
-                                            <i class="bi bi-pencil-square custom-edit-icon" style="font-size: 1.2rem; color: #4B5563;"></i>
-                                        </button>
-                                        
-                                        <div class="form-check form-switch d-inline-block align-middle m-0">
-                                            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
-                                                   data-id="{{ s.id }}" data-name="{{ s.name }}"
-                                                   {% if is_active %}checked{% endif %}>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card d-none d-md-block">
+            <table class="table align-middle m-0" id="suppliersTable">
+                <thead class="text-uppercase text-muted content-table-header">
+                    <tr>
+                        <th class="ps-4" style="width: 25%;">RIF / Tax ID</th>
+                        <th style="width: 35%;">Nombre del Proveedor</th>
+                        <th class="text-center" style="width: 20%;">Estatus Operativo</th>
+                        <th class="text-center" style="width: 20%;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in suppliers %}
+                    {% set is_active = s.status.upper() == 'ACTIVE' or s.status.upper() == 'OPERATIVA' %}
+                    <tr class="supplier-row {{ 'row-inactive' if not is_active }}"
+                        data-status="{{ 'ACTIVE' if is_active else 'INACTIVE' }}"
+                        data-name="{{ s.name }}"
+                        data-taxid="{{ s.tax_id }}"
+                        data-contact="{{ s.contact_name }}"
+                        data-phone="{{ s.phone }}"
+                        data-email="{{ s.email }}"
+                        data-date="{% if s.last_purchase_date %}{{ s.last_purchase_date.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}Ninguna compra registrada{% endif %}">
+
+                        <td class="ps-4 supplier-tax-id clickable-trigger" style="cursor: pointer;">{{ s.tax_id }}</td>
+                        <td class="clickable-trigger" style="cursor: pointer;">
+                            <span class="supplier-name text-dark h6">{{ s.name }}</span>
+                            <i class="bi bi-window-fullscreen ms-1 text-muted small" title="Ver detalles"></i>
+                        </td>
+                        <td class="text-center">
+                            {% if is_active %}
+                                <span class="badge badge-ph-active">Operativa</span>
+                            {% else %}
+                                <span class="badge badge-ph-inactive">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <button class="btn btn-action-edit p-1 me-3" title="Editar Proveedor" data-id="{{ s.id }}">
+                                    <i class="bi bi-pencil-square custom-edit-icon" style="font-size: 1.2rem; color: #4B5563;"></i>
+                                </button>
+
+                                <div class="form-check form-switch d-inline-block align-middle m-0">
+                                    <input class="form-check-input status-toggle" type="checkbox" role="switch"
+                                           data-id="{{ s.id }}" data-name="{{ s.name }}"
+                                           {% if is_active %}checked{% endif %}>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
 
         <!-- VISTA DE TELÉFONO (TARJETAS AJUSTADAS) -->
-        <div class="mobile-suppliers-deck d-block d-md-none" id="mobileSuppliersContainer">
+        <div class="mobile-suppliers-deck d-block d-md-none mt-3" id="mobileSuppliersContainer">
             {% for s in suppliers %}
             {% set is_active = s.status.upper() == 'ACTIVE' or s.status.upper() == 'OPERATIVA' %}
             <div class="mobile-supplier-card p-3 mb-3 rounded-4 shadow-sm bg-white supplier-row-mobile {{ 'row-inactive' if not is_active }}"
@@ -123,7 +105,7 @@
                  data-phone="{{ s.phone }}"
                  data-email="{{ s.email }}"
                  data-date="{% if s.last_purchase_date %}{{ s.last_purchase_date.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}Ninguna compra registrada{% endif %}">
-                
+
                 <!-- Superior -->
                 <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
                     <span class="fw-bold text-dark mobile-tax-id clickable-trigger-mobile" style="cursor: pointer; font-size: 0.95rem;">
@@ -134,7 +116,7 @@
                             <i class="bi bi-pencil-square custom-edit-icon" style="font-size: 1.2rem; color: #4B5563;"></i>
                         </button>
                         <div class="form-check form-switch d-inline-block align-middle m-0">
-                            <input class="form-check-input status-toggle" type="checkbox" role="switch" 
+                            <input class="form-check-input status-toggle" type="checkbox" role="switch"
                                    data-id="{{ s.id }}" data-name="{{ s.name }}"
                                    {% if is_active %}checked{% endif %}>
                         </div>
@@ -144,7 +126,7 @@
                 <!-- Detalle Principal -->
                 <div class="clickable-trigger-mobile mb-2" style="cursor: pointer;">
                     <div class="supplier-name text-dark fw-bold mb-1" style="font-size: 1.1rem;">
-                        {{ s.name }} 
+                        {{ s.name }}
                         <i class="bi bi-window-fullscreen ms-1 text-muted small" style="font-size: 0.85rem;" title="Ver detalles"></i>
                     </div>
                     <div class="text-muted small">
@@ -177,7 +159,7 @@
                 <p class="text-muted small mb-0">Intenta ajustar los criterios de búsqueda.</p>
             </div>
         </div>
-        
+
     </div>
 </div>
 

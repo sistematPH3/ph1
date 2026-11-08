@@ -132,6 +132,13 @@ def create_app():
         # ==========================================================\
 
         # ==========================================================\
+        # AUDITORÍA DE GASTOS DE COCINA (NUEVO)
+        # ==========================================================\
+        from .inventory.routes.kitchen_expense_audit_routes import kitchen_expense_audit_bp
+        app.register_blueprint(kitchen_expense_audit_bp)
+        # ==========================================================\
+
+        # ==========================================================\
         # GESTIÓN DE COMPRAS 
         # ==========================================================\
         from .logistics.routes.purchase_management_routes import purchase_management_bp
@@ -150,6 +157,21 @@ def create_app():
 
         from app.dashboard.dashboard_routes import dashboard_bp
         app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+
+        # ==========================================================
+        # MÓDULO 8 (Rápido 2): REPORTES DE ESTADÍSTICA (KPIs, comparativos,
+        # ranking entre sedes). Pantalla y API. Los resúmenes se leen del cajón
+        # statistics_snapshots que llena Rápido 1.
+        # ==========================================================
+        from app.analytics.routes.analysis_reports_routes import analysis_reports_bp
+        app.register_blueprint(analysis_reports_bp)
+
+        from app.reports.routes.export_routes import exports_bp
+        app.register_blueprint(exports_bp)
+
+        from app.reports.routes.audit_export_routes import audit_exports_bp
+        app.register_blueprint(audit_exports_bp)
+        # ==========================================================
 
        # ==========================================================
         # MÓDULO: PERSONAL (STAFF)
@@ -188,6 +210,10 @@ def create_app():
         from app.waste.routes.waste_config_routes import waste_config_bp
         app.register_blueprint(waste_config_bp)
 
+        # --- CAJÓN DE ESTADÍSTICAS (RÁPIDO 1 - MÓDULO 8) ---
+        from app.analytics import analytics_bp
+        app.register_blueprint(analytics_bp)
+
         from . import models 
         from .models.security_model import User
         from app.models import logistics_model
@@ -199,6 +225,18 @@ def create_app():
 
         app.jinja_env.filters['ph_qty'] = ph_qty
         app.jinja_env.filters['ph_amount'] = ph_amount
+
+        # ==========================================================
+        # PATRON DE CORREO PARA EL FRONTEND
+        # ==========================================================
+        # Login, registro y "recuperar contrasena" validan el correo con el
+        # mismo patron que el backend (PATRON_EMAIL). Se expone aqui para no
+        # repetirlo en los tres routes: si el backend cambia la regla, el
+        # data-email-pattern de las plantillas cambia con el.
+        @app.context_processor
+        def inject_patron_email():
+            from app.security.requests.auth_validators import PATRON_EMAIL
+            return {'patron_email': PATRON_EMAIL.pattern}
 
         # ==========================================================
         # CONTEXTO GLOBAL PARA EL SIDEBAR Y LOS AVISOS DE NOVEDADES

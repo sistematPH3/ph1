@@ -1,73 +1,218 @@
-.dashboard-header {
-    margin-bottom: 30px;
+/* =========================================================
+   PANEL DE OPERACIONES — ajustes sobre el sistema visual de finanzas
+   (compila con finance_dashboard.css y los componentes de alertas)
+   ========================================================= */
+
+/* Las secciones del panel controlan su espaciado; el main ya no aporta padding
+   (igual que en finanzas). Se alinean las alarmas al margen del hero. */
+main.content .stock-alert-wrapper,
+main.content .expired-alert-wrapper {
+    margin-left: 30px;
+    margin-right: 30px;
 }
 
-.dashboard-header h1 {
-    font-size: 28px;
-    font-weight: 700;
-    color: #222f3e;
-    margin-bottom: 8px;
+/* El panel de vencimientos próximos abarca toda la fila de la cuadrícula */
+.fin-est--full {
+    grid-column: 1 / -1;
 }
 
-.dashboard-header p {
-    font-size: 15px;
-    color: #576574;
-    margin: 0;
+/* --- Filas de recepciones / disputas --- */
+.fin-op-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #f8f9fc;
+    border: 1px solid #eef1f6;
+    border-left: 4px solid #1d5fb5;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 25px;
+.fin-op-item:hover {
+    transform: translateX(3px);
+    box-shadow: var(--shadow);
+    border-color: #c1cbe0;
 }
 
-.card-link {
-    text-decoration: none;
-    color: inherit;
-    display: block;
+.fin-mov-arrow {
+    color: #c8102e;
+    font-size: .72rem;
 }
 
-.card-dash {
-    background-color: #ffffff;
-    border-radius: 8px;
-    padding: 35px 20px;
-    text-align: center;
-    border-top: 4px solid transparent;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
-    transition: all 0.3s ease;
-    height: 100%;
+/* --- Estado vacío (estilo coherente con finanzas) --- */
+.fin-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 34px 20px;
 }
 
-.card-dash i {
-    font-size: 32px;
-    color: #2e3e50;
-    margin-bottom: 15px;
-    transition: color 0.3s ease;
+.fin-empty i {
+    font-size: 1.9rem;
+    color: #b6bfcc;
 }
 
-.card-dash h3 {
-    font-size: 20px;
-    font-weight: 600;
-    color: #222f3e;
-    margin-bottom: 8px;
-}
-
-.card-dash p {
-    font-size: 14px;
-    color: #8395a7;
+.fin-empty h4 {
     margin: 0;
+    font-size: .95rem;
+    font-weight: 800;
+    color: #47506b;
 }
 
-.card-dash:hover {
-    transform: translateY(-5px);
-    border-top: 4px solid #c0392b;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+.fin-empty p {
+    margin: 0;
+    font-size: .8rem;
+    color: #8a94a8;
 }
 
-.card-dash:hover i {
-    color: #c0392b;
+/* --- Lista de lotes por vencer --- */
+.fin-lotes-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fin-lote-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #f8f9fc;
+    border: 1px solid #eef1f6;
+    border-left: 4px solid #e5a400;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.fin-lote-item:hover {
+    transform: translateX(3px);
+    box-shadow: var(--shadow);
+    border-color: #f0c9d0;
+}
+
+.fin-lote-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.fin-lote-product {
+    font-weight: 800;
+    color: #1f2937;
+    font-size: .92rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-lote-product i { color: #c8102e; font-size: .82rem; }
+
+.fin-lote-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: .76rem;
+    color: #6b7280;
+    flex-wrap: wrap;
+}
+
+.fin-lote-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.fin-lote-meta i { color: #c8102e; }
+
+.fin-lote-venc { color: #8a94a8; }
+
+.fin-lote-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.fin-lote-ud {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #334155;
+    background: #eef2f7;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-lote-dias {
+    font-size: .72rem;
+    font-weight: 800;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
+    white-space: nowrap;
+}
+
+.fin-lote-dias--crit { background: #fee2e2; color: #c2442e; }
+.fin-lote-dias--ok   { background: #fff3d6; color: #b45309; }
+.fin-lote-dias--warn { background: #e4f0ff; color: #1d5fb5; }
+
+.fin-lote-cta {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #c8102e;
+    background: #fdf0f2;
+    border: 1px solid #f5c6cd;
+    border-radius: .5rem;
+    padding: .36rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background .18s ease;
+}
+
+.fin-lote-cta:hover { background: #fbe3e7; color: #c8102e; }
+
+/* =========================================================
+   RESPONSIVE — TABLET
+   ========================================================= */
+@media (max-width: 900px) {
+    .fin-lote-meta { gap: 9px; }
+    .fin-kpi-detalle { flex-wrap: wrap; }
+}
+
+/* =========================================================
+   RESPONSIVE — TELÉFONO
+   ========================================================= */
+@media (max-width: 720px) {
+    /* Las alarmas se alinean al margen de las demás secciones */
+    main.content .stock-alert-wrapper,
+    main.content .expired-alert-wrapper {
+        margin-left: 14px;
+        margin-right: 14px;
+    }
+
+    .fin-est-marca { font-size: .66rem; }
+    .fin-empty { padding: 26px 14px; }
+
+    .fin-lote-item,
+    .fin-op-item { flex-wrap: wrap; align-items: flex-start; }
+    .fin-lote-side { width: 100%; justify-content: flex-start; }
+}
+
+@media (max-width: 400px) {
+    .fin-lote-cta { width: 100%; justify-content: center; }
 }

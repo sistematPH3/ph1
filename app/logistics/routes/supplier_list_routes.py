@@ -14,7 +14,7 @@ def get_supplier_list_service():
     return SupplierListService(repository)
 
 @supplier_list_bp.route('/suppliers/list', methods=['GET'], strict_slashes=False)
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def index():
     try:
         service = get_supplier_list_service()
@@ -40,7 +40,7 @@ def index():
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
 
 @supplier_list_bp.route('/suppliers/register', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def register_supplier_view():
     try:
         return render_template('logistics/register-supplier.html', supplier=None)
@@ -49,7 +49,7 @@ def register_supplier_view():
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/register', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def handle_register_supplier():
     try:
         name = request.form.get('name')
@@ -78,7 +78,7 @@ def handle_register_supplier():
         return render_template('logistics/register-supplier.html', supplier=None)
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['GET'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def edit_supplier_view(supplier_id):
     try:
         service = get_supplier_list_service()
@@ -94,7 +94,7 @@ def edit_supplier_view(supplier_id):
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def handle_edit_supplier(supplier_id):
     try:
         service = get_supplier_list_service()
@@ -121,7 +121,7 @@ def handle_edit_supplier(supplier_id):
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/list/<int:supplier_id>/toggle', methods=['POST'])
-@require_roles('admin', 'management', 'manager')
+@require_roles('admin')
 def toggle_status(supplier_id):
     try:
         service = get_supplier_list_service()

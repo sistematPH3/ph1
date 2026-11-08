@@ -497,3 +497,33 @@ body.modal-open .toggle-sidebar-btn {
         padding: 20px; 
     }
 }
+
+/* =========================================================
+   MENÚ ALTO (.sidebar-tall): cuando la barra lateral desborda
+   la pantalla se permite scroll de página; el contenido queda
+   fijo y "Cerrar Sesión" queda anclado abajo. Los submenús
+   flotantes a un lado se conservan intactos.
+   ========================================================= */
+body.sidebar-tall .wrapper {
+    overflow-y: auto;
+}
+/* El contenido fijo solo aplica sin modales abiertos: `position: sticky`
+   crea un contexto de apilamiento que pondría el modal POR DEBAJO del
+   backdrop de Bootstrap (pantalla oscura bloqueada). */
+body.sidebar-tall:not(.modal-open) .content {
+    position: sticky;
+    top: 0;
+}
+.sidebar-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1060;
+    background-color: #000000;
+    padding-top: 6px;
+}
+
+/* Con un modal abierto, "Cerrar Sesión" queda por debajo del backdrop (1050)
+   para no tapar ni bloquear la ventana flotante. */
+body.modal-open .sidebar-actions {
+    z-index: 1020;
+}

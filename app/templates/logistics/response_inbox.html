@@ -2,8 +2,8 @@
 
 {% block content %}
 <!-- Hojas de estilo -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=6">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/response_inbox.css') }}?v=16">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=20">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/response_inbox.css') }}?v=17">
 
 {# Fila de respuesta + su desplegable. Usada dos veces: sección "no leídos" y "leídos". #}
 {% macro render_response_rows(response_list) %}
@@ -395,31 +395,25 @@
         {% else %}
 
         <!-- ========== BÚSQUEDA Y FILTROS (aplican a ambas pestañas) ========== -->
-        <div class="row g-2 align-items-center mb-1">
-            <div class="col-12 col-md-5">
-                <div class="input-group">
-                    <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" id="inbox-search" class="form-control border-start-0 shadow-none"
-                           placeholder="Buscar por #traslado, #merma, sede, producto, persona o novedad..." autocomplete="off">
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="inbox-search" class="form-control rounded-pill bg-light border-0 ps-5"
+                           placeholder="Buscar..." autocomplete="off" style="height: 36px;">
                 </div>
-            </div>
-            <div class="col-6 col-md-2">
-                <select id="filter-tipo" class="form-select shadow-none" title="Filtrar por tipo de respuesta">
+                <select id="filter-tipo" class="form-select form-select-sm bg-light border-0 shadow-none rounded-pill text-dark fw-medium" style="height: 36px; width: 200px;" title="Filtrar por tipo de respuesta">
                     <option value="">Todas</option>
                     <option value="TRASLADO">Traslados</option>
                     <option value="MERMA">Mermas</option>
                 </select>
-            </div>
-            <div class="col-6 col-md-2">
-                <select id="filter-novedad" class="form-select shadow-none" title="Filtrar por clasificación de novedad">
+                <select id="filter-novedad" class="form-select form-select-sm bg-light border-0 shadow-none rounded-pill text-dark fw-medium" style="height: 36px; width: 220px;" title="Filtrar por clasificación de novedad">
                     <option value="">Todas las novedades</option>
                     {% for code, label in filter_novedades.items() %}
                     <option value="{{ code }}">{{ label }}</option>
                     {% endfor %}
                 </select>
-            </div>
-            <div class="col-6 col-md-3">
-                <select id="filter-sede" class="form-select shadow-none" title="Filtrar por sucursal involucrada">
+                <select id="filter-sede" class="form-select form-select-sm bg-light border-0 shadow-none rounded-pill text-dark fw-medium" style="height: 36px; width: 200px;" title="Filtrar por sucursal involucrada">
                     <option value="">Todas las sedes</option>
                     {% for sid, sname in filter_sedes.items() %}
                     <option value="{{ sid }}">{{ sname }}</option>
@@ -459,7 +453,7 @@
             {% if has_unread %}
             <!-- Pestaña: No leídos -->
             <div class="tab-pane fade show active" id="unread-pane" role="tabpanel">
-                <div class="table-responsive-md">
+                <div class="table-responsive-md bg-white shadow-sm rounded-4 mt-3 table-card">
                     <table class="table ph-table">
                         <thead>
                             <tr class="ph-table-header">
@@ -487,7 +481,7 @@
 
             <!-- Pestaña: Leídos -->
             <div class="tab-pane fade {% if not has_unread %}show active{% endif %}" id="read-pane" role="tabpanel">
-                <div class="table-responsive-md">
+                <div class="table-responsive-md bg-white shadow-sm rounded-4 mt-3 table-card">
                     <table class="table ph-table">
                         <thead>
                             <tr class="ph-table-header">

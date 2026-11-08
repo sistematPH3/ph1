@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, abort, flash, redirect, url_for
 from flask_login import login_required, current_user
+from app.decorators.roles import require_roles
 from app.models import LoginAudit, Location, Role 
 from sqlalchemy.orm import joinedload
 
@@ -7,14 +8,10 @@ audit_bp = Blueprint('audit', __name__, url_prefix='/auditoria')
 
 @audit_bp.route('/accesos', methods=['GET'])
 @login_required
+@require_roles('admin', 'finance')
 def ver_auditoria_accesos():
     user_role = current_user.role.name if hasattr(current_user.role, 'name') else current_user.role
-    
-    roles_autorizados = ['Administrator', 'Finance']
-    if user_role not in roles_autorizados:
-        flash("No tienes permisos para acceder a este módulo.", "danger")
-        return redirect(url_for('security.login'))
-    
+
     # 1. Iniciamos la consulta base
     query = LoginAudit.query.options(
         joinedload(LoginAudit.user),
@@ -32,12 +29,20 @@ def ver_auditoria_accesos():
         
         # Excluimos los roles Administrator y Guest 
         query = query.join(LoginAudit.role).filter(
-            Role.name.notin_(['Administrator', 'Guest'])
+            Role.name.notin_(['Administrator', 'Admin', 'Guest'])
         )
         
     # 3. Finalizamos construyendo el ordenamiento y ejecutando la consulta
     historial = query.order_by(LoginAudit.timestamp.desc()).all()
         
-    sedes = Location.query.order_by(Location.name.asc()).all()
+    # 4. Sede institucional (Almacén Central) nunca se lista para Finanzas
+    if user_role == 'Finance':
+        if getattr(current_user, 'is_admin', False):
+            sedes = [loc for loc in Location.query.order_by(Location.name.asc()).all()
+                     if loc.id != 1]
+        else:
+            sedes = [loc for loc in current_user.locations if loc.id != 1]
+    else:
+        sedes = Location.query.order_by(Location.name.asc()).all()
     
     return render_template('security/login_audit.html', historial=historial, sedes=sedes)

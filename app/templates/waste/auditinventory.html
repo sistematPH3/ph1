@@ -37,7 +37,7 @@
                             {% endfor %}
                         </select>
                         {% endif %}
-                        <select name="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
+                        <select name="severity" id="severity" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" onchange="this.form.submit()">
                             <option value="">Todas las severidades</option>
                             {% for sev_val, sev_txt in [('NORMAL','NORMAL'), ('EDITADO','EDITADO'), ('ANULADO','ANULADO'), ('ALERTA','ALERTA'), ('CRITICO','CRÍTICO'), ('REABASTECIDO','REABASTECIDO')] %}
                             <option value="{{ sev_val }}" {% if filters.get('severity') == sev_val %}selected{% endif %}>{{ sev_txt }}</option>
@@ -62,7 +62,14 @@
             </div>
         </div>
 
-        <ul class="nav nav-tabs ph-tabs" id="auditInventoryTabs" role="tablist">
+        {% set export_base_url = url_for('audit_exports.descargar_inventario') %}
+{% if current_user.is_admin %}
+    {% set sedes = locations|default([]) %}
+{% endif %}
+        {% set export_sin_fechas = True %}
+{% include 'reports/audit_export_toolbar.html' %}
+
+<ul class="nav nav-tabs ph-tabs" id="auditInventoryTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link {% if active_tab == 'ingresos' %}active{% endif %}" id="ingresos-tab" data-bs-toggle="tab" data-bs-target="#ingresos" type="button" role="tab">
                     <i class="bi bi-box-arrow-in-down me-2 text-success"></i>Ingresos ({{ ingresos | length }})
@@ -737,6 +744,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/audit/audit_export.js') }}?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ url_for('static', filename='js/waste/auditinventory.js') }}?v=4"></script>
 {% endblock %}

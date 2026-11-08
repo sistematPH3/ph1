@@ -35,3 +35,28 @@ class WasteAuditRepository:
             logs.append(log)
 
         return logs
+
+    @staticmethod
+    def get_merma_audit_date_range(location_ids=None):
+        """Rango (min, max) de fechas con registros de mermas existentes.
+
+        Respeta la restricción de sedes pero NO la severidad/fechas: el
+        calendario debe ofrecer el rango completo (como en Traslados).
+        """
+        query = db.session.query(
+            db.func.min(AuditLog.timestamp),
+            db.func.max(AuditLog.timestamp)
+        ).filter(
+            AuditLog.action == 'MERMA',
+            AuditLog.timestamp.isnot(None)
+        )
+
+        if location_ids is not None:
+            if isinstance(location_ids, list):
+                if not location_ids:
+                    return None, None
+                query = query.filter(AuditLog.location_id.in_(location_ids))
+            else:
+                query = query.filter(AuditLog.location_id == location_ids)
+
+        return query.one()

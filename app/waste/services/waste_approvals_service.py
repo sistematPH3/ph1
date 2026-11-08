@@ -6,6 +6,7 @@ audita). Solo el Administrador aprueba/rechaza; el resto de roles (con cola de
 pendientes) solo ve su bandeja en solo lectura.
 """
 from datetime import datetime, timedelta
+from app.time_utils import current_ve_time
 
 from app.extensions import db
 from app.models.inventory_model import Product
@@ -48,7 +49,7 @@ def _param_float(clave, default):
 
 def _tasa_merma_diaria(location_id):
     """Mermas normales de la sede en los últimos 30 días promediadas por día."""
-    hoy = datetime.now()
+    hoy = current_ve_time()
     since = hoy - timedelta(days=30)
     historial = MermaApprovalsRepository.get_merma_history(location_id, since)
     if not historial:
@@ -63,7 +64,7 @@ def _dias_desde_ultima_merma(waste_id, location_id):
     Si no hay una merma previa real y separada, se aplica el período base
     configurado (regla de tiempo de la propuesta).
     """
-    hoy = datetime.now()
+    hoy = current_ve_time()
     ultima = MermaApprovalsRepository.get_last_merma_date(location_id, waste_id)
     if ultima is None:
         return _param_float('WASTE_BASE_PERIOD_DAYS', 7)
@@ -111,7 +112,7 @@ def _clasificar_novedad(waste_id, location_id, total_quantity, type_code, type_r
     tolerancia = _param_float('WASTE_TIME_TOLERANCE', 1.5)
     periodo_base = _param_float('WASTE_BASE_PERIOD_DAYS', 7)
 
-    hoy = datetime.now()
+    hoy = current_ve_time()
     desde_30 = hoy - timedelta(days=30)
     fechas = [
         h['date'] for h in MermaApprovalsRepository.get_merma_history(
@@ -787,5 +788,5 @@ def _avisar_autor_final(waste, admin, decisiones_audit):
         type=tipo,
         message=mensaje,
         is_read=False,
-        created_at=datetime.now(),
+        created_at=current_ve_time(),
     ))

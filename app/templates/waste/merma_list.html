@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_approvals.css') }}?v=19">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_approvals.css') }}?v=24">
 {% endblock %}
 
 {% block content %}
@@ -12,7 +12,7 @@
     <div class="ph-card">
 
         <!-- Cabecera del listado -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3" id="mermaPendingHeader">
+        <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3" id="mermaPendingHeader">
             <div class="d-flex align-items-center">
                 <div class="ph-icon-box me-3 shadow-sm" style="background-color: #af1515;">
                     <i class="bi bi-pencil-square"></i>
@@ -31,33 +31,33 @@
                     </p>
                 </div>
             </div>
-            <div class="d-flex flex-column align-items-end gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <a href="{{ url_for('register_waste.nueva_merma') }}" class="btn btn-danger text-white fw-bold rounded-pill px-4 py-2 shadow-sm">
-                        <i class="bi bi-plus-lg me-1"></i>Nueva Merma
-                    </a>
-                    <span class="badge bg-danger rounded-pill px-3 py-2 fs-6 shadow-sm" id="pendingCountBadge">
-                        <i class="bi bi-hourglass-split me-1"></i> Pendientes: {{ pending_count or 0 }}
-                    </span>
+            <div class="merma-header-actions d-flex align-items-center gap-2">
+                <a href="{{ url_for('register_waste.nueva_merma') }}" class="btn btn-merma-red text-white fw-bold rounded-pill px-3 py-2 shadow-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Nueva Merma
+                </a>
+                <span class="badge merma-red-badge rounded-pill px-3 py-2 shadow-sm" id="pendingCountBadge">
+                    <i class="bi bi-hourglass-split me-1"></i> Pendientes: {{ pending_count or 0 }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Cintillo de búsqueda + nota -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="searchMermaList" class="form-control rounded-pill bg-light border-0 ps-5"
+                           placeholder="Buscar por ID, tipo, sede, motivo..." style="height: 36px;" autocomplete="off">
+                </div>
+                <div class="text-white small fw-semibold w-100 mt-1">
+                    <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas;
+                    por eso puedes corregir o cancelar mientras siguen pendientes.
                 </div>
             </div>
         </div>
 
-        <!-- Barra de búsqueda + nota -->
-        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="input-group" style="max-width: 340px;">
-                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control" placeholder="Buscar por ID, tipo, sede, motivo..."
-                       id="searchMermaList">
-            </div>
-            <div class="text-muted small fw-semibold">
-                <i class="bi bi-info-circle me-1"></i>Estas mermas aún <b>no descuentan stock</b> hasta ser aprobadas;
-                por eso puedes corregir o cancelar mientras siguen pendientes.
-            </div>
-        </div>
-
         <!-- Tabla de pendientes del autor -->
-        <div class="table-responsive">
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card">
             <table class="table ph-table align-middle" id="mermaPendingTable">
                 <thead>
                     <tr style="background-color: #af1515 !important;">

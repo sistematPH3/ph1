@@ -169,7 +169,7 @@
 }
 
 #categorySearchInput, #searchInput {
-    border: 1px solid var(--ph-border-soft, #dee2e6) !important;
+    border: none !important;
     background-color: #f8f9fa !important;
     transition: all 0.3s ease-in-out !important;
     color: var(--ph-text-main, #1F2937) !important;
@@ -180,6 +180,42 @@
     box-shadow: 0 0 0 0.25rem rgba(176, 18, 18, 0.15) !important;
     background-color: #ffffff !important;
     outline: none !important;
+}
+
+/* ==========================================================================
+   BUSCADOR + FILTRO LADO A LADO (Cintillo de Gestión de Insumos)
+   Mantiene buscador y filtro en una sola fila incluso en móvil.
+   ========================================================================== */
+.ph-filters-cintillo .d-flex.justify-content-between {
+    flex-wrap: nowrap !important;
+}
+
+@media (max-width: 767.98px) {
+    .ph-filters-cintillo .d-flex.justify-content-between {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .ph-filters-cintillo .flex-grow-1 {
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        flex: 1 1 auto !important;
+    }
+
+    .ph-filters-cintillo .mariuska-select-group {
+        min-width: 0 !important;
+        width: auto !important;
+        flex: 0 0 auto !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .ph-filters-cintillo .mariuska-select-group select {
+        max-width: 130px;
+        text-overflow: ellipsis;
+    }
 }
 
 /* ==========================================================================

@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 import urllib3
 
+from app.decorators.roles import admin_required, require_roles_api
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 api_bcv_bp = Blueprint('api_bcv', __name__)
@@ -27,10 +29,12 @@ def get_bcv_rate_from_web(currency):
     return None
 
 @api_bcv_bp.route('/prueba-bcv', methods=['GET'])
+@admin_required
 def vista_prueba_bcv():
     return render_template('prueba_bcv.html')
 
 @api_bcv_bp.route('/api/get-rate', methods=['GET'])
+@require_roles_api('admin', 'management', 'manager')
 def get_bcv_rate():
     currency = request.args.get('currency', 'USD')
     rate = get_bcv_rate_from_web(currency)

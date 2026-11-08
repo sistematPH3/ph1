@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 import math
+import sys
 from sqlalchemy import text
 from app.models.inventory_model import db
 from app.models.waste_model import Waste, WasteDetail, WasteDetailPhoto
@@ -8,6 +9,8 @@ from app.waste.repositories.register_waste_repository import (
     RegisterWasteRepository,
     InsufficientStockError,
 )
+from app.inventory.services.product_cost_service import obtener_costo_unitario
+from app.time_utils import current_ve_time
 
 def get_form_data(user_id):
     user = RegisterWasteRepository.get_user_by_id(user_id)
@@ -290,7 +293,13 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
                 }
             used_by_lot[(product_id, lot_number)] = acum_lote
 
-            unit_cost = RegisterWasteRepository.get_unit_cost(product_id, lot_number)
+            unit_cost = obtener_costo_unitario(
+                int(product_id),
+                fecha=current_ve_time(),
+                moneda='USD',
+                metodo='lote',
+                lote=str(lot_number).strip(),
+            )
             subtotal = (quantity * unit_cost).quantize(Decimal('0.01'))
 
             expiration_date = RegisterWasteRepository.get_lot_expiration_date(
@@ -309,7 +318,7 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
                             'ya haya pasado.'
                         )
                     }
-                hoy = datetime.now().date()
+                hoy = current_ve_time().date()
                 vence = expiration_date.date() if hasattr(expiration_date, 'date') else expiration_date
                 if vence >= hoy:
                     return {
@@ -372,7 +381,7 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
             evidence_url=evidence_url or None,
             notes=(notes or '').strip() or None,
             request_id=request_id,
-            date=datetime.now(),
+            date=current_ve_time(),
             user_id=user_id,
             status='PENDIENTE' if pending else 'APROBADO',
             total_quantity=total_quantity.quantize(Decimal('0.01')),
@@ -428,5 +437,7 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
         db.session.rollback()
         return {'success': False, 'message': str(e)}
     except Exception as e:
+        import traceback
+        print("EXCEPTION:", traceback.format_exc(), file=sys.stderr)
         db.session.rollback()
         return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}

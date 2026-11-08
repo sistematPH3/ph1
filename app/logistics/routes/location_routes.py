@@ -57,7 +57,7 @@ def register_location():
     return render_template('logistics/register_location.html', form=form)
 
 @location_bp.route('/check-name', methods=['POST'])
-@login_required
+@admin_required
 def check_name():
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -77,7 +77,7 @@ def check_name():
     return {"available": exists is None}
 
 @location_bp.route('/check-phone', methods=['POST'])
-@login_required
+@admin_required
 def check_phone():
     data = request.get_json()
     phone = data.get('phone', '').strip()

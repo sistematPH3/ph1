@@ -35,6 +35,7 @@ def obtener_alarmas_para_dashboard():
     alarmas = []
     for inv, prod_name, unit, loc_name in resultados:
         alarmas.append({
+            'location_id': inv.location_id,
             'location_name': loc_name,
             'product_name': prod_name or 'Insumo sin nombre',
             'new_quantity': float(inv.current_quantity or 0.0),

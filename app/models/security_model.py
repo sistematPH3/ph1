@@ -41,7 +41,7 @@ class User(db.Model, UserMixin):
 
     @property
     def is_admin(self):
-        return self.role is not None and self.role.name == 'Administrator'
+        return self.role is not None and self.role.name in ('Administrator', 'Admin')
 
     @property
     def is_manager(self):

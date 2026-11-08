@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=19">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_dispute.css') }}?v=20">
 
 <!-- Agregamos translate="no" y la clase notranslate para blindar la vista contra Google Translate -->
 <div class="container-fluid mt-4 mb-5 px-4 notranslate" translate="no">
@@ -35,55 +35,58 @@
             </div>
         </div>
 
-        <!-- Barra de Filtros Superior -->
-        <div class="ph-filter-bar mb-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <!-- Buscador -->
-            <div class="input-group" style="max-width: 320px;">
-                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control border-0 shadow-none" placeholder="Buscar por ID, Tipo, Sede..." id="searchDisputeInput">
+        <!-- Cintillo de Filtros Superior -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Buscador -->
+                <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="searchDisputeInput" class="form-control rounded-pill bg-light border-0 ps-5"
+                           placeholder="Buscar por ID, Tipo, Sede..." style="height: 36px;">
+                </div>
+
+                <!-- Filtros: Estado, Sede y rango de fechas (filtra por la llegada del mensaje) -->
+                <form method="GET" action="{{ url_for('movement_dispute.list_disputes') }}" class="d-flex align-items-center flex-wrap gap-2" style="margin-bottom: 0;">
+                    <span class="text-white small fw-semibold">Filtrar:</span>
+
+                    <!-- Selector dinámico de Estados / Novedades -->
+                    <select class="form-select form-select-sm bg-light border-0 shadow-none rounded-pill text-dark fw-medium" id="statusFilterSelect" style="height: 36px; width: 250px;">
+                        <option value="" selected>Todos los estados</option>
+                        <option value="faltante de conteo">Faltante de Conteo</option>
+                        <option value="sobrante / excedente">Sobrante / Excedente</option>
+                        <option value="producto erróneo">Producto Erróneo</option>
+                        <option value="violación de custodia">Violación de Custodia</option>
+                        <option value="incidencia temperatura">Incidencia Temperatura</option>
+                        <option value="vencimiento próximo">Vencimiento Próximo</option>
+                        <option value="lote no coincide">Lote no Coincide</option>
+                        <option value="rechazo por espacio">Rechazo por Espacio</option>
+                        <option value="retorno de emergencia">Retorno de Emergencia</option>
+                        <option value="novedad faltante">Novedad Faltante</option>
+                        <option value="incidencia mixta">Incidencia Mixta</option>
+                    </select>
+
+                    <!-- Selector de Sede Dinámico basado en la tabla Locations -->
+                    <select class="form-select form-select-sm bg-light border-0 shadow-none rounded-pill text-dark fw-medium" id="locationFilterSelect" style="height: 36px; width: 180px;">
+                        <option value="" selected>Todas las sedes</option>
+                        {% for loc in locations[1:] %}
+                            <option value="{{ loc.name }}">{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <!-- Filtro de llegada: busca por la fecha en que llego la novedad a este apartado -->
+                    <span class="text-white small fw-semibold"><i class="bi bi-bell me-1"></i>Llegada de la novedad:</span>
+                    <input type="date" name="start_date" class="form-control form-control-sm bg-light border-0 shadow-none rounded-pill px-3" style="height: 36px; width: 150px;"
+                           value="{{ start_date or '' }}" min="{{ date_min or '' }}" max="{{ date_max or '' }}" onchange="this.form.submit()">
+
+                    {% if start_date %}
+                    <a href="{{ url_for('movement_dispute.list_disputes') }}" class="btn btn-sm btn-outline-light rounded-pill px-3">Limpiar</a>
+                    {% endif %}
+                </form>
             </div>
-
-            <!-- Filtros: Estado, Sede y rango de fechas (filtra por la llegada del mensaje) -->
-            <form method="GET" action="{{ url_for('movement_dispute.list_disputes') }}" class="d-flex align-items-center flex-wrap gap-2">
-                <span class="text-muted small fw-semibold">Filtrar:</span>
-
-                <!-- Selector dinámico de Estados / Novedades -->
-                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="statusFilterSelect" style="width: 250px;">
-                    <option value="" selected>Todos los estados</option>
-                    <option value="faltante de conteo">Faltante de Conteo</option>
-                    <option value="sobrante / excedente">Sobrante / Excedente</option>
-                    <option value="producto erróneo">Producto Erróneo</option>
-                    <option value="violación de custodia">Violación de Custodia</option>
-                    <option value="incidencia temperatura">Incidencia Temperatura</option>
-                    <option value="vencimiento próximo">Vencimiento Próximo</option>
-                    <option value="lote no coincide">Lote no Coincide</option>
-                    <option value="rechazo por espacio">Rechazo por Espacio</option>
-                    <option value="retorno de emergencia">Retorno de Emergencia</option>
-                    <option value="novedad faltante">Novedad Faltante</option>
-                    <option value="incidencia mixta">Incidencia Mixta</option>
-                </select>
-
-                <!-- Selector de Sede Dinámico basado en la tabla Locations -->
-                <select class="form-select form-select-sm bg-white border-0 shadow-none text-dark fw-medium" id="locationFilterSelect" style="width: 180px;">
-                    <option value="" selected>Todas las sedes</option>
-                    {% for loc in locations[1:] %}
-                        <option value="{{ loc.name }}">{{ loc.name }}</option>
-                    {% endfor %}
-                </select>
-
-                <!-- Filtro de llegada: busca por la fecha en que llego la novedad a este apartado -->
-                <span class="text-muted small fw-semibold"><i class="bi bi-bell me-1"></i>Llegada de la novedad:</span>
-                <input type="date" name="start_date" class="form-control form-control-sm bg-white border-0 shadow-none rounded-pill px-3" style="width: 150px;"
-                       value="{{ start_date or '' }}" min="{{ date_min or '' }}" max="{{ date_max or '' }}" onchange="this.form.submit()">
-
-                {% if start_date %}
-                <a href="{{ url_for('movement_dispute.list_disputes') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Limpiar</a>
-                {% endif %}
-            </form>
         </div>
 
         <!-- Tabla de Novedades / Disputas -->
-        <div class="table-responsive">
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card">
             <table class="table ph-table align-middle">
                 <thead>
                     <tr style="background-color: #af1515 !important;">

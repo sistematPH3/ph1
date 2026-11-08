@@ -1,251 +1,294 @@
-/* Layout base */
-.wrapper { display: flex; min-height: 100vh; background-color: #f4f7f6; }
-.content-area { flex: 1; padding: 40px; }
+/* =========================================================
+   PANEL EJECUTIVO DE DIRECCIÓN — ajustes sobre el sistema visual de finanzas
+   (compila con finance_dashboard.css y los componentes de alertas)
+   ========================================================= */
 
-/* Cabecera */
-.dashboard-header { margin-bottom: 30px; }
-.dashboard-header h1 { color: #202124; font-weight: 800; }
-
-/* Grid de tarjetas */
-.dashboard-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-    gap: 20px; 
+/* Las secciones del panel controlan su espaciado; el main ya no aporta padding
+   (igual que en finanzas). Se alinean las alarmas al margen del hero. */
+main.content .stock-alert-wrapper,
+main.content .expired-alert-wrapper {
+    margin-left: 30px;
+    margin-right: 30px;
 }
 
-.card-link { text-decoration: none; color: inherit; }
-
-.card-dash { 
-    background: white; 
-    padding: 30px; 
-    border-radius: 15px; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    text-align: center;
+/* --- Tabla de traslados recientes --- */
+.fin-mov-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
 }
 
-.card-dash:hover { 
-    transform: translateY(-10px); 
-    box-shadow: 0 10px 25px rgba(227, 24, 55, 0.15); 
-}
-
-.card-dash i { font-size: 2rem; color: #E31837; margin-bottom: 15px; }
-.card-dash h3 { margin: 10px 0; color: #202124; }
-.card-dash p { color: #5f6368; font-size: 0.9rem; }
-
-/* Tarjeta destacada */
-.card-dash.highlight { border-top: 5px solid #E31837; }
-
-/* Métricas en vivo (Sub-Gerencia) */
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.metric-dash {
-    background: white;
-    padding: 25px 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    text-align: center;
-    border-left: 5px solid #E31837;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.metric-dash:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(227, 24, 55, 0.12);
-}
-
-/* Colores propios por métrica */
-.metric-red { border-left-color: #E31837; }
-.metric-red i, .metric-red .metric-number { color: #E31837; }
-
-.metric-amber { border-left-color: #f59e0b; }
-.metric-amber i, .metric-amber .metric-number { color: #c77700; }
-
-.metric-coral { border-left-color: #e35d3b; }
-.metric-coral i, .metric-coral .metric-number { color: #cc4c2d; }
-
-.metric-dash i {
-    font-size: 1.4rem;
-    display: block;
-    margin-bottom: 8px;
-}
-
-.metric-number {
-    display: block;
-    font-size: 2.1rem;
+.fin-mov-table thead th {
+    text-transform: uppercase;
+    font-size: .66rem;
+    letter-spacing: .06em;
     font-weight: 800;
-    color: #202124;
-    line-height: 1.1;
+    color: #8a94a8;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eceff5;
 }
 
-.metric-label {
+.fin-mov-table tbody td {
+    padding: 11px 10px;
+    border-bottom: 1px solid #f0f2f7;
+    color: #2a3040;
+    vertical-align: middle;
+}
+
+.fin-mov-table tbody tr:last-child td { border-bottom: none; }
+
+.fin-mov-table tbody tr:hover { background: #f7f9fc; }
+
+.fin-mov-id {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.fin-mov-fecha {
+    color: #64748b;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.fin-mov-fecha small {
     display: block;
-    margin-top: 6px;
-    color: #5f6368;
-    font-size: 0.82rem;
-    font-weight: 500;
+    font-size: .68rem;
+    color: #94a3b8;
 }
 
-/* Paneles de reporte (Sub-Gerencia) */
-.dash-panel {
-    background: white;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    padding: 18px 20px;
-    margin-bottom: 24px;
-    border-left: 4px solid transparent;
-}
-
-.accent-red   { border-left-color: #E31837; }
-.accent-coral { border-left-color: #e35d3b; }
-.accent-amber { border-left-color: #f59e0b; }
-
-.dash-panel-header {
+.fin-mov-route {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 10px;
-    border-bottom: 1px solid #f1f3f5;
-    padding-bottom: 12px;
-    margin-bottom: 12px;
-}
-
-.dash-panel-title {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #202124;
-    margin: 0;
-}
-
-.accent-red   .dash-panel-title i { color: #E31837; margin-right: 8px; }
-.accent-coral .dash-panel-title i { color: #e35d3b; margin-right: 8px; }
-.accent-amber .dash-panel-title i { color: #c77700; margin-right: 8px; }
-
-.dash-panel-sub {
-    margin: 2px 0 0 0;
-    color: #5f6368;
-    font-size: 0.85rem;
-}
-
-.dash-link {
-    color: #E31837;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
-    font-size: 0.85rem;
-    text-decoration: none;
+    color: #1e293b;
+}
+
+.fin-mov-arrow {
+    color: #c8102e;
+    font-size: .72rem;
+}
+
+.fin-mov-contenido {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: .74rem;
+    font-weight: 700;
+    padding: .25rem .6rem;
+    border-radius: .45rem;
     white-space: nowrap;
 }
 
-.dash-link:hover {
-    color: #8f1111;
-}
-
-/* Tabla de dashboard */
-.dash-table {
-    margin-bottom: 0;
-    font-size: 0.85rem;
-}
-
-.dash-table thead th {
-    background: #f8f9fb;
-    color: #5f6368;
+.fin-mov-badge {
+    display: inline-block;
+    font-size: .68rem;
+    font-weight: 800;
     text-transform: uppercase;
-    font-size: 0.68rem;
-    letter-spacing: 0.6px;
-    border: none;
-    padding: 0.5rem 0.8rem;
+    letter-spacing: .04em;
+    padding: .28rem .6rem;
+    border-radius: .45rem;
+    white-space: nowrap;
 }
 
-.dash-table tbody td {
-    vertical-align: middle;
-    border-bottom: 1px solid #f0f2f5;
-    padding: 0.45rem 0.8rem;
-    color: #202124;
+.fin-mov-badge--ok   { background: #d9f3e6; color: #0f7a4d; }
+.fin-mov-badge--warn { background: #e4f0ff; color: #1d5fb5; }
+.fin-mov-badge--off  { background: #fde3e0; color: #c2442e; }
+
+/* --- Estado vacío (estilo coherente con finanzas) --- */
+.fin-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 34px 20px;
 }
 
-.dash-table tbody tr:hover td {
-    background: #fafbfd;
+.fin-empty i {
+    font-size: 1.9rem;
+    color: #b6bfcc;
 }
 
-.route-line {
-    display: inline-flex;
+.fin-empty h4 {
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 800;
+    color: #47506b;
+}
+
+.fin-empty p {
+    margin: 0;
+    font-size: .8rem;
+    color: #8a94a8;
+}
+
+/* --- Lista de lotes por vencer --- */
+.fin-lotes-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fin-lote-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #f8f9fc;
+    border: 1px solid #eef1f6;
+    border-left: 4px solid #e5a400;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.fin-lote-item:hover {
+    transform: translateX(3px);
+    box-shadow: var(--shadow);
+    border-color: #f0c9d0;
+}
+
+.fin-lote-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.fin-lote-product {
+    font-weight: 800;
+    color: #1f2937;
+    font-size: .92rem;
+    display: flex;
     align-items: center;
     gap: 6px;
-    font-weight: 500;
-    font-size: 0.85rem;
 }
 
-.exp-date {
-    font-weight: 600;
-    color: #202124;
+.fin-lote-product i { color: #c8102e; font-size: .82rem; }
+
+.fin-lote-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: .76rem;
+    color: #6b7280;
+    flex-wrap: wrap;
 }
 
-/* Chips y badges */
-.dash-chip {
-    background: #f1f3f5;
-    color: #495057;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.2em 0.6em;
-    border-radius: 50px;
+.fin-lote-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     white-space: nowrap;
 }
 
-.dash-lot {
-    background: #fff4e5;
-    color: #b45309;
-    font-weight: 600;
-    font-size: 0.75rem;
-    padding: 0.2em 0.6em;
-    border-radius: 6px;
-    border: 1px solid #fde4c0;
+.fin-lote-meta i { color: #c8102e; }
+
+.fin-lote-venc { color: #8a94a8; }
+
+.fin-lote-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.fin-lote-ud {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #334155;
+    background: #eef2f7;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
     white-space: nowrap;
 }
 
-.dash-badge {
-    font-weight: 600;
-    font-size: 0.72rem;
-    padding: 0.3em 0.75em;
-    border-radius: 50px;
+.fin-lote-dias {
+    font-size: .72rem;
+    font-weight: 800;
+    padding: .24rem .55rem;
+    border-radius: .45rem;
     white-space: nowrap;
-    display: inline-block;
 }
 
-.dash-badge-success { background: #d1e7dd; color: #0f5132; }
-.dash-badge-info    { background: #cff4fc; color: #055160; }
-.dash-badge-danger  { background: #f8d7da; color: #842029; }
-.dash-badge-warning { background: #fff3cd; color: #664d03; }
-.dash-badge-secondary { background: #e9ecef; color: #495057; }
+.fin-lote-dias--crit { background: #fee2e2; color: #c2442e; }
+.fin-lote-dias--ok   { background: #fff3d6; color: #b45309; }
 
-.dash-qty-critical {
-    font-weight: 700;
-    color: #E31837;
+.fin-lote-cta {
+    font-size: .74rem;
+    font-weight: 800;
+    color: #c8102e;
+    background: #fdf0f2;
+    border: 1px solid #f5c6cd;
+    border-radius: .5rem;
+    padding: .36rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background .18s ease;
 }
 
-/* Dos columnas lado a lado */
-.dash-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
+.fin-lote-cta:hover { background: #fbe3e7; color: #c8102e; }
+
+/* El panel de vencimientos próximos abarca toda la fila de la cuadrícula */
+.fin-est--full {
+    grid-column: 1 / -1;
 }
 
-.dash-row .dash-panel { margin-bottom: 0; }
-
-.access-panel {
-    border-top: 4px solid #E31837;
-}
-
-.access-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
+/* =========================================================
+   RESPONSIVE — TABLET
+   ========================================================= */
 @media (max-width: 900px) {
-    .dash-row { grid-template-columns: 1fr; }
-    .dash-row .dash-panel { margin-bottom: 24px; }
+    .fin-mov-table thead th { padding: 7px 8px; font-size: .62rem; }
+    .fin-mov-table tbody td { padding: 9px 8px; font-size: .78rem; }
+    .fin-mov-contenido { font-size: .7rem; padding: .22rem .5rem; }
+    .fin-kpi-detalle { flex-wrap: wrap; }
+}
+
+/* =========================================================
+   RESPONSIVE — TELÉFONO
+   ========================================================= */
+@media (max-width: 720px) {
+    /* Las alarmas se alinean al margen de las demás secciones */
+    main.content .stock-alert-wrapper,
+    main.content .expired-alert-wrapper {
+        margin-left: 14px;
+        margin-right: 14px;
+    }
+
+    /* Tabla compacta: se ocultan ID y Contenido, queda Fecha/Origen/Estado */
+    .fin-mov-table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .fin-mov-table thead th:nth-child(1),
+    .fin-mov-table thead th:nth-child(4),
+    .fin-mov-table tbody td:nth-child(1),
+    .fin-mov-table tbody td:nth-child(4) { display: none; }
+
+    .fin-mov-route { gap: 5px; font-size: .78rem; }
+    .fin-mov-fecha small { font-size: .64rem; }
+    .fin-mov-badge { font-size: .62rem; padding: .22rem .5rem; }
+    .fin-est-marca { font-size: .66rem; }
+    .fin-empty { padding: 26px 14px; }
+
+    .fin-lote-item { flex-wrap: wrap; align-items: flex-start; }
+    .fin-lote-side { width: 100%; justify-content: flex-start; }
+}
+
+@media (max-width: 400px) {
+    .fin-mov-fecha { font-size: .74rem; }
+    .fin-mov-route { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .fin-mov-arrow { display: none; }
+    .fin-lote-cta { width: 100%; justify-content: center; }
 }

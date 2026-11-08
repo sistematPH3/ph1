@@ -56,7 +56,7 @@ def seed_database():
         
         if not user_exists:
             admin = User(
-                name='Mariuska Admin',
+                name='Sistema Admin',
                 email=email_admin,
                 password_hash=generate_password_hash('Ph12345.'),
                 role_id=1,

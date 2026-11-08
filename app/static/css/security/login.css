@@ -288,9 +288,10 @@ body, html {
     display: none; text-align: center;
 }
 /* ==========================================================================
-   ADAPTACIÓN FIEL AL MOCKUP PARA DISPOSITIVOS MÓVILES (PANTALLAS MENORES A 768px)
+   ADAPTACIÓN PARA MÓVILES Y TABLET (PANTALLAS MENORES A 1366px)
+   Misma vista apilada del teléfono: sección blanca arriba y roja abajo.
    ========================================================================== */
-@media (max-width: 768px) {
+@media (max-width: 1366px) {
     body, html {
         overflow-x: hidden;
         overflow-y: auto;
@@ -313,7 +314,7 @@ body, html {
         flex: none;
         width: 100%;
         height: auto;
-        padding: 25px 15px 25px 15px;
+        padding: 70px 15px 25px 15px;
         background-color: white;
         display: flex;
         flex-direction: column;
@@ -382,7 +383,7 @@ body, html {
        COLUMNA DERECHA (Sección Roja Inferior)
        ---------------------------------------------------- */
     .col-right {
-        flex: none;
+        flex: 1 1 auto;
         width: 100%;
         /* Espaciado inferior de 80px para que el botón negro no sea bloqueado por el borde inferior */
         padding: 10px 20px 80px 20px; 
@@ -415,8 +416,19 @@ body, html {
         transform-origin: top left;
     }
 
+    /* Relleno rojo sólido debajo del diseño crema de la franja: cubre cualquier
+       espacio blanco en la parte baja sin tapar el diseño superior. */
     .col-right::after {
-        display: none;
+        content: '';
+        display: block !important;
+        position: absolute;
+        top: -40px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--ph-red-dark);
+        z-index: 12;
+        pointer-events: none;
     }
 
     /* Contenedor del formulario: Bajado sutilmente a -40px para despegarlos del borde del chorreado */
@@ -426,7 +438,7 @@ body, html {
         width: 100%;
         max-width: 360px;
         /* Bajamos un poquito el formulario con un margen negativo más suave */
-        margin: -40px auto 0 auto; 
+        margin: -5px auto 0 auto; 
     }
 
     /* Icono de grupo de usuarios */
@@ -452,42 +464,88 @@ body, html {
     }
 }
 
-/* AJUSTES ESPECÍFICOS PARA TABLET (Entre 769px y 1024px) */
-@media (min-width: 769px) and (max-width: 1024px) {
-    
-    /* 1. ELIMINACIÓN DE LÍNEAS EN CONTENEDORES */
-    .login-wrapper, .col-left, .col-right {
-        border: none !important;
-        outline: none !important;
-        background-clip: padding-box !important; /* Ayuda a evitar líneas de borde residuales */
-    }
+/* AJUSTES ESPECÍFICOS PARA TABLET (Entre 769px y 1366px):
+   Misma vista apilada del móvil, con contenido más grande. */
+@media (min-width: 769px) and (max-width: 1366px) {
 
-    /* 2. AJUSTE FINO DE LA MANCHA ROJA */
-    .col-right::before {
-        /* Desplazamos la mancha hacia la derecha cambiando de -200px a -120px */
-        left: -120px !important; 
-        /* Reducimos el ancho proporcionalmente para que encaje bien */
-        width: calc(100% + 120px) !important;
-    }
-
-    /* 3. Icono de usuario totalmente blanco */
-    .right-content-wrapper .group-icon {
-        opacity: 1 !important;
-    }
-
-    /* 4. Mover la pizza más arriba */
     .col-left {
-        justify-content: flex-start !important;
-        padding-top: 60px !important;
-    }
-    
-    .pizza-slice-image {
-        margin-top: 40px !important;
-        margin-bottom: auto !important;
+        padding: 90px 28px 40px;
     }
 
-    /* 5. Eliminar línea divisoria de los inputs */
-    .input-with-icon .vertical-divider {
-        display: none !important;
+    .brand-logo-main {
+        width: 195px;
+        margin: 0 0 22px 0 !important;
+    }
+
+    .info-text-peach {
+        font-size: 1.35rem !important;
+        padding: 14px 30px !important;
+        width: 80%;
+        max-width: 440px;
+        margin-bottom: 16px !important;
+        box-sizing: border-box;
+    }
+
+    .btn-registro-link {
+        font-size: 1.55rem;
+        padding: 13px 36px;
+        margin: 10px 0 0 0 !important;
+    }
+
+    .pizza-slice-image {
+        width: 180px;
+        margin: 22px 0 0 0 !important;
+    }
+
+    .group-icon {
+        width: 150px !important;
+    }
+
+    .right-content-wrapper {
+        max-width: 500px;
+    }
+
+    .agbalumo-subtitle-white {
+        font-size: 2rem;
+    }
+
+    .input-with-icon {
+        height: 66px;
+        padding: 0 18px;
+    }
+
+    .form-input-auth {
+        font-size: 1.15rem;
+    }
+
+    .field-icon {
+        width: 26px;
+    }
+
+    .vertical-divider {
+        height: 30px;
+        margin: 0 18px;
+    }
+
+    .eye-toggle-icon {
+        width: 26px;
+    }
+
+    .forget-pass-peach {
+        font-size: 0.85rem;
+        padding: 5px 14px;
+    }
+
+    .btn-final-negro {
+        width: 90%;
+        max-width: 460px;
+        font-size: 1.8rem;
+        padding: 14px;
+    }
+
+    .forget-pass-container {
+        width: 100%;
+        max-width: 460px;
+        margin: 0 auto 25px auto;
     }
 }

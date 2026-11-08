@@ -1,183 +1,211 @@
-{% extends "base_list.html" %}
+{% extends "layout.html" %}
+
+{% block title %}Gestión de Auditoría de Accesos | Pizza Hut{% endblock %}
 
 {% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/login_audit.css') }}">
 {% endblock %}
 
-{% block search_input_id %}auditSearchInput{% endblock %}
-{% block search_placeholder %}Buscar por nombre, correo o acción...{% endblock %}
-{% block table_id %}auditDataTable{% endblock %}
+{% block content %}
+<div class="container-fluid mt-4 mb-5 px-4">
+    <div class="ph-card">
 
-{% block title_list %}
-    <div class="d-flex align-items-center">
-        <div class="icon-wrapper me-3 shadow-sm d-flex align-items-center justify-content-center" style="background-color: #d61c2c; color: white; width: 44px; height: 44px; border-radius: 10px; font-size: 1.25rem;">
-            <i class="bi bi-shield-lock-fill"></i>
-        </div>
-        <span style="color: #1a1a1a; font-weight: 700; letter-spacing: -0.3px; font-size: 1.75rem;">Gestión de Auditoría de Accesos</span>
-    </div>
-{% endblock %}
-
-{% block subtitle_list %}Control y estado de historial de sesiones a nivel nacional{% endblock %}
-
-{% block actions_filter %}
-    <div class="filters-responsive-wrapper d-flex gap-2 align-items-center justify-content-end">
-        <select id="locationFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted" style="font-size: 0.88rem;">
-            <option value="all">Todas las sedes</option>
-            <option value="global">Global / Sin Sede</option>
-            {% for sede in sedes %}
-                <option value="{{ sede.id }}">{{ sede.name }}</option>
-            {% endfor %}
-        </select>
-
-        <input type="date" id="dateFilter" class="form-control rounded-pill bg-light border-0 py-2 text-muted" style="width: 140px; font-size: 0.88rem;">
-
-        <div class="position-relative time-filter-container">
-            <select id="hourFilter" class="form-select rounded-pill bg-light border-0 py-2 text-muted" style="width: 130px; font-size: 0.88rem;">
-                <option value="">Todas las horas</option>
-                <option value="12 AM">12:00 AM</option>
-                <option value="01 AM">01:00 AM</option>
-                <option value="02 AM">02:00 AM</option>
-                <option value="03 AM">03:00 AM</option>
-                <option value="04 AM">04:00 AM</option>
-                <option value="05 AM">05:00 AM</option>
-                <option value="06 AM">06:00 AM</option>
-                <option value="07 AM">07:00 AM</option>
-                <option value="08 AM">08:00 AM</option>
-                <option value="09 AM">09:00 AM</option>
-                <option value="10 AM">10:00 AM</option>
-                <option value="11 AM">11:00 AM</option>
-                <option value="12 PM">12:00 PM</option>
-                <option value="01 PM">01:00 PM</option>
-                <option value="02 PM">02:00 PM</option>
-                <option value="03 PM">03:00 PM</option>
-                <option value="04 PM">04:00 PM</option>
-                <option value="05 PM">05:00 PM</option>
-                <option value="06 PM">06:00 PM</option>
-                <option value="07 PM">07:00 PM</option>
-                <option value="08 PM">08:00 PM</option>
-                <option value="09 PM">09:00 PM</option>
-                <option value="10 PM">10:00 PM</option>
-                <option value="11 PM">11:00 PM</option>
-            </select>
-        </div>
-    </div>
-{% endblock %}
-
-{% block table_head %}
-    <th class="ps-4" style="width: 8%;">ID</th>
-    <th style="width: 22%;">USUARIO</th>
-    <th style="width: 15%;">ROL</th>
-    <th style="width: 20%;">UBICACIÓN</th>
-    <th style="width: 15%;">ACCIÓN</th>
-    <th style="width: 20%;">FECHA Y HORA</th>
-{% endblock %}
-
-{% block table_body %}
-    {% for log in historial %}
-    <tr class="audit-data-row border-bottom" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
-        <td class="ps-4 fw-bold text-dark" style="font-size: 0.9rem;">{{ log.id }}</td>
-        
-        <td>
-            <div class="d-flex flex-column">
-                <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ log.user.name }}</span>
-                <span class="text-muted small" style="font-size: 0.82rem;">{{ log.user.email }}</span>
+        <!-- Encabezado corporativo -->
+        <div class="d-flex align-items-center mb-1">
+            <div class="ph-icon-box me-3 shadow-sm">
+                <i class="bi bi-shield-lock"></i>
             </div>
-        </td>
-        
-        <td>
-            <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill" style="font-weight: 600;">
-                {{ log.role.name }}
-            </span>
-        </td>
-        
-        <td>
-            {% if log.location %}
-                <span class="text-dark d-flex align-items-center" style="font-size: 0.9rem;">
-                    <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
-                </span>
-            {% else %}
-                <span class="text-muted font-italic d-flex align-items-center" style="font-size: 0.9rem;">
-                    Global / Sin Sede
-                </span>
-            {% endif %}
-        </td>
-        
-        <td>
-            {% if log.action == 'INICIO_SESION' %}
-                <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">INICIO_SESION</span>
-            {% elif log.action == 'CERRAR_SESION' %}
-                <span class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">CERRAR_SESION</span>
-            {% else %}
-                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">{{ log.action }}</span>
-            {% endif %}
-        </td>
-        
-        <td class="text-muted small" style="font-size: 0.85rem;">
-            <i class="bi bi-calendar3 me-1"></i> <span class="audit-date">{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span> <br>
-            <i class="bi bi-clock me-1 mt-1"></i> <span class="audit-time">{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
-        </td>
-    </tr>
-    {% endfor %}
+            <div>
+                <h2 class="ph-title mb-1">Gestión de Auditoría de Accesos</h2>
+                <p class="text-muted mb-0">Control y estado de historial de sesiones a nivel nacional.</p>
+            </div>
+        </div>
 
-    <tr class="d-md-none p-0 border-0 bg-transparent">
-        <td colspan="6" class="p-0 border-0">
-            <div id="auditCardsContainer" class="mobile-audit-container">
-                {% for log in historial %}
-                <div class="mobile-audit-card mb-3" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold text-dark fs-6">#{{ log.id }}</span>
-                            {% if log.action == 'INICIO_SESION' %}
-                                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">INICIO_SESION</span>
-                            {% elif log.action == 'CERRAR_SESION' %}
-                                <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">CERRAR_SESION</span>
-                            {% else %}
-                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ log.action }}</span>
-                            {% endif %}
-                        </div>
-                        <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill" style="font-size: 0.75rem;">{{ log.role.name }}</span>
-                    </div>
-                    
-                    <div class="mb-2">
-                        <span class="d-block fw-bold text-dark user-name-text">{{ log.user.name }}</span>
-                        <span class="d-block text-muted small email-subtext">{{ log.user.email }}</span>
-                    </div>
+        {% set export_base_url = url_for('audit_exports.descargar_accesos') %}
+        {% set export_sin_fechas = True %}
+        {% include 'reports/audit_export_toolbar.html' %}
 
-                    <div class="mb-3 d-flex align-items-center text-dark" style="font-size: 0.85rem;">
-                        {% if log.location %}
-                            <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
-                        {% else %}
-                            <i class="bi bi-globe me-2 text-muted"></i> <span class="text-muted font-italic">Global / Sin Sede</span>
-                        {% endif %}
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-calendar3 me-1.5 text-muted"></i>
-                            <span>{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span>
-                        </div>
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-clock me-1.5 text-muted"></i>
-                            <span>{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
-                        </div>
-                    </div>
+        <!-- Filtros dentro del cintillo rojo -->
+        <div class="ph-filters-cintillo mt-3">
+            <div class="filters-responsive-wrapper d-flex align-items-center gap-2 flex-nowrap">
+                <div class="position-relative flex-grow-1" style="min-width: 240px;">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="auditSearchInput" class="form-control rounded-pill bg-light border-0 ps-5" style="height: 36px;"
+                           placeholder="Buscar por nombre, correo o acción...">
                 </div>
-                {% endfor %}
+
+                <select id="locationFilter" class="form-select form-select-sm border-0 bg-light rounded-pill" style="height: 36px; flex: 0 0 auto; width: 130px;" title="Filtrar por sede">
+                    <option value="all">Todas</option>
+                    {% if not current_user.is_finance %}
+                    <option value="global">Global / Sin Sede</option>
+                    {% endif %}
+                    {% for sede in sedes %}
+                        <option value="{{ sede.id }}">{{ sede.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="date" id="dateFilter" class="form-control form-control-sm border-0 bg-light rounded-pill" title="Filtrar por fecha" style="height: 36px; flex: 0 0 auto; width: 130px;">
+
+                <select id="hourFilter" class="form-select form-select-sm border-0 bg-light rounded-pill" title="Filtrar por hora" style="height: 36px; flex: 0 0 auto; width: 130px;">
+                    <option value="">Todas</option>
+                    <option value="12 AM">12:00 AM</option>
+                    <option value="01 AM">01:00 AM</option>
+                    <option value="02 AM">02:00 AM</option>
+                    <option value="03 AM">03:00 AM</option>
+                    <option value="04 AM">04:00 AM</option>
+                    <option value="05 AM">05:00 AM</option>
+                    <option value="06 AM">06:00 AM</option>
+                    <option value="07 AM">07:00 AM</option>
+                    <option value="08 AM">08:00 AM</option>
+                    <option value="09 AM">09:00 AM</option>
+                    <option value="10 AM">10:00 AM</option>
+                    <option value="11 AM">11:00 AM</option>
+                    <option value="12 PM">12:00 PM</option>
+                    <option value="01 PM">01:00 PM</option>
+                    <option value="02 PM">02:00 PM</option>
+                    <option value="03 PM">03:00 PM</option>
+                    <option value="04 PM">04:00 PM</option>
+                    <option value="05 PM">05:00 PM</option>
+                    <option value="06 PM">06:00 PM</option>
+                    <option value="07 PM">07:00 PM</option>
+                    <option value="08 PM">08:00 PM</option>
+                    <option value="09 PM">09:00 PM</option>
+                    <option value="10 PM">10:00 PM</option>
+                    <option value="11 PM">11:00 PM</option>
+                </select>
             </div>
-        </td>
-    </tr>
-    
-    <tr id="noResultsRow" style="display: none;">
-        <td colspan="6" class="text-center py-5 bg-white border-0">
-            <div class="py-4 text-muted">
-                <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
-                <h5 class="fw-bold mb-1" style="color: #4a5568;">No se encontraron resultados</h5>
-                <p class="small mb-0" style="color: #718096;">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
-            </div>
-        </td>
-    </tr>
+        </div>
+
+        <!-- Tabla de eventos -->
+        <div class="table-responsive bg-white shadow-sm rounded-4 mt-3 table-card">
+            <table id="auditDataTable" class="table align-middle table-hover mb-0">
+                <thead class="text-uppercase text-muted content-table-header">
+                    <tr>
+                        <th class="ps-4" style="width: 8%;">ID</th>
+                        <th style="width: 22%;">USUARIO</th>
+                        <th style="width: 15%;">ROL</th>
+                        <th style="width: 20%;">UBICACIÓN</th>
+                        <th style="width: 15%;">ACCIÓN</th>
+                        <th style="width: 20%;">FECHA Y HORA</th>
+                    </tr>
+                </thead>
+                <tbody class="border-0">
+                    {% for log in historial %}
+                    <tr class="audit-data-row border-bottom" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
+                        <td class="ps-4 fw-bold text-dark" style="font-size: 0.9rem;">{{ log.id }}</td>
+                        
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ log.user.name }}</span>
+                                <span class="text-muted small email-subtext" style="font-size: 0.82rem;">{{ log.user.email }}</span>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill" style="font-weight: 600;">
+                                {{ log.role.name }}
+                            </span>
+                        </td>
+                        
+                        <td>
+                            {% if log.location %}
+                                <span class="text-dark d-flex align-items-center" style="font-size: 0.9rem;">
+                                    <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted font-italic d-flex align-items-center" style="font-size: 0.9rem;">
+                                    Global / Sin Sede
+                                </span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if log.action == 'INICIO_SESION' %}
+                                <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">INICIO_SESION</span>
+                            {% elif log.action == 'CERRAR_SESION' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">CERRAR_SESION</span>
+                            {% else %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill" style="letter-spacing: 0.5px;">{{ log.action }}</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="text-muted small" style="font-size: 0.85rem;">
+                            <i class="bi bi-calendar3 me-1"></i> <span class="audit-date">{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span> <br>
+                            <i class="bi bi-clock me-1 mt-1"></i> <span class="audit-time">{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    <tr class="d-md-none p-0 border-0 bg-transparent">
+                        <td colspan="6" class="p-0 border-0">
+                            <div id="auditCardsContainer" class="mobile-audit-container">
+                                {% for log in historial %}
+                                <div class="mobile-audit-card mb-3" data-location="{{ log.location_id or 'global' }}" data-date="{{ log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '' }}" data-time12="{{ log.timestamp.strftime('%I %p') if log.timestamp else '' }}">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold text-dark fs-6">#{{ log.id }}</span>
+                                            {% if log.action == 'INICIO_SESION' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">INICIO_SESION</span>
+                                            {% elif log.action == 'CERRAR_SESION' %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">CERRAR_SESION</span>
+                                            {% else %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ log.action }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill" style="font-size: 0.75rem;">{{ log.role.name }}</span>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <span class="d-block fw-bold text-dark user-name-text">{{ log.user.name }}</span>
+                                        <span class="d-block text-muted small email-subtext">{{ log.user.email }}</span>
+                                    </div>
+
+                                    <div class="mb-3 d-flex align-items-center text-dark" style="font-size: 0.85rem;">
+                                        {% if log.location %}
+                                            <i class="bi bi-geo-alt-fill me-2 text-danger"></i> {{ log.location.name }}
+                                        {% else %}
+                                            <i class="bi bi-globe me-2 text-muted"></i> <span class="text-muted font-italic">Global / Sin Sede</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.82rem;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar3 me-1.5 text-muted"></i>
+                                            <span>{{ log.timestamp.strftime('%d/%m/%Y') if log.timestamp else '---' }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-clock me-1.5 text-muted"></i>
+                                            <span>{{ log.timestamp.strftime('%I:%M %p') if log.timestamp else 'Pendiente' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr id="noResultsRow" style="display: none;">
+                        <td colspan="6" class="text-center py-5 bg-white border-0">
+                            <div class="py-4 text-muted">
+                                <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
+                                <h5 class="fw-bold mb-1" style="color: #4a5568;">No se encontraron resultados</h5>
+                                <p class="small mb-0" style="color: #718096;">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+    {{ super() }}
     <script src="{{ url_for('static', filename='js/security/login_audit.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/audit/audit_export.js') }}"></script>
 {% endblock %}
