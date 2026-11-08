@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if product_type %}Editar Categoría{% else %}Nueva Categoría{% endif %}</title>
+    <link rel="stylesheet" href="{{ url_for('inventory.static', filename='css/inventory/products.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="form-container">
+        <h2>{% if product_type %}Editar Categoría{% else %}Nueva Categoría{% endif %}</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for class_alert, message in messages %}
+                    <div style="background-color: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #fecaca; font-weight: 600; font-size: 0.9rem;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{% if product_type %}{{ url_for('inventory.edit_category', type_id=product_type.id) }}{% else %}{{ url_for('inventory.create_category') }}{% endif %}">
+            
+            <div class="form-group">
+                <label for="name">Nombre de la Categoría</label>
+                <input type="text" id="name" name="name" value="{{ data.get('name', '') or (product_type.name if product_type else '') }}" placeholder="Ej. Lácteos, Embutidos, Salsas" maxlength="60" required>
+            </div>
+
+            <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 0.5rem 10px;">
+                <label for="requires_manual_date" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
+                    ¿Lleva fecha de vencimiento manual? <br>
+                    <small style="font-weight: 400; color: #6c757d; font-size: 0.8rem;">(Se digita manualmente en cada compra)</small>
+                </label>
+                <input type="checkbox" id="requires_manual_date" name="requires_manual_date" value="true"
+                       {% if data.get('requires_manual_date') or (product_type and product_type.requires_manual_date) %}checked{% endif %}
+                       style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
+            </div>
+
+            <div class="form-group" id="shelf_life_toggle_group" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 0.5rem 10px;">
+                <label for="has_shelf_life" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
+                    ¿Cuenta con días de vida útil estándar?
+                </label>
+                <input type="checkbox" id="has_shelf_life" 
+                       {% if data.get('shelf_life_days', 0)|int > 0 or (product_type and product_type.shelf_life_days) %}checked{% endif %}
+                       style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
+            </div>
+
+            <div class="form-group" id="shelf_life_days_container" style="display: none;">
+                <label for="shelf_life_days">Cantidad de Días Hábiles en Cocina</label>
+                <input type="number" id="shelf_life_days" name="shelf_life_days" 
+                       value="{{ data.get('shelf_life_days', '') or (product_type.shelf_life_days if product_type else 0) }}" min="0" max="365" placeholder="Ej. 7, 15, 30">
+            </div>
+
+            <div class="form-actions">
+                <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">{% if product_type %}Actualizar{% else %}Registrar{% endif %}</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const hasShelfLifeCheckbox = document.getElementById('has_shelf_life');
+        const shelfLifeDaysContainer = document.getElementById('shelf_life_days_container');
+        const shelfLifeDaysInput = document.getElementById('shelf_life_days');
+        const requiresManualCheckbox = document.getElementById('requires_manual_date');
+
+        function toggleShelfLifeInput() {
+            if (hasShelfLifeCheckbox.checked) {
+                shelfLifeDaysContainer.style.display = 'flex';
+                if(shelfLifeDaysInput.value == 0) shelfLifeDaysInput.value = '';
+                shelfLifeDaysInput.setAttribute('required', 'required');
+                requiresManualCheckbox.checked = false; 
+            } else {
+                shelfLifeDaysContainer.style.display = 'none';
+                shelfLifeDaysInput.removeAttribute('required');
+                shelfLifeDaysInput.value = 0;
+            }
+        }
+
+        requiresManualCheckbox.addEventListener('change', () => {
+            if(requiresManualCheckbox.checked) {
+                hasShelfLifeCheckbox.checked = false;
+                toggleShelfLifeInput();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            toggleShelfLifeInput();
+        });
+
+        hasShelfLifeCheckbox.addEventListener('change', toggleShelfLifeInput);
+    </script>
+</body>
+</html>
