@@ -34,6 +34,7 @@ body {
     width: 100%; 
     max-width: 500px; 
     text-align: center; 
+    box-sizing: border-box;
 }
 
 h2 {
@@ -116,7 +117,6 @@ button:hover {
     background-color: #c2142e; 
 }
 
-
 .btn-cancel {
     display: block;
     width: 100%;
@@ -171,4 +171,23 @@ button:hover {
     margin-top: 15px; 
     font-weight: bold; 
     font-size: 14px;
+}
+
+@media (max-width: 767.98px) {
+    body {
+        padding: 15px;
+    }
+    
+    .card {
+        padding: 25px 20px;
+    }
+    
+    h2 {
+        font-size: 24px;
+    }
+    
+    input, button, .btn-cancel, .login-link {
+        padding: 12px;
+        font-size: 16px;
+    }
 }

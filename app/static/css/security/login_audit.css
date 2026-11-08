@@ -1,43 +1,22 @@
-/* ==========================================================================
-   LOCAL FONT CUSTOM DEFINITIONS
-   ========================================================================== */
-@font-face {
-    font-family: 'Inter';
-    src: url('../fonts/Inter-Regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
-@font-face {
-    font-family: 'Inter';
-    src: url('../fonts/Inter-Bold.ttf') format('truetype');
-    font-weight: 700;
-    font-style: normal;
-}
 
-/* ==========================================================================
-   CORPORATE STYLE DICTIONARY (PIZZA HUT PALETTE MATCH)
-   ========================================================================== */
+
 :root {
-    --brand-primary-red: #b01212;          /* Rojo exacto de la cabecera de la tabla */
-    --brand-icon-bg: #d61c2c;              /* Rojo brillante de los botones/iconos de acción */
+    --brand-primary-red: #b01212;
+    --brand-icon-bg: #d61c2c;
     --interface-bg-light: #f8f9fa;
     --interface-text-dark: #1a1a1a;
     --interface-border-color: #eaeaea;
     --font-family-body: 'Inter', sans-serif;
 }
 
-/* Base layout styling */
 .login-audit-container {
     font-family: var(--font-family-body);
     background-color: var(--interface-bg-light);
     min-height: 100vh;
-    max-width: 1400px; /* Evita que se estire infinitamente en monitores anchos */
+    max-width: 1400px;
     margin: 0 auto;
 }
 
-/* ==========================================================================
-   MODULE HEADER DEFINITIONS
-   ========================================================================== */
 .module-header .icon-wrapper {
     background-color: var(--brand-icon-bg);
     color: #ffffff;
@@ -64,20 +43,15 @@
     font-weight: 400;
 }
 
-/* ==========================================================================
-   TOOLBAR CARDS & INPUT CONTROLS
-   ========================================================================== */
 .toolbar-card, .table-card {
     border-radius: 12px !important;
     background-color: #ffffff;
 }
 
-/* Evita que los bordes de la tabla sobresalgan de la tarjeta redondeada */
 .table-card {
     overflow: hidden !important;
 }
 
-/* Alineación de iconos dentro de inputs */
 .search-icon-position, .filter-icon-position {
     position: absolute;
     left: 18px;
@@ -88,11 +62,10 @@
     z-index: 5;
 }
 
-/* Formateo de Inputs compactos redondos */
 .toolbar-card .form-control,
 .toolbar-card .form-select {
     border: 1px solid var(--interface-border-color);
-    border-radius: 20px; /* Curvado idéntico al buscador de tu foto */
+    border-radius: 20px;
     padding-top: 6px;
     padding-bottom: 6px;
     font-size: 0.88rem;
@@ -108,10 +81,6 @@
     box-shadow: 0 0 0 3px rgba(214, 28, 44, 0.1);
 }
 
-/* ==========================================================================
-   DATA TABLE STRUCTURING (COMPACT)
-   ========================================================================== */
-/* Se fuerza el fondo rojo directamente en las celdas de la cabecera para anular Bootstrap */
 #auditDataTable th {
     background-color: var(--brand-primary-red) !important;
     font-family: var(--font-family-body);
@@ -124,7 +93,6 @@
     border: none !important;
 }
 
-/* Redondeado exacto de las esquinas superiores de la cabecera */
 #auditDataTable th:first-child {
     border-top-left-radius: 12px !important;
 }
@@ -133,17 +101,15 @@
 }
 
 #auditDataTable td {
-    padding: 10px 16px !important; /* Más compacto para reducir la altura de la pantalla */
+    padding: 10px 16px !important;
     border-bottom: 1px solid var(--interface-border-color);
     font-size: 0.88rem;
 }
 
-/* Efecto Hover sutil */
 .audit-data-row:hover {
     background-color: rgba(214, 28, 44, 0.01) !important;
 }
 
-/* Evitar que la fila de error herede efectos visuales de Bootstrap */
 #noResultsRow:hover {
     background-color: #ffffff !important;
 }
@@ -151,7 +117,6 @@
     border: none !important;
 }
 
-/* Elementos internos */
 .user-name-text {
     font-size: 0.9rem;
     letter-spacing: -0.1px;
@@ -170,7 +135,6 @@
     font-size: 0.82rem;
 }
 
-/* Badges estilizados */
 .role-badge {
     background-color: #f1f3f5;
     color: #495057;
@@ -190,4 +154,111 @@
 
 .text-warning-dark {
     color: #856404 !important;
+}
+
+.time-filter-container {
+    min-width: 150px;
+}
+
+.time-filter-container input[type="time"] {
+    height: 38px;
+    cursor: pointer;
+}
+
+.btn-clear-time {
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+    z-index: 5;
+}
+
+.btn-clear-time:hover {
+    color: var(--brand-icon-bg) !important;
+}
+
+.filters-responsive-wrapper {
+    width: auto;
+}
+
+/* ==========================================
+   VISTA RESPONSIVE (CELULARES) - OPTIMIZADA
+   ========================================== */
+@media (max-width: 767.98px) {
+    /* OCULTAR COMPLETAMENTE las filas de escritorio para evitar duplicaciones */
+    #auditDataTable thead,
+    tr.audit-data-row {
+        display: none !important;
+    }
+
+    #auditDataTable, 
+    #auditDataTable tbody {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    /* Aseguramos que la fila que envuelve a las tarjetas móviles no tenga bordes raros */
+    tr.d-md-none,
+    tr.d-md-none td {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+        background-color: transparent !important;
+        padding: 0 !important;
+    }
+
+    .filters-responsive-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+
+    #locationFilter, 
+    #dateFilter, 
+    .time-filter-container {
+        width: 100% !important;
+    }
+
+    .mobile-audit-container {
+        padding: 10px 0 !important;
+    }
+
+    /* Estilo premium e idéntico de tarjetas para móviles */
+    .mobile-audit-card {
+        border: 1px solid var(--interface-border-color) !important;
+        background-color: #ffffff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+        padding: 1.25rem !important;
+        transition: transform 0.2s ease;
+    }
+
+    .mobile-audit-card .user-name-text {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+    }
+
+    .mobile-audit-card .email-subtext {
+        font-size: 0.85rem !important;
+        color: #6c757d !important;
+    }
+
+    /* Estilo píldora para los badges */
+    .mobile-audit-card .role-badge {
+        font-size: 0.8rem !important;
+        padding: 4px 12px !important;
+        background-color: #f1f3f5 !important;
+        border-radius: 30px !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+
+    .mobile-audit-card .status-badge {
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 4px 12px !important;
+        border-radius: 30px !important;
+    }
 }

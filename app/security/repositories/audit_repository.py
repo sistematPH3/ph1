@@ -11,7 +11,8 @@ class AuditRepository:
             user_id=user_id,
             role_id=role_id,
             location_id=location_id,
-            action=action
+            action=action,
+            timestamp=None # 👈 ESTO FORZA A QUE SE EJECUTE EL @validates('timestamp')
         )
         db.session.add(nuevo_log)
         db.session.commit()

@@ -1,23 +1,21 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 def validar_id_entidad(campo_nombre, valor, obligatorio=True):
     """
     Valida que los IDs (user_id, role_id, location_id) sean enteros no negativos.
-    Permite el 0 porque se usa como valor por defecto para roles o estados iniciales.
     """
     if valor is None:
         if obligatorio:
             raise ValueError(f"El campo '{campo_nombre}' es obligatorio.")
         return None
         
-    # Cambiamos '<= 0' por '< 0' para permitir que el 0 sea un rol válido (como el de tus invitados)
     if not isinstance(valor, int) or valor < 0:
         raise ValueError(f"El campo '{campo_nombre}' debe ser un número entero mayor o igual a cero.")
     return valor
 
 def validar_accion_auditoria(accion):
     """
-    Valida que la acción no esté vacía y no supere los 50 caracteres (character varying(50)).
+    Valida que la acción no esté vacía y no supere los 50 caracteres.
     """
     if not accion or not isinstance(accion, str):
         raise ValueError("La acción registrada no puede estar vacía.")
@@ -31,15 +29,37 @@ def validar_accion_auditoria(accion):
 
 def validar_timestamp_auditoria(timestamp):
     """
-    Asegura que el timestamp sea un objeto datetime válido y no esté en el futuro.
+    Asegura que el timestamp sea válido, ajustado a hora Venezuela (UTC-4),
+    y permite un margen de tolerancia para evitar rechazos por milisegundos.
     """
+    # 1. Definir el huso horario de Venezuela
+    tz_venezuela = timezone(timedelta(hours=-4))
+    
+    # 2. Obtener hora actual de Venezuela (naive)
+    hora_actual_venezuela = datetime.now(tz_venezuela).replace(tzinfo=None)
+
+    # 3. Si no hay timestamp, asignar la hora actual inmediatamente
     if timestamp is None:
-        return datetime.utcnow()
+        return hora_actual_venezuela
         
     if not isinstance(timestamp, datetime):
         raise ValueError("El timestamp debe ser una fecha/hora válida.")
         
-    if timestamp > datetime.utcnow():
-        raise ValueError("No se pueden registrar eventos con fechas futuras.")
+    # 4. Normalizar zona horaria del timestamp recibido
+    if timestamp.tzinfo is not None:
+        timestamp_comparar = timestamp.astimezone(tz_venezuela).replace(tzinfo=None)
+    else:
+        timestamp_comparar = timestamp
+
+    # 5. AJUSTE: Tolerancia de 2 minutos
+    # Esto soluciona el problema de registros rechazados por desfases mínimos
+    # entre el servidor y el tiempo de inserción.
+    tolerancia = timedelta(minutes=2)
+    
+    # Validamos que el evento no sea una fecha futura (con margen)
+    if timestamp_comparar > (hora_actual_venezuela + tolerancia):
+        # Aquí puedes decidir si prefieres "corregirlo" automáticamente 
+        # o lanzar el error. Para auditoría, es mejor corregir al presente:
+        return hora_actual_venezuela
         
-    return timestamp
+    return timestamp_comparar

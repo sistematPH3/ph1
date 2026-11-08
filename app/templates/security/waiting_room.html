@@ -1,36 +1,43 @@
-{% extends "auth_base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sala de Espera - Pizza Hut</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/security/waiting_room.css') }}">
+</head>
+<body>
+    <div class="body-waiting">
+        <div class="card-waiting">
+            <h1>¡Bienvenido/a,<br>
+                <span class="nombre-usuario">{{ current_user.name }}!</span>
+            </h1>
+            
+            <p class="status-text">
+                Tu status es de <b>invitado</b>, aún no tienes acceso al sistema. 
+                Espera a que un administrador apruebe tu cuenta.
+            </p>
+            
+            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/perrito_ph.png') }}" 
+                 alt="Perrito PH" class="dog-img">
 
-{% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/security/waiting_room.css') }}">
-
-<div class="body-waiting">
-    <div class="card-waiting">
-        <h1>¡Bienvenido/a,<br>
-            <span class="nombre-usuario">{{ current_user.name }}!</span>
-        </h1>
-        
-        <p class="status-text">
-            Tu status es de <b>invitado</b>, aún no tienes acceso al sistema. 
-            Espera a que un administrador apruebe tu cuenta.
-        </p>
-        
-        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/perrito_ph.png') }}" 
-             alt="Perrito PH" class="dog-img">
-
-        <button onclick="mostrarAdvertencia()" class="btn-ph-red">Solicitud Enviada</button>
+            <button onclick="mostrarAdvertencia()" class="btn-ph-red">Solicitud Enviada</button>
+            
+            <a href="{{ url_for('security.logout') }}" class="btn-ph-link">Volver al Login</a>
+        </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    function mostrarAdvertencia() {
-        Swal.fire({
-            title: 'Solicitud en proceso',
-            text: 'El equipo administrativo de Pizza Hut te dará acceso pronto.',
-            icon: 'info',
-            confirmButtonColor: '#be0000',
-            confirmButtonText: 'Entendido'
-        });
-    }
-</script>
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function mostrarAdvertencia() {
+            Swal.fire({
+                title: 'Solicitud en proceso',
+                text: 'El equipo administrativo de Pizza Hut te dará acceso pronto.',
+                icon: 'info',
+                confirmButtonColor: '#be0000',
+                confirmButtonText: 'Entendido'
+            });
+        }
+    </script>
+</body>
+</html>

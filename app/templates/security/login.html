@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inicio de Sesión | Pizza Hut</title>
     
-    
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
     <!-- Enlace a tus archivos CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/auth_base.css') }}">
@@ -15,20 +14,20 @@
     <div class="login-wrapper">
         
         <!-- COLUMNA IZQUIERDA: Branding y Bienvenida -->
-       <div class="col-left">
-    <!-- LOGO (Arriba) -->
-    <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Logo Pizza Hut" class="brand-logo-main">
-    
-    <!-- CONTENIDO CENTRAL (Agrupado) -->
-    <div class="left-center-content">
-        <p class="info-text-peach">¡Es un placer saludarte!</p>
-        <p class="info-text-peach">Si aún no eres parte de nuestra gestión</p>
-        <a href="{{ url_for('security.register') }}" class="btn-registro-link">Regístrate Aquí</a>
-    </div>
-    
-    <!-- PIZZA (Abajo) -->
-    <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/pizza.png') }}" alt="Pizza Slice" class="pizza-slice-image">
-</div>
+        <div class="col-left">
+            <!-- LOGO (Arriba) -->
+            <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Logo Pizza Hut" class="brand-logo-main">
+            
+            <!-- CONTENIDO CENTRAL (Agrupado) -->
+            <div class="left-center-content">
+                <p class="info-text-peach">¡Es un placer saludarte!</p>
+                <p class="info-text-peach">Si aún no eres parte de nuestra gestión</p>
+                <a href="{{ url_for('security.register') }}" class="btn-registro-link">Regístrate Aquí</a>
+            </div>
+            
+            <!-- PIZZA (Abajo) -->
+            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/pizza.png') }}" alt="Pizza Slice" class="pizza-slice-image">
+        </div>
         
         <!-- COLUMNA DERECHA: Formulario de Acceso -->
         <div class="col-right">
@@ -57,11 +56,7 @@
                         <div class="input-with-icon">
                             <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/email_icon.png') }}" class="field-icon" alt="Email">
                             <div class="vertical-divider"></div>
-                            <input type="email" name="email" id="email" 
-                                   class="form-input-auth" 
-                                   placeholder="Ingrese su Gmail" 
-                                   required 
-                                   onblur="validarFormatoEmail(this)">
+                            <input type="email" name="email" id="email" class="form-input-auth" placeholder="Ingrese su Gmail" required>
                         </div>
                         <div id="emailError" class="error-hint-text">Formato inválido @</div>
                     </div>
@@ -76,10 +71,14 @@
                                    placeholder="Ingrese su Contraseña" 
                                    required 
                                    maxlength="12">
+                            
+                            <!-- Pasamos dinámicamente las rutas de las imágenes al JS usando atributos data-* -->
                             <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}" 
                                  id="togglePassword" 
                                  class="eye-toggle-icon" 
-                                 alt="Ver contraseña">
+                                 alt="Ver contraseña"
+                                 data-eye-open="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_abierto.png') }}"
+                                 data-eye-closed="{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}">
                         </div>
                     </div>
 
@@ -95,36 +94,8 @@
         </div>
     </div>
 
-    <!-- Lógica de validación y visualización -->
-    <script>
-        // Validación visual del email
-        function validarFormatoEmail(input) {
-            const errorDiv = document.getElementById('emailError');
-            const container = input.closest('.input-with-icon');
-            if (input.value !== "" && !input.value.includes('@')) {
-                errorDiv.style.display = 'block';
-                container.style.borderColor = '#ff4444';
-            } else {
-                errorDiv.style.display = 'none';
-                container.style.borderColor = 'var(--ph-yellow)';
-            }
-        }
-
-        // Mostrar/Ocultar contraseña
-        const togglePassword = document.querySelector('#togglePassword');
-        const passwordInput = document.querySelector('#password');
-
-        togglePassword.addEventListener('click', function () {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            
-            // Cambiar imagen del ojo (Asegúrate de tener ambas imágenes en la ruta)
-            if (type === 'text') {
-                this.src = "{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_abierto.png') }}";
-            } else {
-                this.src = "{{ url_for('static', filename='img/website_icons/security/hero_icons/ojo_cerrado.png') }}";
-            }
-        });
-    </script>
+    <!-- Vinculación del archivo JS externo -->
+   <!-- Vinculación del archivo JS con truco para romper el cache automáticamente -->
+<script src="{{ url_for('static', filename='js/security/login.js') }}?v={{ range(1, 99999) | random }}"></script>
 </body>
 </html>

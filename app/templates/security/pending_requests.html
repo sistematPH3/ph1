@@ -1,123 +1,215 @@
-{% extends "auth_base.html" %}
+{% extends "base_list.html" %}
+
+{% block search_input_id %}userInput{% endblock %}
+{% block search_input_attrs %}onkeyup="filterTable()"{% endblock %}
+{% block search_placeholder %}Buscar por nombre o correo...{% endblock %}
+{% block table_id %}userTable{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/security/admin_panel.css') }}?v=6.0">
 
-<div class="container mt-5 admin-container">
-    <div class="card main-card">
-        <!-- Cabecera con Logo -->
-        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="brand-section d-flex align-items-center">
-                    <img src="{{ url_for('static', filename='img/brand/logo_ph.png') }}" alt="Pizza Hut" class="me-3" style="height: 50px;">
-                    <div>
-                        <h2 class="title-ph mb-0">Gestión de Permisos</h2>
-                        <p class="subtitle-ph mb-0">Revisión de nuevos colaboradores</p>
+<div class="container-fluid py-3 py-md-5 px-2 px-md-4">
+    <div class="main-white-panel p-3 p-md-5">
+        
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <div class="d-flex align-items-center gap-3 mb-2 mb-md-1">
+                    <div class="icon-box-red">
+                        <i class="bi bi-shield-lock-fill"></i>
                     </div>
+                    <h3 class="module-title m-0">Gestión de Permisos</h3>
                 </div>
-                <span class="badge rounded-pill ph-badge-red">Módulo Administrativo</span>
+                <p class="text-subtitle m-0">Revisión de nuevos colaboradores en espera de acceso al sistema</p>
             </div>
+            <span class="badge badge-module-tag rounded-pill px-3 py-2 fw-semibold shadow-sm align-self-start align-self-md-auto">
+                Módulo Administrativo
+            </span>
+        </div>
 
-            <div class="row mt-4 mb-2">
-                <div class="col-md-8">
-                    <div class="search-box">
-                        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/search_icon.png') }}" class="search-icon-img" alt="Buscar">
-                        <input type="text" id="userInput" onkeyup="filterTable()" class="form-control border-0" placeholder="Buscar por nombre o correo...">
+        <div class="filters-section-container mb-4">
+            <div class="row g-3">
+                <div class="col-12 col-md-8">
+                    <div class="search-box-container w-100" style="position: relative;">
+                        <i class="bi bi-search search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); z-index: 5;"></i>
+                        <input type="text" id="userInput" class="form-control search-input" 
+                               onkeyup="filterTable()"
+                               placeholder="Buscar por nombre o correo..." 
+                               style="padding-left: 44px !important; border-radius: 50px; height: 48px;">
                     </div>
                 </div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-outline-secondary rounded-pill" onclick="toggleSort()">
-                        <i class="fas fa-sort-amount-down"></i> <span id="sortText">Más recientes</span>
-                    </button>
+
+                <div class="col-12 col-md-4">
+                    <div class="dropdown h-100">
+                        <button class="btn btn-filter-sort rounded-pill px-4 w-100 h-100 d-flex align-items-center justify-content-between shadow-sm fw-medium dropdown-toggle" 
+                                type="button" 
+                                id="dropdownFilter" 
+                                data-bs-toggle="dropdown" 
+                                aria-expanded="false" 
+                                style="height: 48px !important;">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-sort-down me-2 text-muted"></i>
+                                <span id="selectedFilterLabel">
+                                    {% if request.args.get('sort') == 'desc' %}Orden: Z-A{% else %}Ordenar{% endif %}
+                                </span>
+                            </div>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end w-100 shadow-sm border-0 rounded-3" aria-labelledby="dropdownFilter" style="font-size: 0.9rem;">
+                            <li><a class="dropdown-item py-2" href="#" onclick="toggleSort(event)"><i class="bi bi-sort-alpha-down me-2 text-muted"></i>Nombre (A-Z)</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-custom mb-0" id="userTable">
-                    <thead>
-                        <tr>
-                            <th>Usuario</th>
-                            <th>Correo y Registro</th>
-                            <th class="text-center">Estado</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for usuario in usuarios_espera %}
-                        <tr>
-                            <!-- 1. Columna Nombre -->
-                            <td class="user-name">
-                                <div class="avatar-circle">{{ usuario.name[0] | upper }}</div>
-                                <span>{{ usuario.name }}</span>
-                            </td>
-
-                            <!-- 2. Columna Correo y Registro -->
-                            <td>
-                                <div class="user-email text-dark fw-bold">{{ usuario.email }}</div>
-                                <div class="text-muted small">ID de Registro: {{ usuario.id }}</div>
-                            </td>
-
-                            <!-- 3. Columna Estado -->
-                            <td class="text-center">
-                                <span class="badge status-pending">Pendiente</span>
-                            </td>
-
-                            <!-- 4. Columna Acciones -->
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <!-- Formulario Rechazar con Alerta -->
-                                    <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="d-inline">
-                                        <button type="submit" class="btn btn-action btn-reject" title="Rechazar"
-                                                onclick="return confirm('¿Estás segura de que deseas rechazar a {{ usuario.name }}? Esta acción no se puede deshacer.')">
-                                            <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/reject_user.png') }}" width="18">
+        <div class="card card-ph-clean border-0">
+            <div class="card-body p-0">
+                
+                <div class="table-responsive d-none d-md-block">
+                    <table class="table align-middle m-0" id="userTable">
+                        <thead>
+                            <tr class="text-uppercase content-table-header">
+                                <th class="ps-4" style="width: 30%;">Usuario</th>
+                                <th style="width: 35%;">Correo y Registro</th>
+                                <th class="text-center" style="width: 15%;">Estado</th>
+                                <th class="text-center pe-4" style="width: 20%;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            {% for usuario in usuarios_espera %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-circle-red">{{ usuario.name[0] | upper }}</div>
+                                        <span class="ms-3 user-name-text">{{ usuario.name }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="user-email-text fw-medium">{{ usuario.email }}</div>
+                                    <div class="user-id-text">ID de Registro: #{{ usuario.id }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="status-badge-pending">Pendiente</span>
+                                </td>
+                                <td class="pe-4">
+                                    <div class="d-flex gap-3 justify-content-center align-items-center">
+                                        <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="m-0" id="rejectForm_{{ usuario.id }}">
+                                            <button type="button" class="btn-action-square btn-action-reject" title="Rechazar solicitud" onclick="confirmReject('{{ usuario.id }}')">
+                                                <i class="bi bi-x-circle-fill"></i>
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn-action-square btn-action-approve" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}" title="Aprobar y asignar rol">
+                                            <i class="bi bi-check-circle-fill"></i>
                                         </button>
-                                    </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-                                    <!-- Botón Aprobar -->
-                                    <button type="button" class="btn btn-action btn-approve" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#modalApprove{{ usuario.id }}" 
-                                            title="Asignar Rol">
-                                        <img src="{{ url_for('static', filename='img/website_icons/security/hero_icons/check_user.png') }}" width="18">
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="mobile-cards-container d-block d-md-none" id="userCardsContainer">
+                    {% for usuario in usuarios_espera %}
+                    <div class="mobile-user-card p-3 mb-3 border rounded-4 shadow-sm">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-circle-red">{{ usuario.name[0] | upper }}</div>
+                            <div class="ms-3">
+                                <div class="user-name-text target-name-mobile">{{ usuario.name }}</div>
+                                <span class="status-badge-pending mt-1">Pendiente</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 py-2 border-top border-bottom">
+                            <div class="user-email-text fw-medium mb-1 target-email-mobile">
+                                <i class="bi bi-envelope me-2 text-muted"></i>{{ usuario.email }}
+                            </div>
+                            <div class="user-id-text">
+                                <i class="bi bi-hash me-2 text-muted"></i>ID Registro: #{{ usuario.id }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 w-100">
+                            <form action="{{ url_for('security.reject_user', user_id=usuario.id) }}" method="POST" class="flex-fill" id="rejectForm_{{ usuario.id }}">
+                                <button type="button" class="btn btn-outline-danger rounded-pill w-100 py-2 d-flex align-items-center justify-content-center fw-semibold gap-1" onclick="confirmReject('{{ usuario.id }}')">
+                                    <i class="bi bi-x-circle"></i> Rechazar
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-success flex-fill rounded-pill py-2 d-flex align-items-center justify-content-center fw-semibold gap-1" data-bs-toggle="modal" data-bs-target="#approveModal{{ usuario.id }}">
+                                <i class="bi bi-check-circle"></i> Aprobar
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="noSearchResults" class="text-center py-5 d-none">
+                    <div class="py-4 text-muted">
+                        <i class="bi bi-search d-inline-block mb-3" style="font-size: 3rem; color: #a0aec0; opacity: 0.7;"></i>
+                        <h5 class="fw-bold mb-1" style="color: #4a5568;">No se encontraron resultados</h5>
+                        <p class="small mb-0" style="color: #718096;">Intenta ajustar los criterios de búsqueda o limpiar los filtros seleccionados.</p>
+                    </div>
+                </div>
+
+                {% if not usuarios_espera %}
+                <div class="text-center py-5 text-muted">
+                    <div class="py-4">
+                        <i class="bi bi-shield-slash text-muted mb-3 d-inline-block" style="font-size: 3rem; opacity: 0.5;"></i>
+                        <h5 class="fw-bold text-secondary mb-1">No hay solicitudes pendientes</h5>
+                        <p class="text-muted small mb-0">Todos los accesos de los colaboradores están al día.</p>
+                    </div>
+                </div>
+                {% endif %}
+
             </div>
         </div>
+        
     </div>
 </div>
 
-<!-- Modales de aprobación -->
 {% for usuario in usuarios_espera %}
-<div class="modal fade" id="modalApprove{{ usuario.id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Asignar Rol a {{ usuario.name }}</h5>
+<div class="modal fade text-start" id="approveModal{{ usuario.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-light py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-shield-check-fill me-2 text-danger"></i>Asignar Credenciales
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST">
-                <div class="modal-body">
-                     <label class="form-label text-muted small fw-bold">SELECCIONE EL CARGO:</label>
-                     <select name="role_id" class="form-select" required>
-                        <option value="" selected disabled>Seleccione un rol...</option>
-                        <option value="1">Administrador</option>
-                        <option value="2">Gerente</option>
-                        <option value="3">Sub gerente</option>
-                        <option value="4">Operaciones</option>
-                        <option value="5">Dirección</option>
-                        <option value="6">Finanzas</option>
-                    </select>
+            
+            <form action="{{ url_for('security.approve_user', user_id=usuario.id) }}" method="POST" onsubmit="validarFormularioAprobacion(event, this)">
+                <div class="modal-body p-4 text-dark">
+                    <p class="text-muted small">Elige las propiedades de acceso para <strong>{{ usuario.name }}</strong>.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Cargo o Rol</label>
+                        <select class="form-select select-custom-pill" name="role_id" onchange="toggleSedesContainer(this)">
+                            <option value="" selected disabled>Selecciona un rol...</option>
+                            <option value="1">Administrador</option>
+                            <option value="6">Finanzas</option>
+                            <option value="5">Director</option>
+                            <option value="2">Gerente de Sede</option>
+                            <option value="3">Subgerente de Sede</option>
+                            <option value="4">Operaciones</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 location-container-box">
+                        <label class="form-label fw-bold small text-muted text-uppercase d-block mb-2">Sedes Habilitadas</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for sede in sedes %}
+                            <div class="form-check-inline m-0">
+                                <input type="checkbox" class="btn-check" name="location_ids" id="sede_{{ usuario.id }}_{{ sede.id }}" value="{{ sede.id }}" autocomplete="off">
+                                <label class="btn btn-outline-location-pill btn-sm rounded-pill px-3" for="sede_{{ usuario.id }}_{{ sede.id }}">{{ sede.name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-ph-red rounded-pill px-4">Confirmar Registro</button>
+                
+                <div class="modal-footer border-0 bg-light py-3 px-4 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 m-0" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-confirm-red rounded-pill px-4 text-white fw-bold m-0">Confirmar Acceso</button>
                 </div>
             </form>
         </div>
@@ -125,33 +217,6 @@
 </div>
 {% endfor %}
 
-<script>
-function filterTable() {
-    let input = document.getElementById("userInput");
-    let filter = input.value.toLowerCase();
-    let table = document.getElementById("userTable");
-    let tr = table.getElementsByTagName("tr");
-
-    for (let i = 1; i < tr.length; i++) {
-        let tdName = tr[i].getElementsByTagName("td")[0];
-        let tdEmail = tr[i].getElementsByTagName("td")[1];
-        if (tdName || tdEmail) {
-            let txtValueName = tdName.textContent || tdName.innerText;
-            let txtValueEmail = tdEmail.textContent || tdEmail.innerText;
-            if (txtValueName.toLowerCase().indexOf(filter) > -1 || txtValueEmail.toLowerCase().indexOf(filter) > -1) {
-                tr[i].style.display = "";
-            } else {
-                tr[i].style.display = "none";
-            }
-        }
-    }
-}
-
-function toggleSort() {
-    let currentUrl = new URL(window.location.href);
-    let order = currentUrl.searchParams.get("sort") === "asc" ? "desc" : "asc";
-    currentUrl.searchParams.set("sort", order);
-    window.location.href = currentUrl.href;
-}
-</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/security/admin_table.js') }}?v=1.9"></script>
 {% endblock %}

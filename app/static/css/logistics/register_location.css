@@ -1,0 +1,361 @@
+/* =========================================================================
+   PALETA DE COLORES CORPORATIVA (Sincronizada con Sedes e Inventario)
+   ========================================================================= */
+:root {
+    --ph-red: #b01212;        /* Rojo exacto de tu marca */
+    --ph-red-hover: #8c0e0e;  /* Variación para efectos hover */
+    --ph-red-light: #fdf2f2;  /* Fondos suaves o alertas */
+    --ph-text-main: #1F2937;
+    --ph-text-soft: #4B5563;
+    --ph-text-muted: #8892A0;
+    --ph-border-soft: #E2E8F0;
+}
+
+/* Contenedor de Centrado Premium */
+.register-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* Alinea el formulario al tope superior */
+    padding: 0.3rem 1rem 2.5rem 1rem !important; /* Reducimos arriba a 0.5rem y mantenemos abajo en 2.5rem */
+    width: 100%;
+}
+
+/* Tarjeta Blanca Redondeada (Estilo 'Nuevo Producto') */
+.form-card-premium {
+    background-color: #ffffff !important;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    padding: 2.5rem !important;
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+}
+
+/* Título Itálico Rojo Corporativo */
+.form-card-premium h2 {
+    margin-bottom: 2rem !important;
+    color: var(--ph-red) !important;
+    text-align: center !important;
+    font-weight: 800 !important;
+    font-size: 2.1rem !important;
+    font-style: italic !important;
+    letter-spacing: -0.5px !important;
+}
+
+/* Contenedor de campos */
+.form-group-premium {
+    margin-bottom: 1.35rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Etiquetas elegantes alineadas */
+.form-group-premium label {
+    margin-bottom: 0.45rem !important;
+    font-weight: 800 !important;
+    color: var(--ph-text-main) !important;
+    font-size: 0.9rem !important;
+    margin-left: 10px !important;
+}
+
+/* Inputs y Selects redondos (Estilo Píldora) */
+.form-group-premium input,
+.form-group-premium select,
+.form-group-premium .form-control {
+    padding: 0.85rem 1.25rem !important;
+    border: 2px solid var(--ph-border-soft) !important;
+    border-radius: 50px !important;
+    font-size: 0.95rem !important;
+    color: var(--ph-text-soft) !important;
+    background-color: #f9fafb !important;
+    transition: all 0.3s ease !important;
+    height: auto !important;
+}
+
+/* Dirección (Textarea con bordes suavizados de 20px) */
+.form-group-premium textarea {
+    padding: 0.85rem 1.25rem !important;
+    border: 2px solid var(--ph-border-soft) !important;
+    border-radius: 20px !important;
+    font-size: 0.95rem !important;
+    color: var(--ph-text-soft) !important;
+    background-color: #f9fafb !important;
+    transition: all 0.3s ease !important;
+    resize: vertical !important;
+}
+
+/* Enfoque Interactivo (Brillo rojo sutil al escribir) */
+.form-group-premium input:focus,
+.form-group-premium select:focus,
+.form-group-premium textarea:focus,
+.form-group-premium .form-control:focus {
+    background-color: #ffffff !important;
+    border-color: var(--ph-red) !important;
+    outline: none !important;
+    box-shadow: 0 0 10px rgba(176, 18, 18, 0.12) !important;
+}
+
+/* Errores del validador */
+.error-feedback-premium {
+    color: var(--ph-red) !important;
+    font-size: 0.85rem !important;
+    margin-top: 0.4rem !important;
+    font-weight: 600 !important;
+    margin-left: 10px !important;
+}
+
+/* Botones horizontales side-by-side */
+.form-actions-premium {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    margin-top: 2.2rem !important;
+}
+
+/* Botones Píldora */
+.btn-premium {
+    flex: 1 !important;
+    padding: 0.85rem 1.5rem !important;
+    border: none !important;
+    border-radius: 50px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    text-align: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Cancelar: Negro elegante, igual al diseño de productos */
+/* =========================================================================
+   EFECTO AURA PREMIUM PARA BOTONES (Hover interactivo)
+   ========================================================================= */
+
+/* Botón Guardar Sede (Rojo corporativo) */
+.btn-premium-primary {
+    background-color: var(--ph-red) !important;
+    color: #ffffff;
+    border-radius: 50px;
+    font-weight: 700;
+    transition: all 0.25s ease-in-out !important;
+}
+
+.btn-premium-primary:hover {
+    background-color: var(--ph-red) !important;
+    transform: translateY(-2.5px); /* Micro-levantamiento visual */
+    /* Aura roja corporativa */
+    box-shadow: 0 6px 18px rgba(214, 35, 0, 0.4) !important; 
+}
+
+/* Botón Cancelar (Negro/Gris oscuro) */
+.btn-premium-secondary {
+    background-color: #000000;
+    color: #ffffff;
+    border-radius: 50px;
+    font-weight: 700;
+    transition: all 0.25s ease-in-out !important;
+}
+
+.btn-premium-secondary:hover {
+    background-color: #222222;
+    transform: translateY(-2.5px);
+    /* Aura negra elegante */
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important; 
+}
+/* =========================================================================
+   Alineación fija para Iconos de Validación en Textarea (Error y Éxito)
+   ========================================================================= */
+textarea.form-control {
+    resize: none; /* Mantiene el tamaño del textarea fijo como en tu Figma */
+}
+/* Fija tanto el (!) rojo como el (checkmark) verde arriba a la derecha */
+textarea.form-control.is-invalid,
+textarea.form-control.is-valid {
+    background-position: right 16px top 16px !important;
+    padding-right: 2.5rem !important; /* Evita que el texto se monte sobre el icono */
+}
+/* =========================================================================
+   MODAL DE ÉXITO PREMIUM
+   ========================================================================= */
+
+/* Fondo del modal (Overlay con Blur) */
+.custom-modal {
+    display: none; /* Oculto por defecto */
+    position: fixed;
+    z-index: 9999; /* Por encima de todo, incluso del sidebar */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px); /* Desenfoque elegante de fondo */
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Clase para disparar la visualización */
+.custom-modal.show {
+    display: flex;
+    opacity: 1;
+}
+
+/* Tarjeta del modal */
+.custom-modal-content {
+    background-color: #ffffff;
+    padding: 2.5rem 2rem;
+    border-radius: 24px;
+    width: 90%;
+    max-width: 420px;
+    text-align: center;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    transform: scale(0.85);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.custom-modal.show .custom-modal-content {
+    transform: scale(1);
+}
+
+/* Círculo del checkmark verde */
+.success-icon-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.success-checkmark {
+    width: 85px;
+    height: 85px;
+    background-color: rgba(40, 167, 69, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #28a745;
+    box-shadow: 0 0 20px rgba(40, 167, 69, 0.25);
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+/* Animación de entrada para el Checkmark */
+.animate-check {
+    animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Textos del modal */
+.custom-modal-content h3 {
+    color: #111111;
+    font-weight: 800;
+    font-size: 1.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.custom-modal-content p {
+    color: #6c757d;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 2rem;
+}
+
+/* Barra de carga */
+.modal-loading-bar {
+    width: 100%;
+    height: 6px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.loading-progress {
+    width: 0%;
+    height: 100%;
+    background-color: #d62300; /* Rojo corporativo Pizza Hut */
+    border-radius: 10px;
+    animation: fillProgress 3.5s linear forwards; /* Sincronizado con la redirección */
+}
+
+@keyframes fillProgress {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
+/* =========================================================================
+   ESTILOS RESPONSIVOS OPTIMIZADOS (VISTA MÓVIL AMPLIA)
+   ========================================================================= */
+
+@media (max-width: 768px) {
+    
+    /* 1. Liberamos los paddings por defecto de Bootstrap en el contenedor principal */
+    .container {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        max-width: 100% !important;
+    }
+
+    /* 2. Reducimos al mínimo los márgenes del wrapper para pegar la tarjeta a los bordes de la pantalla */
+    .register-wrapper {
+        padding: 0.5rem 0.25rem 2rem 0.25rem !important;
+    }
+
+    /* 3. Maximizamos el espacio interno de la tarjeta */
+    .form-card-premium {
+        padding: 1.5rem 1rem !important; /* Pasamos de 2.5rem a solo 1rem de padding lateral */
+        border-radius: 16px !important;   /* Curvatura más sutil que aprovecha mejor las esquinas */
+        max-width: 100% !important;
+        border: none !important;          /* Quitamos el borde sutil en móvil para ganar limpieza visual */
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* 4. Ajustamos las etiquetas y campos para que no se sientan claustrofóbicos */
+    .form-group-premium label {
+        margin-left: 6px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .form-group-premium input,
+    .form-group-premium select,
+    .form-group-premium .form-control,
+    .form-group-premium textarea {
+        padding: 0.75rem 1rem !important; /* Reducimos ligeramente el padding interno de los inputs */
+        font-size: 0.9rem !important;
+    }
+
+    /* 5. Escala del título para que encaje perfectamente en una o dos líneas cómodas */
+    .form-card-premium h2 {
+        font-size: 1.55rem !important;
+        margin-bottom: 1.25rem !important;
+    }
+
+    /* 6. Distribución de botones apilados con un tamaño cómodo para el dedo */
+    .form-actions-premium {
+        flex-direction: column-reverse !important;
+        gap: 0.75rem !important;
+        margin-top: 1.5rem !important;
+    }
+
+    .btn-premium {
+        width: 100% !important;
+        flex: none !important;
+        padding: 0.75rem 1rem !important; /* Botones ligeramente menos altos para móvil */
+    }
+
+    /* 7. Modal de Éxito adaptado a la nueva anchura */
+    .custom-modal-content {
+        padding: 2rem 1.25rem !important;
+        width: 94% !important;
+    }
+}

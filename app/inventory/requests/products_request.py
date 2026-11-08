@@ -42,9 +42,6 @@ def validate_product_form(data, current_product_id=None):
     else:
         unit_of_measure = unit_select
 
-    quantity = data.get('quantity', '').strip()
-    if not quantity or not quantity.isdigit():
-        errors['quantity'] = 'La cantidad debe ser un número entero válido.'
 
     technical_description = data.get('technical_description', '').strip()
 
@@ -75,7 +72,6 @@ def validate_product_form(data, current_product_id=None):
         'sku': cleaned_sku,
         'product_type_id': int(product_type_id) if product_type_id and str(product_type_id).isdigit() else None,
         'unit_of_measure': unit_of_measure if is_valid else '',
-        'quantity': int(quantity) if quantity and quantity.isdigit() else 0,
         'technical_description': technical_description,
         'expiration_date': expiration_date,  # Se inyecta la fecha limpia calculada
         'is_active': True

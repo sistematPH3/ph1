@@ -1,0 +1,388 @@
+{% extends 'layout.html' %}
+
+{% block extra_css %}
+<link class="stylesheet" rel="stylesheet" href="{{ url_for('static', filename='css/logistics/purchase_management.css') }}?v=1.0"> 
+{% endblock %}
+
+{% block content %}
+<div class="main-container py-4 px-4">
+    
+    <div class="d-flex align-items-center mb-4">
+        <div class="icon-container-audit me-3">
+            <i class="bi bi-receipt fs-4"></i>
+        </div>
+        <div>
+            <h2 class="header-title m-0 fw-bold">Gestión de Compras</h2>
+            <p class="text-muted m-0 small">Control y trazabilidad de facturas de proveedores a nivel general</p>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card card-custom p-3 mb-4">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <div class="filter-input-group">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="search-input" placeholder="Buscar por número o proveedor...">
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="filter-input-group">
+                    <i class="bi bi-filter"></i>
+                    <select id="supplier-filter">
+                        <option value="">Todos los proveedores</option>
+                        {% for supplier in suppliers %}
+                            <option value="{{ supplier.name }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="filter-input-group">
+                    <i class="bi bi-calendar3"></i>
+                    <input type="date" id="date-filter">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-custom overflow-hidden" id="purchases-main-container">
+        <div class="table-responsive d-none d-md-block">
+            <table class="table table-custom-audit table-hover align-middle" id="purchases-table">
+                <thead>
+                    <tr>
+                        <th>Identificación</th>
+                        <th>Proveedor</th>
+                        <th>Fecha de Compra</th>
+                        <th>Monto Total</th>
+                        <th>Moneda</th>
+                        <th>Tasa Aplicada</th>
+                        <th>Estado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    {% if purchases %}
+                        {% for purchase in purchases %}
+                        <tr class="purchase-row" 
+                            data-id="{{ purchase.id }}" 
+                            data-supplier="{{ purchase.supplier_name }}"
+                            data-date="{{ purchase.purchase_date.strftime('%Y-%m-%d') }}"
+                            style="cursor: pointer;">
+                            
+                            <td class="fw-bold text-secondary">#{{ purchase.id }}</td>
+                            <td><span class="fw-semibold text-dark">{{ purchase.supplier_name }}</span></td>
+                            <td>{{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}</td>
+                            <td class="fw-bold text-danger">Bs. {{ "{:,.2f}".format(purchase.total_amount * purchase.exchange_rate) }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ purchase.currency }}</span></td>
+                            <td>Bs. {{ "{:,.4f}".format(purchase.exchange_rate) }}</td>
+                            <td>
+                                {% if purchase.status == 'COMPLETED' %}
+                                <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
+                                {% else %}
+                                <span class="status-badge-annulled"><i class="bi bi-x-circle-fill"></i> ANNULLED</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-sm btn-light btn-audit-action text-dark border toggle-details-btn" 
+                                            type="button" 
+                                            data-bs-toggle="collapse" 
+                                            data-bs-target="#details-row-desktop-{{ purchase.id }}">
+                                        <i class="bi bi-chevron-down"></i> Insumos
+                                    </button>
+                                    
+                                    {% if purchase.status == 'COMPLETED' %}
+                                        {% if purchase.can_modify %}
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
+                                                data-id="{{ purchase.id }}">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </button>
+                                        
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
+                                                data-id="{{ purchase.id }}" 
+                                                data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
+                                            <i class="bi bi-trash3"></i> Anular
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-sm btn-light text-muted border" style="cursor: not-allowed;" title="Tiempo de modificación expirado" disabled>
+                                            <i class="bi bi-lock-fill"></i> Bloqueada
+                                        </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <tr id="details-row-desktop-{{ purchase.id }}" class="collapse detail-row-container" data-purchase-id="{{ purchase.id }}">
+                            <td colspan="8" class="bg-light p-4" style="border-left: 4px solid #b0121a;">
+                                <div class="container-fluid">
+                                    <div class="row mb-3 pb-2 border-bottom">
+                                        <div class="col-md-6">
+                                            <h6 class="fw-bold text-dark m-0"><i class="bi bi-box-seam me-2"></i>Especificación Técnica y Desglose de Insumos</h6>
+                                        </div>
+                                        <div class="col-md-6 text-md-end">
+                                            {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
+                                            <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-image me-1"></i> Ver Factura Original (Evidencia)
+                                            </a>
+                                            {% elif purchase.invoice_url == 'En proceso...' %}
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
+                                                <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
+                                            </button>
+                                            {% else %}
+                                            <span class="text-muted small"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
+                                            {% endif %}
+                                            <a href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=purchase.id) }}" class="btn btn-sm btn-danger fw-bold shadow-sm ms-2">
+                                                <i class="bi bi-file-earmark-bar-graph me-1"></i> Auditoría Completa de Divisas
+                                            </a>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered bg-white m-0 align-middle">
+                                            <thead class="table-dark small text-uppercase">
+                                                <tr>
+                                                    <th>Identificación</th>
+                                                    <th>SKU</th>
+                                                    <th class="text-center">Cantidad</th>
+                                                    <th class="text-center">Vencimiento</th>
+                                                    <th class="text-end">Precio por cantidad (Divisa Originaria)</th>
+                                                    <th class="text-end">Total en Bs.</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="collapse-body-{{ purchase.id }}">
+                                                <tr>
+                                                    <td colspan="6" class="text-center py-2 text-muted">
+                                                        <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Cargando renglones...
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-block d-md-none p-3" id="mobile-purchases-container">
+            {% if purchases %}
+                {% for purchase in purchases %}
+                <div class="mobile-purchase-card" 
+                     data-id="{{ purchase.id }}" 
+                     data-supplier="{{ purchase.supplier_name }}"
+                     data-date="{{ purchase.purchase_date.strftime('%Y-%m-%d') }}">
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <span class="badge bg-secondary px-3 py-2 rounded-pill">#{{ purchase.id }}</span>
+                        {% if purchase.status == 'COMPLETED' %}
+                        <span class="status-badge-completed"><i class="bi bi-check-circle-fill"></i> COMPLETED</span>
+                        {% else %}
+                        <span class="status-badge-annulled"><i class="bi bi-x-circle-fill"></i> ANNULLED</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="fw-bold text-dark fs-5 mb-1">{{ purchase.supplier_name }}</div>
+                        <div class="text-muted small d-flex align-items-center mb-1">
+                            <i class="bi bi-calendar3 me-2"></i> {{ purchase.purchase_date.strftime('%d/%m/%Y %I:%M %p') }}
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small fw-bold text-uppercase">Monto Total</span>
+                            <span class="fw-bold text-danger fs-6">Bs. {{ "{:,.2f}".format(purchase.total_amount * purchase.exchange_rate) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small fw-bold text-uppercase">Tasa & Moneda</span>
+                            <span class="fw-semibold text-dark small">{{ purchase.currency }} | Bs. {{ "{:,.4f}".format(purchase.exchange_rate) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-light btn-audit-action text-dark border flex-grow-1 toggle-details-btn" 
+                                type="button" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#details-row-mobile-{{ purchase.id }}">
+                            <i class="bi bi-chevron-down"></i> Insumos
+                        </button>
+                        
+                        {% if purchase.status == 'COMPLETED' %}
+                            {% if purchase.can_modify %}
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger flex-grow-1" 
+                                    data-id="{{ purchase.id }}">
+                                <i class="bi bi-pencil-square"></i> Editar
+                            </button>
+                            
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger flex-grow-1" 
+                                    data-id="{{ purchase.id }}" 
+                                    data-url="{{ url_for('purchase_management.annul', purchase_id=purchase.id) }}">
+                                <i class="bi bi-trash3"></i> Anular
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-light text-muted border flex-grow-1" style="cursor: not-allowed;" disabled>
+                                <i class="bi bi-lock-fill"></i> Bloqueada por Tiempo
+                            </button>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div id="details-row-mobile-{{ purchase.id }}" class="collapse detail-row-container mt-3" data-purchase-id="{{ purchase.id }}">
+                        <div class="bg-light p-3 rounded-3" style="border-left: 4px solid #b0121a;">
+                            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam me-2"></i>Insumos Adquiridos</h6>
+                            
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
+                                <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
+                                    <i class="bi bi-image me-1"></i> Ver Factura Original
+                                </a>
+                                {% elif purchase.invoice_url == 'En proceso...' %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="Swal.fire('Subiendo Imagen', 'La factura se está guardando en el servidor en este momento. Por favor, recarga la página en unos segundos.', 'info')">
+                                    <i class="bi bi-hourglass-split me-1"></i> Procesando Imagen...
+                                </button>
+                                {% else %}
+                                <span class="text-muted small w-100 text-center d-block mb-2"><i class="bi bi-paperclip"></i> Sin evidencia física adjunta</span>
+                                {% endif %}
+                                <a href="{{ url_for('purchase_routes.view_purchase_details', purchase_id=purchase.id) }}" class="btn btn-sm btn-danger fw-bold shadow-sm w-100">
+                                    <i class="bi bi-file-earmark-bar-graph me-1"></i> Auditoría Completa
+                                </a>
+                            </div>
+                            
+                            <div class="table-responsive bg-white border rounded">
+                                <table class="table table-sm m-0 align-middle">
+                                    <tbody class="collapse-body-{{ purchase.id }}">
+                                        <tr>
+                                            <td class="text-center py-3 text-muted small">
+                                                <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Cargando renglones...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div id="no-data-row" class="text-center py-5 text-muted {% if purchases %}d-none{% endif %}">
+            <i class="bi bi-search fs-1 d-block mb-3 text-secondary" style="font-size: 3rem !important;"></i>
+            <h5 class="fw-bold text-dark m-0">No se encontraron resultados</h5>
+        </div>
+
+        <div class="pagination-container" id="pagination-box">
+            <nav>
+                <ul class="pagination pagination-sm m-0" id="pagination-items"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAnnul" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+        <div class="modal-content border-0 shadow-lg p-4 text-center" style="border-radius: 24px !important;">
+            <div class="modal-body p-0">
+                <div class="mb-4 text-danger d-flex justify-content-center">
+                    <i class="bi bi-octagon-fill position-relative" style="font-size: 5.5rem; line-height: 1; color: #b0121a;">
+                        <span class="position-absolute top-50 start-50 translate-middle text-white fw-bold fs-2" style="margin-top: -4px; font-family: sans-serif;">!</span>
+                    </i>
+                </div>
+                <h3 class="fw-bold text-dark mb-3" style="font-family: 'Inter', sans-serif;">¿Anular Factura?</h3>
+                <p class="text-muted small px-3 mb-4">Estás a punto de anular lógicamente la factura <strong id="annulPurchaseId"></strong>.</p>
+                
+                <form id="formAnnulConfirm" method="POST" action="">
+                    <div class="d-grid gap-3 px-3">
+                        <button type="submit" class="btn rounded-pill py-2 text-white fw-bold" style="background-color: #b0121a; border: none; font-size: 1rem;">Confirmar</button>
+                        <a href="#" class="text-muted small text-decoration-none" data-bs-dismiss="modal" style="color: #6c757d !important;">← Cancelar y volver</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEdit" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header bg-light border-bottom-0 py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-primary me-2"></i>Edición de Compra #<span id="editPurchaseId"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="editErrorAlert" class="alert alert-danger d-none small mb-4 rounded-3 border-0" style="background-color: #f8d7da; color: #842029;"></div>
+                
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted">Motivo de la Modificación <span class="text-danger">*</span></label>
+                    <textarea id="editReason" class="form-control shadow-sm border-secondary" rows="2" placeholder="Ej. Se omitió el ingreso de un producto por error de transcripción..." required></textarea>
+                </div>
+
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                    <p class="text-muted small m-0">Modifique las cantidades, precios, o añada insumos olvidados a esta compra.</p>
+                    <button type="button" class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm align-self-start align-self-md-auto" id="btnAddRowEdit">
+                        <i class="bi bi-plus-lg me-1"></i> Añadir Insumo
+                    </button>
+                </div>
+
+                <div class="table-responsive border rounded-3">
+                    <table class="table align-middle table-borderless m-0" id="edit-table">
+                        <thead class="table-light text-center small text-uppercase fw-bold border-bottom">
+                            <tr>
+                                <th class="text-start ps-3">Insumo (SKU)</th>
+                                <th style="width: 120px;">Cantidad</th>
+                                <th style="width: 150px;">Vencimiento</th>
+                                <th style="width: 150px;">Precio (Divisa)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="edit-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-light rounded-pill px-4 border shadow-sm fw-medium" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn rounded-pill px-4 fw-bold shadow-sm text-white" id="btnSaveEdit" style="background-color: #b0121a; border: none;">
+                        <i class="bi bi-floppy me-1"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="new-product-options">
+    <option value="" disabled selected>Seleccione...</option>
+    {% if products %}
+        {% for p in products %}
+            <option value="{{ p.id }}">{{ p.sku }} - {{ p.name }}</option>
+        {% endfor %}
+    {% endif %}
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.0"></script>
+{% endblock %}

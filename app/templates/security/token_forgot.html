@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pizza Hut - Recuperar Contraseña</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/security/token.css') }}">
 </head>
@@ -22,73 +23,6 @@
         <p id="mensaje"></p>
     </div>
 
-    <script>
-        const emailInput = document.getElementById('email');
-        const errorMsg = document.getElementById('error-msg');
-        const form = document.getElementById('forgotForm');
-
-        
-        emailInput.addEventListener('input', function() {
-            const email = this.value;
-            
-            if (email.length > 0 && !email.includes('@')) {
-                errorMsg.innerText = `Incluye un signo "@" en la dirección de correo electrónico.`;
-                errorMsg.style.display = 'block';
-            } else {
-                
-                errorMsg.style.display = 'none';
-            }
-        });
-
-        
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = emailInput.value.trim();
-            const msj = document.getElementById('mensaje');
-            
-            msj.innerText = '';
-
-            
-            if (!email) {
-                errorMsg.innerText = "Por favor ingrese su correo";
-                errorMsg.style.display = 'block';
-                return;
-            }
-
-            
-            if (!email.includes('@')) {
-                errorMsg.innerText = `Incluye un signo "@" en la dirección de correo electrónico. La dirección "${email}" no incluye el signo "@".`;
-                errorMsg.style.display = 'block';
-                return; 
-            }
-
-            errorMsg.style.display = 'none';
-            msj.innerText = "Procesando...";
-            msj.style.color = "#666";
-            
-            fetch(window.location.pathname, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email })
-            })
-            .then(res => res.json())
-            .then(data => {
-                msj.innerText = ""; 
-                
-                if (data.error) {
-                    errorMsg.innerText = data.error;
-                    errorMsg.style.display = 'block';
-                } else {
-                    msj.style.color = "green";
-                    msj.innerText = data.message;
-                }
-            })
-            .catch(err => {
-                msj.innerText = "";
-                errorMsg.innerText = "Error de conexión.";
-                errorMsg.style.display = 'block';
-            });
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/security/token.js') }}"></script>
 </body>
 </html>

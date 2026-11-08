@@ -26,6 +26,20 @@ def create_app():
         from .security.routes.audit_routes import audit_bp
         app.register_blueprint(audit_bp)
         # ==========================================================
+
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA DE PERSONAL (NUEVO)
+        # ==========================================================
+        from .security.routes.audit_user_routes import audit_user_bp
+        app.register_blueprint(audit_user_bp)
+        # ==========================================================
+
+        # ==========================================================
+        # REGISTRO DEL BLUEPRINT DE AUDITORÍA DE COMPRAS
+        # ==========================================================
+        from .security.routes.audit_purchase_routes import audit_purchase_bp
+        app.register_blueprint(audit_purchase_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)
@@ -36,11 +50,51 @@ def create_app():
         
         from .logistics.routes.location_routes import location_bp
         app.register_blueprint(location_bp, url_prefix='/logistics')
+        
+        # ==========================================================\
+        # REGISTRO DEL SUB-MÓDULO DE REGISTRO DE COMPRAS de Modulo 4
+        # ==========================================================\
+        from .logistics.routes.purchase_routes import purchase_bp
+        app.register_blueprint(purchase_bp, url_prefix='/logistics')
+        # ==========================================================\
 
-        # Importamos el Blueprint que acabamos de estructurar arriba
+        # ==========================================================\
+        # SUB-MÓDULO: LISTADO DE PROVEEDORES (NUEVO)
+        # ==========================================================\
+        from .logistics.routes.supplier_list_routes import supplier_list_bp
+        app.register_blueprint(supplier_list_bp, url_prefix='/logistics')
+        # ==========================================================\
+
+        
         from .inventory import inventory_bp
-        # Lo registramos con el prefijo /inventory para que sea estético y organizado
+        
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
+
+        # ==========================================================\
+        # GESTIÓN DE COMPRAS 
+        # ==========================================================\
+        from .logistics.routes.purchase_management_routes import purchase_management_bp
+        app.register_blueprint(purchase_management_bp, url_prefix='/logistics')
+        # ==========================================================\
+
+        # ==========================================================
+        # MÓDULO 4: REGISTRO DE LA API MULTI-MONEDA (Nueva Carpeta Integrations)
+        # ==========================================================
+        from .integrations.api_bcv.routes_api import api_bcv_bp
+        app.register_blueprint(api_bcv_bp, url_prefix='/bcv')
+
+        from .integrations.imgbb.imgbb_routes import imgbb_bp
+        app.register_blueprint(imgbb_bp)
+        # ==========================================================
+
+        from app.dashboard.dashboard_routes import dashboard_bp
+        app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+
+       # ==========================================================
+        # MÓDULO: PERSONAL (STAFF)
+        # ==========================================================
+        from app.security.routes.staff_routes import staff_bp
+        app.register_blueprint(staff_bp, url_prefix='/staff')
 
         from . import models 
         from .models.security_model import User

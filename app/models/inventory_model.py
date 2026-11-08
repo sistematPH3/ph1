@@ -26,6 +26,9 @@ class ProductType(db.Model):
     requires_manual_date = db.Column(db.Boolean, default=False, nullable=False)
     shelf_life_days = db.Column(db.Integer, nullable=True) # NULL si requiere fecha de fábrica
 
+    # NUEVO CAMPO: Estatus operativo de la categoría
+    is_active = db.Column(db.Boolean, default=True, nullable=False, server_default='true')
+
     # Relación: Un tipo de producto operativo agrupa muchos insumos/productos reales
     products = db.relationship('Product', backref='product_type', lazy=True)
 
@@ -42,8 +45,6 @@ class Product(db.Model):
     # RELACIÓN ÚNICA: Conectado al Tipo Operativo para heredar sus reglas
     product_type_id = db.Column(db.Integer, db.ForeignKey('product_types.id'), nullable=True)
     
-    
-    quantity = db.Column(db.Integer, nullable=False, default=0) #
     unit_of_measure = db.Column(db.String(20)) #
     technical_description = db.Column(db.Text, nullable=True) #
     is_active = db.Column(db.Boolean, default=True, nullable=False) #

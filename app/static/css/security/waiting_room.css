@@ -1,29 +1,22 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #f4f4f4;
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
 .body-waiting { 
-    background-color: #f4f4f4 !important; 
     display: flex; 
     justify-content: center; 
     align-items: center; 
     min-height: 100vh; 
-    margin: 0;
-}
-
-.card-waiting { 
-    background: white !important; 
-    padding: 40px; 
-    border-radius: 20px; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-    text-align: center; 
-    max-width: 450px; 
-}
-
-.body-waiting { 
-    background-color: #f4f4f4; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    min-height: 80vh; 
-    font-family: 'Segoe UI', sans-serif;
-    margin: 0;
+    width: 100vw;
 }
 
 .card-waiting { 
@@ -34,13 +27,13 @@
     text-align: center; 
     max-width: 450px; 
     width: 100%;
-    margin: auto;
+    margin: 20px;
 }
 
 .card-waiting h1 { 
     font-size: 2rem; 
     color: #333; 
-    margin-bottom: 15px;
+    margin-bottom: 15px; 
     line-height: 1.2;
 }
 
@@ -75,4 +68,19 @@
     font-weight: bold; 
     width: 100%;
     cursor: pointer;
+}
+
+.btn-ph-link {
+    display: block;
+    margin-top: 20px;
+    color: #666;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
+}
+
+.btn-ph-link:hover {
+    color: #be0000;
+    text-decoration: underline;
 }
