@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 
-{# Importamos la macro de los estados #}
 {% from 'logistics/_venezuela_states.html' import render_venezuela_states %}
 
 {% block extra_css %}
@@ -67,7 +66,7 @@
         </div>
     </div>
 </div>
-<!-- Modal de Éxito Premium (Se muestra solo al registrar con éxito) -->
+
 <div id="successModal" class="custom-modal">
     <div class="custom-modal-content">
         <div class="success-icon-wrapper">
@@ -80,9 +79,8 @@
         <h3>¡Sede Registrada!</h3>
         <p>La información de la sede se ha guardado de forma exitosa.</p>
         
-        <!-- Barra de progreso visual -->
-        <div class="modal-loading-bar">
-            <div class="loading-progress"></div>
+        <div class="modal-actions-wrapper mt-3">
+            <button id="btnAceptarSuccess" class="btn-premium btn-premium-primary w-100">Aceptar</button>
         </div>
     </div>
 </div>

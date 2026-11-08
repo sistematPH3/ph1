@@ -40,6 +40,13 @@ def create_app():
         from .security.routes.audit_purchase_routes import audit_purchase_bp
         app.register_blueprint(audit_purchase_bp)
         # ==========================================================
+
+        # ==========================================================
+        # MÓDULO WASTE: AUDITORÍA DE INVENTARIO 
+        # ==========================================================
+        from .waste.routes.auditinventory_routes import auditinventory_bp
+        app.register_blueprint(auditinventory_bp)
+        # ==========================================================
         
         from .logistics import logistics_bp
         app.register_blueprint(logistics_bp)
@@ -71,6 +78,13 @@ def create_app():
         app.register_blueprint(inventory_bp, url_prefix='/inventory')
 
         # ==========================================================\
+        # REGISTRO DE CONSUMO DE COCINA (MÓDULO 5)
+        # ==========================================================\
+        from .inventory.routes.register_consumption_routes import register_consumption_bp
+        app.register_blueprint(register_consumption_bp)
+        # ==========================================================\
+
+        # ==========================================================\
         # GESTIÓN DE COMPRAS 
         # ==========================================================\
         from .logistics.routes.purchase_management_routes import purchase_management_bp
@@ -95,6 +109,9 @@ def create_app():
         # ==========================================================
         from app.security.routes.staff_routes import staff_bp
         app.register_blueprint(staff_bp, url_prefix='/staff')
+
+        from app.inventory.routes.inventory_movement_routes import inventory_movements_bp
+        app.register_blueprint(inventory_movements_bp)
 
         from . import models 
         from .models.security_model import User

@@ -10,6 +10,7 @@ def list_user_audits():
     if not (current_user.is_admin or current_user.is_management or current_user.is_finance):
         flash("No tienes permisos para acceder a este módulo.", "danger")
         return redirect(url_for('security.login'))
+    # 2. Pasamos el 'current_user' al servicio para evaluar su rol y sedes
+    audits = AuditUserService.get_audit_history(current_user=current_user)
     
-    audits = AuditUserService.get_audit_history()
     return render_template('security/audit_user.html', audits=audits)

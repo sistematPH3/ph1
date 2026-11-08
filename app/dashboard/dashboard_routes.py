@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
-# Asegúrate de importar finance_required desde tus decoradores
 from app.decorators.roles import management_required, manager_required, admin_required, finance_required
+from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -15,7 +15,6 @@ def index():
         return redirect(url_for('dashboard.manager_dashboard'))
     elif current_user.is_admin:
         return redirect(url_for('dashboard.admin_dashboard'))
-    # Modificamos aquí para redirigir al dashboard de finanzas en lugar de inventario directo
     elif current_user.is_finance:
         return redirect(url_for('dashboard.finance_dashboard'))
     elif current_user.is_assistant_manager or current_user.is_operations:
@@ -30,25 +29,29 @@ def index():
 @login_required
 @management_required
 def director_dashboard():
-    return render_template('dashboard/management_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/management_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/manager-dashboard')
 @login_required
 @manager_required
 def manager_dashboard():
-    return render_template('dashboard/manager_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/manager_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/admin')
 @login_required
 @admin_required
 def admin_dashboard():
-    return render_template('dashboard/admin_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/admin_dashboard.html', alarmas=alarmas)
 
 
 @dashboard_bp.route('/finance')
 @login_required
 @finance_required
 def finance_dashboard():
-    return render_template('dashboard/finance_dashboard.html')
+    alarmas = obtener_alarmas_para_dashboard()
+    return render_template('dashboard/finance_dashboard.html', alarmas=alarmas)

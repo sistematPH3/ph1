@@ -1,0 +1,33 @@
+/* Contenedor principal del modal */
+.modal-custom {
+    display: none; /* Oculto por defecto */
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%); /* Centrado perfecto horizontal */
+    background-color: #ffffff;
+    padding: 25px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    z-index: 1000;
+    width: 400px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Título del modal */
+.modal-custom h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* Espaciado de los botones */
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}

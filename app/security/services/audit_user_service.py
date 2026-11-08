@@ -5,8 +5,9 @@ logger = logging.getLogger(__name__)
 
 class AuditUserService:
     @staticmethod
-    def get_audit_history():
-        return AuditUserRepository.get_user_audits()
+    def get_audit_history(current_user=None):
+        # Transfiere el usuario actual al repositorio para que aplique el filtro
+        return AuditUserRepository.get_user_audits(current_user=current_user)
 
     @staticmethod
     def registrar_modificacion(responsible_user_id, target_user_id, role_id, action, changed_data=None):
