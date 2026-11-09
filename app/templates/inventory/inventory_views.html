@@ -231,8 +231,13 @@
                                         {% if (item.reserved_quantity or 0) > 0 %}
                                         <small class="d-block text-warning fs-7 fw-semibold">+{{ "%.2f"|format(item.reserved_quantity) }} congelados</small>
                                         {% endif %}
-                                        {% if (item.transit_quantity or 0) > 0 %}
-                                        <small class="d-block text-info fs-7 fw-semibold">+{{ "%.2f"|format(item.transit_quantity) }} en tránsito</small>
+                                        {% set disputed_qty = item.disputed_quantity or 0 %}
+                                        {% set normal_transit = (item.transit_quantity or 0) - disputed_qty %}
+                                        {% if normal_transit > 0 %}
+                                        <small class="d-block text-info fs-7 fw-semibold">+{{ "%.2f"|format(normal_transit) }} en tránsito</small>
+                                        {% endif %}
+                                        {% if disputed_qty > 0 %}
+                                        <small class="d-block text-danger fs-7 fw-semibold"><i class="bi bi-shield-exclamation me-1"></i>+{{ "%.2f"|format(disputed_qty) }} en disputa</small>
                                         {% endif %}
                                     </td>
                                     <td data-label="Stock Mínimo" class="text-center text-muted">{{ "%.2f"|format(item.min_stock or 0) }}</td>
@@ -270,5 +275,5 @@
 {% endblock %}
 
 {% block extra_js %}
-    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.1"></script>
+    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.2"></script>
 {% endblock %}

@@ -93,7 +93,11 @@ class ResolveDisputeTest(unittest.TestCase):
 
         inv_origin = Inventory(
             location_id=loc_origin.id, product_id=product.id,
-            current_quantity=0, transit_quantity=0, min_stock=20
+            current_quantity=0,
+            # Estado REAL tras una recepción con novedad: el faltante queda
+            # resguardado en el tránsito del origen hasta que se arbitre.
+            transit_quantity=max(0, dispatched - received),
+            min_stock=20
         )
         db.session.add(inv_origin)
         db.session.flush()
@@ -175,8 +179,10 @@ class ResolveDisputeTest(unittest.TestCase):
         # 2) La sede destino recibe los 8 conformes.
         self.assertIsNotNone(inv_dest)
         self.assertEqual(float(inv_dest.current_quantity), 8.00)
-        # 3) La sede origen recupera los 2 que faltaron.
+        # 3) La sede origen recupera los 2 que faltaron...
         self.assertEqual(float(env["inv_origin"].current_quantity), 2.00)
+        # ...y el tránsito en disputa queda liberado (ya no hay nada pendiente).
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
         # 4) No debe crearse ningún traslado de retorno.
         self.assertEqual(
             Movement.query.filter_by(return_of_dispute_id=env["mov"].id).count(), 0
@@ -185,6 +191,13 @@ class ResolveDisputeTest(unittest.TestCase):
         resolution = AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").first()
         self.assertIsNotNone(resolution)
         self.assertEqual(resolution.changed_data["movement_id"], env["mov"].id)
+        # 6) El impacto REAL en el stock queda visible en la auditoría.
+        self.assertEqual(resolution.changed_data["stock_impact"]["origin_current_delta"], 2.00)
+        item = resolution.changed_data["items"][0]
+        self.assertEqual(item["reintegrated_qty"], 2.00)
+        self.assertEqual(
+            resolution.changed_data["resolution_summary"]["reintegrated_total"], 2.00
+        )
 
     # =========================================================================
     # CASO 2: RECHAZO POR ESPACIO -> se devuelve TODO, no se acredita destino
@@ -239,7 +252,10 @@ class ResolveDisputeTest(unittest.TestCase):
 
         inv_origin = Inventory(
             location_id=loc_origin.id, product_id=product.id,
-            current_quantity=0, transit_quantity=0, min_stock=20
+            current_quantity=0,
+            # Faltante resguardado en tránsito: (100-30) lote A + (50-50) lote B.
+            transit_quantity=70,
+            min_stock=20
         )
         db.session.add(inv_origin)
         db.session.flush()
@@ -314,8 +330,10 @@ class ResolveDisputeTest(unittest.TestCase):
         # 2) Destino recibe SOLO los 8 conformes.
         self.assertIsNotNone(inv_dest)
         self.assertEqual(float(inv_dest.current_quantity), 8.00)
-        # 3) El faltante NO vuelve al origen (se perdió en ruta).
+        # 3) El faltante NO vuelve al origen (se perdió en ruta) y el tránsito
+        # en disputa queda liberado tras darlo de baja.
         self.assertEqual(float(env["inv_origin"].current_quantity), 0.00)
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
         # 4) No se crea traslado de retorno.
         self.assertEqual(
             Movement.query.filter_by(return_of_dispute_id=env["mov"].id).count(), 0
@@ -349,8 +367,9 @@ class ResolveDisputeTest(unittest.TestCase):
         # 1) Destino recibe lo que realmente llegó: 30 (lote A) + 50 (lote B) = 80.
         self.assertIsNotNone(inv_dest)
         self.assertEqual(float(inv_dest.current_quantity), 80.00)
-        # 2) Los 70 perdidos NO vuelven al origen.
+        # 2) Los 70 perdidos NO vuelven al origen y el tránsito en disputa se libera.
         self.assertEqual(float(env["inv_origin"].current_quantity), 0.00)
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
         # 3) La auditoría registra el extravío POR LOTE.
         resolution = AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").first()
         self.assertIsNotNone(resolution)

@@ -70,6 +70,71 @@ class InventoryViewRepository:
         ]
 
     @staticmethod
+    def _pending_dispute_statuses():
+        """Estados de movimiento que representan una disputa aún abierta.
+
+        Se importa dentro del método para evitar ciclos de importación entre el
+        módulo de inventario y el de logística.
+        """
+        from app.logistics.repositories.movement_dispute_repository import (
+            MovementDisputeRepository,
+        )
+        return MovementDisputeRepository.PENDING_DISPUTE_STATUSES
+
+    @staticmethod
+    def get_disputed_qty_by_location():
+        """Faltante en disputa por (sede origen, producto).
+
+        Mientras una recepción con novedad no se resuelve, el faltante queda
+        resguardado en el ORIGEN (nunca llegó a destino). Se calcula desde los
+        movimientos abiertos para que sea visible incluso en registros viejos
+        donde el tránsito ya se había liberado.
+        """
+        statuses = InventoryViewRepository._pending_dispute_statuses()
+        rows = db.session.query(
+            Movement.origin_location_id.label('location_id'),
+            MovementDetail.product_id.label('product_id'),
+            func.sum(MovementDetail.missing_quantity).label('disputed')
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.status.in_(statuses),
+            MovementDetail.missing_quantity.isnot(None),
+            MovementDetail.missing_quantity > 0,
+        ).group_by(
+            Movement.origin_location_id, MovementDetail.product_id
+        ).all()
+
+        return {
+            (r.location_id, r.product_id): float(r.disputed or 0.0)
+            for r in rows
+        }
+
+    @staticmethod
+    def get_disputed_qty_by_lot(location_id, product_id):
+        """Faltante en disputa por lote para una sede/producto concretos."""
+        statuses = InventoryViewRepository._pending_dispute_statuses()
+        rows = db.session.query(
+            MovementDetail.lot_number.label('lot_number'),
+            func.sum(MovementDetail.missing_quantity).label('disputed')
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == int(location_id),
+            Movement.status.in_(statuses),
+            MovementDetail.product_id == int(product_id),
+            MovementDetail.lot_number.isnot(None),
+            MovementDetail.lot_number != '',
+            MovementDetail.missing_quantity.isnot(None),
+            MovementDetail.missing_quantity > 0,
+        ).group_by(MovementDetail.lot_number).all()
+
+        return {
+            str(r.lot_number).strip(): float(r.disputed or 0.0)
+            for r in rows if r.lot_number
+        }
+
+    @staticmethod
     def get_product_lots_by_location(location_id, product_id):
         loc_id = int(location_id)
         prod_id = int(product_id)

@@ -219,8 +219,13 @@ async function openLotsModal(locationId, productId, productName, sku) {
                     const congelado = Number(l.frozen_quantity != null ? l.frozen_quantity : 0).toFixed(2);
                     const merma = Number(l.frozen_merma_quantity != null ? l.frozen_merma_quantity : 0).toFixed(2);
                     const transito = Number(l.frozen_transit_quantity != null ? l.frozen_transit_quantity : 0).toFixed(2);
+                    const disputa = Number(l.frozen_disputed_quantity != null ? l.frozen_disputed_quantity : 0).toFixed(2);
                     const total = (Number(disponible) + Number(congelado)).toFixed(2);
                     const hasCancelled = Number(congelado) > 0;
+                    const breakdownParts = [];
+                    if (Number(merma) > 0) breakdownParts.push(`Mermas ${merma}`);
+                    if (Number(transito) > 0) breakdownParts.push(`Tránsito ${transito}`);
+                    if (Number(disputa) > 0) breakdownParts.push(`En disputa ${disputa}`);
                     return `
                     <tr>
                         <td class="ps-3 fw-bold text-dark font-monospace">${l.lot_number}</td>
@@ -232,7 +237,7 @@ async function openLotsModal(locationId, productId, productName, sku) {
                         <td class="text-center fw-bold text-success">${disponible}</td>
                         <td class="text-center">
                             <span class="fw-bold ${hasCancelled ? 'text-warning' : 'text-muted'}">${congelado}</span>
-                            ${hasCancelled ? `<small class="d-block text-muted fs-7">Mermas ${merma} · Tránsito ${transito}</small>` : ''}
+                            ${hasCancelled ? `<small class="d-block text-muted fs-7">${breakdownParts.join(' · ')}</small>` : ''}
                         </td>
                         <td class="text-center fw-bold text-primary">${total}</td>
                     </tr>
@@ -288,7 +293,10 @@ function updateInventoryView() {
 
     const activeInventory = rawInventoryData.filter(item => {
         const qty = item.current_quantity != null ? Number(item.current_quantity) : 0;
-        return qty > 0;
+        // Mostrar también productos sin stock disponible pero con faltante en
+        // disputa: de lo contrario la disputa quedaría oculta.
+        const disputed = item.disputed_quantity != null ? Number(item.disputed_quantity) : 0;
+        return qty > 0 || disputed > 0;
     });
 
     const filteredData = activeInventory.filter(item => {
@@ -418,6 +426,11 @@ function renderTableRows(items, emptySearchReason = null) {
         const unit = item.unit || item.product?.unit_of_measure || '';
         const reservedQty = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
         const transitQty = item.transit_quantity != null ? Number(item.transit_quantity) : 0;
+        const disputedQty = item.disputed_quantity != null ? Number(item.disputed_quantity) : 0;
+        // El tránsito "normal" excluye el faltante en disputa (se muestra aparte).
+        const normalTransitQty = item.normal_transit_quantity != null
+            ? Number(item.normal_transit_quantity)
+            : Math.max(0, transitQty - disputedQty);
 
         const isLow = isItemLow(item);
 
@@ -428,8 +441,11 @@ function renderTableRows(items, emptySearchReason = null) {
         const frozenHint = reservedQty > 0
             ? `<small class="d-block text-warning fs-7 fw-semibold">+${reservedQty.toFixed(2)} congelados</small>`
             : '';
-        const transitHint = transitQty > 0
-            ? `<small class="d-block text-info fs-7 fw-semibold">+${transitQty.toFixed(2)} en tránsito</small>`
+        const transitHint = normalTransitQty > 0
+            ? `<small class="d-block text-info fs-7 fw-semibold">+${normalTransitQty.toFixed(2)} en tránsito</small>`
+            : '';
+        const disputedHint = disputedQty > 0
+            ? `<small class="d-block text-danger fs-7 fw-semibold"><i class="bi bi-shield-exclamation me-1"></i>+${disputedQty.toFixed(2)} en disputa</small>`
             : '';
 
         return `
@@ -450,6 +466,7 @@ function renderTableRows(items, emptySearchReason = null) {
                     ${qty} <small class="text-muted fs-7">${unit}</small>
                     ${frozenHint}
                     ${transitHint}
+                    ${disputedHint}
                 </td>
                 <td data-label="Stock Mínimo" class="text-center text-muted">${minQty}</td>
                 <td data-label="Estado" class="text-center">${badge}</td>

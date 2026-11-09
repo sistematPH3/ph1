@@ -276,6 +276,11 @@
                                         
                                         <p class="text-muted small mb-3">Defina la acción administrativa de arbitraje de forma independiente para cada producto involucrado en esta incidencia:</p>
 
+                                        <div class="alert alert-warning border-0 shadow-sm py-2 px-3 small mb-3" role="alert">
+                                            <i class="bi bi-info-circle-fill me-1"></i>
+                                            <strong>Cantidad que se tomará:</strong> el sistema usa la cantidad <strong>registrada como recibida</strong> en la recepción (el conteo físico de <strong>lo que realmente llegó</strong>), <strong>no</strong> la cantidad despachada en la guía. El faltante (despachado − llegó) es lo que está <strong>EN DISPUTA</strong> y solo se reintegra o se da de baja según la acción que elija aquí.
+                                        </div>
+
                                         <!-- Ítems del manifestado original -->
                                         <h6 class="ph-section-title mb-3"><i class="bi bi-box-seam me-1 text-danger"></i> Ítems del Manifestado Original</h6>
                                         {% for item in mov.details %}
@@ -292,6 +297,14 @@
                                                 {% endif %}
                                             </div>
                                             
+                                            <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
+                                                <span>Despachado en guía: <strong class="text-dark">{{ "%.2f"|format(item.quantity | float) }}</strong></span>
+                                                <span>Registrado como recibido (lo que llegó): <strong class="text-dark">{{ "%.2f"|format(item.received_quantity | default(0, true) | float) }}</strong></span>
+                                                {% if item.missing_quantity and item.missing_quantity > 0 %}
+                                                <span>En disputa (faltante): <strong class="text-danger">{{ "%.2f"|format(item.missing_quantity | float) }}</strong></span>
+                                                {% endif %}
+                                            </div>
+
                                             <div class="d-flex flex-column gap-2">
                                                 <!-- Opciones dinámicas segun catálogo -->
                                                 <div>
@@ -300,17 +313,17 @@
                                                         <option value="" selected disabled>-- Seleccione resolución --</option>
                                                         
                                                         {% if mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
-                                                            <option value="ACEPTAR_RECEPCION">Aceptar recepción física real (Confirmar lo que llegó)</option>
-                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (Pérdida en ruta)</option>
+                                                            <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido: {{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u. (reintegra el faltante a la sede origen)</option>
+                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (el faltante se registra como pérdida en ruta)</option>
                                                         {% elif mov.status in ['SOBRANTE_EXCEDENTE'] %}
                                                             <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar en destino (Ingresar excedente al stock local)</option>
                                                             <option value="RESOLUCION_REINTEGRO">Devolver al origen (Reintegro en Transporte)</option>
                                                         {% elif mov.status == 'VIOLACION_CUSTODIA' %}
                                                             <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar recepción en destino con acta de auditoría</option>
                                                             <option value="INCIDENCIA_INTERNA">Procesar como incidencia interna local (caja dañada/abierta, el contenido queda en sede)</option>
-                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física local</option>
+                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física local (tomar lo registrado como recibido)</option>
                                                         {% elif mov.status == 'INCIDENCIA_TEMPERATURA' %}
-                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física (Cerrar tránsito y notificar a auditoría)</option>
+                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física (tomar lo registrado como recibido, cerrar tránsito y notificar a auditoría)</option>
                                                         {% elif mov.status == 'VENCIMIENTO_PROXIMO' %}
                                                             <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
                                                         {% elif mov.status == 'LOTE_NO_COINCIDE' %}
@@ -318,7 +331,7 @@
                                                         {% elif mov.status in ['RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA'] %}
                                                             <option value="RETORNO_EMERGENCIA">Ordenar Retorno de Emergencia a central</option>
                                                         {% else %}
-                                                            <option value="ACEPTAR_RECEPCION">Aceptar recepción física real</option>
+                                                            <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido ({{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u.)</option>
                                                             <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial</option>
                                                         {% endif %}
                                                     </select>

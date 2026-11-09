@@ -9,6 +9,23 @@ from app.inventory.repositories.inventory_views_repository import InventoryViewR
 class InventoryViewService:
 
     @staticmethod
+    def _attach_disputed_quantities(inventory_data):
+        """Adjunta a cada registro el faltante en disputa de su (sede, producto).
+
+        El faltante de un traslado con novedad se mantiene resguardado en el
+        origen hasta que se arbitra; aquí se expone como `disputed_quantity`
+        para que el inventario no lo oculte.
+        """
+        if not inventory_data:
+            return inventory_data
+        disputed_map = InventoryViewRepository.get_disputed_qty_by_location()
+        for item in inventory_data:
+            item.disputed_quantity = disputed_map.get(
+                (item.location_id, item.product_id), 0.0
+            )
+        return inventory_data
+
+    @staticmethod
     def get_inventory_for_user(current_user, filter_params):
         search_term = filter_params.get('search_term') or filter_params.get('search')
         selected_location_id = filter_params.get('location_id')
@@ -33,6 +50,8 @@ class InventoryViewService:
             alerts_summary = InventoryViewRepository.get_low_stock_counts_by_location()
             total_global_alerts = sum(item['count'] for item in alerts_summary)
 
+            InventoryViewService._attach_disputed_quantities(inventory_data)
+
             return {
                 'is_admin': True,
                 'inventory': inventory_data,
@@ -52,6 +71,8 @@ class InventoryViewService:
             else:
                 inventory_data = []
                 location_name = "Sin Sede Asignada"
+
+            InventoryViewService._attach_disputed_quantities(inventory_data)
 
             return {
                 'is_admin': False,
@@ -112,13 +133,14 @@ class InventoryViewService:
                 }
 
             # Salidas desde el Central: despachos a sucursales.
-            # Se descuenta la cantidad física que realmente salió del origen. Con
-            # sobrante (received_quantity > quantity) el excedente también salió
-            # físicamente, por lo que se usa el mayor de ambos; sin sobrante
-            # coincide con la guía.
-            salida_fisica_central = func.greatest(
-                func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity),
-                MovementDetail.quantity
+            # Se descuenta la cantidad física que realmente salió del origen:
+            #   - con recepción, lo recibido (cubre faltante y sobrante);
+            #   - sin recepción (aún EN_TRANSITO), lo despachado.
+            # Usar el mayor (greatest) sobre-descontaba el faltante que nunca
+            # salió del Central y descuadraba el detalle de lotes contra el
+            # current_quantity real.
+            salida_fisica_central = func.coalesce(
+                MovementDetail.received_quantity, MovementDetail.quantity
             )
             despachos = db.session.query(
                 MovementDetail.lot_number,
@@ -307,6 +329,11 @@ class InventoryViewService:
                 lote_limpio = str(lot).strip()
                 salidas_transito[lote_limpio] = float(total_transit or 0.0)
 
+        # Faltante EN DISPUTA por lote: mercancía que salió según la guía pero
+        # no llegó, y sigue sin arbitrar. Se resguarda en el origen y se muestra
+        # aparte para que no se confunda con tránsito normal ni desaparezca.
+        salidas_disputa = InventoryViewRepository.get_disputed_qty_by_lot(loc_id, prod_id)
+
         lots_raw = []
         for lot_num, data in entradas_lote.items():
             total_in = data['total_in']
@@ -314,16 +341,21 @@ class InventoryViewService:
             total_out_consumos = salidas_consumo.get(lot_num, 0.0)
             total_out_mermas = salidas_mermas_pendientes.get(lot_num, 0.0)
             total_out_transito = salidas_transito.get(lot_num, 0.0)
+            total_out_disputa = salidas_disputa.get(lot_num, 0.0)
 
-            disponible = total_in - total_out_traslados - total_out_consumos - total_out_mermas
+            disponible = (
+                total_in - total_out_traslados - total_out_consumos
+                - total_out_mermas - total_out_disputa
+            )
 
-            if disponible > 0.001:
+            if disponible > 0.001 or total_out_disputa > 0.001:
                 lots_raw.append({
                     'lot_number': lot_num,
                     'expiration_date': data['expiration_date'].strftime('%Y-%m-%d') if data['expiration_date'] else '',
                     'disponible': disponible,
                     'frozen': total_out_mermas,
                     'transit': total_out_transito,
+                    'disputed': total_out_disputa,
                     'initial_quantity': round(float(total_in), 2),
                     'exp_date_raw': data['expiration_date']
                 })
@@ -335,7 +367,11 @@ class InventoryViewService:
 
         for item in lots_raw:
             capped_qty = min(item['disponible'], max(0.0, remaining_pool))
-            congelado_total = float(item.get('frozen', 0.0)) + float(item.get('transit', 0.0))
+            congelado_total = (
+                float(item.get('frozen', 0.0))
+                + float(item.get('transit', 0.0))
+                + float(item.get('disputed', 0.0))
+            )
             if capped_qty > 0.001 or congelado_total > 0.001:
                 lots.append({
                     'lot_number': item['lot_number'],
@@ -346,6 +382,7 @@ class InventoryViewService:
                     'frozen_quantity': round(congelado_total, 2),
                     'frozen_merma_quantity': round(float(item.get('frozen', 0.0)), 2),
                     'frozen_transit_quantity': round(float(item.get('transit', 0.0)), 2),
+                    'frozen_disputed_quantity': round(float(item.get('disputed', 0.0)), 2),
                     'initial_quantity': item['initial_quantity']
                 })
                 remaining_pool -= capped_qty

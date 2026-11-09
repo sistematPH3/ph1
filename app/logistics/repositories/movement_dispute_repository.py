@@ -16,6 +16,7 @@ class MovementDisputeRepository:
         'RECHAZO_POR_ESPACIO',
         'RETORNO_EMERGENCIA',
         'NOVEDAD_FALTANTE',
+        'INCIDENCIA_MIXTA',
     ]
 
     @staticmethod

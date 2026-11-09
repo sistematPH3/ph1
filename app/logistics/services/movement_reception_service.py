@@ -313,14 +313,17 @@ class MovementReceptionService:
                                 movement["destination_location_id"], product_id, creditable_qty
                             )
                 else:
-                    # En caso de novedad/disputa liberamos el tránsito COMPLETO que se despachó
-                    # (el movimiento quedó "en disputa", no EN_TRANSITO, así que el tránsito que
-                    # resguardaba esa salida debe liberarse para no dejar stock bloqueado). Esto NO
-                    # acredita nada en destino todavía: el destino final lo decide resolve_dispute en
-                    # la bandeja de arbitraje, que reacomoda el current/transit según la resolución.
-                    if dispatched_qty > Decimal("0.00"):
+                    # En caso de novedad/disputa liberamos del tránsito SOLO la porción
+                    # que físicamente llegó (min(recibido, despachado)). El faltante
+                    # (despachado - recibido) SE MANTIENE en transit_quantity para que
+                    # quede visible como "en disputa" y el stock no desaparezca del
+                    # inventario mientras el administrador arbitra. Esto NO acredita nada
+                    # en destino todavía: el destino final lo decide resolve_dispute, que
+                    # reacomoda el current/transit según la resolución.
+                    conforming_qty = min(rec_qty, dispatched_qty)
+                    if conforming_qty > Decimal("0.00"):
                         MovementReceptionRepository.update_origin_transit(
-                            movement["origin_location_id"], product_id, dispatched_qty
+                            movement["origin_location_id"], product_id, conforming_qty
                         )
 
                 # Observación del muelle por renglón: se deriva de la diferencia física y de la

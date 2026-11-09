@@ -1711,7 +1711,9 @@ class MovementReceptionTest(unittest.TestCase):
         inv_dest = Inventory.query.filter_by(location_id=env["dest"].id, product_id=env["product"].id).first()
         self.assertEqual(inv_dest.current_quantity, 0.0)
         inv_orig = Inventory.query.filter_by(location_id=env["origin"].id, product_id=env["product"].id).first()
-        self.assertEqual(inv_orig.transit_quantity, 0.0)
+        # El faltante (10 - 8 = 2) queda en tránsito como "en disputa" hasta
+        # que el arbitraje decida si se reintegra o se da de baja.
+        self.assertEqual(float(inv_orig.transit_quantity), 2.0)
         detail = db.session.get(MovementDetail, env["detail"].id)
         self.assertEqual(float(detail.missing_quantity), 2.0)
 
@@ -2327,8 +2329,9 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_persistencia_faltante_no_ensucia_inventario(self):
         # Un faltante NO debe acreditar destino NI tocar el current del origen;
-        # solo libera tránsito y deja el movimiento en novedad (la decisión la
-        # toma el arbitraje). Verificado contra BD cometida.
+        # libera del tránsito solo lo recibido y deja el faltante en tránsito
+        # como "en disputa" hasta que el arbitraje decida. Verificado contra BD
+        # cometida.
         env = self._seed(dispatched=10, origin_current=50.0)
         ok, msg = self._process(env, novelty_type="FALTANTE_CONTEO", notes="faltaron 2",
                                 items_override=[{
@@ -2356,7 +2359,8 @@ class MovementReceptionTest(unittest.TestCase):
         inv_origin = db.session.query(Inventory).filter_by(
             location_id=env["origin"].id, product_id=env["product"].id).first()
         self.assertEqual(float(inv_origin.current_quantity), 50.0)
-        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+        # El faltante (10 - 8 = 2) permanece en tránsito como "en disputa".
+        self.assertEqual(float(inv_origin.transit_quantity), 2.0)
 
         # La auditoría deja la incidencia para arbitraje.
         log = db.session.query(AuditLog).filter_by(action="RECEPCION_NOVEDAD").first()

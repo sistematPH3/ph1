@@ -44,9 +44,13 @@ def get_inventory_api():
             min_stock = float(item.min_stock) if item and item.min_stock is not None else 0.0
             transit_qty = float(item.transit_quantity or 0) if item else 0.0
             reserved_qty = float(item.reserved_quantity or 0) if item else 0.0
+            disputed_qty = float(getattr(item, 'disputed_quantity', 0) or 0) if item else 0.0
             # El tránsito ya está descontado de current_quantity al despachar;
             # restarlo otra vez aquí lo descontaría dos veces.
             available_qty = round(max(0.0, curr_qty - reserved_qty), 2)
+            # El tránsito "normal" excluye el faltante en disputa (que se muestra
+            # aparte) para no contarlo dos veces cuando ambos coinciden.
+            normal_transit_qty = round(max(0.0, transit_qty - disputed_qty), 2)
 
             items.append({
                 'product_id': prod_id,
@@ -57,6 +61,8 @@ def get_inventory_api():
                 'location_name': loc_name,
                 'current_quantity': curr_qty,
                 'transit_quantity': transit_qty,
+                'normal_transit_quantity': normal_transit_qty,
+                'disputed_quantity': disputed_qty,
                 'reserved_quantity': reserved_qty,
                 'available_quantity': available_qty,
                 'min_stock': min_stock,

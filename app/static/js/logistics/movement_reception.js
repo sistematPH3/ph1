@@ -78,20 +78,20 @@ document.addEventListener("DOMContentLoaded", () => {
             icon: "bi-exclamation-triangle-fill",
             title: "Protocolo Obligatorio: Faltante de Conteo Físico",
             body: `<ul>
-                <li><strong>Instrucción en Tabla:</strong> Coloque en «Recibido Conforme» la cantidad exacta que ingresó a bodega.</li>
-                <li><strong>Retención Contable:</strong> La diferencia faltante quedará inmovilizada en tránsito de la sede emisora para investigación de muelle y arbitraje.</li>
+                <li><strong>Qué se registrará:</strong> El sistema tomará como cantidad recibida <strong>exactamente el número que escriba en «Cantidad física que llegó»</strong>, es decir, lo que realmente contó y entró a bodega. <strong>No</strong> se tomará la cantidad despachada en la guía.</li>
+                <li><strong>Diferencia en disputa:</strong> lo que falte respecto a la guía (despachado − llegó) quedará <strong>en disputa</strong> en la sede emisora hasta que el Administrador lo resuelva. No se acredita ni se da de baja automáticamente.</li>
                 <li><strong>Justificación:</strong> Indique en las notas el conteo verificado junto con el transportista.</li>
             </ul>`,
             buttonText: "Confirmar con Faltante",
             buttonAlert: true,
-            help: "Descuadre físico menor a la guía. La diferencia quedará congelada en tránsito para arbitraje."
+            help: "Se registrará como recibido el conteo físico que escriba (lo que llegó), no lo despachado. El faltante quedará en disputa para arbitraje."
         },
         SOBRANTE_EXCEDENTE: {
             theme: "card-surplus-guide",
             icon: "bi-box-seam-fill",
             title: "Protocolo Obligatorio: Sobrante / Excedente Físico",
             body: `<ul>
-                <li><strong>Instrucción en Tabla:</strong> Coloque en «Recibido Conforme» la cantidad física total descargada (superior a la orden).</li>
+                <li><strong>Instrucción en Tabla:</strong> Coloque en «Cantidad física que llegó» la cantidad total descargada (superior a la orden).</li>
                 <li><strong>Resguardo Preventivo:</strong> El sistema acreditará la cantidad autorizada en la orden. El excedente físico permanecerá en resguardo temporal sin ingresar a producción.</li>
                 <li><strong>Justificación:</strong> Detalle en las notas el número de bultos o cajas adicionales recibidas.</li>
             </ul>`,
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
             icon: "bi-exclamation-octagon-fill",
             title: "Protocolo Obligatorio: Producto Erróneo / SKU Cruzado",
             body: `<ul>
-                <li><strong>Paso 1 (Tabla superior):</strong> Si el producto solicitado en la guía no llegó físicamente, coloque <strong>0.00</strong> en «Recibido Conforme» para generar el faltante formal.</li>
+                <li><strong>Paso 1 (Tabla superior):</strong> Si el producto solicitado en la guía no llegó físicamente, coloque <strong>0.00</strong> en «Cantidad física que llegó» para generar el faltante formal.</li>
                 <li><strong>Paso 2 (Formulario inferior):</strong> Declare los insumos físicos descargados por error del camión seleccionándolos del catálogo.</li>
                 <li><strong>Custodia:</strong> La mercancía no solicitada permanecerá en <strong>custodia física temporal</strong> para coordinar su retorno formal a Central.</li>
             </ul>`,
@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
             icon: "bi-box-arrow-left",
             title: "Protocolo Obligatorio: Rechazo Parcial por Falta de Espacio",
             body: `<ul>
-                <li><strong>Instrucción en Tabla:</strong> Coloque en «Recibido Conforme» únicamente la cantidad que cabe en sus cavas/depósito.</li>
+                <li><strong>Instrucción en Tabla:</strong> Coloque en «Cantidad física que llegó» únicamente la cantidad que cabe en sus cavas/depósito.</li>
                 <li><strong>Retorno de Emergencia:</strong> El remanente no descargado permanecerá en el camión para que el Administrador dicte el retorno a Central.</li>
             </ul>`,
             buttonText: "Confirmar Rechazo por Espacio",
@@ -1450,6 +1450,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 surplusLotsHtml = `<div class="mt-1">${lotsDetail}</div>`;
             }
 
+            // Aviso explícito del faltante: deja claro que la cantidad que se
+            // tomará como recibida es el conteo físico declarado (lo que llegó)
+            // y que la diferencia queda en disputa, no se descuenta en silencio.
+            let missingNoteHtml = "";
+            if (diff < -0.001) {
+                const missingQty = Math.abs(diff).toFixed(2);
+                missingNoteHtml = `
+                    <div class="alert alert-warning border-0 py-2 px-2 mt-2 mb-0 small" role="alert">
+                        <i class="bi bi-shield-exclamation me-1"></i>
+                        Se tomará como cantidad recibida el <strong>conteo físico declarado: ${it.received_quantity.toFixed(2)} ${it.unit}</strong> (lo que llegó), no lo despachado (${it.dispatched_qty.toFixed(2)} ${it.unit}).
+                        La diferencia de <strong>${missingQty} ${it.unit}</strong> quedará <strong>EN DISPUTA</strong> en la sede emisora hasta el arbitraje.
+                    </div>`;
+            }
+
             // Aviso (NO bloqueo) cuando el sobrante supera el stock físico del origen.
             let surplusWarnHtml = "";
             if (it.exceeds_origin_stock) {
@@ -1464,12 +1478,13 @@ document.addEventListener("DOMContentLoaded", () => {
             listItemsHtml += `
                 <li class="modal-breakdown-item">
                     <div>
-                        <strong>${it.product_name}</strong> (${it.received_quantity.toFixed(2)} / ${it.dispatched_qty.toFixed(2)} ${it.unit})
+                        <strong>${it.product_name}</strong> — llegó <strong>${it.received_quantity.toFixed(2)}</strong> de ${it.dispatched_qty.toFixed(2)} ${it.unit}
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${diffText}
                         ${conditionTag}
                     </div>
+                    ${missingNoteHtml}
                     ${surplusWarnHtml}
                     ${surplusLotsHtml}
                 </li>

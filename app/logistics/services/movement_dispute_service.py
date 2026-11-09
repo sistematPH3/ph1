@@ -346,6 +346,26 @@ def resolve_dispute(movement_id, payload, user_id):
     resolution_items = []
     linked_return_movement_id = None
 
+    # Snapshot del inventario de ORIGEN por producto antes de aplicar la
+    # resolución. Al final se compara contra el estado real para registrar en la
+    # auditoría el impacto neto (reintegros y liberación de tránsito), de modo
+    # que el ajuste de stock deje de ser invisible.
+    origin_current_before = {}
+    origin_transit_before = {}
+
+    def _snapshot_origin_inventory(product_id):
+        if product_id in origin_current_before:
+            return
+        inv = Inventory.query.filter_by(
+            location_id=movement.origin_location_id, product_id=product_id
+        ).first()
+        origin_current_before[product_id] = (
+            _to_decimal(inv.current_quantity) if inv else Decimal('0.00')
+        )
+        origin_transit_before[product_id] = (
+            _to_decimal(inv.transit_quantity) if inv else Decimal('0.00')
+        )
+
     # 1. Procesar resoluciones para los ítems del manifestado original
     for detail in movement.details:
         action = payload.get(f"item_{detail.id}_action")
@@ -356,6 +376,8 @@ def resolve_dispute(movement_id, payload, user_id):
         qty_missing = _to_decimal(disc_data.get("missing_qty", getattr(detail, 'missing_quantity', 0)))
         extra_units = _to_decimal(disc_data.get("extra_units", 0))
         novelty_type = disc_data.get("type")
+
+        _snapshot_origin_inventory(detail.product_id)
 
         inv_origin = Inventory.query.filter_by(
             location_id=movement.origin_location_id, product_id=detail.product_id
@@ -377,6 +399,9 @@ def resolve_dispute(movement_id, payload, user_id):
         qty_to_return = Decimal('0.00')
         # Mercancía dada de baja (extravío / merma): no se acredita a nadie.
         lost_qty = Decimal('0.00')
+        # Porción del faltante que vuelve al inventario del origen (decisión
+        # "aceptar lo que llegó": el faltante nunca salió del abastecedor).
+        reintegrated_qty = Decimal('0.00')
 
         if action == 'CORREGIR_LOTE':
             # Decisión "dejar": el producto se queda, solo se corrige el lote.
@@ -384,12 +409,20 @@ def resolve_dispute(movement_id, payload, user_id):
                 detail.lot_number = new_lot
             credited_qty = conforming_qty
             _credit_inventory(inv_dest, credited_qty)
+            # El faltante no declarado como baja vuelve al origen.
+            if qty_missing > Decimal('0.00') and inv_origin is not None:
+                inv_origin.current_quantity = _to_decimal(inv_origin.current_quantity) + qty_missing
+                reintegrated_qty = qty_missing
 
         elif action == 'RESOLUCION_ACREDITAR_DESTINO':
             # Decisión "quedárselo": se acredita TODO lo recibido físicamente
             # (porción autorizada + excedente físico).
             credited_qty = received_qty
             _credit_inventory(inv_dest, credited_qty)
+            # El faltante no declarado como baja vuelve al origen.
+            if qty_missing > Decimal('0.00') and inv_origin is not None:
+                inv_origin.current_quantity = _to_decimal(inv_origin.current_quantity) + qty_missing
+                reintegrated_qty = qty_missing
 
         elif action == 'BAJA_EXTRAVIO_PARCIAL':
             # Baja por extravío parcial: lo conforme queda en destino; lo
@@ -400,10 +433,11 @@ def resolve_dispute(movement_id, payload, user_id):
 
         elif action == 'DERIVAR_MERMA_SANITARIA':
             # Merma sanitaria: se descarta TODO lo recibido; no se acredita al
-            # destino ni se repone en origen.
+            # destino ni se repone en origen. Si además hubo faltante, también
+            # se registra como pérdida (no puede quedar stock en el limbo).
             detail.received_quantity = Decimal('0.00')
             credited_qty = Decimal('0.00')
-            lost_qty = received_qty
+            lost_qty = received_qty + qty_missing
 
         elif action in RETURN_ACTIONS:
             # Decisión 3: DEVOLVER.
@@ -421,6 +455,9 @@ def resolve_dispute(movement_id, payload, user_id):
                 # código viejo que calculaba extra+missing = 0 y no creaba nada.
                 qty_to_return = received_qty
                 detail.received_quantity = Decimal('0.00')
+                # Lo que nunca llegó no puede devolverse: se registra como
+                # pérdida en ruta para que el stock no desaparezca en silencio.
+                lost_qty = qty_missing
             else:
                 # Reintegro parcial (ej. sobrante): lo conforme se queda
                 # acreditado en destino; devuelven el excedente físico
@@ -463,6 +500,18 @@ def resolve_dispute(movement_id, payload, user_id):
             if qty_missing > Decimal('0.00') and inv_origin is not None:
                 current_origin = _to_decimal(inv_origin.current_quantity)
                 inv_origin.current_quantity = current_origin + qty_missing
+                reintegrated_qty = qty_missing
+
+        # El faltante estaba resguardado en el tránsito del ORIGEN desde la
+        # recepción con novedad (para mostrarse como "en disputa"). Al cerrar
+        # la disputa se libera: ya sea porque vuelve al current (reintegro) o
+        # porque se da de baja. Se usa max(0, ...) para no romper movimientos
+        # viejos donde el tránsito ya se había liberado por completo.
+        if inv_origin is not None and qty_missing > Decimal('0.00'):
+            inv_origin.transit_quantity = max(
+                Decimal('0.00'),
+                _to_decimal(inv_origin.transit_quantity) - qty_missing
+            )
 
         # La pérdida efectiva queda escrita en el detalle: tras resolver, el
         # snapshot de traslados debe reflejar la decisión (0 si se acreditó o
@@ -477,7 +526,8 @@ def resolve_dispute(movement_id, payload, user_id):
             "action": action or "SIN_ACCION",
             "credited_qty": float(credited_qty),
             "return_qty": float(qty_to_return),
-            "lost_qty": float(lost_qty)
+            "lost_qty": float(lost_qty),
+            "reintegrated_qty": float(reintegrated_qty)
         })
 
     # 2. Procesar resoluciones sobre productos erróneos / fuera de guía
@@ -488,6 +538,8 @@ def resolve_dispute(movement_id, payload, user_id):
 
         if not prod_id or qty_err <= Decimal('0.00'):
             continue
+
+        _snapshot_origin_inventory(prod_id)
 
         if err_action == 'RESOLUCION_ACREDITAR_DESTINO':
             inv_dest_err = _get_or_create_inventory(movement.destination_location_id, prod_id)
@@ -550,10 +602,30 @@ def resolve_dispute(movement_id, payload, user_id):
     movement.resolution_notes = general_notes
     movement.resolved_by_id = user_id
 
+    # Impacto neto REAL sobre el inventario de origen: comparamos el estado
+    # actual contra el snapshot tomado antes de resolver. Así la auditoría deja
+    # de mostrar "reintegrado 0" cuando en realidad el stock sí se ajustó.
+    origin_current_delta = Decimal('0.00')
+    origin_transit_delta = Decimal('0.00')
+    for pid, before_current in origin_current_before.items():
+        inv_after = Inventory.query.filter_by(
+            location_id=movement.origin_location_id, product_id=pid
+        ).first()
+        after_current = _to_decimal(inv_after.current_quantity) if inv_after else Decimal('0.00')
+        after_transit = _to_decimal(inv_after.transit_quantity) if inv_after else Decimal('0.00')
+        origin_current_delta += after_current - before_current
+        origin_transit_delta += after_transit - origin_transit_before[pid]
+
+    stock_impact = {
+        "origin_current_delta": round(float(origin_current_delta), 2),
+        "origin_transit_delta": round(float(origin_transit_delta), 2),
+    }
+
     resolution_summary = {
         "credited_total": round(sum(i["credited_qty"] for i in resolution_items), 2),
         "returned_total": round(sum(i["return_qty"] for i in resolution_items), 2),
         "lost_total": round(sum(i["lost_qty"] for i in resolution_items), 2),
+        "reintegrated_total": round(sum(i["reintegrated_qty"] for i in resolution_items), 2),
     }
 
     db.session.add(AuditLog(
@@ -561,12 +633,16 @@ def resolve_dispute(movement_id, payload, user_id):
         action='RESOLUCION_DISPUTA',
         severity='ALERTA' if has_returns else 'NORMAL',
         user_id=user_id,
+        # Se asocia a la sede destino (donde ocurrió la recepción/disputa) para
+        # que el evento no desaparezca cuando la auditoría filtra por sede.
+        location_id=movement.destination_location_id,
         changed_data={
             "movement_id": movement.id,
             "event": "RESOLUCION_DISPUTA",
             "general_notes": general_notes,
             "items": resolution_items,
             "resolution_summary": resolution_summary,
+            "stock_impact": stock_impact,
             "linked_return_movement_id": linked_return_movement_id,
             "user_id": user_id,
             "timestamp": current_ve_time().isoformat()

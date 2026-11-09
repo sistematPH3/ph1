@@ -315,6 +315,21 @@
                                             </div>
                                         </div>
                                         {% endif %}
+                                        {% set impact = data.get('stock_impact') or {} %}
+                                        {% set cur_delta = impact.get('origin_current_delta', 0) %}
+                                        {% set transit_delta = impact.get('origin_transit_delta', 0) %}
+                                        {% if cur_delta or transit_delta %}
+                                        <div class="d-flex gap-3 mb-3 small text-muted flex-wrap">
+                                            {% if cur_delta > 0 %}
+                                            <span class="badge bg-light text-success"><i class="bi bi-arrow-return-left me-1"></i>Reintegrado al origen: {{ "%.2f"|format(cur_delta) }}</span>
+                                            {% elif cur_delta < 0 %}
+                                            <span class="badge bg-light text-danger"><i class="bi bi-arrow-right me-1"></i>Descontado del origen: {{ "%.2f"|format(cur_delta|abs) }}</span>
+                                            {% endif %}
+                                            {% if transit_delta %}
+                                            <span class="badge bg-light ph-text-warning">Tránsito liberado: {{ "%.2f"|format(transit_delta|abs) }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
                                         {% if data.get('items') %}
                                         <div class="table-responsive rounded border">
                                             <table class="table table-sm table-hover align-middle mb-0 bg-white ph-tbl-resolucion">
@@ -322,6 +337,7 @@
                                                     <tr>
                                                         <th>Lote</th><th>Acción</th>
                                                         <th class="text-center">Acreditado en destino</th>
+                                                        <th class="text-center text-success">Reintegrado al origen</th>
                                                         <th class="text-center">Devuelto al origen</th>
                                                         <th class="text-center text-danger">Dado de baja / Extraviado</th>
                                                     </tr>
@@ -332,11 +348,12 @@
                                                         <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
                                                         <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
                                                         <td class="text-center text-success">{{ "%.2f"|format(item.get('credited_qty', 0)) }}</td>
+                                                        <td class="text-center text-success fw-bold">{{ "%.2f"|format(item.get('reintegrated_qty', 0)) if item.get('reintegrated_qty', 0) > 0 else '-' }}</td>
                                                         <td class="text-center ph-text-warning">{{ "%.2f"|format(item.get('return_qty', 0)) }}</td>
                                                         <td class="text-center text-danger fw-bold">{{ "%.2f"|format(item.get('lost_qty', 0)) if item.get('lost_qty', 0) > 0 else '-' }}</td>
                                                     </tr>
                                                     {% else %}
-                                                    <tr><td colspan="5" class="text-center text-muted py-3">Sin desglose de la resolución.</td></tr>
+                                                    <tr><td colspan="6" class="text-center text-muted py-3">Sin desglose de la resolución.</td></tr>
                                                     {% endfor %}
                                                 </tbody>
                                             </table>
