@@ -552,7 +552,8 @@ def obtener_recibido_por_insumo(location_ids, desde, hasta, orientacion_id=None)
     llegó a cada sede de destino y en qué cantidad. Solo los movimientos que
     clasifican como 'recibidos' (destino ∈ sedes del usuario; con orientacion_id
     se narra desde esa sede). La cantidad efectiva usada es received_quantity
-    (lo realmente llegado) o quantity a falta de registro.
+    (lo realmente llegado); si no hay recepción registrada (NULL) no se cuenta
+    como mercancía recibida, aunque el movimiento tenga cantidad despachada.
     Devuelve {'detalle': fn(filas), 'top': fn} con:
       - detalle: fila por (sede, producto) ya agregada, ordenada por cantidad
         descendente: {sede_name, product_id, product_name, quantity, lots}.
@@ -589,9 +590,11 @@ def obtener_recibido_por_insumo(location_ids, desde, hasta, orientacion_id=None)
             continue
         sede_id = destino
         for detalle in mov.details:
-            cantidad = (Decimal(str(detalle.received_quantity or 0))
+            # Sin recepción registrada no llegó mercancía: no se usa lo
+            # despachado como respaldo.
+            cantidad = (Decimal(str(detalle.received_quantity))
                         if detalle.received_quantity is not None
-                        else Decimal(str(detalle.quantity or 0)))
+                        else Decimal('0.00'))
             if not cantidad:
                 continue
             producto = db.session.get(Product, detalle.product_id)

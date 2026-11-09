@@ -577,6 +577,32 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual([f['product_name'] for f in recibido['top']],
                          ['Harina', 'Jamón'])
 
+    def test_recibido_por_insumo_no_usa_lo_despachado_sin_recepcion(self):
+        # Detalle sin recepción registrada (NULL): no debe aparecer como
+        # mercancía recibida aunque el movimiento tenga cantidad despachada.
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede_a.id,
+                       date=datetime(2026, 9, 12), user_id=self.admin.id,
+                       status='COMPLETADO')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id,
+            lot_number='L-SIN-REC', quantity=Decimal('30.00'),
+            received_quantity=None))
+        db.session.commit()
+
+        reporte = svc.construir_reporte(
+            svc.ReportFilters(location_id=self.sede_a.id, metric='TRANSFERS',
+                              period_type='MONTHLY', moneda='USD'),
+            self.admin.id)
+        recibido = reporte['detail']['recibido_por_insumo']
+        self.assertEqual(recibido['detalle'], [])
+        self.assertEqual(recibido['top'], [])
+        self.assertEqual(
+            reporte['detail']['direccional']['recibidos']['quantity'],
+            _redondo('0.00'))
+
     # ---------------------------------------------------- permisos ---------
     def test_usuario_sin_sedes_recibe_error(self):
         invitado = User(name="Sin Sedes", email="sin@ph.test",
