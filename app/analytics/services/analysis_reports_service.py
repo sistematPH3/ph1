@@ -650,9 +650,12 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
     """Resumen direccional REAL de los movimientos del rango con su mercancía
     y costo (último costo de compra por producto/lote), convertido a la moneda
     elegida: recibidos (entraron a tus sedes), enviados (salieron de ellas) e
-    internos. Cada dirección trae conteo (nº de traslados), quantity
-    (mercancía movida) y cost (valor convertido). Con orientacion_id (la
-    Central para quien la gestiona) la dirección se narra desde esa sede."""
+    internos. Cada dirección trae conteo (nº de traslados), quantity (enviados:
+    lo despachado; recibidos e internos: lo realmente llegado) y cost (valor
+    convertido). Además trae total_despachado (lo que salió físicamente, sin
+    importar la dirección) para los KPIs que miden mercancía movida. Con
+    orientacion_id (la Central para quien la gestiona) la dirección se narra
+    desde esa sede."""
     moneda = (moneda or 'USD').upper()
     if isinstance(desde, datetime):
         desde_dt = desde
@@ -676,6 +679,21 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
         monto = _convertir_buckets(buckets, moneda, hasta_dt)
         return _redondear(monto) if monto is not None else Decimal('0.00')
 
+    # Total despachado (independiente de la dirección): lo usa el dashboard del
+    # Admin para seguir midiendo "uds. movidas" como lo que salió físicamente.
+    buckets_despachado = _bucket_vacio()
+    cantidad_despachada = Decimal('0.00')
+    for f in datos['filas']:
+        cantidad_despachada += f['despachado']
+        for m in MONEDAS:
+            buckets_despachado[m] += f['buckets_despachado'].get(
+                m, Decimal('0.00'))
+    total_despachado = {
+        'conteo': total['conteo'],
+        'quantity': _redondear(cantidad_despachada),
+        'cost': convertir(buckets_despachado),
+    }
+
     movimientos = [{
         'id': f['id'],
         'date': f['date'],
@@ -696,6 +714,7 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
         'recibidos': direccional['recibidos'],
         'internos': direccional['internos'],
         'total': total,
+        'total_despachado': total_despachado,
         'movimientos': movimientos,
         'perdidas': _redondear(perdidas),
         'extravios_quantity': datos['extravios_quantity'],

@@ -818,9 +818,11 @@ def obtener_flujo_traslados(period_type=SnapshotPeriodType.MONTHLY, moneda='USD'
     """Flujo REAL de traslados por período para el dashboard del Admin.
 
     A diferencia del snapshot TRANSFERS (que solo mide pérdidas en traslado),
-    aquí se cuenta TODA la mercancía trasladada y su costo (último costo de
+    aquí se cuenta TODA la mercancía despachada y su costo (último costo de
     compra por producto/lote), reutilizando obtener_traslados_direccional del
     cajón de finanzas: {periods, serie: {cost, conteo, quantity}, comparativo}.
+    Se usa el total despachado (no el recibido) porque el KPI mide mercancía
+    movida/salida.
     """
     from app.analytics.services.analysis_reports_service import (
         obtener_traslados_direccional,
@@ -834,9 +836,9 @@ def obtener_flujo_traslados(period_type=SnapshotPeriodType.MONTHLY, moneda='USD'
     costos, conteos, cantidades = [], [], []
     for inicio, fin in periodos:
         flujo = obtener_traslados_direccional(location_ids, inicio, fin, moneda)
-        total = flujo['total']
+        total = flujo['total_despachado']
         costos.append(float(total['cost']))
-        conteos.append(total['conteo'])
+        conteos.append(flujo['total']['conteo'])
         cantidades.append(float(total['quantity']))
 
     comparativo = {

@@ -1041,6 +1041,113 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(result['total']['cost'], _redondo('1400.00'))
         self.assertEqual(len(result['movimientos']), 2)
 
+    def test_traslado_recibido_mide_lo_que_llego_y_no_lo_despachado(self):
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('500.00'), currency='USD',
+            invoice_url='https://img/rec1.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id, lot_number='L-REC',
+            quantity=Decimal('50.00'), foreign_price=Decimal('10.00'),
+            price_bs=Decimal('8146.91')))
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede_a.id,
+                       date=datetime(2026, 9, 10), user_id=self.admin.id,
+                       status='COMPLETADO')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id, lot_number='L-REC',
+            quantity=Decimal('50.00'), received_quantity=Decimal('40.00')))
+        db.session.commit()
+
+        result = svc.obtener_traslados_direccional(
+            [self.sede_a.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'USD')
+        self.assertEqual(result['recibidos']['quantity'], _redondo('40.00'))
+        self.assertEqual(result['recibidos']['cost'], _redondo('400.00'))
+        self.assertEqual(result['total']['quantity'], _redondo('40.00'))
+        # Lo despachado se conserva aparte para los KPIs de mercancía movida.
+        self.assertEqual(result['total_despachado']['quantity'],
+                         _redondo('50.00'))
+        self.assertEqual(result['total_despachado']['cost'], _redondo('500.00'))
+
+    def test_traslado_interno_mide_lo_recibido_y_enviado_lo_despachado(self):
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('500.00'), currency='USD',
+            invoice_url='https://img/rec2.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id, lot_number='L-INT',
+            quantity=Decimal('50.00'), foreign_price=Decimal('10.00'),
+            price_bs=Decimal('8146.91')))
+        interna = Movement(type='TRASLADO', origin_location_id=self.central.id,
+                           destination_location_id=self.sede_a.id,
+                           date=datetime(2026, 9, 10), user_id=self.admin.id,
+                           status='COMPLETADO')
+        salida = Movement(type='TRASLADO', origin_location_id=self.sede_a.id,
+                          destination_location_id=self.sede_b.id,
+                          date=datetime(2026, 9, 11), user_id=self.admin.id,
+                          status='COMPLETADO')
+        db.session.add_all([interna, salida])
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=interna.id, product_id=self.harina.id,
+            lot_number='L-INT', quantity=Decimal('50.00'),
+            received_quantity=Decimal('40.00')))
+        db.session.add(MovementDetail(
+            movement_id=salida.id, product_id=self.harina.id,
+            lot_number='L-INT', quantity=Decimal('7.00'),
+            received_quantity=Decimal('5.00')))
+        db.session.commit()
+
+        result = svc.obtener_traslados_direccional(
+            [self.central.id, self.sede_a.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'USD')
+        # Interno: lo que llegó a la sede destino, no lo despachado.
+        self.assertEqual(result['internos']['conteo'], 1)
+        self.assertEqual(result['internos']['quantity'], _redondo('40.00'))
+        self.assertEqual(result['internos']['cost'], _redondo('400.00'))
+        # Enviado: lo que salió de la sede, aunque llegue menos.
+        self.assertEqual(result['enviados']['quantity'], _redondo('7.00'))
+        self.assertEqual(result['enviados']['cost'], _redondo('70.00'))
+
+    def test_traslado_sin_recepcion_no_cuenta_como_recibido(self):
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('100.00'), currency='USD',
+            invoice_url='https://img/rec3.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id, lot_number='L-TRA',
+            quantity=Decimal('10.00'), foreign_price=Decimal('10.00'),
+            price_bs=Decimal('814.69')))
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede_a.id,
+                       date=datetime(2026, 9, 10), user_id=self.admin.id,
+                       status='EN_TRANSITO')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id, lot_number='L-TRA',
+            quantity=Decimal('10.00'), received_quantity=None))
+        db.session.commit()
+
+        result = svc.obtener_traslados_direccional(
+            [self.sede_a.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'USD')
+        # Sin recepción registrada no hay mercancía llegada (no se usa quantity).
+        self.assertEqual(result['recibidos']['quantity'], _redondo('0.00'))
+        self.assertEqual(result['recibidos']['cost'], _redondo('0.00'))
+
     def test_kpis_finanzas_flujo_principal_es_traslados_recibidos(self):
         compra = Purchase(
             supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),

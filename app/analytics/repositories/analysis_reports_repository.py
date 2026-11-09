@@ -438,11 +438,15 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
       - internos:  se mueven entre sus sedes.
     Si se pasa orientacion_id (p. ej. la Central para quien la gestiona) la
     dirección se calcula desde esa sede: se narra lo que ella envía/recibe.
+    La cantidad y el costo se miden según la dirección: quien envía reporta lo
+    despachado; quien recibe (o un traslado interno, donde el usuario es origen
+    y destino) reporta lo realmente llegado (received_quantity; sin recepción
+    registrada no hay mercancía llegada).
     Devuelve {'filas': [...]} con un dict por movimiento (id, date, type,
     status, direccion, origin_id, origin_name, destination_id,
-    destination_name, quantity, missing_quantity, buckets, perdidas) y además
-    'perdidas' (extravíos missing_quantity valorizados bucket a bucket) y
-    'extravios_quantity'."""
+    destination_name, quantity, despachado, missing_quantity, buckets,
+    buckets_despachado, perdidas) y además 'perdidas' (extravíos
+    missing_quantity valorizados bucket a bucket) y 'extravios_quantity'."""
     vacio = {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')}
     base = {'filas': [], 'perdidas': dict(vacio),
             'extravios_quantity': Decimal('0.00')}
@@ -474,16 +478,31 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
         direccion = _direccion(origen, destino, ids, orientacion_id)
 
         buckets = dict(vacio)
+        buckets_despachado = dict(vacio)
         perdidas_mov = dict(vacio)
         cantidad = Decimal('0.00')
+        cantidad_despachada = Decimal('0.00')
         faltante = Decimal('0.00')
         for detalle in mov.details:
-            cantidad += Decimal(str(detalle.quantity or 0))
+            despachada = Decimal(str(detalle.quantity or 0))
+            # Enviados: lo que salió. Recibidos e internos: lo que llegó. Si no
+            # hay recepción registrada (received_quantity NULL) no llegó nada.
+            if direccion == 'enviados':
+                efectiva = despachada
+            else:
+                efectiva = (Decimal(str(detalle.received_quantity))
+                            if detalle.received_quantity is not None
+                            else Decimal('0.00'))
+            cantidad += efectiva
+            cantidad_despachada += despachada
             precio, moneda = _ultimo_costo_compra(detalle.product_id,
                                                   detalle.lot_number)
             if moneda not in buckets:
                 buckets[moneda] = Decimal('0.00')
-            buckets[moneda] += Decimal(str(detalle.quantity or 0)) * precio
+            buckets[moneda] += efectiva * precio
+            if moneda not in buckets_despachado:
+                buckets_despachado[moneda] = Decimal('0.00')
+            buckets_despachado[moneda] += despachada * precio
             if detalle.missing_quantity:
                 falta = Decimal(str(detalle.missing_quantity))
                 faltante += falta
@@ -494,6 +513,8 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
         for moneda in ('USD', 'BS', 'EUR'):
             buckets[moneda] = buckets.get(moneda, Decimal('0.00')).quantize(
                 Decimal('0.01'))
+            buckets_despachado[moneda] = buckets_despachado.get(
+                moneda, Decimal('0.00')).quantize(Decimal('0.01'))
             perdidas_mov[moneda] = perdidas_mov.get(
                 moneda, Decimal('0.00')).quantize(Decimal('0.01'))
             perdidas[moneda] += perdidas_mov[moneda]
@@ -510,8 +531,10 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             'destination_id': destino,
             'destination_name': nombre_sede(destino),
             'quantity': cantidad.quantize(Decimal('0.01')),
+            'despachado': cantidad_despachada.quantize(Decimal('0.01')),
             'missing_quantity': faltante.quantize(Decimal('0.01')),
             'buckets': dict(buckets),
+            'buckets_despachado': dict(buckets_despachado),
             'perdidas': dict(perdidas_mov),
         })
 
