@@ -56,8 +56,8 @@ class InventoryViewRepository:
             Location.is_active == True,
             Product.is_active == True,
             Inventory.current_quantity > 0,
+            # El tránsito ya está descontado de current_quantity al despachar.
             (Inventory.current_quantity
-             - func.coalesce(Inventory.transit_quantity, 0)
              - func.coalesce(Inventory.reserved_quantity, 0)) <= Inventory.min_stock
         ).group_by(Location.id, Location.name).all()
 

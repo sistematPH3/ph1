@@ -247,9 +247,9 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
                 return {'success': False, 'message': f'No existe inventario para el producto ID {product_id} en esta sede.'}
 
             stock = float(inventory_item.current_quantity)
-            transit = float(inventory_item.transit_quantity or 0)
             reservado = float(inventory_item.reserved_quantity or 0)
-            disponible = stock - transit - reservado
+            # El tránsito ya está descontado de current_quantity al despachar.
+            disponible = stock - reservado
             name = inventory_item.product.name if inventory_item.product else f"ID {product_id}"
             if disponible < invq:
                 return {'success': False, 'message': f'Stock insuficiente para {name}. Disponible: {disponible:.2f}.'}

@@ -44,7 +44,9 @@ def get_inventory_api():
             min_stock = float(item.min_stock) if item and item.min_stock is not None else 0.0
             transit_qty = float(item.transit_quantity or 0) if item else 0.0
             reserved_qty = float(item.reserved_quantity or 0) if item else 0.0
-            available_qty = round(max(0.0, curr_qty - transit_qty - reserved_qty), 2)
+            # El tránsito ya está descontado de current_quantity al despachar;
+            # restarlo otra vez aquí lo descontaría dos veces.
+            available_qty = round(max(0.0, curr_qty - reserved_qty), 2)
 
             items.append({
                 'product_id': prod_id,

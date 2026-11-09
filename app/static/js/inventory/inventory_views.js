@@ -5,9 +5,9 @@ const ITEMS_PER_PAGE = 5;
 function getAvailableQty(item) {
     if (item.available_quantity != null) return Number(item.available_quantity);
     const current = item.current_quantity != null ? Number(item.current_quantity) : 0;
-    const transit = item.transit_quantity != null ? Number(item.transit_quantity) : 0;
     const reserved = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
-    return Math.max(0, current - transit - reserved);
+    // El tránsito ya está descontado de current_quantity al despachar.
+    return Math.max(0, current - reserved);
 }
 
 function isItemLow(item) {
@@ -417,6 +417,7 @@ function renderTableRows(items, emptySearchReason = null) {
         const minQty = item.min_stock != null ? Number(item.min_stock).toFixed(2) : '0.00';
         const unit = item.unit || item.product?.unit_of_measure || '';
         const reservedQty = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
+        const transitQty = item.transit_quantity != null ? Number(item.transit_quantity) : 0;
 
         const isLow = isItemLow(item);
 
@@ -426,6 +427,9 @@ function renderTableRows(items, emptySearchReason = null) {
 
         const frozenHint = reservedQty > 0
             ? `<small class="d-block text-warning fs-7 fw-semibold">+${reservedQty.toFixed(2)} congelados</small>`
+            : '';
+        const transitHint = transitQty > 0
+            ? `<small class="d-block text-info fs-7 fw-semibold">+${transitQty.toFixed(2)} en tránsito</small>`
             : '';
 
         return `
@@ -445,6 +449,7 @@ function renderTableRows(items, emptySearchReason = null) {
                 <td data-label="Stock Disponible" class="text-center fw-bold fs-6">
                     ${qty} <small class="text-muted fs-7">${unit}</small>
                     ${frozenHint}
+                    ${transitHint}
                 </td>
                 <td data-label="Stock Mínimo" class="text-center text-muted">${minQty}</td>
                 <td data-label="Estado" class="text-center">${badge}</td>

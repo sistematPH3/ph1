@@ -119,8 +119,9 @@ class KitchenExpenseAuditRepository:
 
     @staticmethod
     def get_current_available_map(location_ids, product_ids):
-        """Disponible actual (físico - tránsito - reservado) por (sede, producto),
-        tal como se muestra en el inventario en este momento."""
+        """Disponible actual (físico - reservado) por (sede, producto),
+        tal como se muestra en el inventario en este momento. El tránsito ya
+        está descontado de current_quantity al despachar."""
         location_ids = [i for i in (location_ids or []) if i is not None]
         product_ids = [p for p in (product_ids or []) if p is not None]
         if not location_ids or not product_ids:
@@ -129,7 +130,6 @@ class KitchenExpenseAuditRepository:
             Inventory.location_id,
             Inventory.product_id,
             (func.coalesce(Inventory.current_quantity, 0) -
-             func.coalesce(Inventory.transit_quantity, 0) -
              func.coalesce(Inventory.reserved_quantity, 0)).label('available'),
         ).filter(
             Inventory.location_id.in_(location_ids),
@@ -191,7 +191,8 @@ class KitchenExpenseAuditRepository:
                                         notes, original_log_id=None,
                                         new_original_severity=None, lot_number=None):
         """Registra el movimiento compensatorio de la auditoría y ajusta el stock físico.
-        prev_qty/new_qty = stock disponible antes/después (current - transit - reserved);
+        prev_qty/new_qty = stock disponible antes/después (current - reserved;
+        el tránsito ya está descontado de current_quantity);
         prev_physical_qty/new_physical_qty = stock físico para el UPDATE;
         original_quantity/edited_quantity = cantidad de gasto original y corregida."""
         result = db.session.execute(text(

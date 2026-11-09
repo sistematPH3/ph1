@@ -201,12 +201,12 @@ class RegisterConsumptionRepository:
                 salidas_pendientes[str(r.lot_number).strip()] = float(r.total_pend or 0.0)
 
         # Disponible agregado de la sede (igual criterio que el consumo):
-        # físico - en tránsito - congelado por mermas.
+        # físico - congelado por mermas. El tránsito ya está descontado de
+        # current_quantity al despachar.
         inventory_item = RegisterConsumptionRepository.get_inventory_item(prod_id, loc_id)
         stock_actual = float(inventory_item.current_quantity) if inventory_item else 0.0
         reservado = float(inventory_item.reserved_quantity or 0) if inventory_item else 0.0
-        transit = float(inventory_item.transit_quantity or 0) if inventory_item else 0.0
-        disponible_total = max(0.0, stock_actual - transit - reservado)
+        disponible_total = max(0.0, stock_actual - reservado)
 
         lots = []
         for lot_num, data in entradas_por_lote.items():

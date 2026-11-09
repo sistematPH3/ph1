@@ -86,6 +86,10 @@ class Inventory(db.Model):
     min_stock = db.Column(db.Numeric(10, 2), nullable=False, default=20.00)
 
     def available_quantity(self):
-        """Stock realmente disponible para gastar/mover: físico menos lo que
-        ya está en tránsito y lo congelado por mermas pendientes."""
-        return Decimal(str(self.current_quantity or 0)) - Decimal(str(self.transit_quantity or 0)) - Decimal(str(self.reserved_quantity or 0))
+        """Stock realmente disponible para gastar/mover: físico menos lo
+        congelado por mermas pendientes.
+
+        No se resta transit_quantity: al despachar, el tránsito ya se descuenta
+        de current_quantity. Restarlo aquí lo descontaría dos veces.
+        """
+        return Decimal(str(self.current_quantity or 0)) - Decimal(str(self.reserved_quantity or 0))

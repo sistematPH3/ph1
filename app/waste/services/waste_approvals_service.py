@@ -362,7 +362,6 @@ def _stock_disponible(location_id, product_id):
         return 0.0
     disponible = (
         float(inv.current_quantity or 0)
-        - float(inv.transit_quantity or 0)
         - float(inv.reserved_quantity or 0)
     )
     return round(disponible, 2)
@@ -371,11 +370,14 @@ def _stock_disponible(location_id, product_id):
 def _descontar_stock_lines(waste, details):
     """Descuenta current_quantity por producto/sede por cada línea a aprobar.
 
-    Valida que el stock disponible (current - transit - reserved) alcance ANTES
+    Valida que el stock disponible (current - reserved) alcance ANTES
     de descontar (de forma acumulada cuando varias líneas de la misma sede
     apuntan al mismo insumo). Si algún producto no tiene suficiente stock se
     aborta: nada se descuenta. Al aprobar se LIBERA la reserva correspondiente
     (el stock congelado que la merma pendiente había apartado).
+
+    El tránsito no se resta: ya está descontado de current_quantity al
+    despachar, así que restarlo aquí lo descontaría dos veces.
 
     La auditoría registra el saldo físicamente contable (current_quantity)
     ANTES y DESPUÉS del descuento, no el "disponible", para que el historial
@@ -401,7 +403,6 @@ def _descontar_stock_lines(waste, details):
             )
         disponible = (
             float(inv.current_quantity or 0)
-            - float(inv.transit_quantity or 0)
             - float(inv.reserved_quantity or 0)
             # Solo se liberan las reservas que EXISTEN de las líneas que se
             # aprueban (la merma pendiente congeló esa cantidad al crearse;

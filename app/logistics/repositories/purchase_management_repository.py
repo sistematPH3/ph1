@@ -34,11 +34,12 @@ class PurchaseManagementRepository:
 
     @staticmethod
     def _disponible(inventory_record):
-        """Stock realmente disponible: físico menos tránsito y mermas pendientes.
+        """Stock realmente disponible: físico menos mermas pendientes.
 
-        Antes se comparaba contra current_quantity, lo que permitía anular o
-        editar compras sobre stock ya comprometido en tránsito o congelado por
-        una merma pendiente.
+        El tránsito ya está descontado de current_quantity al despachar, así
+        que no se resta otra vez. Antes se comparaba contra current_quantity,
+        lo que permitía anular o editar compras sobre stock ya comprometido
+        en tránsito o congelado por una merma pendiente.
         """
         if inventory_record is None:
             return CERO

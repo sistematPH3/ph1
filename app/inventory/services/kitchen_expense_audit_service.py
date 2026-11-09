@@ -302,8 +302,9 @@ def get_kitchen_expense_entries(filters, user, is_admin):
                 r['prev_qty'] = max(0.0, r['prev_qty'] - f)
                 r['new_qty'] = max(0.0, r['new_qty'] - f)
 
-    # 'current_qty' = stock disponible real HOY (físico - tránsito - reservado),
-    # para que el gasto corregido muestre el disponible vigente y no el histórico.
+    # 'current_qty' = stock disponible real HOY (físico - reservado; el tránsito
+    # ya está descontado de current_quantity al despachar), para que el gasto
+    # corregido muestre el disponible vigente y no el histórico.
     available_map = KitchenExpenseAuditRepository.get_current_available_map(
         [p[0] for p in pairs], [p[1] for p in pairs]
     ) if pairs else {}
@@ -475,9 +476,9 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
 
     _inv_state = KitchenExpenseAuditRepository.get_inventory_state(log.location_id, product_id)
     physical_stock = Decimal('0.00') if _inv_state.get('current_quantity') is None else Decimal(str(_inv_state.get('current_quantity')))
-    transit_stock = Decimal('0.00') if _inv_state.get('transit_quantity') is None else Decimal(str(_inv_state.get('transit_quantity')))
     reserved_stock = Decimal('0.00') if _inv_state.get('reserved_quantity') is None else Decimal(str(_inv_state.get('reserved_quantity')))
-    current_stock = physical_stock - transit_stock - reserved_stock
+    # El tránsito ya está descontado de current_quantity al despachar.
+    current_stock = physical_stock - reserved_stock
 
     new_severity_status = None
 

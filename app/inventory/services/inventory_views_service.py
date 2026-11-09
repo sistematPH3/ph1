@@ -75,7 +75,9 @@ class InventoryViewService:
         if total_stock <= 0:
             return []
 
-        reservado_total = float(inventory.reserved_quantity or 0) + float(inventory.transit_quantity or 0)
+        # El tránsito NO se resta: al despachar ya se descontó de
+        # current_quantity. Restarlo aquí lo descontaría dos veces.
+        reservado_total = float(inventory.reserved_quantity or 0)
         disponible_total = max(0.0, total_stock - reservado_total)
 
         entradas_lote = {}

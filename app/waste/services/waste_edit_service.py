@@ -304,7 +304,7 @@ class WasteEditService:
 
         # Ajuste de reserva por el delta entre las líneas pendientes nuevas y
         # las anteriores. Valida primero que la nueva reserva no supere el
-        # stock físico disponible (current - transit).
+        # stock físico disponible (current; el tránsito ya salió de current).
         new_pending = {}
         for line in validation["data"]["lines"]:
             new_pending[line["product_id"]] = new_pending.get(line["product_id"], 0.0) + float(line["quantity"])
@@ -321,7 +321,8 @@ class WasteEditService:
                     "success": False,
                     "message": f"No existe inventario para {nombre} en esta sede."
                 }, 400
-            disponible_fisico = float(inv.current_quantity or 0) - float(inv.transit_quantity or 0)
+            # El tránsito ya está descontado de current_quantity al despachar.
+            disponible_fisico = float(inv.current_quantity or 0)
             nueva_reserva = float(inv.reserved_quantity or 0) + delta
             if nueva_reserva > disponible_fisico + 1e-9:
                 product = RegisterWasteRepository.get_product_by_id(product_id)

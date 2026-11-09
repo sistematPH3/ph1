@@ -394,9 +394,9 @@ class RegisterWasteRepository:
                 if not inventory_item:
                     continue
                 stock = float(inventory_item.current_quantity)
-                transit = float(inventory_item.transit_quantity or 0)
                 reservado = float(inventory_item.reserved_quantity or 0)
-                disponible = stock - transit - reservado
+                # El tránsito ya está descontado de current_quantity al despachar.
+                disponible = stock - reservado
                 qty = float(d['quantity'])
                 if disponible + 1e-9 < qty:
                     name = inventory_item.product.name if inventory_item.product else f"ID {d['product_id']}"

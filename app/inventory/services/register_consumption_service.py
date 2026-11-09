@@ -54,11 +54,11 @@ def register_consumption(location_id, items, user_id):
                 return {'success': False, 'message': f'No existe registro de inventario para el insumo ID {product_id}.'}
 
             stock_actual = float(inventory_item.current_quantity)
-            # Disponible = físico menos lo en tránsito y lo CONGELADO por mermas
-            # pendientes: no se puede gastar stock que aún espera decisión.
+            # Disponible = físico menos lo CONGELADO por mermas pendientes.
+            # El tránsito ya está descontado de current_quantity al despachar,
+            # así que no se resta otra vez.
             disponible = (
                 stock_actual
-                - float(inventory_item.transit_quantity or 0)
                 - float(inventory_item.reserved_quantity or 0)
             )
             if disponible < quantity_to_consume:
