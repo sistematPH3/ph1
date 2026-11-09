@@ -212,15 +212,28 @@ class TestAprobacion(BaseRegistro):
         pendientes = UserManagementRepository.get_pending_users()
         self.assertIn(CORREO, [u.email for u in pendientes])
 
-    def test_invitado_pendiente_no_puede_autenticarse(self):
-        """El bypass: is_active True + rol invitado permitia entrar sin aprobar."""
+    def test_invitado_pendiente_puede_autenticarse(self):
+        """El invitado pendiente debe poder entrar a la sala de espera.
+
+        is_active=False sigue marcando la cuenta como pendiente; el acceso
+        queda limitado a la sala de espera, no a los modulos internos.
+        """
         RegisterService.registrar_usuario(NOMBRE, CORREO, PASSWORD_OK)
         usuario, motivo = LoginService.autenticar(CORREO, PASSWORD_OK)
-        self.assertNotEqual(
-            motivo, "ok",
-            "Un invitado pendiente no debe poder iniciar sesion",
+        self.assertEqual(motivo, "ok")
+        self.assertFalse(usuario.is_active)
+        self.assertTrue(usuario.is_authenticated)
+
+    def test_login_de_invitado_redirige_a_la_sala_de_espera(self):
+        RegisterService.registrar_usuario(NOMBRE, CORREO, PASSWORD_OK)
+        respuesta = self.client.post(
+            '/auth/login',
+            data={'email': CORREO, 'password': PASSWORD_OK},
+            follow_redirects=False,
         )
-        self.assertEqual(motivo, "cuenta_desactivada")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn('/auth/waiting-room', respuesta.headers['Location'])
+        self.assertEqual(self.client.get('/auth/waiting-room').status_code, 200)
 
 
 class TestCheckEmail(BaseRegistro):

@@ -17,7 +17,9 @@ class LoginService:
         if usuario and check_password_hash(usuario.password_hash, password):
             
             # 1. ¿Está desactivado manualmente?
-            if not usuario.is_active:
+            #    (En un invitado, is_active=False significa "pendiente de
+            #    aprobación", no una cuenta bloqueada por el administrador).
+            if not usuario.is_active and not usuario.is_guest:
                 return usuario, "cuenta_desactivada"
             
             # 2. ¿Tiene sedes activas? (Solo si no es admin ni guest)

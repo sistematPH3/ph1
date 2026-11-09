@@ -69,6 +69,10 @@ class User(db.Model, UserMixin):
         return self.role_id == 0 or (self.role is not None and self.role.name == 'Guest')
     
     @property
+    def is_authenticated(self):
+        return self.is_active or self.is_guest
+    
+    @property
     def is_fully_active(self):
         """
         Validación de habilitación de usuario:

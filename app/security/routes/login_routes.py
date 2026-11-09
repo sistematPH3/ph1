@@ -19,7 +19,9 @@ def login():
         usuario, estado = LoginService.autenticar(datos['email'], datos['password'])
 
         if estado == "ok":
-            login_user(usuario)
+            # El invitado pendiente tiene is_active=False; sin force, Flask-Login
+            # no crea la sesión y nunca llegaría a la sala de espera.
+            login_user(usuario, force=usuario.is_guest)
             
             sede_id = usuario.locations[0].id if (hasattr(usuario, 'locations') and usuario.locations) else None
             nuevo_ingreso = LoginAudit(
