@@ -568,8 +568,7 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
         resumen['extravios_valorizados'] = True
         resumen['direccional'] = direccional
         resumen['movimientos'] = direccional['movimientos']
-        recibido = obtener_recibido_por_insumo(location_ids, inicio, fin,
-                                               orientacion)
+        recibido = obtener_recibido_por_insumo(location_ids, inicio, fin)
         resumen['recibido_por_insumo'] = recibido
         if SEDE_CENTRAL_ID not in location_ids:
             # Regla de negocio: las sedes no centrales no envían, solo reciben

@@ -576,13 +576,16 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
     }
 
 
-def obtener_recibido_por_insumo(location_ids, desde, hasta, orientacion_id=None):
+def obtener_recibido_por_insumo(location_ids, desde, hasta):
     """Mercancía RECIBIDA del rango por insumo (producto) y por sede: qué
-    llegó a cada sede de destino y en qué cantidad. Solo los movimientos que
-    clasifican como 'recibidos' (destino ∈ sedes del usuario; con orientacion_id
-    se narra desde esa sede). La cantidad efectiva usada es received_quantity
-    (lo realmente llegado); si no hay recepción registrada (NULL) no se cuenta
-    como mercancía recibida, aunque el movimiento tenga cantidad despachada.
+    llegó a cada sede de destino visible y en qué cantidad. Se cuentan todos
+    los movimientos cuyo DESTINO está entre las sedes consultadas (sin
+    importar la orientación del flujo): así el Admin ve lo recibido por sus
+    sucursales aunque la Central sea el origen. La cantidad efectiva usada es
+    received_quantity (lo realmente llegado); si no hay recepción registrada
+    (NULL) no se cuenta como mercancía recibida, aunque el movimiento tenga
+    cantidad despachada. Los movimientos cancelados y los que siguen en
+    tránsito se excluyen.
     Devuelve {'detalle': fn(filas), 'top': fn} con:
       - detalle: fila por (sede, producto) ya agregada, ordenada por cantidad
         descendente: {sede_name, product_id, product_name, quantity, lots}.
@@ -618,7 +621,9 @@ def obtener_recibido_por_insumo(location_ids, desde, hasta, orientacion_id=None)
 
     for mov in movimientos:
         origen, destino = mov.origin_location_id, mov.destination_location_id
-        if _direccion(origen, destino, ids, orientacion_id) != 'recibidos':
+        # Solo cuenta lo que llega a una sede visible; lo que sale hacia
+        # fuera del ámbito consultado no es mercancía recibida.
+        if destino not in ids:
             continue
         sede_id = destino
         for detalle in mov.details:

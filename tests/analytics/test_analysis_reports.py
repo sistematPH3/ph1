@@ -603,6 +603,55 @@ class AnalysisReportsTest(unittest.TestCase):
             reporte['detail']['direccional']['recibidos']['quantity'],
             _redondo('0.00'))
 
+    def test_recibido_por_insumo_admin_ve_lo_recibido_por_sus_sedes(self):
+        # Admin con TODAS las sedes: el flujo direccional se narra desde la
+        # Central (enviados), pero "Mercancía recibida" debe mostrar lo que
+        # llegó a cada sucursal. Antes quedaba vacía porque solo miraba lo
+        # que entraba a la Central.
+        mov1 = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                        destination_location_id=self.sede_a.id,
+                        date=datetime(2026, 9, 12), user_id=self.admin.id,
+                        status='COMPLETADO')
+        mov2 = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                        destination_location_id=self.sede_b.id,
+                        date=datetime(2026, 9, 13), user_id=self.admin.id,
+                        status='COMPLETADO')
+        db.session.add_all([mov1, mov2])
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov1.id, product_id=self.harina.id, lot_number='L-ADM1',
+            quantity=Decimal('50.00'), received_quantity=Decimal('50.00')))
+        db.session.add(MovementDetail(
+            movement_id=mov1.id, product_id=self.jamon.id, lot_number='J-ADM1',
+            quantity=Decimal('5.00'), received_quantity=Decimal('5.00')))
+        db.session.add(MovementDetail(
+            movement_id=mov2.id, product_id=self.harina.id, lot_number='L-ADM2',
+            quantity=Decimal('20.00'), received_quantity=Decimal('15.00'),
+            missing_quantity=Decimal('5.00')))
+        db.session.commit()
+
+        reporte = svc.construir_reporte(
+            svc.ReportFilters(location_id=None, metric='TRANSFERS',
+                              period_type='MONTHLY', moneda='USD'),
+            self.admin.id)
+        resumen = reporte['detail']
+        recibido = resumen['recibido_por_insumo']
+        self.assertTrue(recibido['top'])
+        self.assertEqual(
+            [(f['product_name'], f['quantity']) for f in recibido['top']],
+            [('Harina', _redondo('65.00')), ('Jamón', _redondo('5.00'))])
+        por_sede = {(f['sede_name'], f['product_name']): f['quantity']
+                    for f in recibido['detalle']}
+        self.assertEqual(por_sede[('Sede La Candelaria', 'Harina')],
+                         _redondo('50.00'))
+        self.assertEqual(por_sede[('Sede La Candelaria', 'Jamón')],
+                         _redondo('5.00'))
+        self.assertEqual(por_sede[('Sede Bello Monte', 'Harina')],
+                         _redondo('15.00'))
+        # El flujo direccional sigue narrado desde la Central.
+        self.assertEqual(resumen['enviados'], 2)
+        self.assertEqual(resumen['recibidos'], 0)
+
     # ---------------------------------------------------- permisos ---------
     def test_usuario_sin_sedes_recibe_error(self):
         invitado = User(name="Sin Sedes", email="sin@ph.test",

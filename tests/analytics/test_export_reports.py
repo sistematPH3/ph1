@@ -119,9 +119,13 @@ class ExportReportsTest(unittest.TestCase):
     def _datos_exportacion(self, moneda='USD', location_id=None):
         if location_id is None:
             location_id = self.sede.id
+        # period_start fijo: sin él el ancla cae en el mes en curso y la
+        # cabecera deja de ser determinista con el paso del tiempo.
         filtros = svc.ReportFilters(location_id=location_id,
                                     metric='PURCHASES',
-                                    period_type='MONTHLY', moneda=moneda)
+                                    period_type='MONTHLY',
+                                    period_start=date(2026, 9, 1),
+                                    moneda=moneda)
         return export_service.construir_exportacion(filtros, self.admin.id)
 
     def test_cabecera_de_auditoria_completa(self):
