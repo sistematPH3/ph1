@@ -1173,6 +1173,121 @@ class AnalysisReportsTest(unittest.TestCase):
         # Sin recepción registrada no hay mercancía llegada (no se usa quantity).
         self.assertEqual(result['recibidos']['quantity'], _redondo('0.00'))
         self.assertEqual(result['recibidos']['cost'], _redondo('0.00'))
+        # Además, un movimiento en tránsito no cuenta como recibido: aún no ha
+        # llegado a la sede.
+        self.assertEqual(result['recibidos']['conteo'], 0)
+        self.assertEqual(result['total']['conteo'], 0)
+
+    def test_traslado_en_transito_cuenta_como_enviado_pero_no_como_recibido(self):
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('100.00'), currency='USD',
+            invoice_url='https://img/rec4.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id, lot_number='L-TR2',
+            quantity=Decimal('10.00'), foreign_price=Decimal('10.00'),
+            price_bs=Decimal('814.69')))
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede_a.id,
+                       date=datetime(2026, 9, 10), user_id=self.admin.id,
+                       status='EN_TRANSITO')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id, lot_number='L-TR2',
+            quantity=Decimal('10.00'), received_quantity=None))
+        db.session.commit()
+
+        desde = datetime(2026, 9, 1)
+        hasta = datetime(2026, 9, 30, 23, 59, 59)
+
+        # Desde la sede destino el traslado no es un recibido.
+        destino = svc.obtener_traslados_direccional(
+            [self.sede_a.id], desde, hasta, 'USD')
+        self.assertEqual(destino['recibidos']['conteo'], 0)
+        self.assertEqual(destino['total']['conteo'], 0)
+        # Sigue apareciendo en el detalle, pero con 0 unidades recibidas.
+        self.assertEqual(len(destino['movimientos']), 1)
+        self.assertEqual(destino['movimientos'][0]['quantity'], _redondo('0.00'))
+
+        # Entre sedes del mismo usuario tampoco cuenta como interno.
+        interno = svc.obtener_traslados_direccional(
+            [self.central.id, self.sede_a.id], desde, hasta, 'USD')
+        self.assertEqual(interno['internos']['conteo'], 0)
+
+        # Pero sí salió de la Central: cuenta como enviado y como mercancía
+        # movida para el KPI del Admin.
+        origen = svc.obtener_traslados_direccional(
+            [self.central.id], desde, hasta, 'USD')
+        self.assertEqual(origen['enviados']['conteo'], 1)
+        self.assertEqual(origen['enviados']['quantity'], _redondo('10.00'))
+        self.assertEqual(origen['total_despachado']['conteo'], 1)
+        self.assertEqual(origen['total_despachado']['quantity'],
+                         _redondo('10.00'))
+        self.assertEqual(origen['recibidos']['conteo'], 0)
+
+        # El reporte de mercancía recibida por insumo tampoco lo cuenta.
+        recibido = svc.obtener_recibido_por_insumo(
+            [self.sede_a.id], desde, hasta)
+        self.assertEqual(recibido['top'], [])
+
+    def test_traslado_cancelado_no_entra_en_estadisticas(self):
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('100.00'), currency='USD',
+            invoice_url='https://img/rec5.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id, lot_number='L-CAN',
+            quantity=Decimal('10.00'), foreign_price=Decimal('10.00'),
+            price_bs=Decimal('814.69')))
+        cancelado = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                             destination_location_id=self.sede_a.id,
+                             date=datetime(2026, 9, 10), user_id=self.admin.id,
+                             status='CANCELADO')
+        anulado = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                           destination_location_id=self.sede_a.id,
+                           date=datetime(2026, 9, 11), user_id=self.admin.id,
+                           status='ANULADO')
+        db.session.add_all([cancelado, anulado])
+        db.session.flush()
+        for mov in (cancelado, anulado):
+            db.session.add(MovementDetail(
+                movement_id=mov.id, product_id=self.harina.id,
+                lot_number='L-CAN', quantity=Decimal('10.00'),
+                received_quantity=Decimal('10.00')))
+        db.session.commit()
+
+        desde = datetime(2026, 9, 1)
+        hasta = datetime(2026, 9, 30, 23, 59, 59)
+
+        enviados = svc.obtener_traslados_direccional(
+            [self.central.id], desde, hasta, 'USD')
+        self.assertEqual(enviados['enviados']['conteo'], 0)
+        self.assertEqual(enviados['total']['conteo'], 0)
+        self.assertEqual(enviados['total_despachado']['conteo'], 0)
+        self.assertEqual(enviados['movimientos'], [])
+
+        recibidos = svc.obtener_traslados_direccional(
+            [self.sede_a.id], desde, hasta, 'USD')
+        self.assertEqual(recibidos['recibidos']['conteo'], 0)
+        self.assertEqual(recibidos['total']['quantity'], _redondo('0.00'))
+
+        resumen = svc.obtener_resumen_traslados(
+            [self.central.id, self.sede_a.id], desde, hasta)
+        self.assertEqual(resumen['enviados'], 0)
+        self.assertEqual(resumen['recibidos'], 0)
+        self.assertEqual(resumen['internos'], 0)
+        self.assertEqual(resumen['por_estado'], {})
+
+        recibido = svc.obtener_recibido_por_insumo(
+            [self.sede_a.id], desde, hasta)
+        self.assertEqual(recibido['top'], [])
 
     def test_kpis_finanzas_flujo_principal_es_traslados_recibidos(self):
         compra = Purchase(

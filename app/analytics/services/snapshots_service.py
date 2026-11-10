@@ -838,7 +838,7 @@ def obtener_flujo_traslados(period_type=SnapshotPeriodType.MONTHLY, moneda='USD'
         flujo = obtener_traslados_direccional(location_ids, inicio, fin, moneda)
         total = flujo['total_despachado']
         costos.append(float(total['cost']))
-        conteos.append(flujo['total']['conteo'])
+        conteos.append(total['conteo'])
         cantidades.append(float(total['quantity']))
 
     comparativo = {

@@ -13,6 +13,16 @@ from app.models.inventory_model import Product
 from app.models.waste_model import AuditLog, Waste, WasteType
 
 
+# Estados de un movimiento que nunca entran a las estadísticas: el traslado
+# fue cancelado, anulado o rechazado, así que la mercancía no se movió.
+ESTADOS_TRASLADO_ANULADOS = (
+    'CANCELADO', 'CANCELADO_EMISOR', 'ANULADO', 'RECHAZADO',
+)
+# Un movimiento EN_TRANSITO ya salió de origen (cuenta como enviado) pero aún
+# no ha llegado a destino (no cuenta como recibido ni interno).
+ESTADOS_TRASLADO_EN_TRANSITO = ('EN_TRANSITO',)
+
+
 def obtener_sedes_permitidas(user_id):
     """Ids de sedes que el usuario puede ver. El admin ve todas las activas;
     el resto solo las que tiene asignadas en user_locations."""
@@ -399,6 +409,8 @@ def obtener_resumen_traslados(location_ids, desde, hasta, orientacion_id=None):
     movimientos = Movement.query.filter(
         Movement.date >= desde,
         Movement.date <= hasta,
+        db.or_(Movement.status.is_(None),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS)),
         db.or_(Movement.origin_location_id.in_(location_ids),
                Movement.destination_location_id.in_(location_ids)),
     ).all()
@@ -408,11 +420,16 @@ def obtener_resumen_traslados(location_ids, desde, hasta, orientacion_id=None):
     for mov in movimientos:
         origen, destino = mov.origin_location_id, mov.destination_location_id
         direccion = _direccion(origen, destino, location_ids, orientacion_id)
+        estado = (mov.status or 'OTROS').upper()
+        # Un traslado en tránsito ya salió, pero no se ha recibido: solo
+        # cuenta como enviado.
+        if (direccion != 'enviados'
+                and estado in ESTADOS_TRASLADO_EN_TRANSITO):
+            continue
         resumen[direccion] += 1
 
         tipo = (mov.type or 'OTROS').upper()
         resumen['por_tipo'][tipo] = resumen['por_tipo'].get(tipo, 0) + 1
-        estado = (mov.status or 'OTROS').upper()
         resumen['por_estado'][estado] = resumen['por_estado'].get(estado, 0) + 1
         if mov.source_dispute_id is not None:
             resumen['reposiciones'] += 1
@@ -466,6 +483,8 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
     movimientos = Movement.query.filter(
         Movement.date >= desde,
         Movement.date <= hasta,
+        db.or_(Movement.status.is_(None),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS)),
         db.or_(Movement.origin_location_id.in_(ids),
                Movement.destination_location_id.in_(ids)),
     ).order_by(Movement.date.asc(), Movement.id.asc()).all()
@@ -476,6 +495,13 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
     for mov in movimientos:
         origen, destino = mov.origin_location_id, mov.destination_location_id
         direccion = _direccion(origen, destino, ids, orientacion_id)
+        estado = (mov.status or 'OTROS').upper()
+        # Un traslado en tránsito salió de origen pero aún no ha llegado: cuenta
+        # como enviado, pero no como recibido ni interno (ni sus pérdidas, que
+        # solo pueden registrarse al recibir).
+        cuenta_direccion = not (
+            direccion != 'enviados' and estado in ESTADOS_TRASLADO_EN_TRANSITO
+        )
 
         buckets = dict(vacio)
         buckets_despachado = dict(vacio)
@@ -493,6 +519,8 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
                 efectiva = (Decimal(str(detalle.received_quantity))
                             if detalle.received_quantity is not None
                             else Decimal('0.00'))
+            if not cuenta_direccion:
+                efectiva = Decimal('0.00')
             cantidad += efectiva
             cantidad_despachada += despachada
             precio, moneda = _ultimo_costo_compra(detalle.product_id,
@@ -503,7 +531,7 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             if moneda not in buckets_despachado:
                 buckets_despachado[moneda] = Decimal('0.00')
             buckets_despachado[moneda] += despachada * precio
-            if detalle.missing_quantity:
+            if detalle.missing_quantity and cuenta_direccion:
                 falta = Decimal(str(detalle.missing_quantity))
                 faltante += falta
                 if moneda not in perdidas_mov:
@@ -530,6 +558,7 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             'origin_name': nombre_sede(origen),
             'destination_id': destino,
             'destination_name': nombre_sede(destino),
+            'cuenta_direccion': cuenta_direccion,
             'quantity': cantidad.quantize(Decimal('0.01')),
             'despachado': cantidad_despachada.quantize(Decimal('0.01')),
             'missing_quantity': faltante.quantize(Decimal('0.01')),
@@ -576,6 +605,9 @@ def obtener_recibido_por_insumo(location_ids, desde, hasta, orientacion_id=None)
     movimientos = Movement.query.filter(
         Movement.date >= desde,
         Movement.date <= hasta,
+        db.or_(Movement.status.is_(None),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS
+                                      + ESTADOS_TRASLADO_EN_TRANSITO)),
         db.or_(Movement.origin_location_id.in_(ids),
                Movement.destination_location_id.in_(ids)),
     ).order_by(Movement.date.asc(), Movement.id.asc()).all()

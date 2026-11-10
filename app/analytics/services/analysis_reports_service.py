@@ -622,11 +622,15 @@ def _cubo_direccion_vacio():
 
 def _agrupar_direccional(filas, moneda, fecha):
     """Agrupa las filas de obtener_traslados_valorizados por dirección y
-    convierte el costo a la moneda del reporte con la tasa vigente en 'fecha'."""
+    convierte el costo a la moneda del reporte con la tasa vigente en 'fecha'.
+    Las filas con cuenta_direccion=False (p. ej. un traslado en tránsito que
+    todavía no llegó) se omiten: no suman a recibidos ni internos."""
     base = {d: {'conteo': 0, 'quantity': Decimal('0.00'),
                 'buckets': _bucket_vacio()}
             for d in ('enviados', 'recibidos', 'internos')}
     for fila in filas:
+        if not fila.get('cuenta_direccion', True):
+            continue
         ag = base[fila['direccion']]
         ag['conteo'] += 1
         ag['quantity'] += fila['quantity']
@@ -689,7 +693,7 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
             buckets_despachado[m] += f['buckets_despachado'].get(
                 m, Decimal('0.00'))
     total_despachado = {
-        'conteo': total['conteo'],
+        'conteo': len(datos['filas']),
         'quantity': _redondear(cantidad_despachada),
         'cost': convertir(buckets_despachado),
     }
