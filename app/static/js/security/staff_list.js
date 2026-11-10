@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Si la página se recargó con restos de un modal anterior, se limpian.
+    cleanupModalArtifacts();
+
     // ---- LÓGICA DE ACTIVACIÓN MASIVA POR SEDE ----
 const locationFilterEl = document.getElementById('locationFilter');
 const bulkActivateBtn = document.getElementById('bulkActivateBtn');
@@ -146,6 +149,25 @@ if (locationFilterEl && bulkActivateBtn) {
         sw.addEventListener('change', function() {
             const userId = this.dataset.id;
             const isChecked = this.checked;
+            const row = this.closest('tr');
+            const esAdmin = row ? row.dataset.isAdmin === 'true' : false;
+            const sedesActivas = row ? (row.dataset.locations || '').split(',').filter(Boolean) : [];
+
+            // Activar a un usuario sin sedes activas SIEMPRE falla en el backend
+            // (salvo administradores). Por eso no se pide confirmación: se avisa
+            // directamente y el switch vuelve a su estado anterior.
+            if (isChecked && !esAdmin && sedesActivas.length === 0) {
+                this.checked = false;
+                showAlertModal(
+                    "Sede Obligatoria",
+                    "El personal debe tener al menos una sede ACTIVA asignada para activarse.",
+                    function() {
+                        const switchEl = document.querySelector(`.status-toggle[data-id="${userId}"]`);
+                        if (switchEl) switchEl.checked = false;
+                    }
+                );
+                return;
+            }
 
             const message = isChecked 
                 ? "¿Está seguro de activar a este usuario?" 
@@ -171,6 +193,22 @@ if (locationFilterEl && bulkActivateBtn) {
     }
 });
 
+// ---- LIMPIEZA DEFENSIVA DE RESTOS DE BOOTSTRAP ----
+// Al cerrar un modal y abrir otro inmediatamente, Bootstrap puede dejar atrás
+// un .modal-backdrop (la "sombra" negra que bloquea la pantalla) y la clase
+// modal-open en el body. Esta función borra esos restos SOLO cuando ya no
+// queda ningún modal visible, para no quitarle el fondo al modal actual.
+function cleanupModalArtifacts() {
+    if (document.querySelector('.modal.show')) return;
+
+    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+        backdrop.remove();
+    });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+}
+
 // ---- FUNCIÓN GLOBAL: LANZAR ALERTA SIMPLE (OK) ----
 function showAlertModal(title, message, callbackOnClose) {
     const modalEl = document.getElementById('alertModal');
@@ -187,7 +225,13 @@ function showAlertModal(title, message, callbackOnClose) {
             modalEl.removeEventListener('hidden.bs.modal', handler); 
         });
     }
-    
+
+    modalEl.addEventListener('hidden.bs.modal', function handler() {
+        modalEl.removeEventListener('hidden.bs.modal', handler);
+        // Se espera un instante por si el callback abrió otro modal.
+        setTimeout(cleanupModalArtifacts, 0);
+    });
+
     modalInstance.show();
 }
 
@@ -209,14 +253,22 @@ function showConfirmModal(title, message, onYes, onNo) {
     newBtnYes.addEventListener('click', function() {
         confirmed = true;
         modalInstance.hide();
-        if (onYes) onYes();
     });
     
     modalEl.addEventListener('hidden.bs.modal', function handler() {
-        if (!confirmed && onNo) {
-            onNo(); 
-        }
         modalEl.removeEventListener('hidden.bs.modal', handler);
+
+        // onYes se ejecuta SOLO cuando el modal ya terminó de cerrarse. Antes se
+        // llamaba justo después de hide(), así que el modal de alerta podía
+        // abrirse mientras el backdrop de la confirmación seguía en pantalla:
+        // eso dejaba la sombra negra que bloqueaba el sistema.
+        if (confirmed) {
+            if (onYes) onYes();
+        } else if (onNo) {
+            onNo();
+        }
+
+        setTimeout(cleanupModalArtifacts, 0);
     }, { once: true });
     
     modalInstance.show();
@@ -326,26 +378,36 @@ function saveChanges() {
         "¿Está seguro de guardar los datos editados?",
         function() {
             const editModalEl = document.getElementById('editModal');
-            bootstrap.Modal.getOrCreateInstance(editModalEl).hide();
 
-            fetch(`/staff/editar/${userId}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    location.reload();
-                } else {
-                    showAlertModal("Error de Guardado", d.message || "No se pudieron aplicar los cambios.", function() {
-                        bootstrap.Modal.getOrCreateInstance(editModalEl).show();
-                    });
-                }
-            })
-            .catch(err => {
-                showAlertModal("Error Crítico", "Ocurrió un problema de red al procesar la solicitud.");
-            });
+            const guardar = function() {
+                fetch(`/staff/editar/${userId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        location.reload();
+                    } else {
+                        showAlertModal("Error de Guardado", d.message || "No se pudieron aplicar los cambios.", function() {
+                            bootstrap.Modal.getOrCreateInstance(editModalEl).show();
+                        });
+                    }
+                })
+                .catch(err => {
+                    showAlertModal("Error Crítico", "Ocurrió un problema de red al procesar la solicitud.");
+                });
+            };
+
+            // El fetch se lanza cuando el modal de edición ya terminó de
+            // cerrarse: así un mensaje de error no se abre encima del modal.
+            if (editModalEl.classList.contains('show')) {
+                editModalEl.addEventListener('hidden.bs.modal', guardar, { once: true });
+                bootstrap.Modal.getOrCreateInstance(editModalEl).hide();
+            } else {
+                guardar();
+            }
         }
     );
 }

@@ -86,6 +86,7 @@
                     <!-- Datasets cruzados de rol y sedes activas para procesamiento en JS -->
                     <tr data-status="{{ 'active' if user.is_active else 'inactive' }}"
                         data-role="{{ user.role_id or '' }}"
+                        data-is-admin="{{ 'true' if user.is_admin else 'false' }}"
                         data-locations="{% for loc in user.locations %}{% if loc.is_active %}{{ loc.id }},{% endif %}{% endfor %}">
                         <td>
                             <div class="d-flex align-items-center gap-3">
