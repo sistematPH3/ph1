@@ -326,29 +326,38 @@ def _mensaje_rechazo_preview(validacion):
 
 def _registrar_veredicto(purchase_id, validacion):
     """
-    Deja el veredicto en la tabla de auditoria de compras, que ya existe.
+    Guarda el veredicto del OCR DENTRO del registro CREATE de la compra.
 
-    Se reutiliza PurchaseAuditLog en vez de crear columnas nuevas: guardar el
-    puntaje aqui permite medir con datos reales antes de decidir si un puntaje
-    bajo debe bloquear la compra.
+    Antes se insertaba una fila aparte con action_type='INVOICE_VERDICT'. Como
+    la pantalla de auditoria lista todas las filas de PurchaseAuditLog, cada
+    compra aparecia dos veces: una creacion normal y un "veredicto" que en
+    realidad es telemetria interna del lector de fotos, no un evento del
+    usuario. Ahora el veredicto se anexa al new_data de la creacion: el dato
+    se conserva para medir la calidad del OCR sin ensuciar el historial.
     """
     try:
+        log = (PurchaseAuditLog.query
+               .filter_by(purchase_id=purchase_id, action_type='CREATE')
+               .order_by(PurchaseAuditLog.id.desc())
+               .first())
+        if log is None:
+            current_app.logger.warning(
+                "No hay registro CREATE para la compra %s; no se pudo anexar "
+                "el veredicto de la foto.", purchase_id)
+            return
+
         texto = (validacion.get('texto') or '')[:600]
-        db.session.add(PurchaseAuditLog(
-            purchase_id=purchase_id,
-            action_type='INVOICE_VERDICT',
-            previous_data={},
-            new_data={
-                'veredicto': validacion.get('veredicto'),
-                'tipo': validacion.get('tipo'),
-                'puntaje': validacion.get('puntaje'),
-                'marcas': validacion.get('marcas'),
-                'detalle': validacion.get('detalle'),
-                'texto_ocr': texto,
-                'modo': current_app.config.get('INVOICE_VALIDATION_MODE', 'strict'),
-            },
-            user_id=current_user.id,
-        ))
+        data = dict(log.new_data or {})
+        data['invoice_verdict'] = {
+            'veredicto': validacion.get('veredicto'),
+            'tipo': validacion.get('tipo'),
+            'puntaje': validacion.get('puntaje'),
+            'marcas': validacion.get('marcas'),
+            'detalle': validacion.get('detalle'),
+            'texto_ocr': texto,
+            'modo': current_app.config.get('INVOICE_VALIDATION_MODE', 'strict'),
+        }
+        log.new_data = data
         db.session.commit()
     except Exception as error:
         db.session.rollback()

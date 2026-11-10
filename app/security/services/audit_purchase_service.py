@@ -27,6 +27,13 @@ class AuditPurchaseService:
             .outerjoin(Purchase, PurchaseAuditLog.purchase_id == Purchase.id)\
             .outerjoin(PurchaseCreator, Purchase.user_id == PurchaseCreator.id)
 
+        # La telemetria del OCR (INVOICE_VERDICT) no es un evento auditable del
+        # usuario: antes se guardaba como fila aparte y cada compra aparecia dos
+        # veces en el historial. Las compras nuevas ya la anexan al CREATE, pero
+        # se filtran tambien las filas historicas para limpiar la pantalla y las
+        # descargas PDF/Excel.
+        query = query.filter(PurchaseAuditLog.action_type != 'INVOICE_VERDICT')
+
         # 1. Obtener y normalizar el rol del usuario actual
         user_role_name = current_user.role.name.lower().strip() if (hasattr(current_user, 'role') and current_user.role) else ''
 
