@@ -368,7 +368,8 @@ const handleActionClick = function(e) {
                 if (data.error) throw new Error(data.error);
                 loadEditTable(data);
                 setupEditCountdown(data.remaining_seconds);
-                if (btnSaveEdit) btnSaveEdit.disabled = !data.can_modify;
+                // Una compra ya editada no se puede volver a guardar.
+                if (btnSaveEdit) btnSaveEdit.disabled = !data.can_edit;
             })
             .catch(err => {
                 editTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle-fill me-2"></i>${escapeHtml(err.message || 'Error desconocido.')}</td></tr>`;
@@ -394,8 +395,15 @@ function loadEditTable(data) {
         const tr = document.createElement('tr');
         // normalizarNumeroEdit devuelve NaN si el valor no es parseable, y
         // NaN.toFixed(2) pintaba literalmente "NaN" en el campo de precio.
-        const precioNum = normalizarNumeroEdit(item.foreign_price);
-        const precioTexto = (isNaN(precioNum) ? '0.00' : precioNum.toFixed(2));
+        // El campo muestra el TOTAL de la línea (cantidad x unitario), como el
+        // registro de compras. El unitario se guarda en data-unit-price para
+        // recalcular el total si cambia la cantidad.
+        const unitNum = normalizarNumeroEdit(item.foreign_price);
+        const qtyNum = normalizarNumeroEdit(item.quantity);
+        const unitOk = !isNaN(unitNum);
+        const totalLinea = (unitOk && !isNaN(qtyNum)) ? qtyNum * unitNum
+                                                      : (unitOk ? unitNum : NaN);
+        const precioTexto = (isNaN(totalLinea) ? '0.00' : totalLinea.toFixed(2));
         tr.innerHTML = `
             <td class="ps-3 pe-3">
                 <div class="text-end text-md-start">
@@ -413,7 +421,7 @@ function loadEditTable(data) {
                 <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${escapeHtml(item.expiration_date || '')}">
             </td>
             <td class="px-2" data-currency="${escapeHtml(data.currency)}">
-                <input type="text" inputmode="decimal" class="form-control text-end edit-price border-secondary ps-2 text-dark" data-id="${escapeHtml(item.id)}" value="${escapeHtml(precioTexto)}" placeholder="0.00">
+                <input type="text" inputmode="decimal" class="form-control text-end edit-price border-secondary ps-2 text-dark" data-id="${escapeHtml(item.id)}" data-unit-price="${unitOk ? escapeHtml(unitNum) : ''}" value="${escapeHtml(precioTexto)}" placeholder="0.00">
             </td>
             <td class="text-center px-1 align-middle">
                 <button type="button" class="btn btn-sm btn-outline-danger remove-edit-row" data-id="${escapeHtml(item.id)}" title="Eliminar insumo">
@@ -457,7 +465,7 @@ if (btnAddRowEdit) {
                 <input type="date" class="form-control text-center edit-exp border-success text-dark px-1" value="">
             </td>
             <td class="px-2" data-currency="${escapeHtml(currentCurrency)}">
-                <input type="text" inputmode="decimal" class="form-control text-end edit-price border-success text-dark" data-id="${newRowId}" value="" placeholder="0.00">
+                <input type="text" inputmode="decimal" class="form-control text-end edit-price border-success text-dark" data-id="${newRowId}" data-unit-price="" value="" placeholder="Total línea">
             </td>
             <td class="text-center px-1 align-middle">
                 <button type="button" class="btn btn-sm btn-outline-danger remove-edit-row" title="Quitar fila">
@@ -475,6 +483,35 @@ if (editTableBody) {
         if (!btn) return;
         const row = btn.closest('tr');
         if (row) row.remove();
+    });
+
+    // El campo de precio es el TOTAL de la línea. Al escribir el total se
+    // recalcula el unitario; al cambiar la cantidad se conserva el unitario y
+    // se recalcula el total (mismo comportamiento que el registro de compras).
+    editTableBody.addEventListener('input', function(e) {
+        const priceInput = e.target.closest('.edit-price');
+        if (priceInput) {
+            const row = priceInput.closest('tr');
+            const qtyInput = row ? row.querySelector('.edit-qty') : null;
+            const qty = parseNumEdit(qtyInput ? qtyInput.value : '');
+            const total = parseNumEdit(priceInput.value);
+            if (qty > 0 && !isNaN(total)) {
+                priceInput.dataset.unitPrice = String(total / qty);
+            }
+            return;
+        }
+
+        const qtyInput = e.target.closest('.edit-qty');
+        if (qtyInput) {
+            const row = qtyInput.closest('tr');
+            const priceInput = row ? row.querySelector('.edit-price') : null;
+            if (!priceInput) return;
+            const unit = parseFloat(priceInput.dataset.unitPrice);
+            const qty = parseNumEdit(qtyInput.value);
+            if (!isNaN(unit) && qty > 0) {
+                priceInput.value = (qty * unit).toFixed(2);
+            }
+        }
     });
 }
 
@@ -590,53 +627,79 @@ if (btnSaveEdit) {
             return;
         }
 
-        btnSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
-        btnSaveEdit.disabled = true;
+        // Guardado real. Se separa en una función para poder pedir confirmación
+        // antes de ejecutarlo (evita guardar por un clic accidental).
+        const guardarCambios = () => {
+            btnSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
+            btnSaveEdit.disabled = true;
 
-        fetch(`/logistics/purchases/management/${currentEditPurchaseId}/edit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: items, reason: reasonVal })
-        })
-        .then(res => res.json().then(body => ({ status: res.status, body })))
-        .then(({ status, body }) => {
-            if (body && body.success) {
-                window.location.reload();
-                return;
-            }
-            // El backend devuelve 'error' (resumen) y 'details' (campo a campo).
-            // Antes solo se pintaba 'error' con innerHTML y sin escapar: los
-            // mensajes de ValueError incluyen el nombre del producto, así que
-            // un nombre con HTML se ejecutaba en el navegador del admin. Ahora
-            // se escapa y además se listan los errores por campo.
-            if (editErrorAlert) {
-                let texto = (body && body.error) || 'No se pudo editar la compra.';
-                if (status === 401) {
-                    texto = 'Tu sesión expiró. Vuelve a iniciar sesión.';
+            fetch(`/logistics/purchases/management/${currentEditPurchaseId}/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items, reason: reasonVal })
+            })
+            .then(res => res.json().then(body => ({ status: res.status, body })))
+            .then(({ status, body }) => {
+                if (body && body.success) {
+                    window.location.reload();
+                    return;
                 }
-                const detalles = body && body.details ? Object.values(body.details) : [];
-                if (detalles.length > 0) {
-                    const lista = detalles
-                        .filter(d => d !== null && d !== undefined && String(d).trim() !== '')
-                        .map(d => `<li>${escapeHtml(String(d).trim())}</li>`)
-                        .join('');
-                    if (lista) {
-                        texto += `<ul style="margin:0.5rem 0 0 0; padding-left:1.25rem; text-align:left">${lista}</ul>`;
+                // El backend devuelve 'error' (resumen) y 'details' (campo a campo).
+                // Antes solo se pintaba 'error' con innerHTML y sin escapar: los
+                // mensajes de ValueError incluyen el nombre del producto, así que
+                // un nombre con HTML se ejecutaba en el navegador del admin. Ahora
+                // se escapa y además se listan los errores por campo.
+                if (editErrorAlert) {
+                    let texto = (body && body.error) || 'No se pudo editar la compra.';
+                    if (status === 401) {
+                        texto = 'Tu sesión expiró. Vuelve a iniciar sesión.';
                     }
+                    const detalles = body && body.details ? Object.values(body.details) : [];
+                    if (detalles.length > 0) {
+                        const lista = detalles
+                            .filter(d => d !== null && d !== undefined && String(d).trim() !== '')
+                            .map(d => `<li>${escapeHtml(String(d).trim())}</li>`)
+                            .join('');
+                        if (lista) {
+                            texto += `<ul style="margin:0.5rem 0 0 0; padding-left:1.25rem; text-align:left">${lista}</ul>`;
+                        }
+                    }
+                    editErrorAlert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + texto;
+                    editErrorAlert.classList.remove('d-none');
                 }
-                editErrorAlert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + texto;
-                editErrorAlert.classList.remove('d-none');
+                btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
+                btnSaveEdit.disabled = false;
+            })
+            .catch(err => {
+                if (editErrorAlert) {
+                    editErrorAlert.innerHTML = '<i class="bi bi-wifi-off me-2"></i>Fallo crítico de conexión al servidor.';
+                    editErrorAlert.classList.remove('d-none');
+                }
+                btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
+                btnSaveEdit.disabled = false;
+            });
+        };
+
+        // Confirmación: el usuario debe ratificar que quiere guardar los cambios.
+        if (typeof Swal === 'undefined') {
+            if (window.confirm('¿Está seguro de guardar los cambios de esta compra?')) {
+                guardarCambios();
             }
-            btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
-            btnSaveEdit.disabled = false;
-        })
-        .catch(err => {
-            if (editErrorAlert) {
-                editErrorAlert.innerHTML = '<i class="bi bi-wifi-off me-2"></i>Fallo crítico de conexión al servidor.';
-                editErrorAlert.classList.remove('d-none');
-            }
-            btnSaveEdit.innerHTML = '<i class="bi bi-floppy me-1"></i> Guardar Cambios';
-            btnSaveEdit.disabled = false;
+            return;
+        }
+
+        Swal.fire({
+            icon: 'warning',
+            title: '¿Confirmar edición?',
+            html: `¿Está seguro de guardar los cambios de la compra <b>#${escapeHtml(currentEditPurchaseId)}</b>?<br><small class="text-muted">La modificación quedará registrada en la auditoría.</small>`,
+            showCancelButton: true,
+            confirmButtonText: 'Sí, guardar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#b0121a',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true
+        }).then(result => {
+            if (result.isConfirmed) guardarCambios();
         });
     });
 }

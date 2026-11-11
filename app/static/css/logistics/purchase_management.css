@@ -239,7 +239,7 @@ body {
     /* La moneda llega desde el propio renglon para no repetirla en un
        texto fijo que se queda desactualizado. */
     #edit-table tbody td:nth-child(5)::before {
-        content: "Precio unitario (" attr(data-currency) "):";
+        content: "Precio total línea (" attr(data-currency) "):";
     }
 
     #edit-table tbody td > input,

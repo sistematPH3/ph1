@@ -120,12 +120,18 @@
                                     
                                     {% if purchase.status == 'COMPLETED' %}
                                         {% if purchase.can_modify %}
+                                        {% if purchase.can_edit %}
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger" 
                                                 data-id="{{ purchase.id }}"
                                                 data-purchase-date="{{ purchase.purchase_date.isoformat() }}">
                                             <i class="bi bi-pencil-square"></i> Editar
                                         </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-sm btn-light text-muted border" style="cursor: not-allowed;" title="Esta compra ya fue editada" disabled>
+                                            <i class="bi bi-pencil-square"></i> Editada
+                                        </button>
+                                        {% endif %}
                                         
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger" 
@@ -248,12 +254,18 @@
                         
                         {% if purchase.status == 'COMPLETED' %}
                             {% if purchase.can_modify %}
+                            {% if purchase.can_edit %}
                             <button type="button" 
                                     class="btn btn-sm btn-outline-primary btn-audit-action btn-edit-trigger flex-grow-1" 
                                     data-id="{{ purchase.id }}"
                                     data-purchase-date="{{ purchase.purchase_date.isoformat() }}">
                                 <i class="bi bi-pencil-square"></i> Editar
                             </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-light text-muted border flex-grow-1" style="cursor: not-allowed;" title="Esta compra ya fue editada" disabled>
+                                <i class="bi bi-pencil-square"></i> Editada
+                            </button>
+                            {% endif %}
                             
                             <button type="button" 
                                     class="btn btn-sm btn-outline-danger btn-audit-action btn-annul-trigger flex-grow-1" 
@@ -371,7 +383,7 @@
                 </div>
 
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
-                    <p class="text-muted small m-0">Modifique las cantidades, precios, lotes o añada insumos olvidados a esta compra.</p>
+                    <p class="text-muted small m-0">Modifique las cantidades, precios (total de la línea), lotes o añada insumos olvidados a esta compra.</p>
                     <button type="button" class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm align-self-start align-self-md-auto" id="btnAddRowEdit">
                         <i class="bi bi-plus-lg me-1"></i> Añadir Insumo
                     </button>
@@ -385,7 +397,7 @@
                                 <th style="width: 125px;">Cantidad</th>
                                 <th style="width: 225px;">N° Lote</th>
                                 <th style="width: 165px;">Vencimiento</th>
-                                <th style="width: 135px;">Precio unitario (<span id="editCurrencyLabel">Moneda</span>)</th>
+                                <th style="width: 150px;">Precio total línea (<span id="editCurrencyLabel">Moneda</span>)</th>
                                 <th style="width: 55px;">Eliminar</th>
                             </tr>
                         </thead>
@@ -418,5 +430,6 @@
 <script>
     window.current_user_role_id = {{ current_user.role_id if current_user else 0 }};
 </script>
-<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.7"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.9"></script>
 {% endblock %}

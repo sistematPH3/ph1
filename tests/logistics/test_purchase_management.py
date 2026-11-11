@@ -127,8 +127,8 @@ class PurchaseManagementTestBase(unittest.TestCase):
         db.session.add(compra)
         db.session.flush()
         if renglones:
-            # Estos tests usan la convención del modal de edición: foreign_price
-            # es el precio UNITARIO, así que el total es cantidad x precio.
+            # Los detalles guardados usan foreign_price como precio UNITARIO
+            # (así lo almacena el registro de compras): el total es cantidad x precio.
             total = CERO_TEST
             for product_id, cantidad, precio in renglones:
                 total += cantidad * precio
@@ -168,31 +168,34 @@ class PurchaseManagementTestBase(unittest.TestCase):
         return inv.current_quantity if inv else None
 
     def item(self, detail_id, **kwargs):
+        # El payload de edición usa foreign_price como TOTAL de línea.
         base = {'id': str(detail_id), 'quantity': 10, 'foreign_price': 5}
         base.update(kwargs)
         return base
 
 
 class PrecioAnexosTest(PurchaseManagementTestBase):
-    """Bug: el precio de los insumos NUEVOS se dividia entre la cantidad."""
+    """El modal de edición envía el TOTAL de la línea: el unitario del detalle
+    se deriva dividiéndolo entre la cantidad (igual que el registro)."""
 
-    def test_anexo_no_divide_el_precio_por_la_cantidad(self):
+    def test_anexo_guarda_el_total_de_linea_y_deriva_el_unitario(self):
         compra = self.crear_compra(moneda='USD', tasa=Decimal('10.0000'),
                                    renglones=[(self.prod_a.id, Decimal('2.00'),
                                                Decimal('5.00'))])
         db.session.commit()
 
+        # 10 unidades por 50.00 de total => unitario 5.00.
         items = [
-            self.item(self._detalle_id(compra), quantity=2, foreign_price=5),
+            self.item(self._detalle_id(compra), quantity=2, foreign_price=10),
             {'id': 'new_1', 'product_id': self.prod_b.id, 'quantity': 10,
-             'foreign_price': 5, 'expiration_date': '', 'lot_number': ''},
+             'foreign_price': 50, 'expiration_date': '', 'lot_number': ''},
         ]
         self.assertTrue(self.repo.logical_edit(compra.id, self.admin.id, items,
                                                "anexo de prueba"))
 
         nuevo = db.session.query(PurchaseDetail).filter_by(
             purchase_id=compra.id, product_id=self.prod_b.id).one()
-        # 10 unidades a 5.00 cada una: el unitario NO puede ser 0.50.
+        # 50.00 de total entre 10 unidades => unitario 5.00.
         self.assertEqual(nuevo.quantity, Decimal('10.00'))
         self.assertEqual(nuevo.foreign_price, Decimal('5.00'))
         self.assertEqual(nuevo.price_bs, Decimal('50.00'))
@@ -206,9 +209,9 @@ class PrecioAnexosTest(PurchaseManagementTestBase):
         db.session.commit()
 
         items = [
-            self.item(detalle_id, quantity=2, foreign_price=5),
+            self.item(detalle_id, quantity=2, foreign_price=10),
             {'id': 'new_1', 'product_id': self.prod_b.id, 'quantity': 10,
-             'foreign_price': 5, 'expiration_date': '', 'lot_number': ''},
+             'foreign_price': 50, 'expiration_date': '', 'lot_number': ''},
         ]
         self.repo.logical_edit(compra.id, self.admin.id, items, "anexo")
 
@@ -222,7 +225,8 @@ class PrecioAnexosTest(PurchaseManagementTestBase):
         detalle_id = self._detalle_id(compra)
         db.session.commit()
 
-        items = [self.item(detalle_id, quantity=4, foreign_price=3)]
+        # Total de línea 12.00 para 4 unidades => unitario 3.00.
+        items = [self.item(detalle_id, quantity=4, foreign_price=12)]
         self.repo.logical_edit(compra.id, self.admin.id, items, "sin cambios")
 
         self.assertEqual(compra.total_amount, Decimal('12.00'))
@@ -306,8 +310,9 @@ class StockDisponibleTest(PurchaseManagementTestBase):
 
         ids = [d.id for d in db.session.query(PurchaseDetail).filter_by(
             purchase_id=compra.id).order_by(PurchaseDetail.id).all()]
-        items = [self.item(ids[0], quantity=15, foreign_price=5),
-                 self.item(ids[1], quantity=5, foreign_price=6)]
+        # Totales de línea: 15 x 5.00 = 75.00 y 5 x 6.00 = 30.00.
+        items = [self.item(ids[0], quantity=15, foreign_price=75),
+                 self.item(ids[1], quantity=5, foreign_price=30)]
 
         self.assertTrue(self.repo.logical_edit(compra.id, self.admin.id, items,
                                                "rebalanceo"))
@@ -492,7 +497,7 @@ class TasaCambioTest(PurchaseManagementTestBase):
                                                Decimal('5.00'))])
         db.session.commit()
 
-        items = [self.item(self._detalle_id(compra), quantity=2, foreign_price=7)]
+        items = [self.item(self._detalle_id(compra), quantity=2, foreign_price=14)]
         self.repo.logical_edit(compra.id, self.admin.id, items, "nuevo precio")
 
         self.assertEqual(compra.exchange_rate, Decimal('10.0000'))
@@ -509,7 +514,7 @@ class TasaCambioTest(PurchaseManagementTestBase):
             purchase_id=compra.id).one().id
         db.session.commit()
 
-        items = [self.item(detalle_id, quantity=2, foreign_price=25)]
+        items = [self.item(detalle_id, quantity=2, foreign_price=50)]
         self.repo.logical_edit(compra.id, self.admin.id, items, "precio bs")
 
         detalle = db.session.get(PurchaseDetail, detalle_id)
@@ -528,7 +533,7 @@ class TasaCambioTest(PurchaseManagementTestBase):
             purchase_id=compra.id).one().id
         db.session.commit()
 
-        items = [self.item(detalle_id, quantity=2, foreign_price=5)]
+        items = [self.item(detalle_id, quantity=2, foreign_price=10)]
         self.repo.logical_edit(compra.id, self.admin.id, items, "sin tasa")
 
         self.assertEqual(compra.exchange_rate, Decimal('20.0000'))
@@ -572,7 +577,7 @@ class TasaCambioTest(PurchaseManagementTestBase):
             purchase_id=compra.id).one().id
         db.session.commit()
 
-        items = [self.item(detalle_id, quantity=2, foreign_price=7)]
+        items = [self.item(detalle_id, quantity=2, foreign_price=14)]
         self.repo.logical_edit(compra.id, self.admin.id, items, "precio nuevo")
 
         historiales = self.service.get_formatted_history(current_user=self.user)
@@ -709,7 +714,8 @@ class EliminacionRenglonTest(PurchaseManagementTestBase):
 
         self.assertTrue(self.repo.logical_edit(
             compra.id, self.admin.id,
-            [self.item(det_b.id, quantity=5)], "borré el insumo A"))
+            [self.item(det_b.id, quantity=5, foreign_price=25)],
+            "borré el insumo A"))
 
         self.assertEqual(Decimal(str(self.total_stock(self.prod_a.id))),
                          Decimal('0.00'))
@@ -784,6 +790,69 @@ class LoteLargoTest(PurchaseManagementTestBase):
         siguiente = self.repo._generar_lote(self.prod_a, compra, {})
         self.assertNotIn(siguiente, vistos)
         self.assertLessEqual(len(siguiente), 50)
+
+
+class UnaSolaEdicionTest(PurchaseManagementTestBase):
+    """Regla: una compra solo se puede editar UNA vez.
+
+    La segunda edición se rechaza en el servicio y también en el repositorio
+    (para que una llamada directa no se salte la regla). El listado deja de
+    ofrecer el botón de editar pero mantiene el de anular.
+    """
+
+    @staticmethod
+    def _detalle_id(compra):
+        return db.session.query(PurchaseDetail).filter_by(
+            purchase_id=compra.id).one().id
+
+    def _crear_y_editar_una_vez(self):
+        compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('2.00'),
+                                              Decimal('5.00'))])
+        detalle_id = self._detalle_id(compra)
+        db.session.commit()
+        items = [self.item(detalle_id, quantity=2, foreign_price=10)]
+        self.assertTrue(self.service.process_edit(compra.id, self.user, items,
+                                                  "primera edicion"))
+        return compra, items
+
+    def test_segunda_edicion_por_el_servicio_se_rechaza(self):
+        compra, items = self._crear_y_editar_una_vez()
+
+        with self.assertRaises(ValueError) as ctx:
+            self.service.process_edit(compra.id, self.user, items,
+                                      "segunda edicion")
+        self.assertIn("una edición", str(ctx.exception).lower())
+
+    def test_repositorio_tambien_bloquea_la_segunda_edicion(self):
+        compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('2.00'),
+                                              Decimal('5.00'))])
+        detalle_id = self._detalle_id(compra)
+        db.session.commit()
+        items = [self.item(detalle_id, quantity=2, foreign_price=10)]
+
+        self.repo.logical_edit(compra.id, self.admin.id, items, "primera")
+        with self.assertRaises(ValueError):
+            self.repo.logical_edit(compra.id, self.admin.id, items, "segunda")
+
+    def test_listado_marca_editada_y_conserva_la_anulacion(self):
+        compra, _ = self._crear_y_editar_una_vez()
+
+        fila = next(h for h in self.service.get_formatted_history(
+            current_user=self.user) if h['id'] == compra.id)
+        self.assertTrue(fila['already_edited'])
+        self.assertFalse(fila['can_edit'])
+        # Anular sigue disponible: la regla solo afecta a la edición.
+        self.assertTrue(fila['can_modify'])
+
+    def test_compra_sin_editar_si_se_puede_editar(self):
+        compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('2.00'),
+                                              Decimal('5.00'))])
+        db.session.commit()
+
+        fila = next(h for h in self.service.get_formatted_history(
+            current_user=self.user) if h['id'] == compra.id)
+        self.assertFalse(fila['already_edited'])
+        self.assertTrue(fila['can_edit'])
 
 
 if __name__ == '__main__':

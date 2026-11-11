@@ -379,11 +379,11 @@ class PurchaseValidator:
             try:
                 price = Decimal(normalizar_numero(price_raw))
                 if price < Decimal('0.01'):
-                    errors[f'item_{index}_foreign_price'] = "El precio unitario mínimo es 0.01."
+                    errors[f'item_{index}_foreign_price'] = "El precio total de línea mínimo es 0.01."
                 elif price > Decimal('9999999.99'):
-                    errors[f'item_{index}_foreign_price'] = "El precio unitario excede el límite permitido (máx 9,999,999.99)."
+                    errors[f'item_{index}_foreign_price'] = "El precio total de línea excede el límite permitido (máx 9,999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
-                errors[f'item_{index}_foreign_price'] = "Precio unitario numérico inválido."
+                errors[f'item_{index}_foreign_price'] = "Precio total de línea numérico inválido."
                 
         return errors
 
@@ -429,11 +429,11 @@ class PurchaseValidator:
             try:
                 price = Decimal(normalizar_numero(price_raw))
                 if price < Decimal('0.01'):
-                    errors[f'item_{index}_foreign_price'] = "El precio unitario mínimo es 0.01."
+                    errors[f'item_{index}_foreign_price'] = "El precio total de línea mínimo es 0.01."
                 elif price > Decimal('9999999.99'):
-                    errors[f'item_{index}_foreign_price'] = "El precio unitario excede el límite permitido (máx 9,999,999.99)."
+                    errors[f'item_{index}_foreign_price'] = "El precio total de línea excede el límite permitido (máx 9,999,999.99)."
             except (InvalidOperation, TypeError, ValueError):
-                errors[f'item_{index}_foreign_price'] = "Precio unitario numérico inválido."
+                errors[f'item_{index}_foreign_price'] = "Precio total de línea numérico inválido."
 
             # La fecha de vencimiento se usaba directo con strptime y su error
             # interno se mostraba al usuario; se valida aqui con mensaje claro.

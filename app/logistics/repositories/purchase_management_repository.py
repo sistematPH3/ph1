@@ -1,7 +1,7 @@
 from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType, Inventory, AppParameter, ExchangeRateHistory
 from decimal import ROUND_HALF_UP, Decimal
 from datetime import UTC, datetime, timedelta
-from sqlalchemy import text
+from sqlalchemy import func, text
 import json
 from app.logistics.requests.purchase_validators import (es_moneda_bs,
                                                         normalizar_moneda,
@@ -106,11 +106,26 @@ class PurchaseManagementRepository:
     # Consultas de listado
     # ------------------------------------------------------------------
     def get_filtered_history(self, start_date=None, end_date=None, supplier_id=None, status=None):
+        # Cuenta las ediciones ya registradas por compra en una sola consulta
+        # agregada: el listado necesita saber si una compra ya fue editada (solo
+        # se permite una edición) sin provocar un N+1 por cada fila.
+        edit_counts = (
+            self.db.session.query(
+                PurchaseAuditLog.purchase_id.label('purchase_id'),
+                func.count(PurchaseAuditLog.id).label('edit_count')
+            )
+            .filter(PurchaseAuditLog.action_type == 'EDIT')
+            .group_by(PurchaseAuditLog.purchase_id)
+            .subquery()
+        )
         # outerjoin: Purchase.supplier_id es nullable y antes el INNER JOIN
         # descartaba del listado toda compra sin proveedor (y del reporte).
         query = self.db.session.query(
-            Purchase, Supplier.name.label('supplier_name')
-        ).outerjoin(Supplier, Purchase.supplier_id == Supplier.id)
+            Purchase,
+            Supplier.name.label('supplier_name'),
+            func.coalesce(edit_counts.c.edit_count, 0).label('edit_count')
+        ).outerjoin(Supplier, Purchase.supplier_id == Supplier.id)\
+         .outerjoin(edit_counts, edit_counts.c.purchase_id == Purchase.id)
 
         if start_date:
             query = query.filter(Purchase.purchase_date >= start_date)
@@ -124,6 +139,15 @@ class PurchaseManagementRepository:
             query = query.filter(Purchase.status == status)
 
         return query.order_by(Purchase.purchase_date.desc()).all()
+
+    def has_been_edited(self, purchase_id):
+        """True si la compra ya tiene al menos una edición registrada.
+
+        La regla de negocio es que una compra solo se puede editar una vez.
+        """
+        return (self.db.session.query(PurchaseAuditLog.id)
+                .filter_by(purchase_id=purchase_id, action_type='EDIT')
+                .first()) is not None
 
     def get_app_parameters(self):
         """Parámetros configurables de gestión de compras (límites de tiempo, etc.).
@@ -328,6 +352,15 @@ class PurchaseManagementRepository:
             if not purchase or purchase.status != 'COMPLETED':
                 return False
 
+            # Una compra solo admite UNA edición. Se comprueba también aquí
+            # (además del servicio) para que ninguna llamada directa al
+            # repositorio pueda saltarse la regla.
+            if self.has_been_edited(purchase_id):
+                raise ValueError(
+                    "Esta compra ya fue editada. Solo se permite una edición "
+                    "por compra."
+                )
+
             details = self.db.session.query(PurchaseDetail).filter_by(
                 purchase_id=purchase_id).all()
             detalles_por_id = {str(d.id): d for d in details}
@@ -353,8 +386,12 @@ class PurchaseManagementRepository:
                     'quantity': parsear_decimal(
                         item.get('quantity'), 'cantidad',
                         Decimal('0.01'), Decimal('999999.99')),
+                    # foreign_price llega como PRECIO TOTAL DE LÍNEA (lo que
+                    # muestra el modal de edición), igual que en el registro de
+                    # compras. En la Fase 3 se divide entre la cantidad para
+                    # guardar el precio unitario del detalle.
                     'foreign_price': parsear_decimal(
-                        item.get('foreign_price'), 'precio unitario',
+                        item.get('foreign_price'), 'precio total de línea',
                         Decimal('0.01'), Decimal('9999999.99')
                     ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
                     'expiration_date': (parsear_fecha(item.get('expiration_date'))
@@ -381,12 +418,12 @@ class PurchaseManagementRepository:
                     'quantity': parsear_decimal(
                         item.get('quantity'), 'cantidad',
                         Decimal('0.01'), Decimal('999999.99')),
-                    # foreign_price llega como PRECIO UNITARIO (lo que muestra el
-                    # modal de edición). Antes se dividía entre la cantidad, como
-                    # en el registro de compras donde el campo es total de línea,
-                    # y el total de la factura quedaba dividido por la cantidad.
+                    # foreign_price llega como PRECIO TOTAL DE LÍNEA (lo que
+                    # muestra el modal de edición), igual que en el registro de
+                    # compras. Más abajo se divide entre la cantidad para
+                    # guardar el precio unitario del detalle.
                     'foreign_price': parsear_decimal(
-                        item.get('foreign_price'), 'precio unitario',
+                        item.get('foreign_price'), 'precio total de línea',
                         Decimal('0.01'), Decimal('9999999.99')
                     ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
                     'expiration_date': (parsear_fecha(item.get('expiration_date'))
@@ -468,7 +505,12 @@ class PurchaseManagementRepository:
                 old_lot = detail.lot_number
 
                 new_qty = cambio['quantity']
-                new_price = cambio['foreign_price']
+                line_total = cambio['foreign_price']
+                # El modal envía el TOTAL de la línea (como el registro de
+                # compras): se divide entre la cantidad para guardar el
+                # unitario del detalle.
+                new_price = (line_total / new_qty).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP)
                 qty_diff = new_qty - old_qty
 
                 inventory_record = self._get_inventory(detail.product_id)
@@ -505,7 +547,11 @@ class PurchaseManagementRepository:
                         f"Ajuste por edición de compra (Lote: {cambio['lot_number']})"
                     )
 
-                new_total_amount += (new_qty * new_price)
+                # El total de la factura suma los totales de línea que envió el
+                # usuario (lo realmente pagado), y NO cantidad x unitario ya
+                # redondeado: así la edición coincide con el registro de compras
+                # (3,33 x 3 daría 9,99 frente a un total de línea de 10,00).
+                new_total_amount += line_total
 
             contador_lotes = {}
             for nuevo in nuevos:
@@ -518,13 +564,16 @@ class PurchaseManagementRepository:
                 lot_val = nuevo['lot_number'] or self._generar_lote(
                     nuevo['product'], purchase, contador_lotes)
 
+                line_total = nuevo['foreign_price']
+                unit_price = (line_total / nuevo['quantity']).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP)
                 new_detail = PurchaseDetail(
                     purchase_id=purchase.id,
                     product_id=nuevo['product_id'],
                     quantity=nuevo['quantity'],
-                    foreign_price=nuevo['foreign_price'],
-                    price_bs=(nuevo['foreign_price'] if es_bs
-                              else (nuevo['foreign_price'] * tasa).quantize(
+                    foreign_price=unit_price,
+                    price_bs=(unit_price if es_bs
+                              else (unit_price * tasa).quantize(
                                   Decimal('0.01'), rounding=ROUND_HALF_UP)),
                     expiration_date=exp_date_obj,
                     lot_number=lot_val
@@ -544,7 +593,7 @@ class PurchaseManagementRepository:
                     f"Nuevo insumo añadido por edición de compra (Lote: {lot_val})"
                 )
 
-                new_total_amount += (nuevo['quantity'] * nuevo['foreign_price'])
+                new_total_amount += line_total
                 # Flush para que el siguiente lote generado vea este renglón.
                 self.db.session.flush()
 

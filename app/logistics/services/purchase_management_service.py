@@ -126,7 +126,7 @@ class PurchaseManagementService:
         formatted_history = []
         now = datetime.now(UTC).replace(tzinfo=None)
 
-        for purchase, supplier_name in raw_purchases:
+        for purchase, supplier_name, edit_count in raw_purchases:
             total_amount = purchase.total_amount if purchase.total_amount is not None else CERO
             # En Bs el monto ya es bolívares: no se multiplica por la tasa.
             exchange_rate = purchase.exchange_rate if purchase.exchange_rate is not None else None
@@ -140,6 +140,10 @@ class PurchaseManagementService:
                 total_bs = (total_amount * exchange_rate).quantize(
                     Decimal('0.01'), rounding=ROUND_HALF_UP)
 
+            # Una compra ya editada conserva el botón de anular, pero no el de
+            # editar: solo se permite una edición por compra.
+            already_edited = (edit_count or 0) > 0
+            can_modify = self.can_modify(purchase, current_user, now)
             formatted_history.append({
                 'id': purchase.id,
                 'supplier_id': purchase.supplier_id,
@@ -151,7 +155,9 @@ class PurchaseManagementService:
                 'exchange_rate': exchange_rate,
                 'invoice_url': purchase.invoice_url,
                 'status': purchase.status,
-                'can_modify': self.can_modify(purchase, current_user, now)
+                'can_modify': can_modify,
+                'already_edited': already_edited,
+                'can_edit': can_modify and not already_edited
             })
 
         return formatted_history
@@ -163,6 +169,9 @@ class PurchaseManagementService:
 
         details = self.repository.get_details_by_purchase_id(purchase_id)
         limits = self._get_time_limits()
+        already_edited = self.repository.has_been_edited(purchase_id)
+        can_modify = (self.can_modify(purchase, current_user)
+                      if current_user is not None else False)
         return {
             "purchase": purchase,
             "details": details,
@@ -170,8 +179,9 @@ class PurchaseManagementService:
                 "admin_days": limits['admin_days'],
                 "other_hours": limits['other_hours']
             },
-            "can_modify": (self.can_modify(purchase, current_user)
-                           if current_user is not None else False),
+            "can_modify": can_modify,
+            "already_edited": already_edited,
+            "can_edit": can_modify and not already_edited,
             "remaining_seconds": (self._segundos_restantes(purchase, current_user)
                                   if current_user is not None else 0)
         }
@@ -190,4 +200,12 @@ class PurchaseManagementService:
             raise ValueError("La compra no existe.")
 
         self._check_time_limit(purchase, current_user)
+
+        # Una compra solo se puede editar una vez.
+        if self.repository.has_been_edited(purchase_id):
+            raise ValueError(
+                "Esta compra ya fue editada. Solo se permite una edición por "
+                "compra."
+            )
+
         return self.repository.logical_edit(purchase_id, current_user.id, new_items, reason)

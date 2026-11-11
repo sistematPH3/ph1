@@ -202,6 +202,8 @@ def get_details(purchase_id):
             "status": purchase.status,
             "details": details_list,
             "can_modify": data.get('can_modify', False),
+            "can_edit": data.get('can_edit', data.get('can_modify', False)),
+            "already_edited": data.get('already_edited', False),
             "remaining_seconds": data.get('remaining_seconds', 0),
             "time_limits": data.get('time_limits', {'admin_days': 7, 'other_hours': 24})
         }), 200
