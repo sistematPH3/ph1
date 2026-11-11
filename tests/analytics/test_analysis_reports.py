@@ -1193,6 +1193,50 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(result['enviados']['quantity'], _redondo('7.00'))
         self.assertEqual(result['enviados']['cost'], _redondo('70.00'))
 
+    def test_kpi_multisede_no_central_cuenta_internos_como_recibidos(self):
+        # Usuario con dos sedes no centrales: los movimientos entre SUS sedes
+        # son 'internos', pero también llegaron a una sede visible. Antes el
+        # KPI 'Traslados recibidos' mostraba 0 en este ámbito.
+        compra = Purchase(
+            supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),
+            total_amount=Decimal('1000.00'), currency='USD',
+            invoice_url='https://img/kpi-multi.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id,
+            lot_number='L-KPI-MULTI', quantity=Decimal('10.00'),
+            foreign_price=Decimal('100.00'), price_bs=Decimal('81469.09')))
+        mov = Movement(type='TRASLADO', origin_location_id=self.sede_a.id,
+                       destination_location_id=self.sede_b.id,
+                       date=datetime(2026, 9, 10), user_id=self.admin.id,
+                       status='COMPLETADO')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id,
+            lot_number='L-KPI-MULTI', quantity=Decimal('5.00'),
+            received_quantity=Decimal('4.00')))
+        db.session.commit()
+
+        kpis = svc.obtener_kpis([self.sede_a.id, self.sede_b.id], 'MONTHLY',
+                                date(2026, 9, 15), 'USD',
+                                incluir_compras=False)
+        tr = kpis['kpis']['traslados']
+        self.assertEqual(tr['label'], 'Traslados recibidos')
+        self.assertEqual(tr['actual'], _redondo('400.00'))
+        self.assertEqual(tr['conteo'], 1)
+        self.assertEqual(tr['quantity'], _redondo('4.00'))
+
+        # El desglose direccional conserva la distinción: fue interno y no
+        # una entrada desde fuera del ámbito.
+        directo = svc.obtener_traslados_direccional(
+            [self.sede_a.id, self.sede_b.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'USD')
+        self.assertEqual(directo['internos']['conteo'], 1)
+        self.assertEqual(directo['recibidos']['conteo'], 0)
+
     def test_traslado_sin_recepcion_no_cuenta_como_recibido(self):
         compra = Purchase(
             supplier_id=self.proveedor.id, purchase_date=datetime(2026, 9, 2),

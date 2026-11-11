@@ -43,6 +43,24 @@ def _orientacion_efectiva(location_ids, incluir_compras):
     return SEDE_CENTRAL_ID if incluir_compras else None
 
 
+def flujo_recibido_por_destino(direccional):
+    """Mercancía que llegó a las sedes visibles: recibidos + internos.
+
+    En un ámbito multi-sede los movimientos entre las sedes del propio
+    usuario se clasifican como 'internos', pero también llegaron a una sede
+    visible. Se suman a 'recibidos' para no reportar 0 (misma regla que la
+    sección 'Mercancía recibida': se mide por sede de destino).
+    """
+    return {
+        'conteo': (direccional['recibidos']['conteo']
+                   + direccional['internos']['conteo']),
+        'quantity': (direccional['recibidos']['quantity']
+                     + direccional['internos']['quantity']),
+        'cost': (direccional['recibidos']['cost']
+                 + direccional['internos']['cost']),
+    }
+
+
 def usuario_administra_central(user_id):
     """True si el usuario gestiona la sede Central (id 1). Solo quien la maneja
     ve las compras: el admin las ve todas; el resto solo si tiene la Central
@@ -1248,10 +1266,17 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
         'medido_por_compras': incluir_compras,
     }
 
-    clave_flujo = ('enviados' if orientacion == SEDE_CENTRAL_ID
-                   else 'recibidos')
-    flujo_actual = actual['direccional'][clave_flujo]
-    flujo_anterior = anterior['direccional'][clave_flujo]
+    if orientacion == SEDE_CENTRAL_ID:
+        clave_flujo = 'enviados'
+        flujo_actual = actual['direccional'][clave_flujo]
+        flujo_anterior = anterior['direccional'][clave_flujo]
+    else:
+        # Sedes no centrales: lo que llegó a cualquiera de sus sedes visibles,
+        # incluidos los movimientos entre ellas (internos). Antes solo se
+        # contaban los recibidos de fuera y un ámbito multi-sede mostraba 0.
+        clave_flujo = 'recibidos'
+        flujo_actual = flujo_recibido_por_destino(actual['direccional'])
+        flujo_anterior = flujo_recibido_por_destino(anterior['direccional'])
     f_act, f_ant = flujo_actual['cost'], flujo_anterior['cost']
 
     kpis = {

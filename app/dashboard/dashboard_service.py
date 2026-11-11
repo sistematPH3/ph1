@@ -533,11 +533,22 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
                                           incluir_compras=ver_compras)
     anclas = _anclas_reales(sede_ids, ver_compras, 12)
     periodo = kpis['period']
+    # La dirección principal se narra igual que el KPI: desde la Central para
+    # quien la gestiona (enviados) y por sede de destino para el resto
+    # (recibidos, incluyendo los movimientos entre sus propias sedes).
+    orientacion_traslados = reports_svc._orientacion_efectiva(
+        sede_ids, ver_compras)
     traslados_mes = reports_svc.obtener_traslados_direccional(
         sede_ids,
         datetime_cls.combine(periodo['start'], time_cls.min),
         datetime_cls.combine(periodo['end'], time_cls.max),
-        'USD')
+        'USD', orientacion_traslados)
+    if orientacion_traslados == reports_svc.SEDE_CENTRAL_ID:
+        direccion_principal = 'enviados'
+    else:
+        traslados_mes['recibidos'] = reports_svc.flujo_recibido_por_destino(
+            traslados_mes)
+        direccion_principal = 'recibidos'
     return {
         'kpis_mes': kpis,
         'ranking_mes': (ranking or [])[:3],
@@ -551,7 +562,7 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
         'ver_compras': ver_compras,
         'metric_panel': metric_panel,
         'traslados_mes': traslados_mes,
-        'traslados_direccion_principal': 'recibidos',
+        'traslados_direccion_principal': direccion_principal,
         'evolucion_mes': _evolucion_egresos(sede_ids, periodo['start'],
                                             ver_compras),
         'resumen_mes': _resumen_periodo(sede_ids, periodo, kpis,
