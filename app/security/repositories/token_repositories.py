@@ -126,7 +126,7 @@ def actualizar_password_con_token(token, nueva_password):
         if not recuperacion:
             return False, None
 
-        usuario = User.query.get(recuperacion.user_id)
+        usuario = db.session.get(User, recuperacion.user_id)
         if not usuario:
             return False, None
 

@@ -54,7 +54,7 @@ class CategoryService:
             product_type.shelf_life_days = None
 
         if product_type.category_id:
-            category = Category.query.get(product_type.category_id)
+            category = db.session.get(Category, product_type.category_id)
             if category:
                 category.name = new_name
         

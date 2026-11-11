@@ -36,7 +36,7 @@ def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
             
             url_generada = upload_invoice_image(foto_factura_memoria)
             
-            purchase = Purchase.query.get(purchase_id)
+            purchase = db.session.get(Purchase, purchase_id)
             if purchase:
                 purchase.invoice_url = url_generada
                 db.session.commit()
@@ -81,8 +81,8 @@ def new_purchase_form():
 @require_roles('admin')
 def view_purchase_details(purchase_id):
     purchase = Purchase.query.get_or_404(purchase_id)
-    supplier = Supplier.query.get(purchase.supplier_id)
-    user = User.query.get(purchase.user_id)
+    supplier = db.session.get(Supplier, purchase.supplier_id)
+    user = db.session.get(User, purchase.user_id)
     
     if current_user.role and current_user.role.name.lower() == 'finance':
         user_location_id = getattr(current_user, 'location_id', None)
@@ -108,7 +108,7 @@ def view_purchase_details(purchase_id):
     if purchase.status == 'ANNULLED':
         audit_log = PurchaseAuditLog.query.filter_by(purchase_id=purchase_id, action_type='ANNULLED').order_by(PurchaseAuditLog.timestamp.desc()).first()
         if audit_log:
-            audit_user = User.query.get(audit_log.user_id)
+            audit_user = db.session.get(User, audit_log.user_id)
             if audit_log.timestamp:
                 utc_tz = pytz.utc
                 caracas_tz = pytz.timezone('America/Caracas')
@@ -119,7 +119,7 @@ def view_purchase_details(purchase_id):
     edit_logs = []
     
     for log in edit_logs_raw:
-        editor = User.query.get(log.user_id)
+        editor = db.session.get(User, log.user_id)
         local_time = log.timestamp - timedelta(hours=4) if log.timestamp else None
         reason = log.new_data.get('edit_reason', 'Edición sin motivo especificado') if log.new_data else 'Edición sin motivo especificado'
         
@@ -142,7 +142,7 @@ def view_purchase_details(purchase_id):
             c_item = curr_details.get(key)
 
             prod_id = p_item['product_id'] if p_item else c_item['product_id']
-            product_obj = Product.query.get(prod_id)
+            product_obj = db.session.get(Product, prod_id)
             prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
 
             if not p_item and c_item:
@@ -189,7 +189,7 @@ def view_purchase_details(purchase_id):
 @purchase_bp.route('/purchases/<int:purchase_id>/export', methods=['GET'])
 @require_roles('admin')
 def export_purchase_detail(purchase_id):
-    if not Purchase.query.get(purchase_id):
+    if not db.session.get(Purchase, purchase_id):
         flash('La compra solicitada no existe.', 'error')
         return redirect(url_for('purchase_routes.view_purchase_details',
                                 purchase_id=purchase_id))
@@ -541,7 +541,7 @@ def create_purchase():
         return jsonify({"error": "Datos inválidos", "details": errors}), 400
 
     # Valida que el proveedor y los productos existan y estén activos.
-    supplier = Supplier.query.get(data['supplier_id'])
+    supplier = db.session.get(Supplier, data['supplier_id'])
     if not supplier or str(supplier.status or '').upper() not in ('ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA'):
         return jsonify({"error": "Datos inválidos", "details": {"supplier_id": "El proveedor no existe o no está activo."}}), 400
 

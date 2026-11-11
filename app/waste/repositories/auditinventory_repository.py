@@ -8,7 +8,7 @@ class AuditInventoryRepository:
     
     @staticmethod
     def get_user_by_id(user_id):
-        return User.query.get(user_id)
+        return db.session.get(User, user_id)
 
     @staticmethod
     def get_user_allowed_locations(user_id):

@@ -1,3 +1,4 @@
+from app.extensions import db
 from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
 from app.models import Location, Movement, PurchaseAuditLog, Product, WasteDetail
 from datetime import datetime, timedelta
@@ -215,7 +216,6 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
 
     if not product_id and product_name != 'Insumo no especificado':
         try:
-            from app.models.inventory_model import db
             from sqlalchemy import text
             res = db.session.execute(text("SELECT id FROM products WHERE LOWER(name) = LOWER(:pname) LIMIT 1"), {'pname': str(product_name).strip()}).fetchone()
             if res:
@@ -758,7 +758,7 @@ def get_inventory_audit_entries(filters, user, is_admin):
         if not loc_id:
             return '—'
         if loc_id not in location_cache:
-            loc = Location.query.get(loc_id)
+            loc = db.session.get(Location, loc_id)
             location_cache[loc_id] = loc.name if loc else f"Sede #{loc_id}"
         return location_cache[loc_id]
 

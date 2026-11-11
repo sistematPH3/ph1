@@ -17,7 +17,7 @@ class UserManagementRepository:
     @staticmethod
     def update_user_status(user_id, role_id, location_ids):
         """Actualiza el rol, asigna sedes (vía user_locations) y activa al usuario mediante sincronización."""
-        usuario = User.query.get(user_id)
+        usuario = db.session.get(User, user_id)
         if usuario:
             usuario.role_id = int(role_id)
             
@@ -42,7 +42,7 @@ class UserManagementRepository:
         para prevenir errores de restricción de clave foránea (IntegrityError).
         """
         try:
-            usuario = User.query.get(user_id)
+            usuario = db.session.get(User, user_id)
             if usuario:
                 # 1. Eliminamos los registros de auditoría vinculados al usuario guest
                 LoginAudit.query.filter_by(user_id=user_id).delete()

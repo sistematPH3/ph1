@@ -24,7 +24,7 @@ class MermaApprovalsRepository:
     # ------------------------------------------------------------------
     @staticmethod
     def get_user_by_id(user_id):
-        return User.query.get(user_id)
+        return db.session.get(User, user_id)
 
     @staticmethod
     def get_all_locations():
@@ -215,7 +215,7 @@ class MermaApprovalsRepository:
 
     @staticmethod
     def get_waste_by_id(waste_id):
-        return Waste.query.get(waste_id)
+        return db.session.get(Waste, waste_id)
 
     # ------------------------------------------------------------------
     # Escritura: estado y auditoría

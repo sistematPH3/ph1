@@ -1,10 +1,11 @@
+from app.extensions import db
 from app.models import Location
 
 def get_location_details(location_id):
     """
     Consulta los detalles y separa el estado de la dirección para la UI.
     """
-    location = Location.query.get(location_id)
+    location = db.session.get(Location, location_id)
     if not location:
         return None
 

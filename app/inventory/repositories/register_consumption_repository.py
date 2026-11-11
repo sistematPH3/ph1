@@ -11,7 +11,7 @@ from app.models.security_model import User, user_locations
 class RegisterConsumptionRepository:
     @staticmethod
     def get_user_by_id(user_id):
-        return User.query.get(user_id)
+        return db.session.get(User, user_id)
 
     @staticmethod
     def get_all_sedes():

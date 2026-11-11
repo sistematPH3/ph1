@@ -221,7 +221,7 @@ def create_app():
         
         @login_manager.user_loader
         def load_user(user_id):
-            return User.query.get(int(user_id))
+            return db.session.get(User, int(user_id))
 
         app.jinja_env.filters['ph_qty'] = ph_qty
         app.jinja_env.filters['ph_amount'] = ph_amount

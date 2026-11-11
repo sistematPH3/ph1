@@ -515,7 +515,7 @@ class ResponseInboxRepository:
         if existing:
             existing.is_read = True
             return existing.id
-        waste = Waste.query.get(waste_id)
+        waste = db.session.get(Waste, waste_id)
         db.session.add(Notification(
             user_id=user.id,
             location_id=waste.location_id if waste else None,
@@ -533,7 +533,7 @@ message=(
     @staticmethod
     def mark_waste_as_read(user, waste_id):
         """Marca leída la respuesta de una merma para el usuario (servidor)."""
-        waste = Waste.query.get(waste_id)
+        waste = db.session.get(Waste, waste_id)
         if not waste:
             return False
         if not user.is_admin:

@@ -16,7 +16,7 @@ class RegisterWasteRepository:
 
     @staticmethod
     def get_user_by_id(user_id):
-        return User.query.get(user_id)
+        return db.session.get(User, user_id)
 
     @staticmethod
     def get_all_sedes():
@@ -41,7 +41,7 @@ class RegisterWasteRepository:
 
     @staticmethod
     def get_waste_type_by_id(waste_type_id):
-        return WasteType.query.get(waste_type_id)
+        return db.session.get(WasteType, waste_type_id)
 
     @staticmethod
     def get_waste_by_request_id(request_id):
@@ -85,7 +85,7 @@ class RegisterWasteRepository:
 
     @staticmethod
     def get_product_by_id(product_id):
-        return Product.query.get(product_id)
+        return db.session.get(Product, product_id)
 
     @staticmethod
     def get_products_by_ids(ids):

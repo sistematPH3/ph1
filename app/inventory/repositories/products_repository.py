@@ -16,7 +16,7 @@ class ProductRepository:
 
     @staticmethod
     def find_by_id(product_id):
-        return Product.query.get(product_id)
+        return db.session.get(Product, product_id)
 
     @staticmethod
     def find_by_sku(sku):

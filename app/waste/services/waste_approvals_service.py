@@ -415,7 +415,7 @@ def _descontar_stock_lines(waste, details):
         saldo = saldos.get(d.product_id, disponible)
         qty = float(d.quantity or 0)
         if saldo < qty:
-            prod = Product.query.get(d.product_id)
+            prod = db.session.get(Product, d.product_id)
             nombre = prod.name if prod else f'#{d.product_id}'
             raise ValueError(
                 f'Stock insuficiente para {nombre}: disponible {saldo:.2f}, merma {qty:.2f}.'

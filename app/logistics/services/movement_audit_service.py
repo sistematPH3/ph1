@@ -32,8 +32,8 @@ class MovementAuditService:
     def _hydrate_logs(logs):
         """Adjunta las instancias reales de User/Location a cada log para la vista."""
         for log in logs:
-            log.user = User.query.get(log.user_id) if log.user_id else None
-            log.location = Location.query.get(log.location_id) if log.location_id else None
+            log.user = db.session.get(User, log.user_id) if log.user_id else None
+            log.location = db.session.get(Location, log.location_id) if log.location_id else None
         return logs
 
     @staticmethod
@@ -42,7 +42,7 @@ class MovementAuditService:
         if not location_id:
             return "Sede Desconocida"
         if location_id not in cache:
-            loc = Location.query.get(location_id)
+            loc = db.session.get(Location, location_id)
             cache[location_id] = loc.name if loc else f"Sede #{location_id}"
         return cache[location_id]
 

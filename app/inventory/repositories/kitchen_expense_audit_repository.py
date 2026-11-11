@@ -231,7 +231,7 @@ class KitchenExpenseAuditRepository:
 
         if original_log_id:
             from app.models.waste_model import AuditLog as _AuditLog
-            target = _AuditLog.query.get(original_log_id)
+            target = db.session.get(_AuditLog, original_log_id)
             if target is not None:
                 d = target.changed_data or {}
                 if isinstance(d, str):

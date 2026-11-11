@@ -1,4 +1,5 @@
 import json
+from app.extensions import db
 from app.waste.repositories.waste_audit_repository import WasteAuditRepository
 from app.models.waste_model import Waste, WasteType, WasteDetail
 from app.models.inventory_model import Product
@@ -50,7 +51,7 @@ class WasteAuditService:
             try:
                 pid = int(product_id)
                 if pid not in product_unit_cache:
-                    p = Product.query.get(pid)
+                    p = db.session.get(Product, pid)
                     product_unit_cache[pid] = getattr(p, 'unit_of_measure', None) if p else None
                 return product_unit_cache[pid]
             except Exception:
@@ -62,7 +63,7 @@ class WasteAuditService:
             try:
                 pid = int(product_id)
                 if pid not in product_cache:
-                    p = Product.query.get(pid)
+                    p = db.session.get(Product, pid)
                     product_cache[pid] = p.name if p else None
                 return product_cache[pid]
             except Exception:
@@ -74,7 +75,7 @@ class WasteAuditService:
             try:
                 wpid = int(wt_id)
                 if wpid not in waste_type_cache:
-                    wt = WasteType.query.get(wpid)
+                    wt = db.session.get(WasteType, wpid)
                     waste_type_cache[wpid] = wt.name if wt else (wt.code if wt else None)
                 return waste_type_cache[wpid]
             except Exception:
@@ -91,7 +92,7 @@ class WasteAuditService:
             did = item.get('detail_id')
             if did:
                 try:
-                    det = WasteDetail.query.get(int(did))
+                    det = db.session.get(WasteDetail, int(did))
                 except (TypeError, ValueError):
                     det = None
                 if det and getattr(det, 'waste_type_id', None):
@@ -392,7 +393,7 @@ class WasteAuditService:
             
             if merma_id:
                 try:
-                    waste_obj = Waste.query.get(int(merma_id))
+                    waste_obj = db.session.get(Waste, int(merma_id))
                     if waste_obj:
                         st_obj = str(getattr(waste_obj, 'status', '')).upper().strip()
                         if st_obj in ['REVERTIDO', 'REVERTIDA', 'ANULADO', 'CANCELADO']:

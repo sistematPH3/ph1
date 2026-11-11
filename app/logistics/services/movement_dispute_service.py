@@ -96,7 +96,7 @@ def _get_or_create_inventory(location_id, product_id):
     """Obtiene el registro de inventario de una sede/producto o lo crea en ceros."""
     inv = Inventory.query.filter_by(location_id=location_id, product_id=product_id).first()
     if not inv:
-        _prod = Product.query.get(product_id)
+        _prod = db.session.get(Product, product_id)
         _min = _prod.min_stock_efectivo if _prod else Decimal('20.00')
         inv = Inventory(
             location_id=location_id, product_id=product_id,
@@ -244,7 +244,7 @@ def get_disputes_date_range():
             stamps.append(ts)
             continue
         # Respaldo: movimiento sin auditoría de recepción usa su propia fecha.
-        mov = Movement.query.get(mid)
+        mov = db.session.get(Movement, mid)
         if mov is not None and mov.date is not None:
             stamps.append(mov.date)
     if not stamps:
@@ -333,7 +333,7 @@ def resolve_dispute(movement_id, payload, user_id):
 
     Eleva excepciones si algo falla (el commit/rollback se maneja aquí).
     """
-    movement = Movement.query.get(movement_id)
+    movement = db.session.get(Movement, movement_id)
     if not movement:
         raise ValueError("El traslado especificado no existe.")
 

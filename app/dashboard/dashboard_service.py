@@ -148,7 +148,7 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
 
     sede_actual = None
     if target_location_ids:
-        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+        sede_actual = db.session.get(Location, target_location_ids[0])
 
     # Períodos disponibles para el filtro (meses con actividad real en las sedes)
     try:
@@ -282,7 +282,7 @@ def get_manager_context(current_user, location_id=None, period_start=None):
     # Sede actual para mostrar en el Header
     sede_actual = None
     if target_location_ids:
-        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+        sede_actual = db.session.get(Location, target_location_ids[0])
 
     # Períodos disponibles para el filtro (meses con actividad real en las sedes)
     try:
@@ -679,7 +679,7 @@ def get_management_context(current_user, location_id=None, period_start=None):
 
     sede_actual = None
     if target_location_ids:
-        sede_actual = Location.query.get(target_location_ids[0]) if hasattr(Location, 'query') else None
+        sede_actual = db.session.get(Location, target_location_ids[0])
 
     # Períodos disponibles para el filtro
     try:

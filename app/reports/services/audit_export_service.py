@@ -823,7 +823,7 @@ def _cambios_edicion_compra(log):
         p_item = prev_details.get(key)
         c_item = curr_details.get(key)
         prod_id = (p_item['product_id'] if p_item else c_item['product_id'])
-        product_obj = Product.query.get(prod_id)
+        product_obj = db.session.get(Product, prod_id)
         prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
 
         if not p_item and c_item:

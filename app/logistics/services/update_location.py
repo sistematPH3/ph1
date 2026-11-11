@@ -4,7 +4,7 @@ from app.models import Location
 
 def update_location_service(location_id, form_data):
     try:
-        location = Location.query.get(location_id)
+        location = db.session.get(Location, location_id)
         if not location:
             return False, "La sede no existe."
 

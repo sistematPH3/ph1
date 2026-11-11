@@ -18,6 +18,7 @@ except ImportError:
     from run import app
 
 from app.waste.services.waste_audit_service import WasteAuditService
+from app.models.waste_model import Waste
 
 
 class DummyUser:
@@ -94,8 +95,8 @@ class TestWasteAuditService(unittest.TestCase):
         mock_range.assert_not_called()
 
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
-    @patch('app.models.waste_model.Waste.query')
-    def test_audit_trail_creation_event_is_pending(self, mock_waste_query, mock_get_logs):
+    @patch('app.waste.services.waste_audit_service.db.session.get')
+    def test_audit_trail_creation_event_is_pending(self, mock_get, mock_get_logs):
         """Verifica que un log con acción CREAR devuelva estado PENDIENTE."""
         mock_log = DummyLog(
             log_id=1,
@@ -108,7 +109,7 @@ class TestWasteAuditService(unittest.TestCase):
             }
         )
         mock_get_logs.return_value = [mock_log]
-        mock_waste_query.get.return_value = None
+        mock_get.return_value = None
 
         result = WasteAuditService.get_formatted_audit_trail(self.admin_user, {})
 
@@ -117,8 +118,8 @@ class TestWasteAuditService(unittest.TestCase):
         self.assertFalse(result[0]['is_reverted'])
 
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
-    @patch('app.models.waste_model.Waste.query')
-    def test_audit_trail_approval_event_is_approved(self, mock_waste_query, mock_get_logs):
+    @patch('app.waste.services.waste_audit_service.db.session.get')
+    def test_audit_trail_approval_event_is_approved(self, mock_get, mock_get_logs):
         """Verifica que un log con acción APROBAR devuelva estado APROBADO."""
         mock_log = DummyLog(
             log_id=2,
@@ -129,7 +130,7 @@ class TestWasteAuditService(unittest.TestCase):
             }
         )
         mock_get_logs.return_value = [mock_log]
-        mock_waste_query.get.return_value = None
+        mock_get.return_value = None
 
         result = WasteAuditService.get_formatted_audit_trail(self.admin_user, {})
 
@@ -138,8 +139,8 @@ class TestWasteAuditService(unittest.TestCase):
         self.assertFalse(result[0]['is_reverted'])
 
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
-    @patch('app.models.waste_model.Waste.query')
-    def test_audit_trail_rejection_event_is_rejected(self, mock_waste_query, mock_get_logs):
+    @patch('app.waste.services.waste_audit_service.db.session.get')
+    def test_audit_trail_rejection_event_is_rejected(self, mock_get, mock_get_logs):
         """Verifica que un log con acción RECHAZO devuelva estado RECHAZADO."""
         mock_log = DummyLog(
             log_id=3,
@@ -150,7 +151,7 @@ class TestWasteAuditService(unittest.TestCase):
             }
         )
         mock_get_logs.return_value = [mock_log]
-        mock_waste_query.get.return_value = None
+        mock_get.return_value = None
 
         result = WasteAuditService.get_formatted_audit_trail(self.admin_user, {})
 
@@ -158,12 +159,14 @@ class TestWasteAuditService(unittest.TestCase):
         self.assertEqual(result[0]['status'], 'RECHAZADO')
 
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
-    @patch('app.models.waste_model.Waste.query')
-    def test_audit_trail_reverted_waste_sets_is_reverted_true(self, mock_waste_query, mock_get_logs):
+    @patch('app.waste.services.waste_audit_service.db.session.get')
+    def test_audit_trail_reverted_waste_sets_is_reverted_true(self, mock_get, mock_get_logs):
         """Verifica que si la merma original está REVERTIDA en BD, is_reverted sea True."""
         mock_waste_obj = MagicMock()
         mock_waste_obj.status = 'REVERTIDO'
-        mock_waste_query.get.return_value = mock_waste_obj
+        mock_get.side_effect = (
+            lambda modelo, pk: mock_waste_obj if modelo is Waste else None
+        )
 
         mock_log = DummyLog(
             log_id=4,
@@ -179,8 +182,8 @@ class TestWasteAuditService(unittest.TestCase):
         self.assertTrue(result[0]['is_reverted'])
 
     @patch('app.waste.repositories.waste_audit_repository.WasteAuditRepository.get_audit_logs')
-    @patch('app.models.waste_model.Waste.query')
-    def test_audit_trail_handles_edited_waste(self, mock_waste_query, mock_get_logs):
+    @patch('app.waste.services.waste_audit_service.db.session.get')
+    def test_audit_trail_handles_edited_waste(self, mock_get, mock_get_logs):
         """Verifica que eventos de EDICION o CORRECCION se registren como PENDIENTE."""
         mock_log = DummyLog(
             log_id=5,
@@ -191,7 +194,7 @@ class TestWasteAuditService(unittest.TestCase):
             }
         )
         mock_get_logs.return_value = [mock_log]
-        mock_waste_query.get.return_value = None
+        mock_get.return_value = None
 
         result = WasteAuditService.get_formatted_audit_trail(self.admin_user, {})
 
