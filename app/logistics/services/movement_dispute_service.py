@@ -333,9 +333,22 @@ def resolve_dispute(movement_id, payload, user_id):
 
     Eleva excepciones si algo falla (el commit/rollback se maneja aquí).
     """
-    movement = db.session.get(Movement, movement_id)
+    # Se bloquea la fila (SELECT ... FOR UPDATE) para que dos resoluciones
+    # simultáneas de la misma disputa no se pisen y acrediten el stock dos
+    # veces. Además se exige que siga en disputa: si ya fue resuelta, reintentar
+    # debe fallar en vez de volver a mover inventario (idempotencia).
+    movement = (
+        db.session.query(Movement)
+        .filter_by(id=movement_id)
+        .with_for_update()
+        .first()
+    )
     if not movement:
         raise ValueError("El traslado especificado no existe.")
+    if movement.status not in DISPUTE_STATUSES:
+        raise ValueError(
+            "La disputa de este traslado ya fue resuelta o no está pendiente."
+        )
 
     general_notes = payload.get("general_notes", "")
     _, erroneous_products, audit_items_map = _get_reception_audit(movement)

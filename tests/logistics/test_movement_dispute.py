@@ -443,6 +443,46 @@ class ResolveDisputeTest(unittest.TestCase):
         # Solo se liberan los 2 de esta disputa: quedan 8 en tránsito (no 6).
         self.assertEqual(float(env["inv_origin"].transit_quantity), 8.00)
 
+    # =========================================================================
+    # CASO 7: resolver la misma disputa dos veces es un error y NO vuelve a
+    # mover stock (idempotencia). Antes, el segundo intento acreditaba el
+    # inventario otra vez porque no se validaba el estado.
+    # =========================================================================
+    def test_resolver_dos_veces_falla_y_no_duplica_stock(self):
+        env = self._seed(
+            status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+            dispatched=10, received=8
+        )
+        payload = {
+            f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+            "general_notes": "OK, se queda la mercancía"
+        }
+
+        resolve_dispute(env["mov"].id, payload, user_id=env["user"].id)
+        db.session.refresh(env["inv_origin"])
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id
+        ).first()
+        # Estado tras la primera resolución.
+        self.assertEqual(float(inv_dest.current_quantity), 8.00)
+        self.assertEqual(float(env["inv_origin"].current_quantity), 2.00)
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
+
+        # Segundo intento: la disputa ya no está pendiente -> error.
+        with self.assertRaises(ValueError):
+            resolve_dispute(env["mov"].id, payload, user_id=env["user"].id)
+
+        # El stock NO se movió de nuevo.
+        db.session.refresh(env["inv_origin"])
+        db.session.refresh(inv_dest)
+        self.assertEqual(float(inv_dest.current_quantity), 8.00)
+        self.assertEqual(float(env["inv_origin"].current_quantity), 2.00)
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
+        # Y no se registró una segunda resolución en la auditoría.
+        self.assertEqual(
+            AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").count(), 1
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
