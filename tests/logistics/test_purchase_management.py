@@ -243,11 +243,12 @@ class StockDisponibleTest(PurchaseManagementTestBase):
     y el chequeo no agregaba duplicados por producto."""
 
     def test_no_se_puede_reducir_stock_comprometido_en_transito(self):
-        # Físico 10, en tránsito 8 => solo 2 disponibles. Bajar el renglón a 5
-        # exigiría quitar 5 unidades de las 2 realmente disponibles.
+        # Físico 10 (2 libres + 8 en tránsito) => solo 2 disponibles. Bajar el
+        # renglón a 5 exigiría quitar 5 unidades de las 2 realmente disponibles.
         compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('10.00'),
                                               Decimal('5.00'))])
         inv = self.stock(self.prod_a.id)
+        inv.current_quantity = Decimal('2.00')
         inv.transit_quantity = Decimal('8.00')
         db.session.commit()
 
@@ -259,13 +260,15 @@ class StockDisponibleTest(PurchaseManagementTestBase):
             self.repo.logical_edit(compra.id, self.admin.id, items, "reducir")
         self.assertIn("Producto A", str(ctx.exception))
         # El stock físico no se tocó al rechazar.
-        self.assertEqual(self.total_stock(self.prod_a.id), Decimal('10.00'))
+        self.assertEqual(self.total_stock(self.prod_a.id), Decimal('2.00'))
 
     def test_reduccion_dentro_del_disponible_si_se_permite(self):
         # Mismo escenario pero bajando solo 1: hay 2 disponibles, así que vale.
         compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('10.00'),
                                               Decimal('5.00'))])
-        self.stock(self.prod_a.id).transit_quantity = Decimal('8.00')
+        inv = self.stock(self.prod_a.id)
+        inv.current_quantity = Decimal('2.00')
+        inv.transit_quantity = Decimal('8.00')
         db.session.commit()
 
         detalle_id = db.session.query(PurchaseDetail).filter_by(
@@ -273,7 +276,7 @@ class StockDisponibleTest(PurchaseManagementTestBase):
         items = [self.item(detalle_id, quantity=9, foreign_price=5)]
         self.assertTrue(self.repo.logical_edit(compra.id, self.admin.id, items,
                                                "reducir dentro del disponible"))
-        self.assertEqual(self.total_stock(self.prod_a.id), Decimal('9.00'))
+        self.assertEqual(self.total_stock(self.prod_a.id), Decimal('1.00'))
 
     def test_no_se_puede_anular_stock_con_merma_pendiente(self):
         compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('10.00'),

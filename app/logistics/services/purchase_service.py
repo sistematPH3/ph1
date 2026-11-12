@@ -17,6 +17,17 @@ class PurchaseService:
     @staticmethod
     def register_purchase(data):
         try:
+            # Se usa normalizar_moneda y no la limpieza propia de antes: el
+            # validador ya reconocia 'BS,S', 'BS.', 'BSS', 'BOLIVAR', etc.
+            # como bolívares, pero aqui la comparacion contra ('VES','BS')
+            # no los cubria, asi que una compra en 'BS,S' pasaba la validacion
+            # como bolivares y despues se guardaba como estranjera,
+            # multiplicando el monto por la tasa (3.000 Bs x 36,5 = 109.500).
+            currency = normalizar_moneda(data.get('currency'))
+            if currency not in ('USD', 'EUR', 'BS'):
+                raise ValueError(
+                    'La moneda de la compra debe ser USD, EUR o BS.')
+
             items = data.get('items') or []
             if not items:
                 return {
@@ -25,13 +36,6 @@ class PurchaseService:
                 }
 
             purchase_date = current_ve_time()
-            # Se usa normalizar_moneda y no la limpieza propia de antes: el
-            # validador ya reconocia 'BS,S', 'BS.', 'BSS', 'BOLIVAR', etc.
-            # como bolívares, pero aqui la comparacion contra ('VES','BS')
-            # no los cubria, asi que una compra en 'BS,S' pasaba la validacion
-            # como bolivares y despues se guardaba como estranjera,
-            # multiplicando el monto por la tasa (3.000 Bs x 36,5 = 109.500).
-            currency = normalizar_moneda(data['currency'])
 
             exchange_rate = Decimal(normalizar_numero(data['exchange_rate']))
             if not exchange_rate.is_finite() or exchange_rate <= 0:

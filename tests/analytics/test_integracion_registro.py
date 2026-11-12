@@ -505,19 +505,19 @@ class RegistroSnapshotsTest(unittest.TestCase):
     def test_registrar_compra_moneda_no_soportada_rechazada(self):
         from app.logistics.services.purchase_service import PurchaseService
         res = PurchaseService.register_purchase({
-            "supplier_id": self.supplier.id, "currency": "BS", "exchange_rate": 36.5,
+            "supplier_id": self.supplier.id, "currency": "JPY", "exchange_rate": 36.5,
             "user_id": self.user.id, "invoice_url": "", "items": [],
         })
         self.assertFalse(res["success"])
-        self.assertIn("USD o EUR", res["message"])
+        self.assertIn("USD, EUR o BS", res["message"])
 
     def test_snapshot_omite_compra_con_moneda_inedita(self):
-        # Defensa a nivel de lectura: una compra con moneda fuera de USD/EUR
+        # Defensa a nivel de lectura: una compra con moneda fuera de USD/EUR/BS
         # (legacy o mala data) no distorsiona el cajón ni se valora como USD.
         from app.analytics.services.snapshots_service import generar_snapshots
         p = Purchase(
             purchase_date=datetime.now() - timedelta(minutes=2),
-            total_amount=Decimal("50.00"), currency="BS",
+            total_amount=Decimal("50.00"), currency="JPY",
             exchange_rate=Decimal("36.50"), invoice_url="http://x",
             status="COMPLETED", user_id=self.user.id,
         )
