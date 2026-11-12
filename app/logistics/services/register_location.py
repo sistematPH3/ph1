@@ -1,5 +1,10 @@
+import logging
+
 from app.extensions import db
 from app.models import Location 
+
+logger = logging.getLogger(__name__)
+
 
 def register_location_service(form_data):
     """
@@ -20,5 +25,6 @@ def register_location_service(form_data):
         db.session.commit()
         return True, "Sede registrada exitosamente."
     except Exception as e:
+        logger.exception("Error al registrar la sede")
         db.session.rollback()
         return False, f"Error al registrar: {str(e)}"

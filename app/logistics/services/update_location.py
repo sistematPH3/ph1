@@ -1,6 +1,11 @@
 # app/logistics/services/update_location.py
+import logging
+
 from app.extensions import db
 from app.models import Location
+
+logger = logging.getLogger(__name__)
+
 
 def update_location_service(location_id, form_data):
     try:
@@ -18,5 +23,6 @@ def update_location_service(location_id, form_data):
         db.session.commit()
         return True, "Sede actualizada correctamente."
     except Exception as e:
+        logger.exception("Error al actualizar la sede %s", location_id)
         db.session.rollback()
         return False, f"Error al actualizar: {str(e)}"

@@ -1,6 +1,10 @@
+import logging
+
 from flask import Flask
 from .extensions import db, mail, login_manager 
 from .config import Config
+
+logger = logging.getLogger(__name__)
 
 
 def ph_qty(value):
@@ -257,7 +261,10 @@ def create_app():
             if can_view:
                 try:
                     count = get_pending_disputes_count()
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "No se pudo obtener el contador de disputas pendientes: %s", exc,
+                    )
                     count = 0
             # Mermas pendientes de resolución (círculo rojo del sidebar).
             waste_count = 0
@@ -265,7 +272,10 @@ def create_app():
                 try:
                     from app.waste.services.waste_approvals_service import get_pending_waste_summary
                     waste_count = get_pending_waste_summary(current_user.id)['pending_count']
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "No se pudo obtener el contador de mermas pendientes: %s", exc,
+                    )
                     waste_count = 0
             return {
                 'pending_disputes_count': count,

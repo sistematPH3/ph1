@@ -1,10 +1,14 @@
 import json
+import logging
 from datetime import datetime
 from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import func, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Product, Purchase, PurchaseDetail, AuditLog
+
+logger = logging.getLogger(__name__)
+
 
 class MovementDispatchRepository:
 
@@ -191,7 +195,11 @@ class MovementDispatchRepository:
             if isinstance(c_data, str):
                 try:
                     c_data = json.loads(c_data)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                        exc,
+                    )
                     continue
             if isinstance(c_data, dict):
                 p_id = c_data.get('product_id')

@@ -1,8 +1,11 @@
 import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 # 1. Ajustar el path para que el script pueda encontrar tu carpeta 'app'
 # Esto asume que tasks_bcv.py está en app/integrations/api_bcv/
@@ -41,8 +44,8 @@ def obtener_y_guardar_tasas():
             else:
                 print(f"Error HTTP: {response.status_code}")
             
-        except Exception as e:
-            print(f"Error al guardar: {e}")
+        except Exception:
+            logger.exception("Error al obtener y guardar las tasas del BCV")
 
 if __name__ == "__main__":
     obtener_y_guardar_tasas()

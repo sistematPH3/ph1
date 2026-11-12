@@ -1,9 +1,12 @@
 from datetime import datetime
+import logging
 
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
 from app.models.security_model import User, PasswordRecovery
+
+logger = logging.getLogger(__name__)
 
 
 def ahora():
@@ -90,9 +93,9 @@ def guardar_token(email, token, expiracion):
         db.session.add(recuperacion)
         db.session.commit()
         return True, usuario.id
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"Error en BD al guardar token: {e}")
+        logger.exception("Error en BD al guardar token de recuperación")
         return False, None
 
 
@@ -104,8 +107,9 @@ def eliminar_token(token):
         )
         db.session.commit()
         return True
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
+        logger.warning("No se pudo eliminar el token de recuperación: %s", exc)
         return False
 
 
@@ -134,9 +138,9 @@ def actualizar_password_con_token(token, nueva_password):
         recuperacion.used = True
         db.session.commit()
         return True, usuario.id
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"Error al procesar el cambio de contraseña: {e}")
+        logger.exception("Error al procesar el cambio de contraseña con token")
         return False, None
 
 
@@ -148,9 +152,9 @@ def consultar_vigencia_token(token):
             PasswordRecovery.used.is_(False),
             PasswordRecovery.expires_at > ahora(),
         ).first() is not None
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
-        print("Error al consultar la vigencia del token")
+        logger.warning("Error al consultar la vigencia del token: %s", exc)
         return False
 
 
@@ -170,6 +174,7 @@ def purgar_tokens_vencidos():
         ).delete(synchronize_session=False)
         db.session.commit()
         return vencidos
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
+        logger.warning("No se pudieron purgar los tokens vencidos: %s", exc)
         return 0

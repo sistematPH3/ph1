@@ -1,8 +1,12 @@
 import json
+import logging
 from app.extensions import db
 from app.waste.repositories.waste_audit_repository import WasteAuditRepository
 from app.models.waste_model import Waste, WasteType, WasteDetail
 from app.models.inventory_model import Product
+
+logger = logging.getLogger(__name__)
+
 
 class WasteAuditService:
 
@@ -37,8 +41,10 @@ class WasteAuditService:
         # Ordenamiento cronológico (más recientes primero)
         try:
             logs = sorted(logs, key=lambda x: getattr(x, 'id', 0) or 0, reverse=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudieron ordenar los logs de auditoría: %s", exc,
+            )
 
         # Caché local para optimizar consultas de BD
         product_cache = {}
@@ -54,7 +60,11 @@ class WasteAuditService:
                     p = db.session.get(Product, pid)
                     product_unit_cache[pid] = getattr(p, 'unit_of_measure', None) if p else None
                 return product_unit_cache[pid]
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo resolver la unidad del producto %s: %s",
+                    product_id, exc,
+                )
                 return None
 
         def resolve_product_name(product_id):
@@ -66,7 +76,11 @@ class WasteAuditService:
                     p = db.session.get(Product, pid)
                     product_cache[pid] = p.name if p else None
                 return product_cache[pid]
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo resolver el nombre del producto %s: %s",
+                    product_id, exc,
+                )
                 return None
 
         def resolve_waste_type_name(wt_id):
@@ -78,7 +92,11 @@ class WasteAuditService:
                     wt = db.session.get(WasteType, wpid)
                     waste_type_cache[wpid] = wt.name if wt else (wt.code if wt else None)
                 return waste_type_cache[wpid]
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo resolver el nombre del tipo de merma %s: %s",
+                    wt_id, exc,
+                )
                 return None
 
         def _resolve_decision_motivo(item):
@@ -117,7 +135,11 @@ class WasteAuditService:
             if isinstance(raw_data, str):
                 try:
                     changed_data = json.loads(raw_data)
-                except Exception:
+                except Exception as exc:
+                    logger.debug(
+                        "No se pudo interpretar changed_data como JSON; se usa texto plano: %s",
+                        exc,
+                    )
                     changed_data = {'detalle': raw_data}
             elif isinstance(raw_data, dict):
                 changed_data = dict(raw_data)
@@ -432,8 +454,11 @@ class WasteAuditService:
                                 getattr(waste_obj, 'photo_url', None) or 
                                 getattr(waste_obj, 'evidence', None)
                             )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        "No se pudo completar el detalle del log de auditoría %s: %s",
+                        getattr(log, 'id', '?'), exc,
+                    )
 
             # EVALUACIÓN DEL ESTADO HISTÓRICO DE ESTE LOG
             action_signals = []

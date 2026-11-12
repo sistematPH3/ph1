@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 from app.time_utils import current_ve_time
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -7,6 +8,8 @@ from app.waste.repositories.register_waste_repository import RegisterWasteReposi
 from app.waste.requests.waste_edit_validators import validate_edit_payload, validate_reversal_payload
 from app.waste.services.register_waste_service import user_can_access_location
 from app.inventory.services.product_cost_service import obtener_costo_unitario
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt_quantity(value):
@@ -224,7 +227,11 @@ class WasteEditService:
             try:
                 for v in RegisterWasteRepository.get_expired_lots(waste.location_id):
                     vencidos.add((int(v["product_id"]), str(v["lot_number"]).strip()))
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudieron obtener los lotes vencidos de la sede %s: %s",
+                    waste.location_id, exc,
+                )
                 vencidos = set()
 
         # La edición solo ajusta los productos ya registrados en la merma; no

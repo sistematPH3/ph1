@@ -5,6 +5,7 @@ Contiene TODA la lógica de negocio: listar pendientes, ver detalle, aprobar
 audita). Solo el Administrador aprueba/rechaza; el resto de roles (con cola de
 pendientes) solo ve su bandeja en solo lectura.
 """
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from app.time_utils import current_ve_time
@@ -13,6 +14,8 @@ from app.extensions import db
 from app.models.inventory_model import Product
 from app.models.security_model import Notification
 from app.waste.repositories.waste_approvals_repository import MermaApprovalsRepository
+
+logger = logging.getLogger(__name__)
 
 # Tipos de evento de la auditoría de mermas (van dentro de changed_data['event'],
 # nunca en audit_logs.action, que siempre es 'MERMA').
@@ -543,6 +546,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
     try:
         cambios = _descontar_stock_lines(waste, aprobar) if aprobar else []
     except Exception as exc:
+        logger.exception("Error al descontar el stock de las líneas aprobadas")
         db.session.rollback()
         return {'success': False, 'message': str(exc)}
 
@@ -772,6 +776,7 @@ def cancel_waste(waste_id, user_id, reason):
         db.session.commit()
         return {'success': True, 'message': f'Merma #{waste.id} cancelada (no se tocó el stock).'}
     except Exception as exc:
+        logger.exception("Error al cancelar la merma %s", waste.id)
         db.session.rollback()
         return {'success': False, 'message': f'Error al cancelar la merma: {str(exc)}'}
 

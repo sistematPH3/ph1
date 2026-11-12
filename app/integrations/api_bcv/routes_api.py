@@ -1,9 +1,12 @@
 from flask import Blueprint, jsonify, request, render_template
+import logging
 import requests
 from bs4 import BeautifulSoup
 import urllib3
 
 from app.decorators.roles import admin_required, require_roles_api
+
+logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -24,8 +27,8 @@ def get_bcv_rate_from_web(currency):
         if rate_div:
             rate_str = rate_div.find('strong').text.strip().replace(',', '.')
             return float(rate_str)
-    except Exception as e:
-        print(f"Error scraping BCV: {e}")
+    except Exception as exc:
+        logger.warning("Error scraping BCV (%s): %s", currency, exc)
     return None
 
 @api_bcv_bp.route('/prueba-bcv', methods=['GET'])

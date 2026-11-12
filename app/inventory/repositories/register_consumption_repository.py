@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from sqlalchemy import func, or_
 from app.extensions import db
@@ -7,6 +8,9 @@ from app.models.inventory_model import Inventory, Product
 from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
 from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.security_model import User, user_locations
+
+logger = logging.getLogger(__name__)
+
 
 class RegisterConsumptionRepository:
     @staticmethod
@@ -143,7 +147,11 @@ class RegisterConsumptionRepository:
             if isinstance(c_data, str):
                 try:
                     c_data = json.loads(c_data)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                        exc,
+                    )
                     continue
             if not isinstance(c_data, dict):
                 continue

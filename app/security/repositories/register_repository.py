@@ -1,5 +1,10 @@
+import logging
+
 from app.models.security_model import User
 from app import db  # Importamos la instancia de SQLAlchemy
+
+logger = logging.getLogger(__name__)
+
 
 class RegisterRepository:
     @staticmethod
@@ -14,7 +19,7 @@ class RegisterRepository:
             db.session.add(nuevo_usuario)
             db.session.commit()
             return True
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Error al registrar: {e}")
+            logger.exception("Error al registrar el usuario en la base de datos")
             return False

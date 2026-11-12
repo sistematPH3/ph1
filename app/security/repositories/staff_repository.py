@@ -1,6 +1,11 @@
+import logging
+
 from app.extensions import db
 from app.models.security_model import User, Role 
 from app.models.logistics_model import Location 
+
+logger = logging.getLogger(__name__)
+
 
 class StaffRepository:
     @staticmethod
@@ -35,6 +40,10 @@ class StaffRepository:
             return True, "Usuario actualizado correctamente"
         except Exception as e:
             db.session.rollback()
+            logger.exception(
+                "Error al actualizar el usuario %s",
+                getattr(user, 'id', '?'),
+            )
             error_msg = str(e)
             
             # Detectamos si el error de la base de datos es por correo duplicado

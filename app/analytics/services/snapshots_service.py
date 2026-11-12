@@ -4,6 +4,7 @@ Orquesta la generación de snapshots (UPSERT idempotente), la evaluación de
 alarmas de irregularidad, la configuración (factor y mínimo) y los datos que
 consumen el dashboard del Admin y el panel /estadisticas.
 """
+import logging
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -16,6 +17,8 @@ from app.analytics.repositories import snapshots_repository as repo
 from app.analytics.requests.statistics_validators import validate_config_payload
 from app.inventory.services import product_cost_service
 from app.logistics.repositories.movement_dispute_repository import MovementDisputeRepository
+
+logger = logging.getLogger(__name__)
 
 PERIOD_TYPES = (
     SnapshotPeriodType.WEEKLY,
@@ -261,6 +264,7 @@ def _generar_snapshots_ventana(ventana, period_type, user_id, chunk_size=50):
             db.session.commit()
         return {'success': True, 'message': 'Snapshots actualizados.', 'períodos': len(ventana), 'registros': totales}
     except Exception as exc:
+        logger.exception("Error al generar los snapshots de la ventana")
         db.session.rollback()
         return {'success': False, 'message': f'Error al generar snapshots: {exc}'}
 
@@ -496,8 +500,7 @@ def _crear_notificaciones_alarmas(alertas_para_notificar, period_type, period_st
             db.session.commit()
         except Exception as exc:
             db.session.rollback()
-            # Log error but don't crash
-            pass
+            logger.exception("No se pudieron guardar las notificaciones de alarmas")
 
 
 def obtener_grafico_evolucion(period_type=SnapshotPeriodType.MONTHLY, corte=None,

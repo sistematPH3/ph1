@@ -83,7 +83,11 @@ def filas_consumo_cocina(inicio, fin):
         data = data if isinstance(data, dict) else {}
         try:
             cantidad = abs(Decimal(str(data.get('quantity_changed', 0) or 0)))
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "No se pudo interpretar la cantidad del AuditLog %s: %s",
+                log.id, exc,
+            )
             cantidad = Decimal('0.00')
         product_id = data.get('product_id')
         if product_id is None:

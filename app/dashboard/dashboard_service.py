@@ -153,7 +153,12 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
     # Períodos disponibles para el filtro (meses con actividad real en las sedes)
     try:
         anc_fechas = _anclas_reales(target_location_ids, False, 12)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron calcular los períodos con actividad real; "
+            "se usa la ventana por defecto: %s", exc,
+        )
         anc_fechas = [
             _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
         ]
@@ -287,7 +292,12 @@ def get_manager_context(current_user, location_id=None, period_start=None):
     # Períodos disponibles para el filtro (meses con actividad real en las sedes)
     try:
         anc_fechas = _anclas_reales(target_location_ids, False, 12)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron calcular los períodos con actividad real; "
+            "se usa la ventana por defecto: %s", exc,
+        )
         anc_fechas = [
             _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
         ]
@@ -355,7 +365,11 @@ def get_manager_context(current_user, location_id=None, period_start=None):
                     m_orig = m.get('origin_location_id') if isinstance(m, dict) else getattr(m, 'origin_location_id', None)
                     if m_dest == location_id or m_orig == location_id:
                         traslados_en_transito += 1
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron contar los traslados en tránsito del panel gerente: %s", exc,
+        )
         traslados_en_transito = 0
 
   # 4. ALERTAS DE STOCK Y VENCIDOS
@@ -450,7 +464,12 @@ def get_manager_context(current_user, location_id=None, period_start=None):
                 if isinstance(c_data, str):
                     try:
                         c_data = json.loads(c_data)
-                    except Exception:
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                            exc,
+                        )
                         continue
                 if isinstance(c_data, dict):
                     try:
@@ -684,7 +703,12 @@ def get_management_context(current_user, location_id=None, period_start=None):
     # Períodos disponibles para el filtro
     try:
         anc_fechas = _anclas_reales(target_location_ids, False, 12)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron calcular los períodos con actividad real; "
+            "se usa la ventana por defecto: %s", exc,
+        )
         anc_fechas = [
             _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
         ]
@@ -761,7 +785,12 @@ def get_management_context(current_user, location_id=None, period_start=None):
                 if isinstance(c_data, str):
                     try:
                         c_data = json.loads(c_data)
-                    except Exception:
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                            exc,
+                        )
                         continue
                 if isinstance(c_data, dict):
                     try:
@@ -787,7 +816,11 @@ def get_management_context(current_user, location_id=None, period_start=None):
             por_recibir = [m for m in por_recibir if m.get('destination_location_id') == location_id or m.get('origin_location_id') == location_id]
 
         traslados_en_transito = len(en_camino) + len(por_recibir)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron contar los traslados en tránsito del panel de gestión: %s", exc,
+        )
         traslados_en_transito = 0
 
     alarmas_stock = obtener_alarmas_para_dashboard()
@@ -895,7 +928,12 @@ def get_operations_context(current_user, location_id=None, period_start=None):
     # Períodos disponibles para el filtro (igual que el resto de los paneles)
     try:
         anc_fechas = _anclas_reales(target_location_ids, False, 12)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron calcular los períodos con actividad real; "
+            "se usa la ventana por defecto: %s", exc,
+        )
         anc_fechas = [
             _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
         ]
@@ -928,8 +966,12 @@ def get_operations_context(current_user, location_id=None, period_start=None):
         query_recibidos = query_recibidos.filter(Movement.date >= periodo_inicio)
         if periodo_fin:
             query_recibidos = query_recibidos.filter(Movement.date < periodo_fin)
-    except (TypeError, NotImplementedError):
-        pass
+    except (TypeError, NotImplementedError) as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudo aplicar el filtro de período a los traslados recibidos: %s",
+            exc,
+        )
     traslados_recibidos_count = query_recibidos.count()
 
     # 2. RECEPCIONES PENDIENTES EN MI SEDE (Movimientos EN_TRANSITO donde mi sede es DESTINO)

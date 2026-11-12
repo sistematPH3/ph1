@@ -1,10 +1,13 @@
 import json
+import logging
 from decimal import Decimal, InvalidOperation
 from app.time_utils import current_ve_time
 from app import db
 from app.models import Product
 from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
 from app.logistics.requests.movement_reception_validators import validate_reception_payload
+
+logger = logging.getLogger(__name__)
 
 
 def _derive_auto_novelty(processed_items):
@@ -442,5 +445,6 @@ class MovementReceptionService:
             return True, "Recepción procesada exitosamente."
 
         except Exception as e:
+            logger.exception("Error transaccional al procesar la recepción")
             db.session.rollback()
             return False, f"Error transaccional al procesar recepción: {str(e)}"

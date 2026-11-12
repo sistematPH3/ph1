@@ -73,8 +73,12 @@ def _asegurar_snapshots(period_type, user_id=None, location_ids=None):
             )
             inicio, fin = calcular_periodo(period_type)
             generar_snapshot_periodo(period_type, inicio, fin, user_id=user_id)
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron asegurar los snapshots del período %s: %s",
+            period_type, exc,
+        )
 
 
 @dashboard_bp.route('/')
@@ -213,7 +217,11 @@ def admin_dashboard():
     vencidos = obtener_vencidos_para_dashboard(current_user)
     try:
         expiring_lots = get_expiring_lots(current_user, limit=6)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron obtener los lotes por vencer del panel admin: %s", exc,
+        )
         expiring_lots = []
     period_type = validate_period_type(request.args.get('period'))
     default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
@@ -233,27 +241,47 @@ def admin_dashboard():
         )
         if flujo_traslados['serie']['cost']:
             datos_grafico['metrics']['TRANSFERS'] = flujo_traslados['serie']['cost']
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudo obtener el flujo de traslados del panel admin: %s", exc,
+        )
         flujo_traslados = None
     try:
         pendientes = obtener_pendientes()
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron obtener los pendientes del panel admin: %s", exc,
+        )
         pendientes = {'mermas_pendientes': 0, 'traslados_en_transito': 0, 'disputas_pendientes': 0}
     try:
         costo_operativo = obtener_costo_operativo(
             period_type, moneda=moneda, location_ids=location_ids,
         )
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudo obtener el costo operativo del panel admin: %s", exc,
+        )
         costo_operativo = {'total': '0.00', 'moneda': moneda}
     try:
         comparativo = obtener_comparativo(
             period_type, moneda=moneda, location_ids=location_ids,
         )
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudo obtener el comparativo del panel admin: %s", exc,
+        )
         comparativo = {'metricas': {}}
     try:
         mermas_por_tipo = obtener_mermas_por_tipo(period_type, location_ids=location_ids)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron obtener las mermas por tipo del panel admin: %s", exc,
+        )
         mermas_por_tipo = {'tipos': []}
     return render_template(
         'dashboard/admin_dashboard.html',
@@ -311,7 +339,11 @@ def operations_dashboard():
     expiring_lots = []
     try:
         expiring_lots = get_expiring_lots(current_user, limit=5, horizon_days=7)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "No se pudieron obtener los lotes por vencer del panel de operaciones: %s", exc,
+        )
         expiring_lots = []
 
     sedes = ctx.get('sedes', []) or []

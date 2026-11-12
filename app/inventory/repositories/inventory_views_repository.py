@@ -1,9 +1,13 @@
 import json
+import logging
 from sqlalchemy import func
 from app import db
 from app.models import Inventory, Product, Location, user_locations
 from app.models.logistics_model import Purchase, PurchaseDetail, Movement, MovementDetail
 from app.models.waste_model import AuditLog
+
+logger = logging.getLogger(__name__)
+
 
 class InventoryViewRepository:
     
@@ -220,7 +224,11 @@ class InventoryViewRepository:
             if isinstance(c_data, str):
                 try:
                     c_data = json.loads(c_data)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                        exc,
+                    )
                     continue
             if not isinstance(c_data, dict):
                 continue

@@ -1,9 +1,13 @@
+import logging
 from app.time_utils import current_ve_time
 from decimal import Decimal
 from sqlalchemy import text
 from app.extensions import db
 from app.models.waste_model import Waste, WasteDetail, WasteType, WasteDetailPhoto, AuditLog
 from app.models.inventory_model import Inventory, Product
+
+logger = logging.getLogger(__name__)
+
 
 class WasteEditRepository:
 
@@ -63,8 +67,11 @@ class WasteEditRepository:
                         })
                 if formatted:
                     return formatted
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudieron obtener los lotes del producto %s en la sede %s: %s",
+                product_id, location_id, exc,
+            )
 
         inv_row = db.session.query(Inventory).filter(
             Inventory.location_id == location_id,

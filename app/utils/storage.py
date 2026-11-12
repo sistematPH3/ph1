@@ -1,7 +1,10 @@
 # app/utils/storage.py
 import boto3
+import logging
 import os
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 def get_s3_client():
     """
@@ -31,7 +34,8 @@ def subir_factura(file_stream, filename):
             filename
         )
         return True
-    except Exception as e:
-        # En una etapa de desarrollo, esto ayuda a depurar cualquier error de red
-        print(f"Error técnico de subida a B2: {e}")
+    except Exception:
+        # El detalle técnico queda en el log; al llamador se le sigue
+        # devolviendo False igual que antes.
+        logger.exception("Error técnico al subir %s a B2", filename)
         return False

@@ -5,7 +5,10 @@ from datetime import datetime, timedelta
 from app.time_utils import current_ve_time, TZ_VENEZUELA
 from decimal import Decimal
 import json
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 _MERMA_REJECT_EVENTS = {'MERMA_RECHAZADA', 'RECHAZADA', 'RECHAZADO', 'MERMA_REJECTED'}
 _MERMA_NOVEDADES = {
@@ -224,8 +227,11 @@ def process_inventory_action(log_id, current_user, action_type, new_quantity_req
                 res_ins = db.session.execute(text("SELECT id FROM insumos WHERE LOWER(nombre) = LOWER(:pname) LIMIT 1"), {'pname': str(product_name).strip()}).fetchone()
                 if res_ins:
                     product_id = res_ins[0]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudo resolver el producto por nombre '%s': %s",
+                product_name, exc,
+            )
 
     if not product_id:
         return {'success': False, 'message': 'El registro carece del identificador de insumo necesario para procesar la acción.'}
@@ -328,6 +334,7 @@ f"Stock actual: {_qty_str(current_stock)} unidades; este ajuste intenta desconta
             lot_number=lot_number
         )
     except Exception as e:
+        logger.exception("Error en BD al registrar el movimiento de auditoría de inventario")
         return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}
 
     return {'success': True, 'message': 'Acción procesada con éxito.'}
@@ -749,7 +756,10 @@ def get_inventory_audit_entries(filters, user, is_admin):
             wt.id: (wt.name or wt.code or f'Tipo {wt.id}')
             for wt in _WasteType.query.all()
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "No se pudieron cargar los nombres de los tipos de merma: %s", exc,
+        )
         merma_type_names = {}
 
     location_cache = {}

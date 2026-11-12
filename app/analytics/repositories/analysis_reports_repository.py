@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import timedelta
 from decimal import Decimal
 
@@ -11,6 +12,8 @@ from app.models.logistics_model import (ExchangeRateHistory, Location, Purchase,
                                          PurchaseDetail, Movement, MovementDetail)
 from app.models.inventory_model import Product
 from app.models.waste_model import AuditLog, Waste, WasteType
+
+logger = logging.getLogger(__name__)
 
 
 # Estados de un movimiento que nunca entran a las estadísticas: el traslado
@@ -798,7 +801,11 @@ def obtener_consumo_valorizado(location_ids, desde, hasta):
         if isinstance(c_data, str):
             try:
                 c_data = json.loads(c_data)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                    exc,
+                )
                 continue
         if not isinstance(c_data, dict):
             continue

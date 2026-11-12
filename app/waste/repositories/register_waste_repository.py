@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from sqlalchemy import func, or_
@@ -8,6 +9,9 @@ from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movem
 from app.models.waste_model import Waste, WasteType, WasteDetail, AppParameter, AuditLog
 from app.models.security_model import User, Notification, user_locations
 from app.inventory.services.lot_availability_service import _compute_lot_availability, get_expired_lots
+
+logger = logging.getLogger(__name__)
+
 
 class InsufficientStockError(Exception):
     pass
@@ -164,8 +168,11 @@ class RegisterWasteRepository:
                 .first()
             if detail and detail.foreign_price is not None:
                 return Decimal(str(detail.foreign_price))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudo obtener el costo del lote %s del producto %s: %s",
+                lot_number, product_id, exc,
+            )
         # Si el lote exacto no aparece en una compra completada (ej. sucursal que
         # recibió por traslado), se usa el último costo de compra del producto.
         try:
@@ -179,8 +186,11 @@ class RegisterWasteRepository:
                 .first()
             if fallback and fallback.foreign_price is not None:
                 return Decimal(str(fallback.foreign_price))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudo obtener el costo de respaldo del producto %s: %s",
+                product_id, exc,
+            )
         return Decimal('0.00')
 
     @staticmethod
@@ -223,7 +233,11 @@ class RegisterWasteRepository:
                     MovementDetail.expiration_date.isnot(None)
                 ).scalar()
                 return min_exp
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "No se pudo obtener el vencimiento del lote %s del producto %s: %s",
+                lot, prod_id, exc,
+            )
             return None
         return None
 

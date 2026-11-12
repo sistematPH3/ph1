@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import datetime
 from decimal import Decimal
@@ -9,6 +10,8 @@ from app.inventory.repositories.kitchen_expense_audit_repository import (
     KitchenExpenseAuditRepository,
 )
 from app.time_utils import TZ_VENEZUELA
+
+logger = logging.getLogger(__name__)
 
 _SEV_MAP = {
     'NORMAL': ('NORMAL', 'bg-success', 'bi-check-circle-fill'),
@@ -554,6 +557,7 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
             lot_number=lot_number or c.get('lot_number'),
         )
     except Exception as e:
+        logger.exception("Error en BD al registrar el movimiento de gasto de cocina")
         return {
             'success': False,
             'message': f'Error en base de datos al registrar el movimiento: {str(e)}',

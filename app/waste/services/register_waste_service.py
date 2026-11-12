@@ -1,7 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
+import logging
 import math
-import sys
 from sqlalchemy import text
 from app.models.inventory_model import db
 from app.models.waste_model import Waste, WasteDetail, WasteDetailPhoto
@@ -11,6 +11,9 @@ from app.waste.repositories.register_waste_repository import (
 )
 from app.inventory.services.product_cost_service import obtener_costo_unitario
 from app.time_utils import current_ve_time
+
+logger = logging.getLogger(__name__)
+
 
 def get_form_data(user_id):
     user = RegisterWasteRepository.get_user_by_id(user_id)
@@ -64,8 +67,11 @@ def _advisory_lock(request_id):
             text("SELECT pg_advisory_xact_lock(hashtext(:k)::bigint)"),
             {'k': 'waste_req:' + str(request_id)},
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "No se pudo tomar el lock de registro para la solicitud %s: %s",
+            request_id, exc,
+        )
 
 def _evaluate_pending(total_quantity, location_id, items):
     """
@@ -117,7 +123,11 @@ def _evaluate_pending(total_quantity, location_id, items):
                 if total >= Decimal(str(product.waste_limit)):
                     cantidad_excede = True
                     marcar(pid, 'LIMITE')
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo evaluar el límite de merma del producto %s: %s",
+                    pid, exc,
+                )
                 continue
 
     # Soporte por ítem: un producto puede tener un tipo propio que sí exija
@@ -437,7 +447,6 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
         db.session.rollback()
         return {'success': False, 'message': str(e)}
     except Exception as e:
-        import traceback
-        print("EXCEPTION:", traceback.format_exc(), file=sys.stderr)
+        logger.exception("Error al registrar la merma")
         db.session.rollback()
         return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}

@@ -1,7 +1,12 @@
+import logging
+
 from app.models.security_model import User
 from app.models.logistics_model import Location
 from app.extensions import db
 from app.models import LoginAudit
+
+logger = logging.getLogger(__name__)
+
 
 class UserManagementRepository:
     @staticmethod
@@ -55,8 +60,9 @@ class UserManagementRepository:
                 db.session.commit()
                 return True
             return False
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            # Imprime el error en la consola de Flask por si necesitas depurar algo más
-            print(f"Error detectado al eliminar usuario rechazado: {e}")
+            # El detalle queda en el log del servidor; al usuario se le sigue
+            # devolviendo el mismo False que antes.
+            logger.exception("Error al eliminar el usuario rechazado %s", user_id)
             return False

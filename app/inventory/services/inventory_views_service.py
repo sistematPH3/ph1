@@ -1,10 +1,14 @@
 import json
+import logging
 from decimal import Decimal
 from sqlalchemy import func, or_, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Purchase, PurchaseDetail, AuditLog
 from app.models.waste_model import Waste, WasteDetail
 from app.inventory.repositories.inventory_views_repository import InventoryViewRepository
+
+logger = logging.getLogger(__name__)
+
 
 class InventoryViewService:
 
@@ -274,7 +278,11 @@ class InventoryViewService:
             if isinstance(c_data, str):
                 try:
                     c_data = json.loads(c_data)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                        exc,
+                    )
                     continue
             if isinstance(c_data, dict):
                 p_id = c_data.get('product_id')

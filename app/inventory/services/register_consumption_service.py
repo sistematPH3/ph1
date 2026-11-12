@@ -1,5 +1,10 @@
+import logging
+
 from app.models.inventory_model import db
 from app.inventory.repositories.register_consumption_repository import RegisterConsumptionRepository
+
+logger = logging.getLogger(__name__)
+
 
 def get_consumption_form_data(user_id):
     user = RegisterConsumptionRepository.get_user_by_id(user_id)
@@ -141,5 +146,6 @@ def register_consumption(location_id, items, user_id):
         return {'success': True, 'message': 'Consumo registrado exitosamente con trazabilidad por lote.'}
         
     except Exception as e:
+        logger.exception("Error al registrar el consumo con trazabilidad por lote")
         db.session.rollback()
         return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}

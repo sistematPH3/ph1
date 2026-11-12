@@ -1,7 +1,11 @@
+import logging
+
 from app import db
 from app.models import Movement
 from app.logistics.requests.movement_dispatch_validators import MovementDispatchValidator
 from app.logistics.repositories.movement_dispatch_repository import MovementDispatchRepository
+
+logger = logging.getLogger(__name__)
 
 
 class MovementDispatchService:
@@ -53,6 +57,7 @@ class MovementDispatchService:
             db.session.rollback()
             return {"success": False, "errors": [str(ve)]}, 422
         except Exception as e:
+            logger.exception("Error interno al emitir el despacho")
             db.session.rollback()
             return {"success": False, "errors": [f"Error interno en la transacción: {str(e)}"]}, 500
 
@@ -77,5 +82,6 @@ class MovementDispatchService:
             db.session.rollback()
             return {"success": False, "errors": [str(ve)]}, 422
         except Exception as e:
+            logger.exception("Error interno al cancelar el traslado %s", movement_id)
             db.session.rollback()
             return {"success": False, "errors": [f"Error al cancelar la salida: {str(e)}"]}, 500

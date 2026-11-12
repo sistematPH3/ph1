@@ -5,6 +5,7 @@
 - POST /api/estadisticas/alarmas/evaluar  -> evalúa alarmas y crea notificaciones (Admin).
 - GET/POST /config/estadisticas           -> configuración (factor y mínimo).
 """
+import logging
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 
@@ -16,6 +17,8 @@ from app.analytics.requests.statistics_validators import (
     validate_refresh_payload,
 )
 from app.models import Location
+
+logger = logging.getLogger(__name__)
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -34,6 +37,10 @@ def refresh_snapshots():
         alertas = snapshots_service.evaluar_alarmas(validacion['period_type'], crear_notificaciones=True)
         resultado['alarmas_creadas'] = len(alertas)
     except Exception as e:
+        logger.warning(
+            "No se pudieron evaluar/crear las alarmas del período %s: %s",
+            validacion['period_type'], e,
+        )
         resultado['alarmas_creadas'] = 0
         resultado['alarmas_error'] = str(e)
     return jsonify(resultado)
