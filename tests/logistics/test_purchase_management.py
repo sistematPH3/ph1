@@ -44,6 +44,7 @@ from app.logistics.requests.purchase_validators import (  # noqa: E402
     PurchaseValidator, es_moneda_bs, normalizar_moneda, normalizar_numero)
 from app.logistics.services.purchase_management_service import (  # noqa: E402
     PurchaseManagementService)
+from app.time_utils import current_ve_time  # noqa: E402
 
 
 class FakeUser:
@@ -116,7 +117,7 @@ class PurchaseManagementTestBase(unittest.TestCase):
                      dias_atras=0, horas_atras=0, renglones=None, sin_proveedor=False):
         compra = Purchase(
             supplier_id=None if sin_proveedor else self.proveedor.id,
-            purchase_date=datetime.utcnow() - timedelta(days=dias_atras, hours=horas_atras),
+            purchase_date=current_ve_time() - timedelta(days=dias_atras, hours=horas_atras),
             total_amount=Decimal('0.00'),
             currency=moneda,
             exchange_rate=tasa,
@@ -853,6 +854,43 @@ class UnaSolaEdicionTest(PurchaseManagementTestBase):
             current_user=self.user) if h['id'] == compra.id)
         self.assertFalse(fila['already_edited'])
         self.assertTrue(fila['can_edit'])
+
+
+class FechaCompraTest(PurchaseManagementTestBase):
+    """Regresión del desfase de 4 h: purchase_date se guarda en hora VE y así
+    debe mostrarse/compararse.
+
+    Antes el listado la convertía con utc_a_ve (le restaba 4 h) y can_modify
+    comparaba contra UTC, cerrando la ventana de edición 4 h antes.
+    """
+
+    def test_listado_no_desplaza_la_fecha_de_compra(self):
+        compra = self.crear_compra(dias_atras=0, horas_atras=2)
+        db.session.commit()
+
+        fila = next(h for h in self.service.get_formatted_history(
+            current_user=self.user) if h['id'] == compra.id)
+
+        # Se muestra la fecha tal cual se guardó (hora VE), sin restar 4 h.
+        self.assertEqual(fila['purchase_date'], compra.purchase_date)
+
+    def test_ventana_de_edicion_usa_el_reloj_ve(self):
+        from unittest.mock import patch
+
+        fixed = datetime(2026, 9, 30, 23, 30, 0)
+        compra = self.crear_compra()
+        compra.purchase_date = fixed - timedelta(hours=23)
+        db.session.commit()
+
+        with patch('app.logistics.services.purchase_management_service'
+                   '.current_ve_time', return_value=fixed):
+            # 23 h después (reloj VE) sigue dentro de las 24 h del comprador.
+            self.assertTrue(self.service.can_modify(compra, self.otro_user))
+
+            compra.purchase_date = fixed - timedelta(hours=25)
+            db.session.commit()
+            # 25 h después ya expiró: el límite es de 24 h reales, no 20.
+            self.assertFalse(self.service.can_modify(compra, self.otro_user))
 
 
 if __name__ == '__main__':

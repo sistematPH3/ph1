@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let activeToggleTarget = null;
 
-    // Función para formatear la fecha ISO UTC a la hora local del usuario
+    // Función para formatear la fecha (hora de Venezuela) para el modal.
     function formatToLocalTime(isoString) {
         if (!isoString || isoString === "Ninguna compra registrada") {
             return "Ninguna compra registrada";

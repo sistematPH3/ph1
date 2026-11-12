@@ -1,8 +1,8 @@
-from datetime import UTC, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.logistics.requests.purchase_validators import es_moneda_bs
-from app.time_utils import utc_a_ve, ve_a_utc
+from app.time_utils import current_ve_time
 
 DEFAULT_ADMIN_DAYS = 7
 DEFAULT_OTHER_HOURS = 24
@@ -16,14 +16,15 @@ class PurchaseManagementService:
         self.repository = repository
 
     @staticmethod
-    def _local_to_utc_bounds(start_date, end_date):
-        """Convierte fechas locales (America/Caracas, UTC-4) a rangos UTC.
+    def _local_day_bounds(start_date, end_date):
+        """Rango [inicio, fin) en hora de Venezuela para filtrar por día.
 
-        El sistema guarda purchase_date en UTC; la fecha mostrada es local.
-        Un día local D corresponde en UTC al intervalo [D 04:00, D+1 04:00).
+        purchase_date se guarda en hora VE (naive): así lo escriben
+        register_purchase y lo leen el motor de costos y las estadísticas. Por
+        eso el filtro por día local NO necesita conversión a UTC.
         """
-        start_dt = ve_a_utc(datetime.combine(start_date, time.min)) if start_date else None
-        end_dt = (ve_a_utc(datetime.combine(end_date, time.min) + timedelta(days=1))
+        start_dt = datetime.combine(start_date, time.min) if start_date else None
+        end_dt = (datetime.combine(end_date, time.min) + timedelta(days=1)
                   if end_date else None)
         return start_dt, end_dt
 
@@ -67,17 +68,18 @@ class PurchaseManagementService:
             return False
         if purchase.status != 'COMPLETED':
             return False
-        ahora = now or datetime.now(UTC).replace(tzinfo=None)
-        # Se compara en UTC: purchase_date se guarda en UTC. Antes se usaba
-        # .days sobre la diferencia, que trunca y convertía el límite de 7 días
-        # del administrador en 8 (7d 23h pasaba el filtro).
+        ahora = now or current_ve_time()
+        # Se compara en hora de Venezuela, que es como se guarda purchase_date.
+        # Antes se comparaba contra UTC y la ventana de edición se cerraba 4 h
+        # antes. Tampoco se usa .days sobre la diferencia, que trunca y
+        # convertía el límite de 7 días del administrador en 8 (7d 23h pasaba).
         return (ahora - purchase.purchase_date) <= self._ventana_para_usuario(current_user)
 
     def _segundos_restantes(self, purchase, current_user, now=None):
         """Segundos que le quedan de ventana, para el contador del modal."""
         if purchase is None or not purchase.purchase_date:
             return 0
-        ahora = now or datetime.now(UTC).replace(tzinfo=None)
+        ahora = now or current_ve_time()
         restante = self._ventana_para_usuario(current_user) - (ahora - purchase.purchase_date)
         return max(0, int(restante.total_seconds()))
 
@@ -114,7 +116,7 @@ class PurchaseManagementService:
         )
 
     def get_formatted_history(self, current_user, start_date=None, end_date=None, supplier_id=None, status=None):
-        start_dt, end_dt = self._local_to_utc_bounds(start_date, end_date)
+        start_dt, end_dt = self._local_day_bounds(start_date, end_date)
 
         raw_purchases = self.repository.get_filtered_history(
             start_date=start_dt,
@@ -124,7 +126,7 @@ class PurchaseManagementService:
         )
 
         formatted_history = []
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = current_ve_time()
 
         for purchase, supplier_name, edit_count in raw_purchases:
             total_amount = purchase.total_amount if purchase.total_amount is not None else CERO
@@ -148,7 +150,7 @@ class PurchaseManagementService:
                 'id': purchase.id,
                 'supplier_id': purchase.supplier_id,
                 'supplier_name': supplier_name if supplier_name else "Proveedor N/A",
-                'purchase_date': utc_a_ve(purchase.purchase_date),
+                'purchase_date': purchase.purchase_date,
                 'total_amount': total_amount,
                 'total_bs': total_bs,
                 'currency': purchase.currency,

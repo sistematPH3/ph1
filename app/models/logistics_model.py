@@ -3,6 +3,8 @@ from datetime import datetime
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.dialects.postgresql import JSONB
 
+from app.time_utils import current_ve_time
+
 class Location(db.Model):
     __tablename__ = 'locations'
     id = db.Column(db.Integer, primary_key=True)
@@ -43,7 +45,7 @@ class Purchase(db.Model):
     __tablename__ = 'purchases'
     id = db.Column(db.Integer, primary_key=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
-    purchase_date = db.Column(db.DateTime, default=datetime.utcnow)
+    purchase_date = db.Column(db.DateTime, default=current_ve_time)
     total_amount = db.Column(db.Numeric(15, 2)) 
     currency = db.Column(db.String(5))
     exchange_rate = db.Column(db.Numeric(15, 4)) 

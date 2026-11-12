@@ -646,8 +646,7 @@ def construir_detalle_compra(user, purchase_id, filtros):
                  .filter_by(purchase_id=purchase_id, action_type='EDIT')
                  .order_by(PurchaseAuditLog.timestamp.asc()).all())
 
-    fecha_local = (purchase.purchase_date - timedelta(hours=4)
-                   if purchase.purchase_date else None)
+    fecha_local = purchase.purchase_date
     # Sin tasa registrada no hay conversión posible: se marca como tal en vez
     # de usar 0, que exportaba un total en Bs. de cero.
     tasa = purchase.exchange_rate

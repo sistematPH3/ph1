@@ -1,6 +1,6 @@
 from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType, Inventory, AppParameter, ExchangeRateHistory
 from decimal import ROUND_HALF_UP, Decimal
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from sqlalchemy import func, text
 import json
 from app.logistics.requests.purchase_validators import (es_moneda_bs,
@@ -317,7 +317,7 @@ class PurchaseManagementRepository:
         prod_sku = product.sku if product is not None and product.sku else f"PROD{product.id if product else 0}"
         date_str = (purchase.purchase_date.strftime('%Y%m%d')
                     if purchase.purchase_date
-                    else datetime.now(UTC).strftime('%Y%m%d'))
+                    else current_ve_time().strftime('%Y%m%d'))
         # Se reserva el espacio del sufijo "-YYYYMMDD-NN" (con margen para
         # correlativos de hasta 4 dígitos) y el resto se le entrega al SKU;
         # un SKU de 50 caracteres no cabe completo.
