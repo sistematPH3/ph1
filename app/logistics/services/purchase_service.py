@@ -158,10 +158,15 @@ class PurchaseService:
 
                 # Búsqueda o creación de inventario (min_stock lo define la
                 # configuración previa; aquí NO se fuerza ningún valor).
+                # Se bloquea la fila (SELECT ... FOR UPDATE): el stock se lee y
+                # luego se reescribe (prev + cantidad). Sin el lock, dos compras
+                # concurrentes del mismo insumo leían el mismo "prev" y la
+                # segunda escritura borraba el ingreso de la primera (lost
+                # update) en el Almacén Central.
                 inventory_record = db.session.query(Inventory).filter_by(
                     location_id=1, 
                     product_id=product_id
-                ).first()
+                ).with_for_update().first()
                 
                 if inventory_record:
                     prev_qty = Decimal(str(inventory_record.current_quantity))

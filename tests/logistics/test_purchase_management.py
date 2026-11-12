@@ -893,5 +893,79 @@ class FechaCompraTest(PurchaseManagementTestBase):
             self.assertFalse(self.service.can_modify(compra, self.otro_user))
 
 
+class BloqueoStockTest(PurchaseManagementTestBase):
+    """Regresión del hallazgo #5: las escrituras de stock de compras toman el
+    bloqueo de fila (SELECT ... FOR UPDATE).
+
+    Sin el lock, dos operaciones concurrentes sobre el Almacén Central leían el
+    mismo "prev" y la última escritura perdía el ajuste de la otra (lost
+    update). La prueba verifica que el SELECT de inventario lleve FOR UPDATE.
+    """
+
+    def _capturar_sql(self, func, *args, **kwargs):
+        from sqlalchemy import event
+
+        capturado = []
+
+        def _listener(conn, cursor, statement, params, context, executemany):
+            capturado.append(statement)
+
+        event.listen(db.engine, "before_cursor_execute", _listener)
+        try:
+            func(*args, **kwargs)
+        finally:
+            event.remove(db.engine, "before_cursor_execute", _listener)
+        return capturado
+
+    @staticmethod
+    def _bloquea_inventario(statements):
+        return any(
+            'FOR UPDATE' in s.upper() and 'FROM INVENTORY' in s.upper()
+            for s in statements
+        )
+
+    def test_anular_compra_bloquea_la_fila_de_inventario(self):
+        compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('10.00'),
+                                              Decimal('5.00'))])
+        db.session.commit()
+        sql = self._capturar_sql(self.repo.logical_annulment, compra.id,
+                                 self.admin.id)
+        self.assertTrue(self._bloquea_inventario(sql), sql)
+
+    def test_editar_compra_bloquea_la_fila_de_inventario(self):
+        compra = self.crear_compra(renglones=[(self.prod_a.id, Decimal('10.00'),
+                                              Decimal('5.00'))])
+        detalle_id = db.session.query(PurchaseDetail).filter_by(
+            purchase_id=compra.id).one().id
+        db.session.commit()
+        items = [self.item(detalle_id, quantity=8, foreign_price=5)]
+        sql = self._capturar_sql(self.repo.logical_edit, compra.id,
+                                 self.admin.id, items, "ajuste")
+        self.assertTrue(self._bloquea_inventario(sql), sql)
+
+    def test_registro_compra_bloquea_la_fila_de_inventario(self):
+        from app.logistics.services.purchase_service import PurchaseService
+
+        data = {
+            'currency': 'USD',
+            'exchange_rate': '10.0000',
+            'supplier_id': self.proveedor.id,
+            'user_id': self.admin.id,
+            'invoice_url': 'f.pdf',
+            'items': [{
+                'product_id': self.prod_a.id,
+                'quantity': 5,
+                'foreign_price': 25,
+                'lot_number': 'L-BLOQ-1',
+                'expiration_date': None,
+            }],
+        }
+        resultado = {}
+        sql = self._capturar_sql(
+            lambda: resultado.update(PurchaseService.register_purchase(data)))
+        self.assertTrue(resultado.get('success'), resultado)
+        self.assertTrue(self._bloquea_inventario(sql), sql)
+
+
 if __name__ == '__main__':
     unittest.main()

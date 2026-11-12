@@ -27,10 +27,15 @@ class PurchaseManagementRepository:
         return self.db.session.get(Product, product_id)
 
     def _get_inventory(self, product_id):
+        # Se bloquea la fila (SELECT ... FOR UPDATE). Todas las rutas que usan
+        # este método (anular y editar compras) leen el inventario y luego lo
+        # reescriben (prev ± delta). Sin el lock, dos operaciones concurrentes
+        # sobre el Almacén Central leían el mismo "prev" y la última escritura
+        # perdía el ajuste de la otra (lost update).
         return self.db.session.query(Inventory).filter_by(
             location_id=ALMACEN_CENTRAL_ID,
             product_id=product_id
-        ).first()
+        ).with_for_update().first()
 
     @staticmethod
     def _disponible(inventory_record):
