@@ -104,7 +104,7 @@ def resolve_dispute(movement_id):
 def cancel_linked_replenishment(movement_id):
     """Cancela el traslado de reposición si la disputa se abandona (delegado al servicio)."""
     try:
-        ok, message = service_cancel_replenishment(movement_id)
+        ok, message = service_cancel_replenishment(movement_id, current_user.id)
         return jsonify({"success": ok, "message": message}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error al revertir reposición: {str(e)}"}), 500

@@ -310,6 +310,31 @@ def get_dispute_notifications_summary(limit=5):
 # RESOLUCIÓN DEL VEREDICTO GRANULAR
 # ---------------------------------------------------------------------------
 
+def _assert_can_arbitrate(movement, user_id):
+    """Autoriza arbitrar una disputa según la sede del usuario.
+
+    El Administrador puede resolver cualquier traslado. Un gerente/jefe de sede
+    (Manager / Assistant Manager) solo puede arbitrar traslados en los que
+    participa SU sede (origen o destino). Antes bastaba con conocer el id del
+    traslado para resolver o cancelar la disputa de otra sede (IDOR): el control
+    de rol no miraba la sede, a diferencia de la recepción, que sí valida el
+    destino (movement_reception_service.get_reception_data).
+    """
+    user = db.session.get(User, user_id) if user_id is not None else None
+    if user is None:
+        raise PermissionError("Usuario no válido para arbitrar la disputa.")
+    if getattr(user, 'is_admin', False):
+        return
+    user_location_ids = {loc.id for loc in (user.locations or [])}
+    if (movement.destination_location_id in user_location_ids
+            or movement.origin_location_id in user_location_ids):
+        return
+    raise PermissionError(
+        "No tiene permisos para arbitrar esta disputa: el traslado no "
+        "pertenece a su sede."
+    )
+
+
 def resolve_dispute(movement_id, payload, user_id):
     """Procesa el veredicto granular de la disputa y actualiza inventarios.
 
@@ -345,6 +370,9 @@ def resolve_dispute(movement_id, payload, user_id):
     )
     if not movement:
         raise ValueError("El traslado especificado no existe.")
+    # Control de sede: un gerente solo arbitra traslados de su sede (el admin
+    # arbitra cualquiera). Se valida ANTES del estado para no filtrar datos.
+    _assert_can_arbitrate(movement, user_id)
     if movement.status not in DISPUTE_STATUSES:
         raise ValueError(
             "La disputa de este traslado ya fue resuelta o no está pendiente."
@@ -721,11 +749,19 @@ def _notify_response_resolved(movement, resolver_user_id):
         ))
 
 
-def cancel_linked_replenishment(movement_id):
+def cancel_linked_replenishment(movement_id, user_id):
     """Cancela el traslado de reposición de una disputa y devuelve el stock.
 
     Devuelve (ok, message). Eleva excepciones si algo falla.
     """
+    # Control de sede: solo el Admin o un gerente de una sede participante
+    # puede cancelar la reposición de la disputa (antes cualquiera con el rol
+    # podía hacerlo conociendo el id -> IDOR).
+    dispute = db.session.get(Movement, movement_id)
+    if not dispute:
+        raise ValueError("El traslado especificado no existe.")
+    _assert_can_arbitrate(dispute, user_id)
+
     linked_replenishments = Movement.query.filter_by(
         source_dispute_id=movement_id,
         status='EN_TRANSITO'

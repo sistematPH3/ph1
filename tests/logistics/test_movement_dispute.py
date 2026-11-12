@@ -48,7 +48,10 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app import create_app, db
 from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Product, Role, User
-from app.logistics.services.movement_dispute_service import resolve_dispute
+from app.logistics.services.movement_dispute_service import (
+    cancel_linked_replenishment,
+    resolve_dispute,
+)
 
 
 class ResolveDisputeTest(unittest.TestCase):
@@ -482,6 +485,94 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertEqual(
             AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").count(), 1
         )
+
+
+    # =========================================================================
+    # CASO 8: control de sede (anti-IDOR). Un gerente solo puede arbitrar
+    # traslados en los que participa su sede; el admin arbitra cualquiera.
+    # =========================================================================
+    def _manager(self, location, name="Manager"):
+        role = Role(name="Manager")
+        db.session.add(role)
+        db.session.flush()
+        manager = User(name=name, email=f"{name}-{location.id}@test.com",
+                       password_hash="x", role_id=role.id)
+        db.session.add(manager)
+        db.session.flush()
+        manager.locations.append(location)
+        db.session.commit()
+        return manager
+
+    def _reposicion(self, env):
+        rep = Movement(
+            type="TRASLADO",
+            origin_location_id=env["origin"].id,
+            destination_location_id=env["dest"].id,
+            status="EN_TRANSITO",
+            user_id=env["user"].id,
+            source_dispute_id=env["mov"].id,
+        )
+        db.session.add(rep)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=rep.id, product_id=env["product"].id,
+            lot_number="L-REP", quantity=2, received_quantity=0,
+            missing_quantity=0))
+        db.session.commit()
+        return rep
+
+    def test_manager_de_otra_sede_no_puede_resolver(self):
+        env = self._seed(status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+                         dispatched=10, received=8)
+        otra = Location(name="Sede Ajena", state="Caracas")
+        db.session.add(otra)
+        db.session.commit()
+        manager = self._manager(otra)
+
+        with self.assertRaises(PermissionError):
+            resolve_dispute(env["mov"].id, {
+                f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+                "general_notes": "no autorizado",
+            }, user_id=manager.id)
+
+        # La disputa sigue pendiente y no se movió stock.
+        self.assertEqual(env["mov"].status, "NOVEDAD_FALTANTE")
+
+    def test_manager_de_la_sede_destino_si_puede_resolver(self):
+        env = self._seed(status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+                         dispatched=10, received=8)
+        manager = self._manager(env["dest"])
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+            "general_notes": "ok",
+        }, user_id=manager.id)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "COMPLETADO")
+
+    def test_manager_de_otra_sede_no_puede_cancelar_reposicion(self):
+        env = self._seed(status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+                         dispatched=10, received=8)
+        rep = self._reposicion(env)
+        otra = Location(name="Sede Ajena", state="Caracas")
+        db.session.add(otra)
+        db.session.commit()
+        manager = self._manager(otra)
+
+        with self.assertRaises(PermissionError):
+            cancel_linked_replenishment(env["mov"].id, manager.id)
+        db.session.refresh(rep)
+        self.assertEqual(rep.status, "EN_TRANSITO")
+
+    def test_admin_si_puede_cancelar_reposicion(self):
+        env = self._seed(status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+                         dispatched=10, received=8)
+        rep = self._reposicion(env)
+
+        ok, _msg = cancel_linked_replenishment(env["mov"].id, env["user"].id)
+        self.assertTrue(ok)
+        db.session.refresh(rep)
+        self.assertEqual(rep.status, "CANCELADO")
 
 
 if __name__ == "__main__":
