@@ -1,8 +1,12 @@
+import logging
+
 from flask import render_template, request, redirect, url_for, flash
 from app.inventory import inventory_bp
 from app.inventory.services.products_service import ProductService
 from app.models.inventory_model import Category
 from app.inventory.requests.list_products_request import ListProductsRequest
+
+logger = logging.getLogger(__name__)
 
 # CAMBIO: Importamos el decorador dinámico
 from app.decorators.roles import require_roles 
@@ -43,5 +47,6 @@ def toggle_product_status(product_id):
         ProductRepository.save(product)
         
         return {"success": True, "is_active": product.is_active}, 200
-    except Exception as e:
-        return {"success": False, "error": str(e)}, 500
+    except Exception:
+        logger.exception("Error al cambiar el estado del producto")
+        return {"success": False, "error": "No se pudo actualizar el producto. Intenta de nuevo."}, 500

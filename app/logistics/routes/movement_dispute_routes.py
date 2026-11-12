@@ -3,6 +3,7 @@
 # Controlador HTTP del sub-módulo de Arbitraje / Bandeja de Novedades.
 # Sin lógica de negocio: delega en app/logistics/services/movement_dispute_service.py.
 
+import logging
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, get_flashed_messages
 from flask_login import current_user, login_required
@@ -14,6 +15,8 @@ from app.logistics.services.movement_dispute_service import (
     resolve_dispute as service_resolve_dispute,
     cancel_linked_replenishment as service_cancel_replenishment,
 )
+
+logger = logging.getLogger(__name__)
 
 movement_dispute_bp = Blueprint("movement_dispute", __name__, url_prefix="/logistics/movements/admin/disputes")
 
@@ -58,8 +61,9 @@ def list_disputes():
             date_min=date_min,
             date_max=date_max
         )
-    except Exception as e:
-        flash(f"Error al cargar la bandeja de novedades: {str(e)}", "dispute-error")
+    except Exception:
+        logger.exception("Error al cargar la bandeja de novedades")
+        flash("No se pudo cargar la bandeja de novedades. Intenta de nuevo.", "dispute-error")
         return redirect(url_for('movement_dispute.list_disputes'))
 
 
@@ -75,9 +79,10 @@ def disputes_summary():
     """
     try:
         return jsonify(get_dispute_notifications_summary())
-    except Exception as e:
+    except Exception:
+        logger.exception("Error al obtener el resumen de novedades")
         return jsonify({
-            "error": str(e),
+            "error": "No se pudo obtener el resumen de novedades.",
             "pending_count": 0,
             "items": [],
             "last_seen_date": None,
@@ -93,8 +98,9 @@ def resolve_dispute(movement_id):
         payload = request.form or request.get_json() or {}
         service_resolve_dispute(movement_id, payload, user_id=current_user.id)
         flash(f"Disputa #{movement_id} resuelta exitosamente y saldos actualizados.", "dispute")
-    except Exception as e:
-        flash(f"Error al resolver la disputa: {str(e)}", "dispute-error")
+    except Exception:
+        logger.exception("Error al resolver la disputa %s", movement_id)
+        flash("No se pudo resolver la disputa. Intenta de nuevo.", "dispute-error")
     return redirect(url_for('movement_dispute.list_disputes'))
 
 
@@ -106,5 +112,9 @@ def cancel_linked_replenishment(movement_id):
     try:
         ok, message = service_cancel_replenishment(movement_id, current_user.id)
         return jsonify({"success": ok, "message": message}), 200
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al revertir reposición: {str(e)}"}), 500
+    except Exception:
+        logger.exception("Error al revertir la reposición del traslado %s", movement_id)
+        return jsonify({
+            "success": False,
+            "message": "No se pudo revertir la reposición. Intenta de nuevo.",
+        }), 500

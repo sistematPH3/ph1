@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from app.extensions import db
 from app.models import Supplier
@@ -5,6 +7,8 @@ from app.logistics.repositories.supplier_list_repository import SupplierListRepo
 from app.logistics.services.supplier_list_service import SupplierListService
 from app.logistics.requests.supplier_list_request import SupplierListFilterRequest
 from app.decorators.roles import require_roles
+
+logger = logging.getLogger(__name__)
 
 supplier_list_bp = Blueprint('supplier_list', __name__)
 filter_request_validator = SupplierListFilterRequest()
@@ -35,8 +39,9 @@ def index():
     except ValueError as val_err:
         flash(f"Parámetros de búsqueda inválidos: {str(val_err)}", "warning")
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
-    except Exception as e:
-        flash(f"Error interno en el sistema: {str(e)}", "danger")
+    except Exception:
+        logger.exception("Error al cargar el listado de proveedores")
+        flash("No se pudo cargar el listado de proveedores. Intenta de nuevo.", "danger")
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
 
 @supplier_list_bp.route('/suppliers/register', methods=['GET'])
@@ -44,8 +49,9 @@ def index():
 def register_supplier_view():
     try:
         return render_template('logistics/register-supplier.html', supplier=None)
-    except Exception as e:
-        flash(f"Error al abrir el formulario de registro: {str(e)}", "danger")
+    except Exception:
+        logger.exception("Error al abrir el formulario de registro de proveedor")
+        flash("No se pudo abrir el formulario de registro. Intenta de nuevo.", "danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/register', methods=['POST'])
@@ -72,9 +78,10 @@ def handle_register_supplier():
         
         flash("Proveedor registrado exitosamente.", "success")
         return redirect(url_for('purchase_routes.new_purchase_form'))
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        flash(f"Error al registrar el proveedor: {str(e)}", "danger")
+        logger.exception("Error al registrar el proveedor")
+        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "danger")
         return render_template('logistics/register-supplier.html', supplier=None)
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['GET'])
@@ -89,8 +96,9 @@ def edit_supplier_view(supplier_id):
             return redirect(url_for('supplier_list.index'))
             
         return render_template('logistics/register-supplier.html', supplier=supplier)
-    except Exception as e:
-        flash(f"Error al cargar los datos del proveedor para edición: {str(e)}", "danger")
+    except Exception:
+        logger.exception("Error al cargar el proveedor %s para edición", supplier_id)
+        flash("No se pudo cargar el proveedor para edición. Intenta de nuevo.", "danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['POST'])
@@ -115,9 +123,10 @@ def handle_edit_supplier(supplier_id):
         
         flash("Proveedor actualizado exitosamente.", "success")
         return redirect(url_for('supplier_list.index'))
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        flash(f"Error al actualizar el proveedor: {str(e)}", "danger")
+        logger.exception("Error al actualizar el proveedor %s", supplier_id)
+        flash("No se pudo actualizar el proveedor. Intenta de nuevo.", "danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/list/<int:supplier_id>/toggle', methods=['POST'])
@@ -134,9 +143,13 @@ def toggle_status(supplier_id):
             return jsonify({"success": True, "new_status": new_status}), 200
             
         flash("Estado del proveedor actualizado con éxito.", "success")
-    except Exception as e:
+    except Exception:
+        logger.exception("Error al cambiar el estado del proveedor %s", supplier_id)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({"success": False, "error": str(e)}), 500
-        flash(f"Error al cambiar el estado: {str(e)}", "danger")
+            return jsonify({
+                "success": False,
+                "error": "No se pudo cambiar el estado del proveedor. Intenta de nuevo.",
+            }), 500
+        flash("No se pudo cambiar el estado del proveedor. Intenta de nuevo.", "danger")
         
     return redirect(url_for('supplier_list.index'))

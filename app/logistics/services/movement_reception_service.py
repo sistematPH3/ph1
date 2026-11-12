@@ -447,4 +447,4 @@ class MovementReceptionService:
         except Exception as e:
             logger.exception("Error transaccional al procesar la recepción")
             db.session.rollback()
-            return False, f"Error transaccional al procesar recepción: {str(e)}"
+            return False, "No se pudo procesar la recepción. Intenta de nuevo."

@@ -148,4 +148,4 @@ def register_consumption(location_id, items, user_id):
     except Exception as e:
         logger.exception("Error al registrar el consumo con trazabilidad por lote")
         db.session.rollback()
-        return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}
+        return {'success': False, 'message': 'No se pudo registrar el consumo. Intenta de nuevo.'}

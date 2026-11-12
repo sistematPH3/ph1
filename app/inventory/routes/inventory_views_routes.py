@@ -1,9 +1,13 @@
+import logging
+
 from flask import render_template, jsonify, request
 from flask_login import login_required, current_user
 from app.decorators.roles import require_roles, require_roles_api
 from app.inventory import inventory_bp
 from app.inventory.requests.inventory_views_validators import InventoryViewRequest
 from app.inventory.services.inventory_views_service import InventoryViewService
+
+logger = logging.getLogger(__name__)
 
 OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
 
@@ -75,10 +79,11 @@ def get_inventory_api():
             'items': items
         }), 200
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Error al cargar las vistas de inventario")
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'No se pudo cargar el inventario. Intenta de nuevo.',
             'items': []
         }), 500
 
@@ -94,5 +99,10 @@ def get_product_lots_api():
             
         lots = InventoryViewService.get_lots_for_product(location_id, product_id)
         return jsonify({'success': True, 'lots': lots}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e), 'lots': []}), 500
+    except Exception:
+        logger.exception("Error al cargar los lotes del producto")
+        return jsonify({
+            'success': False,
+            'error': 'No se pudieron cargar los lotes del producto.',
+            'lots': [],
+        }), 500

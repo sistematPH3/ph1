@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from app.models.waste_model import WasteType
@@ -6,6 +8,8 @@ from app.waste.services.waste_audit_service import WasteAuditService
 from app.waste.requests.waste_audit_validators import validate_audit_filters
 from app.decorators.roles import require_roles, require_roles_api
 import json
+
+logger = logging.getLogger(__name__)
 
 waste_audit_bp = Blueprint('waste_audit', __name__, url_prefix='/waste/merma')
 
@@ -82,8 +86,9 @@ def get_all_locations():
         sedes = Location.query.filter_by(is_active=True).all()
         data = [getattr(sede, 'nombre', None) or getattr(sede, 'name', '') for sede in sedes]
         return jsonify({'success': True, 'data': [d for d in data if d]}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'errors': [str(e)]}), 500
+    except Exception:
+        logger.exception("Error al cargar las sedes para la auditoría de mermas")
+        return jsonify({'success': False, 'errors': ['No se pudieron cargar las sedes.']}), 500
 
 def obtener_tipos_merma_por_sede(location_id: int):
     """

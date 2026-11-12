@@ -27,4 +27,4 @@ def register_location_service(form_data):
     except Exception as e:
         logger.exception("Error al registrar la sede")
         db.session.rollback()
-        return False, f"Error al registrar: {str(e)}"
+        return False, "No se pudo registrar la sede. Intenta de nuevo."

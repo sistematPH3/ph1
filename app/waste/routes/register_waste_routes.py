@@ -1,4 +1,5 @@
 import io
+import logging
 import time
 from flask import Blueprint, request, jsonify, render_template, flash, redirect, url_for, session
 from flask_login import login_required, current_user
@@ -12,6 +13,8 @@ from app.waste.services.register_waste_service import (
     register_waste,
     user_can_access_location,
 )
+
+logger = logging.getLogger(__name__)
 
 register_waste_bp = Blueprint('register_waste', __name__)
 
@@ -207,8 +210,9 @@ def subir_foto():
         memory_file.filename = filename
         url = upload_invoice_image(memory_file)
         return jsonify({'success': True, 'url': url}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'No se pudo subir la evidencia: {str(e)}'}), 400
+    except Exception:
+        logger.exception("Error al subir la evidencia de la merma")
+        return jsonify({'success': False, 'message': 'No se pudo subir la evidencia. Intenta de nuevo.'}), 400
 
 @register_waste_bp.route('/waste/merma/new', methods=['POST'])
 @login_required

@@ -560,7 +560,7 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
         logger.exception("Error en BD al registrar el movimiento de gasto de cocina")
         return {
             'success': False,
-            'message': f'Error en base de datos al registrar el movimiento: {str(e)}',
+            'message': 'No se pudo registrar el movimiento. Intenta de nuevo.',
         }
 
     return {'success': True, 'message': 'Acción procesada con éxito.'}

@@ -548,6 +548,9 @@ def decidir_lineas(waste_id, user_id, decisiones):
     except Exception as exc:
         logger.exception("Error al descontar el stock de las líneas aprobadas")
         db.session.rollback()
+        # El mensaje de ValueError es de negocio (stock insuficiente, lote
+        # vencido) y el usuario necesita verlo para corregir; el detalle
+        # técnico ya quedó en el log de arriba.
         return {'success': False, 'message': str(exc)}
 
     # Al RECHAZAR una línea pendiente se libera su reserva: el stock congelado
@@ -778,7 +781,7 @@ def cancel_waste(waste_id, user_id, reason):
     except Exception as exc:
         logger.exception("Error al cancelar la merma %s", waste.id)
         db.session.rollback()
-        return {'success': False, 'message': f'Error al cancelar la merma: {str(exc)}'}
+        return {'success': False, 'message': 'No se pudo cancelar la merma. Intenta de nuevo.'}
 
 
 def _avisar_autor_final(waste, admin, decisiones_audit):

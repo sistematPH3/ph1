@@ -59,7 +59,7 @@ class MovementDispatchService:
         except Exception as e:
             logger.exception("Error interno al emitir el despacho")
             db.session.rollback()
-            return {"success": False, "errors": [f"Error interno en la transacción: {str(e)}"]}, 500
+            return {"success": False, "errors": ["Error interno en la transacción. Intenta de nuevo."]}, 500
 
     @staticmethod
     def execute_precancellation(user, movement_id: int, reason: str):
@@ -84,4 +84,4 @@ class MovementDispatchService:
         except Exception as e:
             logger.exception("Error interno al cancelar el traslado %s", movement_id)
             db.session.rollback()
-            return {"success": False, "errors": [f"Error al cancelar la salida: {str(e)}"]}, 500
+            return {"success": False, "errors": ["No se pudo cancelar la salida. Intenta de nuevo."]}, 500

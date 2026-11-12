@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import current_user
 from sqlalchemy import func
@@ -13,6 +15,8 @@ from app.logistics.services.purchase_management_service import PurchaseManagemen
 from app.logistics.requests.purchase_management_request import PurchaseManagementFilterRequest
 from app.logistics.requests.purchase_validators import PurchaseValidator, es_moneda_bs
 from app.decorators.roles import require_roles, require_roles_api
+
+logger = logging.getLogger(__name__)
 
 purchase_management_bp = Blueprint('purchase_management', __name__)
 filter_request_validator = PurchaseManagementFilterRequest()
@@ -82,10 +86,11 @@ def index():
     except ValueError as val_err:
         flash(f"Parámetros de búsqueda inválidos: {_flatten_errors(val_err)}", "warning")
         return redirect(url_for('purchase_management.index'))
-    except Exception as e:
+    except Exception:
         # Sin rollback la sesión queda envenenada y el resto de la request falla.
         db.session.rollback()
-        flash(f"Error interno en el sistema: {str(e)}", "error")
+        logger.exception("Error al cargar la gestión de compras")
+        flash("No se pudo cargar la gestión de compras. Intenta de nuevo.", "error")
         return render_template('logistics/purchase_management.html', purchases=[], suppliers=[], products=[])
 
 @purchase_management_bp.route('/purchases/management/export', methods=['GET'])
@@ -136,9 +141,10 @@ def exportar_listado():
         # PDF en linea (visor) para evitar gestores externos como IDM.
         return send_file(buffer, as_attachment=(formato != 'pdf'),
                          download_name=nombre, mimetype=mimetype)
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        flash(f"Error generando la exportación: {str(e)}", "error")
+        logger.exception("Error al generar la exportación de compras")
+        flash("No se pudo generar la exportación. Intenta de nuevo.", "error")
         return redirect(url_for('purchase_management.index'))
 
 # Los tres endpoints siguientes responden JSON: usan require_roles_api para
@@ -208,9 +214,10 @@ def get_details(purchase_id):
             "time_limits": data.get('time_limits', {'admin_days': 7, 'other_hours': 24})
         }), 200
         
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": f"Error interno en el servidor: {str(e)}"}), 500
+        logger.exception("Error al procesar la compra")
+        return jsonify({"error": "No se pudo completar la operación. Intenta de nuevo."}), 500
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/annul', methods=['POST'])
 @require_roles_api('admin')
@@ -226,9 +233,13 @@ def annul(purchase_id):
             
     except ValueError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"success": False, "error": f"Ocurrió un error crítico durante la anulación: {str(e)}"}), 500
+        logger.exception("Error al anular la compra %s", purchase_id)
+        return jsonify({
+            "success": False,
+            "error": "No se pudo anular la compra. Intenta de nuevo.",
+        }), 500
 
 @purchase_management_bp.route('/purchases/management/<int:purchase_id>/edit', methods=['POST'])
 @require_roles_api('admin')
@@ -264,6 +275,10 @@ def edit_purchase(purchase_id):
             
     except ValueError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.exception("Error al editar la compra %s", purchase_id)
+        return jsonify({
+            "success": False,
+            "error": "No se pudo editar la compra. Intenta de nuevo.",
+        }), 500

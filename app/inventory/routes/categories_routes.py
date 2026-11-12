@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 from flask import render_template, request, redirect, url_for, flash, jsonify
@@ -5,6 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.inventory import inventory_bp
 from app.inventory.services.category_service import CategoryService
+
+logger = logging.getLogger(__name__)
 
 # CAMBIO: Importamos el decorador dinámico
 from app.decorators.roles import require_roles 
@@ -72,13 +75,14 @@ def create_category():
                 errors={'name': f'La categoría ya se encuentra registrada.'}
             )
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            logger.exception("Error al registrar la categoría")
             return render_template(
                 'inventory/category_form.html',
                 data=request.form,
                 existing_categories=existing_names,
-                errors={'general': f'Error al registrar: {str(e)}'}
+                errors={'general': 'No se pudo registrar la categoría. Verifica los datos e intenta de nuevo.'}
             )
 
     return render_template('inventory/category_form.html', data={}, existing_categories=existing_names, errors={})
@@ -134,14 +138,15 @@ def edit_category(type_id):
                 errors={'name': f'La categoría ya se encuentra registrada.'}
             )
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            logger.exception("Error al actualizar la categoría")
             return render_template(
                 'inventory/category_form.html',
                 product_type=product_type,
                 data=request.form,
                 existing_categories=existing_names,
-                errors={'general': f'Error al actualizar: {str(e)}'}
+                errors={'general': 'No se pudo actualizar la categoría. Verifica los datos e intenta de nuevo.'}
             )
 
     data = {
@@ -165,9 +170,13 @@ def toggle_category_status(type_id):
         db.session.commit()
 
         return jsonify({"success": True, "is_active": product_type.is_active}), 200
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.exception("Error al cambiar el estado de la categoría %s", type_id)
+        return jsonify({
+            "success": False,
+            "error": "No se pudo cambiar el estado de la categoría. Intenta de nuevo.",
+        }), 500
 
 
 @inventory_bp.route('/categories/api/create', methods=['POST'])
@@ -209,6 +218,10 @@ def api_create_category():
             }
         }), 201
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({'success': False, 'error': f'Error al crear categoría: {str(e)}'}), 500
+        logger.exception("Error al crear la categoría")
+        return jsonify({
+            'success': False,
+            'error': 'No se pudo crear la categoría. Verifica los datos e intenta de nuevo.',
+        }), 500

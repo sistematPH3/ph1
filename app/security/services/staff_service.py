@@ -1,7 +1,12 @@
+import logging
+
 from app.security.repositories.staff_repository import StaffRepository
 from app.extensions import db
 from flask_login import current_user
 from app.security.services.audit_user_service import AuditUserService
+
+logger = logging.getLogger(__name__)
+
 
 class StaffService:
     @staticmethod
@@ -148,6 +153,7 @@ class StaffService:
             
             return True, "No se encontraron usuarios inactivos en esta sede."
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            return False, f"Error al procesar la activación masiva: {str(e)}"
+            logger.exception("Error al procesar la activación masiva")
+            return False, "No se pudo procesar la activación masiva. Intenta de nuevo."

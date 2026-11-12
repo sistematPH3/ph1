@@ -335,7 +335,7 @@ f"Stock actual: {_qty_str(current_stock)} unidades; este ajuste intenta desconta
         )
     except Exception as e:
         logger.exception("Error en BD al registrar el movimiento de auditoría de inventario")
-        return {'success': False, 'message': f'Error en base de datos al registrar el movimiento: {str(e)}'}
+        return {'success': False, 'message': 'No se pudo registrar el movimiento. Intenta de nuevo.'}
 
     return {'success': True, 'message': 'Acción procesada con éxito.'}
 

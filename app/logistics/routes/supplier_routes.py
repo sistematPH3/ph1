@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +11,8 @@ from app.logistics.repositories.supplier_repository import SupplierRepository
 
 # Importamos el decorador dinámico unificado
 from app.decorators.roles import require_roles, require_roles_api
+
+logger = logging.getLogger(__name__)
 
 suppliers_bp = Blueprint('suppliers', __name__)
 
@@ -34,9 +38,10 @@ def handle_register():
     except IntegrityError:
         db.session.rollback()
         flash("No se pudo registrar: El RIF, Nombre o Correo ingresado ya pertenece a otro proveedor.", "danger")
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        flash(f"Ocurrió un error inesperado al guardar: {str(e)}", "danger")
+        logger.exception("Error inesperado al registrar el proveedor")
+        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "danger")
         
     return redirect(url_for('logistics.suppliers.show_register_form'))
 

@@ -1,6 +1,10 @@
+import logging
+
 from flask import Blueprint, request, render_template, flash, redirect, url_for
 from app.decorators.roles import admin_required
 from app.integrations.imgbb.imgbb_services import upload_invoice_image
+
+logger = logging.getLogger(__name__)
 
 imgbb_bp = Blueprint('imgbb', __name__)
 
@@ -25,6 +29,7 @@ def process_upload():
     try:
         url_evidencia = upload_invoice_image(file)
         return f"<h1>¡Éxito!</h1><p>URL de ImgBB: <a href='{url_evidencia}' target='_blank'>{url_evidencia}</a></p><img src='{url_evidencia}' width='300'>"
-    except Exception as e:
-        flash(str(e), "error")
+    except Exception:
+        logger.exception("Error al subir la imagen de prueba a ImgBB")
+        flash("No se pudo subir la imagen. Intenta de nuevo.", "error")
         return redirect(url_for('imgbb.show_upload_form'))

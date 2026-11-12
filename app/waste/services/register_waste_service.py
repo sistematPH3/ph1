@@ -449,4 +449,4 @@ def register_waste(user_id, location_id, items, evidence_url=None, notes=None, r
     except Exception as e:
         logger.exception("Error al registrar la merma")
         db.session.rollback()
-        return {'success': False, 'message': f'Error interno del servidor: {str(e)}'}
+        return {'success': False, 'message': 'Error interno del servidor. Intenta de nuevo.'}

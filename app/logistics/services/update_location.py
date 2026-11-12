@@ -25,4 +25,4 @@ def update_location_service(location_id, form_data):
     except Exception as e:
         logger.exception("Error al actualizar la sede %s", location_id)
         db.session.rollback()
-        return False, f"Error al actualizar: {str(e)}"
+        return False, "No se pudo actualizar la sede. Intenta de nuevo."

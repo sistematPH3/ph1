@@ -1,9 +1,13 @@
+import logging
+
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 # Importamos la función con el nombre correcto
 from app.decorators.roles import require_roles 
 from app.logistics.repositories.response_inbox_repository import ResponseInboxRepository
 from app.logistics.services.response_inbox_service import ResponseInboxService
+
+logger = logging.getLogger(__name__)
 
 inbox_bp = Blueprint('response_inbox', __name__)
 
@@ -68,8 +72,12 @@ def inbox_summary():
     """
     try:
         return jsonify(ResponseInboxService.get_inbox_summary(current_user))
-    except Exception as e:
-        return jsonify({"error": str(e), "total": 0, "unread_count": 0, "items": []}), 500
+    except Exception:
+        logger.exception("Error al cargar la bandeja de respuestas")
+        return jsonify({
+            "error": "No se pudo cargar la bandeja de respuestas.",
+            "total": 0, "unread_count": 0, "items": [],
+        }), 500
 
 
 @inbox_bp.route('/logistics/movements/responses/read', methods=['POST'])
@@ -91,8 +99,12 @@ def mark_response_read():
             "success": True,
             "unread_count": ResponseInboxRepository.get_unread_count(current_user),
         })
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        logger.exception("Error al marcar una respuesta como leída")
+        return jsonify({
+            "success": False,
+            "error": "No se pudo marcar la respuesta como leída.",
+        }), 500
 
 
 @inbox_bp.route('/logistics/movements/responses/read-all', methods=['POST'])
@@ -103,5 +115,9 @@ def mark_all_responses_read():
     try:
         marked = ResponseInboxService.mark_all_as_read(current_user)
         return jsonify({"success": True, "marked": marked, "unread_count": 0})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        logger.exception("Error al marcar todas las respuestas como leídas")
+        return jsonify({
+            "success": False,
+            "error": "No se pudieron marcar las respuestas como leídas.",
+        }), 500

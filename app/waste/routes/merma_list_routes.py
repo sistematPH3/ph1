@@ -5,12 +5,16 @@ con confirmación y auditoría). La EDICIÓN (Parte 5 del módulo) la implementa
 compañero en merma_edit; sin embargo, el evento de auditoría MERMA_EDITADA ya
 se renderiza en la Auditoría de Inventario.
 """
+import logging
+
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import current_user, login_required
 
 from app.decorators.roles import require_roles
 from app.waste.requests.waste_approvals_validators import validate_resolution_payload
 from app.waste.services import waste_approvals_service as svc
+
+logger = logging.getLogger(__name__)
 
 merma_list_bp = Blueprint('merma_list', __name__)
 
@@ -44,7 +48,8 @@ def cancelar_merma(waste_id):
         return jsonify({'success': False, 'errors': validation['errors']}), 400
     try:
         result = svc.cancel_waste(waste_id, current_user.id, data.get('reason'))
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error interno: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al cancelar la merma")
+        return jsonify({'success': False, 'message': 'No se pudo cancelar la merma. Intenta de nuevo.'}), 500
     code = 200 if result['success'] else 400
     return jsonify(result), code

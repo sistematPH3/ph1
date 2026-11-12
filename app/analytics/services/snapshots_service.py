@@ -266,7 +266,7 @@ def _generar_snapshots_ventana(ventana, period_type, user_id, chunk_size=50):
     except Exception as exc:
         logger.exception("Error al generar los snapshots de la ventana")
         db.session.rollback()
-        return {'success': False, 'message': f'Error al generar snapshots: {exc}'}
+        return {'success': False, 'message': 'No se pudieron generar los snapshots. Intenta de nuevo.'}
 
 
 def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, location_ids=None):

@@ -42,7 +42,7 @@ def refresh_snapshots():
             validacion['period_type'], e,
         )
         resultado['alarmas_creadas'] = 0
-        resultado['alarmas_error'] = str(e)
+        resultado['alarmas_error'] = 'No se pudieron evaluar las alarmas del período.'
     return jsonify(resultado)
 
 

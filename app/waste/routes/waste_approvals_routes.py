@@ -4,6 +4,8 @@ Parte 3 de la propuesta (Módulo de Mermas). Reúne en un solo archivo la lista
 de mermas en espera y la bandeja donde el Administrador decide aprobar o
 rechazar. Sin lógica de negocio: se delega en waste_approvals_service.py.
 """
+import logging
+
 from flask import Blueprint, render_template, jsonify, request, redirect, url_for
 from flask_login import current_user, login_required
 
@@ -13,6 +15,8 @@ from app.waste.requests.waste_approvals_validators import (
     validate_resolution_payload,
 )
 from app.waste.services import waste_approvals_service as svc
+
+logger = logging.getLogger(__name__)
 
 waste_approvals_bp = Blueprint('waste_approvals', __name__)
 
@@ -40,8 +44,9 @@ def bandeja_api():
     try:
         pendientes = svc.get_pending_wastes(current_user.id)
         return jsonify({'success': True, 'wastes': pendientes}), 200
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error al listar mermas: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al listar las mermas pendientes")
+        return jsonify({'success': False, 'message': 'No se pudieron listar las mermas. Intenta de nuevo.'}), 500
 
 
 @waste_approvals_bp.route('/api/waste/merma/pending-summary', methods=['GET'])
@@ -51,8 +56,13 @@ def pending_summary():
     """Resumen en vivo de mermas pendientes de resolución (círculo del sidebar)."""
     try:
         return jsonify(svc.get_pending_waste_summary(current_user.id)), 200
-    except Exception as exc:
-        return jsonify({'pending_count': 0, 'items': [], 'error': str(exc)}), 500
+    except Exception:
+        logger.exception("Error al obtener el resumen de mermas pendientes")
+        return jsonify({
+            'pending_count': 0,
+            'items': [],
+            'error': 'No se pudo obtener el resumen de mermas pendientes.',
+        }), 500
 
 
 @waste_approvals_bp.route('/api/waste/merma/<int:waste_id>', methods=['GET'])
@@ -66,8 +76,12 @@ def detalle_merma(waste_id):
             return jsonify({'success': False, 'message': error}), 403
         data['is_admin'] = bool(getattr(current_user, 'is_admin', False))
         return jsonify({'success': True, 'waste': data}), 200
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error al cargar el detalle: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al cargar el detalle de la merma %s", waste_id)
+        return jsonify({
+            'success': False,
+            'message': 'No se pudo cargar el detalle de la merma. Intenta de nuevo.',
+        }), 500
 
 
 @waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/approve', methods=['POST'])
@@ -79,8 +93,12 @@ def aprobar_merma(waste_id):
         result = svc.approve_waste(waste_id, current_user.id)
     except PermissionError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 403
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error interno: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al aprobar la merma %s", waste_id)
+        return jsonify({
+            'success': False,
+            'message': 'Error interno al aprobar la merma. Intenta de nuevo.',
+        }), 500
     code = 200 if result['success'] else 400
     return jsonify(result), code
 
@@ -98,8 +116,12 @@ def rechazar_merma(waste_id):
         result = svc.reject_waste(waste_id, current_user.id, data.get('reason'))
     except PermissionError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 403
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error interno: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al rechazar la merma %s", waste_id)
+        return jsonify({
+            'success': False,
+            'message': 'Error interno al rechazar la merma. Intenta de nuevo.',
+        }), 500
     code = 200 if result['success'] else 400
     return jsonify(result), code
 
@@ -122,7 +144,11 @@ def decidir_merma(waste_id):
         result = svc.decidir_lineas(waste_id, current_user.id, data.get('decisiones'))
     except PermissionError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 403
-    except Exception as exc:
-        return jsonify({'success': False, 'message': f'Error interno: {str(exc)}'}), 500
+    except Exception:
+        logger.exception("Error al decidir las líneas de la merma %s", waste_id)
+        return jsonify({
+            'success': False,
+            'message': 'Error interno al decidir las líneas de la merma. Intenta de nuevo.',
+        }), 500
     code = 200 if result['success'] else 400
     return jsonify(result), code
