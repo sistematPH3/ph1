@@ -77,6 +77,21 @@ def new_purchase_form():
         users=users
     )
 
+def _total_linea(item):
+    """Total de la línea (cantidad x precio unitario) de un snapshot de auditoría.
+
+    Se muestra junto al precio unitario para que la edición deje claro el
+    importe real del renglón, que es como se registra y edita la compra.
+    """
+    if not item:
+        return 0
+    try:
+        return round(float(item.get('quantity') or 0)
+                     * float(item.get('foreign_price') or 0), 2)
+    except (TypeError, ValueError):
+        return 0
+
+
 @purchase_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
 @require_roles('admin')
 def view_purchase_details(purchase_id):
@@ -146,15 +161,15 @@ def view_purchase_details(purchase_id):
             prod_name = product_obj.name if product_obj else f"Insumo ID {prod_id}"
 
             if not p_item and c_item:
-                changes.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-', 'to': f"Cant. Comprada: {c_item.get('quantity')} | Lote: {c_item.get('lot_number')} | Precio Unitario: {c_item.get('foreign_price')}"})
+                changes.append({'field': f'Insumo Añadido: {prod_name}', 'from': '-', 'to': f"Cant. Comprada: {c_item.get('quantity')} | Lote: {c_item.get('lot_number')} | Precio Unitario: {c_item.get('foreign_price')} | Total Línea: {_total_linea(c_item)}"})
             elif p_item and not c_item:
-                changes.append({'field': f'Insumo Eliminado: {prod_name}', 'from': f"Cant. Comprada: {p_item.get('quantity')} | Lote: {p_item.get('lot_number')} | Precio Unitario: {p_item.get('foreign_price')}", 'to': '-'})
+                changes.append({'field': f'Insumo Eliminado: {prod_name}', 'from': f"Cant. Comprada: {p_item.get('quantity')} | Lote: {p_item.get('lot_number')} | Precio Unitario: {p_item.get('foreign_price')} | Total Línea: {_total_linea(p_item)}", 'to': '-'})
             else:
                 if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
                     changes.append({'field': f'Cantidad Comprada de {prod_name}', 'from': p_item.get('quantity'), 'to': c_item.get('quantity')})
                 
                 if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
-                    changes.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})', 'from': p_item.get('foreign_price'), 'to': c_item.get('foreign_price')})
+                    changes.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {c_item.get("quantity")})', 'from': f"{p_item.get('foreign_price')} (Total línea: {_total_linea(p_item)})", 'to': f"{c_item.get('foreign_price')} (Total línea: {_total_linea(c_item)})"})
                 
                 p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
                 c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'

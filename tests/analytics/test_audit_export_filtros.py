@@ -38,7 +38,7 @@ _ensure_test_database_exists()
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app import create_app, db
-from app.models import AuditLog, LoginAudit, Location, Role, User
+from app.models import AuditLog, LoginAudit, Location, Product, Role, User
 from app.reports.requests.audit_export_validators import (
     validate_audit_export_params,
 )
@@ -331,6 +331,109 @@ class AuditExportFiltrosTest(unittest.TestCase):
         xls = generar_excel_auditoria(doc['header'], doc['detalle_tablas'])
         self.assertGreater(len(pdf.getvalue()), 1000)
         self.assertGreater(len(xls.getvalue()), 1000)
+
+
+class _FakeLog:
+    """Log de edición mínimo para ejercitar el formateador de auditoría."""
+
+    def __init__(self, previous_data, new_data):
+        self.previous_data = previous_data
+        self.new_data = new_data
+
+
+class _FakeAudit:
+    def __init__(self, action_type, previous_data=None, new_data=None):
+        self.action_type = action_type
+        self.previous_data = previous_data
+        self.new_data = new_data
+        self.timestamp = None
+        self.id = 1
+        self.purchase_id = 1
+
+
+class _FakeUser:
+    name = "Auditor"
+
+
+class _FakeRole:
+    name = "Administrador"
+
+
+class TotalLineaAuditoriaTest(unittest.TestCase):
+    """El historial de edición muestra el total de línea junto al precio unitario.
+
+    Antes solo se veía el precio unitario; como la compra se registra y edita
+    por el total de la línea, faltaba ese importe en la auditoría.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = create_app()
+        cls.app.config["TESTING"] = True
+        with cls.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+    def setUp(self):
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        self.producto = Product(name="Harina", sku="HAR-1")
+        db.session.add(self.producto)
+        db.session.commit()
+
+    def tearDown(self):
+        db.session.rollback()
+        for table in reversed(db.metadata.sorted_tables):
+            db.session.execute(table.delete())
+        db.session.commit()
+        self.ctx.pop()
+
+    def _detalle(self, pid, cantidad, precio, lote="L-1"):
+        return {'id': pid, 'product_id': self.producto.id, 'quantity': cantidad,
+                'foreign_price': precio, 'lot_number': lote,
+                'expiration_date': None}
+
+    def test_export_cambio_de_precio_muestra_total_linea(self):
+        log = _FakeLog(
+            {'details': [self._detalle(1, 10, 2.0)]},
+            {'details': [self._detalle(1, 10, 3.0)]},
+        )
+        cambios = svc._cambios_edicion_compra(log)
+        fila = next(c for c in cambios
+                    if c['field'].startswith('Precio Unitario'))
+        # 10 x 2,00 = 20,00 y 10 x 3,00 = 30,00 (formato es-VE).
+        self.assertIn('Total línea: 20,00', fila['from'])
+        self.assertIn('Total línea: 30,00', fila['to'])
+
+    def test_export_insumo_anadido_muestra_total_linea(self):
+        log = _FakeLog({'details': []},
+                       {'details': [self._detalle(2, 4, 5.0)]})
+        cambios = svc._cambios_edicion_compra(log)
+        fila = next(c for c in cambios
+                    if c['field'].startswith('Insumo Añadido'))
+        # 4 x 5,00 = 20,00.
+        self.assertIn('Total Línea: 20,00', fila['to'])
+
+    def test_auditoria_seguridad_muestra_total_linea(self):
+        from app.security.services.audit_purchase_service import (
+            AuditPurchaseService)
+        audit = _FakeAudit(
+            'EDIT',
+            {'details': [self._detalle(1, 10, 2.0)]},
+            {'details': [self._detalle(1, 10, 3.0)]},
+        )
+        filas = AuditPurchaseService._formatear(
+            None, [(audit, _FakeUser(), _FakeRole())])
+        data = filas[0]['changed_data']
+        clave = next(k for k in data if k.startswith('Precio Unitario'))
+        self.assertIn('Total línea: 20,00', data[clave]['old'])
+        self.assertIn('Total línea: 30,00', data[clave]['new'])
+
+    def test_helper_web_calcula_total_linea(self):
+        from app.logistics.routes.purchase_routes import _total_linea
+        self.assertEqual(
+            _total_linea({'quantity': 10, 'foreign_price': 2.5}), 25.0)
+        self.assertEqual(_total_linea(None), 0)
 
 
 if __name__ == '__main__':

@@ -784,6 +784,16 @@ def construir_detalle_compra(user, purchase_id, filtros):
     return documento
 
 
+def _total_linea(item):
+    """Total de la línea (cantidad x precio unitario) de un snapshot de auditoría."""
+    if not item:
+        return 0
+    try:
+        return float(item.get('quantity') or 0) * float(item.get('foreign_price') or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _cambios_edicion_compra(log):
     """Replica las diferencias visualizadas en el detalle de la compra."""
     from app.models.inventory_model import Product
@@ -816,7 +826,8 @@ def _cambios_edicion_compra(log):
         return (f"Cant. Comprada: {formatear_cantidad(d_item.get('quantity'))} | "
                 f"Lote: {d_item.get('lot_number')} | "
                 f"Precio Unitario: "
-                f"{formatear_numero(d_item.get('foreign_price'), 2)}")
+                f"{formatear_numero(d_item.get('foreign_price'), 2)} | "
+                f"Total Línea: {formatear_numero(_total_linea(d_item), 2)}")
 
     for key in set(list(prev_details.keys()) + list(curr_details.keys())):
         p_item = prev_details.get(key)
@@ -839,8 +850,10 @@ def _cambios_edicion_compra(log):
                                 'to': formatear_cantidad(c_item.get('quantity'))})
             if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
                 cambios.append({'field': f'Precio Unitario de {prod_name} (Cant. Comprada: {formatear_cantidad(c_item.get("quantity"))})',
-                                'from': formatear_numero(p_item.get('foreign_price'), 2),
-                                'to': formatear_numero(c_item.get('foreign_price'), 2)})
+                                'from': (f"{formatear_numero(p_item.get('foreign_price'), 2)} "
+                                         f"(Total línea: {formatear_numero(_total_linea(p_item), 2)})"),
+                                'to': (f"{formatear_numero(c_item.get('foreign_price'), 2)} "
+                                       f"(Total línea: {formatear_numero(_total_linea(c_item), 2)})")})
             p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
             c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
             if p_date != c_date:

@@ -70,6 +70,16 @@ class AuditPurchaseService:
         from app.reports.services.export_service import (
             formatear_cantidad, formatear_numero, formatear_tasa)
 
+        def _total_linea(item):
+            """Total de la línea (cantidad x precio unitario) del snapshot."""
+            if not item:
+                return 0
+            try:
+                return (float(item.get('quantity') or 0)
+                        * float(item.get('foreign_price') or 0))
+            except (TypeError, ValueError):
+                return 0
+
         audits_list = []
 
         for audit, user, role in results:
@@ -121,11 +131,13 @@ class AuditPurchaseService:
                         changed_data[f'Insumo Añadido: {prod_name}'] = {
                             'old': '-',
                             'new': (f"Cant. Comprada: {formatear_cantidad(c_item.get('quantity'))} | "
-                                    f"Precio Unitario: {formatear_numero(c_item.get('foreign_price'), 2)}")}
+                                    f"Precio Unitario: {formatear_numero(c_item.get('foreign_price'), 2)} | "
+                                    f"Total Línea: {formatear_numero(_total_linea(c_item), 2)}")}
                     elif p_item and not c_item:
                         changed_data[f'Insumo Eliminado: {prod_name}'] = {
                             'old': (f"Cant. Comprada: {formatear_cantidad(p_item.get('quantity'))} | "
-                                    f"Precio Unitario: {formatear_numero(p_item.get('foreign_price'), 2)}"),
+                                    f"Precio Unitario: {formatear_numero(p_item.get('foreign_price'), 2)} | "
+                                    f"Total Línea: {formatear_numero(_total_linea(p_item), 2)}"),
                             'new': '-'}
                     else:
                         if str(float(p_item.get('quantity', 0))) != str(float(c_item.get('quantity', 0))):
@@ -134,8 +146,10 @@ class AuditPurchaseService:
                                 'new': formatear_cantidad(c_item.get('quantity'))}
                         if str(float(p_item.get('foreign_price', 0))) != str(float(c_item.get('foreign_price', 0))):
                             changed_data[f'Precio Unitario de {prod_name} (Cant. Comprada: {formatear_cantidad(c_item.get("quantity"))})'] = {
-                                'old': formatear_numero(p_item.get('foreign_price'), 2),
-                                'new': formatear_numero(c_item.get('foreign_price'), 2)}
+                                'old': (f"{formatear_numero(p_item.get('foreign_price'), 2)} "
+                                        f"(Total línea: {formatear_numero(_total_linea(p_item), 2)})"),
+                                'new': (f"{formatear_numero(c_item.get('foreign_price'), 2)} "
+                                        f"(Total línea: {formatear_numero(_total_linea(c_item), 2)})")}
                         p_date = str(p_item.get('expiration_date')) if p_item.get('expiration_date') else 'N/A'
                         c_date = str(c_item.get('expiration_date')) if c_item.get('expiration_date') else 'N/A'
                         if p_date != c_date:
