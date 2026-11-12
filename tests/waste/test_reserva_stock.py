@@ -10,6 +10,7 @@ Nota: usa la base DE PRUEBA (ph_test), nunca la base real (ph).
 import os
 import unittest
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import create_engine, text
 
@@ -166,6 +167,20 @@ class ReservaStockTest(unittest.TestCase):
         self.assertEqual(float(inv.current_quantity), 100.0)
         self.assertEqual(float(inv.reserved_quantity), 10.0)
         self.assertEqual(float(inv.available_quantity()), 90.0)
+
+    def test_reserva_usa_el_mismo_redondeo_que_el_detalle(self):
+        # Regresión #7: con una cantidad de medio centavo (0.125) el detalle se
+        # guarda en Numeric(10,2) como 0.13, pero la reserva quedaba en 0.12
+        # porque `round(float(...))` redondea a la par (banker's). Deben
+        # coincidir al centavo: la reserva usa Decimal + ROUND_HALF_UP.
+        env = self._seed()
+        res = self._register(env, 0.125, env["admin1"].id, "REQ-PREC-1")
+        self.assertTrue(res["success"])
+        waste = Waste.query.get(res["waste_id"])
+        detalle = waste.details[0]
+        inv = self._inv(env["sede_a"], env["product"])
+        self.assertEqual(detalle.quantity, Decimal("0.13"))
+        self.assertEqual(inv.reserved_quantity, Decimal("0.13"))
 
     def test_merma_pendiente_que_excede_disponible_es_rechazada(self):
         env = self._seed()

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from app.time_utils import current_ve_time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from app.waste.repositories.waste_edit_repository import WasteEditRepository
 from app.waste.repositories.register_waste_repository import RegisterWasteRepository
@@ -173,7 +173,10 @@ class WasteEditService:
         old_pending = {}
         for d in waste.details:
             if not d.status or d.status == "PENDIENTE":
-                old_pending[d.product_id] = old_pending.get(d.product_id, 0.0) + float(d.quantity or 0)
+                old_pending[d.product_id] = (
+                    old_pending.get(d.product_id, Decimal("0.00"))
+                    + Decimal(str(d.quantity or 0))
+                )
 
         header_type_id = validation["data"]["waste_type_id"]
         if not header_type_id and validation["data"]["lines"]:
@@ -307,11 +310,15 @@ class WasteEditService:
         # stock físico disponible (current; el tránsito ya salió de current).
         new_pending = {}
         for line in validation["data"]["lines"]:
-            new_pending[line["product_id"]] = new_pending.get(line["product_id"], 0.0) + float(line["quantity"])
+            new_pending[line["product_id"]] = (
+                new_pending.get(line["product_id"], Decimal("0.00"))
+                + Decimal(str(line["quantity"]))
+            )
 
         for product_id in set(old_pending) | set(new_pending):
-            delta = new_pending.get(product_id, 0.0) - old_pending.get(product_id, 0.0)
-            if abs(delta) < 1e-9:
+            delta = (new_pending.get(product_id, Decimal("0.00"))
+                     - old_pending.get(product_id, Decimal("0.00")))
+            if delta == Decimal("0.00"):
                 continue
             inv = RegisterWasteRepository.get_inventory_item_for_update(product_id, waste.location_id)
             if inv is None:
@@ -322,9 +329,14 @@ class WasteEditService:
                     "message": f"No existe inventario para {nombre} en esta sede."
                 }, 400
             # El tránsito ya está descontado de current_quantity al despachar.
-            disponible_fisico = float(inv.current_quantity or 0)
-            nueva_reserva = float(inv.reserved_quantity or 0) + delta
-            if nueva_reserva > disponible_fisico + 1e-9:
+            # Se opera en Decimal y se cuantiza con HALF_UP (igual que la
+            # columna Numeric(10,2)): antes `round(float(...))` redondeaba a la
+            # par y la reserva quedaba desfasada un centavo del detalle.
+            disponible_fisico = Decimal(str(inv.current_quantity or 0))
+            reserva_actual = Decimal(str(inv.reserved_quantity or 0))
+            nueva_reserva = (reserva_actual + delta).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if nueva_reserva > disponible_fisico:
                 product = RegisterWasteRepository.get_product_by_id(product_id)
                 nombre = product.name if product else f"ID {product_id}"
                 return {
@@ -334,7 +346,7 @@ class WasteEditService:
                         "mermada dejaría la disponibilidad por debajo de cero."
                     )
                 }, 400
-            inv.reserved_quantity = round(max(0.0, nueva_reserva), 2)
+            inv.reserved_quantity = max(Decimal("0.00"), nueva_reserva)
 
         WasteEditRepository.save_pending_edit(waste, validation["data"], user_id)
         return {"success": True, "message": f"Merma #{waste.id} actualizada satisfactoriamente."}, 200

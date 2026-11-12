@@ -1,6 +1,6 @@
 import json
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from sqlalchemy import func, or_
 from app.time_utils import current_ve_time
 from app.models.inventory_model import db, Inventory, Product
@@ -433,10 +433,15 @@ class RegisterWasteRepository:
                 )
                 if not inventory_item:
                     continue
-                qty = float(d['quantity'])
-                inventory_item.reserved_quantity = round(
-                    float(inventory_item.reserved_quantity or 0) + qty, 2
-                )
+                # Aritmética en Decimal (no float) y redondeo HALF_UP, igual que
+                # la columna Numeric(10,2) del detalle: antes `round(float(...))`
+                # redondeaba a la par (banker's) y la reserva quedaba 0,01 por
+                # debajo del detalle para cantidades con medio centavo.
+                qty = Decimal(str(d['quantity']))
+                reservado = Decimal(str(inventory_item.reserved_quantity or 0))
+                inventory_item.reserved_quantity = (
+                    reservado + qty
+                ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
         RegisterWasteRepository.audit_waste_creation(
             waste=waste, waste_type=waste_type, user_id=user_id, pending=pending, motivos=motivos

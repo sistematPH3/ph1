@@ -25,6 +25,7 @@ import os
 import unittest
 import json
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import create_engine, text
 
@@ -346,6 +347,41 @@ class WasteEditTest(unittest.TestCase):
             (a.changed_data or {}).get("event") == "MERMA_EDITADA"
             for a in audited
         ))
+
+    def test_post_edit_reserva_coincide_con_el_detalle(self):
+        # Regresión #7: editar la merma a una cantidad de medio centavo
+        # (10.125) guarda el detalle como 10.13 pero la reserva quedaba en 10.12
+        # por el `round(float(...))`. Deben coincidir al centavo.
+        env = self._seed()
+        # `_seed` puede dejar la sede de la merma con id=1 (interpretada como
+        # Sede Central) según el estado de las secuencias; para aislar la prueba
+        # de esa regla se marca el tipo como aplicable a Central.
+        env["waste_type"].applies_central = True
+        # `_seed` crea la merma directo (sin pasar por register_waste), así que
+        # no deja reserva. En producción la merma PENDIENTE ya congeló sus 10 kg
+        # en reserved_quantity; se replica ese estado para medir el ajuste por
+        # el delta (10.125 - 10.00) y no partir de una reserva en cero.
+        inv = Inventory.query.filter_by(
+            location_id=env["loc_a"].id, product_id=env["product"].id).first()
+        inv.reserved_quantity = Decimal("10.00")
+        db.session.commit()
+        self._login(env["admin"].id)
+        resp = self.client.post(
+            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            data=json.dumps({
+                "waste_type_id": env["waste_type"].id,
+                "notes": "Precisión decimal",
+                "lines": [{"product_id": env["product"].id,
+                           "lot_number": "L-AAA", "quantity": 10.125}],
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.get_json())
+        waste = db.session.query(Waste).get(env["waste"].id)
+        detalle = waste.details[0]
+        db.session.refresh(inv)
+        self.assertEqual(detalle.quantity, Decimal("10.13"))
+        self.assertEqual(inv.reserved_quantity, Decimal("10.13"))
 
     # ------------------------------------------------------------------
     # CASO 4: VENCIDO solo acepta lotes vencidos

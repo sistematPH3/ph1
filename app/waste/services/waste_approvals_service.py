@@ -6,6 +6,7 @@ audita). Solo el Administrador aprueba/rechaza; el resto de roles (con cola de
 pendientes) solo ve su bandeja en solo lectura.
 """
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from app.time_utils import current_ve_time
 
 from app.extensions import db
@@ -356,6 +357,25 @@ def _only_admin(user_id):
     return user
 
 
+def _dec(value):
+    """Convierte a Decimal sin pasar por float (evita el ruido binario).
+
+    Las cantidades de inventario son Numeric(10,2); operarlas como float y
+    redondear con round() puede desviar el resultado en un centavo frente al
+    valor que realmente guarda la base de datos.
+    """
+    if value is None:
+        return Decimal('0.00')
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def _q2(value):
+    """Cuantiza a 2 decimales con el MISMO redondeo de la columna (HALF_UP)."""
+    return _dec(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def _stock_disponible(location_id, product_id):
     inv = MermaApprovalsRepository.get_inventory_item(location_id, product_id)
     if inv is None:
@@ -392,7 +412,7 @@ def _descontar_stock_lines(waste, details):
     reservas_propias = {}
     for d in details:
         reservas_propias[d.product_id] = (
-            reservas_propias.get(d.product_id, 0.0) + float(d.quantity or 0)
+            reservas_propias.get(d.product_id, Decimal('0.00')) + _dec(d.quantity)
         )
 
     for d in details:
@@ -401,19 +421,17 @@ def _descontar_stock_lines(waste, details):
             raise ValueError(
                 f'No existe inventario para el insumo #{d.product_id} en la sede #{waste.location_id}.'
             )
+        reserva_actual = _dec(inv.reserved_quantity)
         disponible = (
-            float(inv.current_quantity or 0)
-            - float(inv.reserved_quantity or 0)
+            _dec(inv.current_quantity)
+            - reserva_actual
             # Solo se liberan las reservas que EXISTEN de las líneas que se
             # aprueban (la merma pendiente congeló esa cantidad al crearse;
             # mermas creadas sin reserva no obtienen crédito extra).
-            + min(
-                reservas_propias.get(d.product_id, 0.0),
-                float(inv.reserved_quantity or 0),
-            )
+            + min(reservas_propias.get(d.product_id, Decimal('0.00')), reserva_actual)
         )
         saldo = saldos.get(d.product_id, disponible)
-        qty = float(d.quantity or 0)
+        qty = _dec(d.quantity)
         if saldo < qty:
             prod = db.session.get(Product, d.product_id)
             nombre = prod.name if prod else f'#{d.product_id}'
@@ -423,28 +441,31 @@ def _descontar_stock_lines(waste, details):
         saldos[d.product_id] = saldo - qty
         cambios.append({
             'product_id': d.product_id,
-            'quantity': qty,
+            'quantity': float(qty),
             'stock_antes': None,
             'stock_despues': None,
         })
     # Aplicar los descuentos una vez validado todo y liberar la reserva,
-    # registrando por línea el stock contable real antes/después.
+    # registrando por línea el stock contable real antes/después. La aritmética
+    # va en Decimal (no float) para que el saldo coincida al centavo con la
+    # columna Numeric(10,2).
     for d in details:
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
-        antes = float(inv.current_quantity or 0)
-        qty = float(d.quantity or 0)
-        inv.current_quantity = round(antes - qty, 2)
-        inv.reserved_quantity = round(
-            max(0.0, float(inv.reserved_quantity or 0) - qty), 2
+        antes = _dec(inv.current_quantity)
+        qty = _dec(d.quantity)
+        despues = _q2(antes - qty)
+        inv.current_quantity = despues
+        inv.reserved_quantity = max(
+            Decimal('0.00'), _q2(_dec(inv.reserved_quantity) - qty)
         )
         for c in cambios:
             if (
                 c['product_id'] == d.product_id
-                and c['quantity'] == qty
+                and c['quantity'] == float(qty)
                 and c['stock_antes'] is None
             ):
-                c['stock_antes'] = antes
-                c['stock_despues'] = round(antes - qty, 2)
+                c['stock_antes'] = float(antes)
+                c['stock_despues'] = float(despues)
                 break
     return cambios
 
@@ -531,8 +552,9 @@ def decidir_lineas(waste_id, user_id, decisiones):
         inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         if inv is None:
             continue
-        inv.reserved_quantity = round(
-            max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+        inv.reserved_quantity = max(
+            Decimal('0.00'),
+            _q2(_dec(inv.reserved_quantity) - _dec(d.quantity)),
         )
 
     for d in aprobar:
@@ -732,8 +754,9 @@ def cancel_waste(waste_id, user_id, reason):
             inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
             if inv is None:
                 continue
-            inv.reserved_quantity = round(
-                max(0.0, float(inv.reserved_quantity or 0) - float(d.quantity or 0)), 2
+            inv.reserved_quantity = max(
+                Decimal('0.00'),
+                _q2(_dec(inv.reserved_quantity) - _dec(d.quantity)),
             )
         MermaApprovalsRepository.mark_cancelled(waste, user.id, reason)
         MermaApprovalsRepository.create_audit(
