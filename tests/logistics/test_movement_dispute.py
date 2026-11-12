@@ -419,6 +419,30 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertEqual(len(returns), 1)
         self.assertEqual(float(returns[0].details[0].quantity), 2.00)
 
+    # =========================================================================
+    # CASO 6: el faltante se libera del tránsito UNA sola vez. Si el origen
+    # tiene más tránsito que el de esta disputa (otros despachos en curso), ese
+    # tránsito ajeno no debe desaparecer.
+    # =========================================================================
+    def test_faltante_libera_el_transito_una_sola_vez(self):
+        # Envían 10, llegan 8 (faltan 2). El origen tiene 10 en tránsito: 2 de
+        # esta disputa + 8 de otros despachos en curso.
+        env = self._seed(
+            status="NOVEDAD_FALTANTE", novelty_type="FALTANTE",
+            dispatched=10, received=8
+        )
+        env["inv_origin"].transit_quantity = Decimal("10.00")
+        db.session.commit()
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+            "general_notes": "Se acepta lo que llegó"
+        }, user_id=env["user"].id)
+
+        db.session.refresh(env["inv_origin"])
+        # Solo se liberan los 2 de esta disputa: quedan 8 en tránsito (no 6).
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 8.00)
+
 
 if __name__ == "__main__":
     unittest.main()

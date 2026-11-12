@@ -383,13 +383,6 @@ def resolve_dispute(movement_id, payload, user_id):
             location_id=movement.origin_location_id, product_id=detail.product_id
         ).first()
 
-        # AJUSTE DE TRÁNSITO: process_reception ya restó el received_qty del
-        # tránsito original. Aquí solo liberamos lo que haya quedado marcado
-        # como missing_qty para no dejar stock atascado.
-        if inv_origin and inv_origin.transit_quantity is not None:
-            current_transit = _to_decimal(inv_origin.transit_quantity)
-            inv_origin.transit_quantity = max(Decimal('0.00'), current_transit - qty_missing)
-
         received_qty = _to_decimal(detail.received_quantity)
         authorized_qty = _to_decimal(detail.quantity)
         conforming_qty = min(received_qty, authorized_qty)
@@ -507,6 +500,9 @@ def resolve_dispute(movement_id, payload, user_id):
         # la disputa se libera: ya sea porque vuelve al current (reintegro) o
         # porque se da de baja. Se usa max(0, ...) para no romper movimientos
         # viejos donde el tránsito ya se había liberado por completo.
+        # ÚNICO punto donde se descuenta el faltante del tránsito: antes había
+        # un segundo bloque al inicio del bucle que lo restaba otra vez (el
+        # tránsito del origen quedaba subestimado si había otros despachos).
         if inv_origin is not None and qty_missing > Decimal('0.00'):
             inv_origin.transit_quantity = max(
                 Decimal('0.00'),
