@@ -2,7 +2,7 @@ import logging
 import re
 import unicodedata
 from flask import render_template, request, redirect, url_for, flash, jsonify
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from app import db
 from app.inventory import inventory_bp
 from app.inventory.services.category_service import CategoryService
@@ -10,7 +10,7 @@ from app.inventory.services.category_service import CategoryService
 logger = logging.getLogger(__name__)
 
 # CAMBIO: Importamos el decorador dinámico
-from app.decorators.roles import require_roles 
+from app.decorators.roles import require_roles, require_roles_api 
 
 
 def normalize_text(text: str) -> str:
@@ -180,7 +180,7 @@ def toggle_category_status(type_id):
 
 
 @inventory_bp.route('/categories/api/create', methods=['POST'])
-@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
+@require_roles_api('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def api_create_category():
     try:
         raw_data = request.get_json() if request.is_json else request.form.to_dict()
@@ -198,7 +198,7 @@ def api_create_category():
             return jsonify({
                 'success': False,
                 'error': f'La categoría "{match.name}" ya se encuentra registrada.'
-            }), 400
+            }), 409
 
         formatted_data = {
             'name': cat_name,
@@ -217,6 +217,22 @@ def api_create_category():
                 'shelf_life_days': new_category.shelf_life_days or 0
             }
         }), 201
+
+    except IntegrityError:
+        db.session.rollback()
+        logger.warning("Conflicto al crear la categoría: el nombre ya existe")
+        return jsonify({
+            'success': False,
+            'error': f'La categoría "{cat_name}" ya se encuentra registrada.',
+        }), 409
+
+    except (DataError, ValueError) as exc:
+        db.session.rollback()
+        logger.warning("Datos inválidos al crear la categoría: %s", exc)
+        return jsonify({
+            'success': False,
+            'error': 'No se pudo crear la categoría. Verifica los datos e intenta de nuevo.',
+        }), 400
 
     except Exception:
         db.session.rollback()

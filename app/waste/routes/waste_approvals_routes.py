@@ -73,6 +73,8 @@ def detalle_merma(waste_id):
     try:
         data, error = svc.get_waste_detail(waste_id, current_user.id)
         if error:
+            if 'no existe' in error.lower():
+                return jsonify({'success': False, 'message': error}), 404
             return jsonify({'success': False, 'message': error}), 403
         data['is_admin'] = bool(getattr(current_user, 'is_admin', False))
         return jsonify({'success': True, 'waste': data}), 200

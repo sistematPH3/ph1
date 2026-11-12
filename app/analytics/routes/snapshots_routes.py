@@ -43,6 +43,8 @@ def refresh_snapshots():
         )
         resultado['alarmas_creadas'] = 0
         resultado['alarmas_error'] = 'No se pudieron evaluar las alarmas del período.'
+    if not resultado.get('success', True):
+        return jsonify(resultado), 500
     return jsonify(resultado)
 
 

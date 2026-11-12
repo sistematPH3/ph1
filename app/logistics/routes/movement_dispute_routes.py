@@ -112,6 +112,18 @@ def cancel_linked_replenishment(movement_id):
     try:
         ok, message = service_cancel_replenishment(movement_id, current_user.id)
         return jsonify({"success": ok, "message": message}), 200
+    except PermissionError:
+        logger.warning("Sin permisos para revertir la reposición del traslado %s", movement_id)
+        return jsonify({
+            "success": False,
+            "message": "No tiene permisos para revertir esta reposición.",
+        }), 403
+    except ValueError:
+        logger.warning("Traslado inexistente al revertir la reposición: %s", movement_id)
+        return jsonify({
+            "success": False,
+            "message": "El traslado de la disputa no existe.",
+        }), 404
     except Exception:
         logger.exception("Error al revertir la reposición del traslado %s", movement_id)
         return jsonify({

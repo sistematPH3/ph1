@@ -99,6 +99,11 @@ def mark_response_read():
             "success": True,
             "unread_count": ResponseInboxRepository.get_unread_count(current_user),
         })
+    except (TypeError, ValueError):
+        return jsonify({
+            "success": False,
+            "error": "El identificador de la respuesta no es válido.",
+        }), 400
     except Exception:
         logger.exception("Error al marcar una respuesta como leída")
         return jsonify({

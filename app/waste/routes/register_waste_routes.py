@@ -212,7 +212,7 @@ def subir_foto():
         return jsonify({'success': True, 'url': url}), 200
     except Exception:
         logger.exception("Error al subir la evidencia de la merma")
-        return jsonify({'success': False, 'message': 'No se pudo subir la evidencia. Intenta de nuevo.'}), 400
+        return jsonify({'success': False, 'message': 'No se pudo subir la evidencia. Intenta de nuevo.'}), 502
 
 @register_waste_bp.route('/waste/merma/new', methods=['POST'])
 @login_required
