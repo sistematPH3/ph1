@@ -10,6 +10,6 @@ class AuditService:
             # El servicio le delega la escritura al repositorio
             AuditRepository.guardar_log(user_id, role_id, action, location_id)
             return True
-        except Exception as e:
-            logger.error(f"Error en capa de datos al auditar: {str(e)}")
+        except Exception:
+            logger.exception("Error en capa de datos al auditar")
             return False

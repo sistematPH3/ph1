@@ -20,6 +20,6 @@ class AuditUserService:
                 changed_data
             )
             return True
-        except Exception as e:
-            logger.error(f"Error en capa de datos al auditar usuario: {str(e)}")
+        except Exception:
+            logger.exception("Error en capa de datos al auditar usuario")
             return False
