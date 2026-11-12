@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool
 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -14,6 +15,14 @@ def _base_de_datos_segura():
     if not url:
         return '(sin configurar)'
     return url.rsplit('@', 1)[-1] if '@' in url else '(configuracion invalida)'
+
+
+def _es_bd_de_pruebas(url):
+    """True si la URL apunta a una base cuyo nombre contiene 'test'."""
+    if not url:
+        return False
+    nombre = url.split('?', 1)[0].rstrip('/').rsplit('/', 1)[-1]
+    return 'test' in nombre.lower()
 
 
 print(f"DEBUG: base de datos -> {_base_de_datos_segura()}")
@@ -39,6 +48,11 @@ class Config:
 
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Las pruebas crean una app por módulo. Sin NullPool cada app conserva su
+    # propio pool y la suite completa deja decenas de conexiones abiertas hasta
+    # agotar max_connections. Con NullPool cada operación abre y cierra la suya.
+    if _es_bd_de_pruebas(SQLALCHEMY_DATABASE_URI):
+        SQLALCHEMY_ENGINE_OPTIONS = {'poolclass': NullPool}
 
     # --- SMTP (recuperacion de contrasena) -------------------------------
     # Todo sale del entorno: el codigo ya no lleva credenciales ni hosts.
