@@ -86,6 +86,19 @@ class Config:
     INVOICE_VALIDATION_MODE = os.environ.get('INVOICE_VALIDATION_MODE', 'strict').strip().lower()
     INVOICE_UMBRAL_ACEPTACION = int(os.environ.get('INVOICE_UMBRAL_ACEPTACION', '60'))
 
+    # Umbral (en días) de la alerta de Vencimiento Próximo en la recepción de
+    # traslados. Si el lote físico declarado vence MÁS ALLÁ de este umbral, la
+    # condición "Vencimiento Próximo" no se sostiene y se rechaza el registro.
+    # Si no hay ninguna fecha con la cual validar, también se rechaza: no se
+    # puede sostener la novedad a ciegas. Configurable por entorno.
+    VENCIMIENTO_PROXIMO_DIAS = int(os.environ.get('VENCIMIENTO_PROXIMO_DIAS', '7'))
+
+    # Vida útil MÍNIMA (en días) que debe conservar un insumo con fecha de
+    # caducidad MANUAL (lote de fábrica) al registrarse una compra o editarse.
+    # Evita ingresar mercancía a punto de vencer: si la fecha impresa está más
+    # cerca que este umbral, se rechaza. Configurable por entorno.
+    VENCIMIENTO_MANUAL_MIN_DIAS = int(os.environ.get('VENCIMIENTO_MANUAL_MIN_DIAS', '30'))
+
 
 class TestingConfig(Config):
     TESTING = True
