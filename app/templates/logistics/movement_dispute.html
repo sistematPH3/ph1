@@ -312,7 +312,15 @@
                                                     <select name="item_{{ item.id }}_action" class="form-select form-select-sm" required>
                                                         <option value="" selected disabled>-- Seleccione resolución --</option>
                                                         
-                                                        {% if mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
+                                                        {% if item.item_condition == 'RECHAZO_POR_ESPACIO' %}
+                                                            {# Regla de negocio: no hay espacio físico en la sede, así que la
+                                                               ÚNICA salida es devolver. El reverso RETORNO_EMERGENCIA se
+                                                               genera automáticamente al emitir el veredicto. #}
+                                                            <option value="RETORNO_EMERGENCIA">Devolver al central (única opción: rechazo por espacio)</option>
+                                                        {% elif item.item_condition in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA'] %}
+                                                            <option value="ACEPTAR_RECEPCION">Dejar en sede (se acredita lo recibido; si está dañado, va a merma)</option>
+                                                            <option value="RETORNO_EMERGENCIA">Devolver al central (genera el reverso automático)</option>
+                                                        {% elif mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
                                                             <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido: {{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u. (reintegra el faltante a la sede origen)</option>
                                                             <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (el faltante se registra como pérdida en ruta)</option>
                                                         {% elif mov.status in ['SOBRANTE_EXCEDENTE'] %}
@@ -323,7 +331,8 @@
                                                             <option value="INCIDENCIA_INTERNA">Procesar como incidencia interna local (caja dañada/abierta, el contenido queda en sede)</option>
                                                             <option value="ACEPTAR_RECEPCION">Concluir recepción física local (tomar lo registrado como recibido)</option>
                                                         {% elif mov.status == 'INCIDENCIA_TEMPERATURA' %}
-                                                            <option value="ACEPTAR_RECEPCION">Concluir recepción física (tomar lo registrado como recibido, cerrar tránsito y notificar a auditoría)</option>
+                                                            <option value="ACEPTAR_RECEPCION">Dejar en sede (tomar lo registrado como recibido, cerrar tránsito y notificar a auditoría)</option>
+                                                            <option value="RETORNO_EMERGENCIA">Devolver al central (genera el reverso automático)</option>
                                                         {% elif mov.status == 'VENCIMIENTO_PROXIMO' %}
                                                             <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
                                                         {% elif mov.status == 'LOTE_NO_COINCIDE' %}

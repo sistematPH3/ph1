@@ -86,25 +86,43 @@ class InventoryViewRepository:
         return MovementDisputeRepository.PENDING_DISPUTE_STATUSES
 
     @staticmethod
-    def get_disputed_qty_by_location():
-        """Faltante en disputa por (sede origen, producto).
+    def _held_units_expr():
+        """Unidades resguardadas en el ORIGEN por una disputa abierta.
 
-        Mientras una recepción con novedad no se resuelve, el faltante queda
-        resguardado en el ORIGEN (nunca llegó a destino). Se calcula desde los
-        movimientos abiertos para que sea visible incluso en registros viejos
+        No son solo faltantes: un sobrante pendiente de arbitraje también salió
+        físicamente del origen y quedó congelado en su `transit_quantity` (ver
+        `debit_origin_surplus`). Si solo se sumara `missing_quantity`, esas
+        unidades se exhibirían como tránsito genérico en vez de "en disputa".
+        """
+        return (
+            func.coalesce(MovementDetail.missing_quantity, 0)
+            + func.greatest(
+                func.coalesce(MovementDetail.received_quantity, 0)
+                - MovementDetail.quantity,
+                0,
+            )
+        )
+
+    @staticmethod
+    def get_disputed_qty_by_location():
+        """Unidades en disputa por (sede origen, producto): faltante + sobrante.
+
+        Mientras una recepción con novedad no se resuelve, tanto el faltante
+        (nunca llegó) como el sobrante (llegó de más y salió físicamente del
+        origen) quedan resguardados en el ORIGEN. Se calculan desde los
+        movimientos abiertos para que sean visibles incluso en registros viejos
         donde el tránsito ya se había liberado.
         """
         statuses = InventoryViewRepository._pending_dispute_statuses()
         rows = db.session.query(
             Movement.origin_location_id.label('location_id'),
             MovementDetail.product_id.label('product_id'),
-            func.sum(MovementDetail.missing_quantity).label('disputed')
+            func.sum(InventoryViewRepository._held_units_expr()).label('disputed')
         ).join(
             Movement, MovementDetail.movement_id == Movement.id
         ).filter(
             Movement.status.in_(statuses),
-            MovementDetail.missing_quantity.isnot(None),
-            MovementDetail.missing_quantity > 0,
+            InventoryViewRepository._held_units_expr() > 0,
         ).group_by(
             Movement.origin_location_id, MovementDetail.product_id
         ).all()
@@ -116,11 +134,11 @@ class InventoryViewRepository:
 
     @staticmethod
     def get_disputed_qty_by_lot(location_id, product_id):
-        """Faltante en disputa por lote para una sede/producto concretos."""
+        """Unidades en disputa (faltante + sobrante) por lote de origen."""
         statuses = InventoryViewRepository._pending_dispute_statuses()
         rows = db.session.query(
             MovementDetail.lot_number.label('lot_number'),
-            func.sum(MovementDetail.missing_quantity).label('disputed')
+            func.sum(InventoryViewRepository._held_units_expr()).label('disputed')
         ).join(
             Movement, MovementDetail.movement_id == Movement.id
         ).filter(
@@ -129,12 +147,151 @@ class InventoryViewRepository:
             MovementDetail.product_id == int(product_id),
             MovementDetail.lot_number.isnot(None),
             MovementDetail.lot_number != '',
-            MovementDetail.missing_quantity.isnot(None),
-            MovementDetail.missing_quantity > 0,
+            InventoryViewRepository._held_units_expr() > 0,
         ).group_by(MovementDetail.lot_number).all()
 
         return {
             str(r.lot_number).strip(): float(r.disputed or 0.0)
+            for r in rows if r.lot_number
+        }
+
+    @staticmethod
+    def get_return_transit_by_location():
+        """Devoluciones ya despachadas por (sede origen, producto).
+
+        El traslado de retorno (`RETORNO_EMERGENCIA`) incrementa el tránsito de
+        la sede que devuelve para que la recepción en Central pueda liberarlo,
+        pero NO debe mostrarse como tránsito genérico: son unidades que ya no
+        pertenecen a esa sede y están en camino al Almacén Central.
+        """
+        rows = db.session.query(
+            Movement.origin_location_id.label('location_id'),
+            MovementDetail.product_id.label('product_id'),
+            func.sum(MovementDetail.quantity).label('qty'),
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.type == 'RETORNO_EMERGENCIA',
+            Movement.status == 'EN_TRANSITO',
+        ).group_by(
+            Movement.origin_location_id, MovementDetail.product_id
+        ).all()
+
+        return {
+            (r.location_id, r.product_id): float(r.qty or 0.0)
+            for r in rows
+        }
+
+    @staticmethod
+    def get_incoming_return_qty_by_location():
+        """Devoluciones pendientes de recepción por (sede destino, producto).
+
+        Permite que el Almacén Central exhiba esas unidades como retenidas en
+        muelle (aún no disponibles) mientras el traslado siga EN_TRANSITO.
+        """
+        rows = db.session.query(
+            Movement.destination_location_id.label('location_id'),
+            MovementDetail.product_id.label('product_id'),
+            func.sum(MovementDetail.quantity).label('qty'),
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.type == 'RETORNO_EMERGENCIA',
+            Movement.status == 'EN_TRANSITO',
+        ).group_by(
+            Movement.destination_location_id, MovementDetail.product_id
+        ).all()
+
+        return {
+            (r.location_id, r.product_id): float(r.qty or 0.0)
+            for r in rows
+        }
+
+    @staticmethod
+    def get_disputed_lots(location_id, product_id):
+        """Disputa abierta por lote (faltante + sobrante) en el origen.
+
+        Devuelve cantidad y fecha de vencimiento para poder pintar en el
+        detalle de lotes incluso partidas que no tienen entrada registrada
+        (por ejemplo, un sobrante de una guía cuyo lote no está en compras).
+        """
+        statuses = InventoryViewRepository._pending_dispute_statuses()
+        rows = db.session.query(
+            MovementDetail.lot_number.label('lot_number'),
+            func.max(MovementDetail.expiration_date).label('expiration_date'),
+            func.sum(InventoryViewRepository._held_units_expr()).label('qty'),
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == int(location_id),
+            Movement.status.in_(statuses),
+            MovementDetail.product_id == int(product_id),
+            MovementDetail.lot_number.isnot(None),
+            MovementDetail.lot_number != '',
+            InventoryViewRepository._held_units_expr() > 0,
+        ).group_by(MovementDetail.lot_number).all()
+
+        return {
+            str(r.lot_number).strip(): {
+                'quantity': float(r.qty or 0.0),
+                'expiration_date': r.expiration_date,
+            }
+            for r in rows if r.lot_number
+        }
+
+    @staticmethod
+    def get_return_transit_lots(location_id, product_id):
+        """Devoluciones al Central ya despachadas, desglosadas por lote."""
+        rows = db.session.query(
+            MovementDetail.lot_number.label('lot_number'),
+            func.max(MovementDetail.expiration_date).label('expiration_date'),
+            func.sum(MovementDetail.quantity).label('qty'),
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.origin_location_id == int(location_id),
+            Movement.type == 'RETORNO_EMERGENCIA',
+            Movement.status == 'EN_TRANSITO',
+            MovementDetail.product_id == int(product_id),
+            MovementDetail.lot_number.isnot(None),
+            MovementDetail.lot_number != '',
+        ).group_by(MovementDetail.lot_number).all()
+
+        return {
+            str(r.lot_number).strip(): {
+                'quantity': float(r.qty or 0.0),
+                'expiration_date': r.expiration_date,
+            }
+            for r in rows if r.lot_number
+        }
+
+    @staticmethod
+    def get_incoming_return_lots(location_id, product_id):
+        """Devoluciones en camino a esta sede, desglosadas por lote.
+
+        Se muestran como retenidas por recibir hasta que se registre la
+        recepción física en muelle.
+        """
+        rows = db.session.query(
+            MovementDetail.lot_number.label('lot_number'),
+            func.max(MovementDetail.expiration_date).label('expiration_date'),
+            func.sum(MovementDetail.quantity).label('qty'),
+        ).join(
+            Movement, MovementDetail.movement_id == Movement.id
+        ).filter(
+            Movement.destination_location_id == int(location_id),
+            Movement.type == 'RETORNO_EMERGENCIA',
+            Movement.status == 'EN_TRANSITO',
+            MovementDetail.product_id == int(product_id),
+            MovementDetail.lot_number.isnot(None),
+            MovementDetail.lot_number != '',
+        ).group_by(MovementDetail.lot_number).all()
+
+        return {
+            str(r.lot_number).strip(): {
+                'quantity': float(r.qty or 0.0),
+                'expiration_date': r.expiration_date,
+            }
             for r in rows if r.lot_number
         }
 
@@ -247,6 +404,8 @@ class InventoryViewRepository:
             total_out_traslados = salidas_traslados.get(lot_num, 0.0)
             total_out_consumos = salidas_consumo.get(lot_num, 0.0)
             
+            # `salidas_traslados` descuenta la salida física (recibido si hubo
+            # recepción, despachado si no); no hay que restar la disputa aparte.
             disponible = total_in - total_out_traslados - total_out_consumos
             
             if disponible > 0.001:

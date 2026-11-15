@@ -232,12 +232,21 @@
                                         <small class="d-block text-warning fs-7 fw-semibold">+{{ "%.2f"|format(item.reserved_quantity) }} congelados</small>
                                         {% endif %}
                                         {% set disputed_qty = item.disputed_quantity or 0 %}
-                                        {% set normal_transit = (item.transit_quantity or 0) - disputed_qty %}
+                                        {% set return_transit_qty = item.return_transit_quantity or 0 %}
+                                        {% set retained_qty = item.retained_incoming_quantity or 0 %}
+                                        {# `|float` normaliza ambos operandos: transit_quantity llega como Decimal y disputed_qty como número; restarlos crudos lanza TypeError en Jinja. #}
+                                        {% set normal_transit = (item.transit_quantity|float or 0) - (disputed_qty|float or 0) - (return_transit_qty|float or 0) %}
                                         {% if normal_transit > 0 %}
                                         <small class="d-block text-info fs-7 fw-semibold">+{{ "%.2f"|format(normal_transit) }} en tránsito</small>
                                         {% endif %}
                                         {% if disputed_qty > 0 %}
                                         <small class="d-block text-danger fs-7 fw-semibold"><i class="bi bi-shield-exclamation me-1"></i>+{{ "%.2f"|format(disputed_qty) }} en disputa</small>
+                                        {% endif %}
+                                        {% if return_transit_qty > 0 %}
+                                        <small class="d-block text-secondary fs-7 fw-semibold"><i class="bi bi-arrow-return-left me-1"></i>+{{ "%.2f"|format(return_transit_qty) }} en devolución al central</small>
+                                        {% endif %}
+                                        {% if retained_qty > 0 %}
+                                        <small class="d-block text-warning fs-7 fw-semibold"><i class="bi bi-hourglass-split me-1"></i>+{{ "%.2f"|format(retained_qty) }} retenidos por recibir</small>
                                         {% endif %}
                                     </td>
                                     <td data-label="Stock Mínimo" class="text-center text-muted">{{ "%.2f"|format(item.min_stock or 0) }}</td>
@@ -275,5 +284,5 @@
 {% endblock %}
 
 {% block extra_js %}
-    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.2"></script>
+    <script src="{{ url_for('static', filename='js/inventory/inventory_views.js') }}?v=6.4"></script>
 {% endblock %}

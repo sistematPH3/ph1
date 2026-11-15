@@ -1,6 +1,6 @@
 import json
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from sqlalchemy import func, or_, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Purchase, PurchaseDetail, AuditLog
@@ -13,21 +13,44 @@ logger = logging.getLogger(__name__)
 class InventoryViewService:
 
     @staticmethod
-    def _attach_disputed_quantities(inventory_data):
-        """Adjunta a cada registro el faltante en disputa de su (sede, producto).
+    def _attach_inventory_state_quantities(inventory_data):
+        """Adjunta a cada registro las cantidades de inventario dual.
 
-        El faltante de un traslado con novedad se mantiene resguardado en el
-        origen hasta que se arbitra; aquí se expone como `disputed_quantity`
-        para que el inventario no lo oculte.
+        - `disputed_quantity`: faltante + sobrante de recepciones aún sin
+          arbitrar, resguardados en el origen.
+        - `return_transit_quantity`: unidades ya despachadas en un traslado de
+          retorno hacia Central; no son tránsito genérico de la sede.
+        - `retained_incoming_quantity`: retornos aún EN_TRANSITO cuyo destino es
+          esta sede (Central), retenidos en muelle a la espera de recepción.
+
+        Todas se exponen como Decimal para no mezclar tipos con
+        `transit_quantity` y romper las restas de la vista.
         """
         if not inventory_data:
             return inventory_data
         disputed_map = InventoryViewRepository.get_disputed_qty_by_location()
+        return_transit_map = InventoryViewRepository.get_return_transit_by_location()
+        incoming_map = InventoryViewRepository.get_incoming_return_qty_by_location()
         for item in inventory_data:
-            item.disputed_quantity = disputed_map.get(
-                (item.location_id, item.product_id), 0.0
+            key = (item.location_id, item.product_id)
+            item.disputed_quantity = InventoryViewService._to_decimal(
+                disputed_map.get(key, 0)
+            )
+            item.return_transit_quantity = InventoryViewService._to_decimal(
+                return_transit_map.get(key, 0)
+            )
+            item.retained_incoming_quantity = InventoryViewService._to_decimal(
+                incoming_map.get(key, 0)
             )
         return inventory_data
+
+    @staticmethod
+    def _to_decimal(value):
+        """Convierte de forma segura un valor numérico (float, str, JSON) a Decimal."""
+        try:
+            return Decimal(str(value or 0))
+        except (InvalidOperation, TypeError, ValueError):
+            return Decimal('0.00')
 
     @staticmethod
     def get_inventory_for_user(current_user, filter_params):
@@ -54,7 +77,7 @@ class InventoryViewService:
             alerts_summary = InventoryViewRepository.get_low_stock_counts_by_location()
             total_global_alerts = sum(item['count'] for item in alerts_summary)
 
-            InventoryViewService._attach_disputed_quantities(inventory_data)
+            InventoryViewService._attach_inventory_state_quantities(inventory_data)
 
             return {
                 'is_admin': True,
@@ -76,7 +99,7 @@ class InventoryViewService:
                 inventory_data = []
                 location_name = "Sin Sede Asignada"
 
-            InventoryViewService._attach_disputed_quantities(inventory_data)
+            InventoryViewService._attach_inventory_state_quantities(inventory_data)
 
             return {
                 'is_admin': False,
@@ -97,12 +120,12 @@ class InventoryViewService:
         ).first()
 
         total_stock = float(inventory.current_quantity) if inventory else 0.0
-        if total_stock <= 0:
-            return []
 
         # El tránsito NO se resta: al despachar ya se descontó de
         # current_quantity. Restarlo aquí lo descontaría dos veces.
-        reservado_total = float(inventory.reserved_quantity or 0)
+        reservado_total = (
+            float(inventory.reserved_quantity or 0) if inventory else 0.0
+        )
         disponible_total = max(0.0, total_stock - reservado_total)
 
         entradas_lote = {}
@@ -251,7 +274,11 @@ class InventoryViewService:
             # descontaría dos veces el mismo sobrante.
             despachos_sucursal = db.session.query(
                 MovementDetail.lot_number,
-                func.sum(MovementDetail.quantity).label('total_out')
+                # Salida física real: lo recibido si ya hubo recepción (cubre
+                # faltante y sobrante); lo despachado si sigue EN_TRANSITO.
+                func.sum(func.coalesce(
+                    MovementDetail.received_quantity, MovementDetail.quantity
+                )).label('total_out')
             ).join(
                 Movement, MovementDetail.movement_id == Movement.id
             ).filter(
@@ -337,35 +364,69 @@ class InventoryViewService:
                 lote_limpio = str(lot).strip()
                 salidas_transito[lote_limpio] = float(total_transit or 0.0)
 
-        # Faltante EN DISPUTA por lote: mercancía que salió según la guía pero
-        # no llegó, y sigue sin arbitrar. Se resguarda en el origen y se muestra
-        # aparte para que no se confunda con tránsito normal ni desaparezca.
-        salidas_disputa = InventoryViewRepository.get_disputed_qty_by_lot(loc_id, prod_id)
+        # Incidencias por lote. Se consultan por separado de las entradas para
+        # que partidas sin recepción conforme (sobrante en disputa, devolución
+        # al Central o retorno retenido en muelle) también aparezcan en el
+        # detalle, con su fecha de vencimiento y sin mezclarse entre estados.
+        disputa_lotes = InventoryViewRepository.get_disputed_lots(loc_id, prod_id)
+        retorno_lotes = InventoryViewRepository.get_return_transit_lots(loc_id, prod_id)
+        retenido_lotes = InventoryViewRepository.get_incoming_return_lots(loc_id, prod_id)
+
+        salidas_disputa = {lot: d['quantity'] for lot, d in disputa_lotes.items()}
+        salidas_retorno = {lot: d['quantity'] for lot, d in retorno_lotes.items()}
+        retenido_entrante = {lot: d['quantity'] for lot, d in retenido_lotes.items()}
 
         lots_raw = []
-        for lot_num, data in entradas_lote.items():
-            total_in = data['total_in']
+        lotes = (
+            set(entradas_lote)
+            | set(salidas_disputa)
+            | set(salidas_retorno)
+            | set(retenido_entrante)
+        )
+        for lot_num in lotes:
+            data = entradas_lote.get(lot_num)
+            total_in = data['total_in'] if data else 0.0
+
+            expiration = data['expiration_date'] if data else None
+            if expiration is None:
+                for fuente in (disputa_lotes, retorno_lotes, retenido_lotes):
+                    if lot_num in fuente:
+                        expiration = fuente[lot_num]['expiration_date']
+                        break
+
             total_out_traslados = salidas_traslado.get(lot_num, 0.0)
             total_out_consumos = salidas_consumo.get(lot_num, 0.0)
             total_out_mermas = salidas_mermas_pendientes.get(lot_num, 0.0)
             total_out_transito = salidas_transito.get(lot_num, 0.0)
             total_out_disputa = salidas_disputa.get(lot_num, 0.0)
+            total_out_retorno = salidas_retorno.get(lot_num, 0.0)
+            total_retenido = retenido_entrante.get(lot_num, 0.0)
 
-            disponible = (
+            # `total_out_disputa` NO se resta del disponible: `salidas_traslado`
+            # ya descuenta la salida física del lote. Restarlo de nuevo ocultaba
+            # stock y, en sobrantes, lo descontaba dos veces. La disputa se
+            # expone aparte en `frozen_disputed_quantity`.
+            disponible = max(0.0, (
                 total_in - total_out_traslados - total_out_consumos
-                - total_out_mermas - total_out_disputa
-            )
+                - total_out_mermas
+            ))
 
-            if disponible > 0.001 or total_out_disputa > 0.001:
+            incidencias = (
+                total_out_mermas + total_out_transito + total_out_disputa
+                + total_out_retorno + total_retenido
+            )
+            if disponible > 0.001 or incidencias > 0.001:
                 lots_raw.append({
                     'lot_number': lot_num,
-                    'expiration_date': data['expiration_date'].strftime('%Y-%m-%d') if data['expiration_date'] else '',
+                    'expiration_date': expiration.strftime('%Y-%m-%d') if expiration else '',
                     'disponible': disponible,
                     'frozen': total_out_mermas,
                     'transit': total_out_transito,
                     'disputed': total_out_disputa,
+                    'return_transit': total_out_retorno,
+                    'retained': total_retenido,
                     'initial_quantity': round(float(total_in), 2),
-                    'exp_date_raw': data['expiration_date']
+                    'exp_date_raw': expiration
                 })
 
         lots_raw.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
@@ -379,6 +440,8 @@ class InventoryViewService:
                 float(item.get('frozen', 0.0))
                 + float(item.get('transit', 0.0))
                 + float(item.get('disputed', 0.0))
+                + float(item.get('return_transit', 0.0))
+                + float(item.get('retained', 0.0))
             )
             if capped_qty > 0.001 or congelado_total > 0.001:
                 lots.append({
@@ -391,6 +454,8 @@ class InventoryViewService:
                     'frozen_merma_quantity': round(float(item.get('frozen', 0.0)), 2),
                     'frozen_transit_quantity': round(float(item.get('transit', 0.0)), 2),
                     'frozen_disputed_quantity': round(float(item.get('disputed', 0.0)), 2),
+                    'return_transit_quantity': round(float(item.get('return_transit', 0.0)), 2),
+                    'retained_incoming_quantity': round(float(item.get('retained', 0.0)), 2),
                     'initial_quantity': item['initial_quantity']
                 })
                 remaining_pool -= capped_qty

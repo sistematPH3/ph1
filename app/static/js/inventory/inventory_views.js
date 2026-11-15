@@ -132,7 +132,7 @@ function ensureLotsModalExists() {
 
     const modalHtml = `
         <div class="modal fade" id="inventoryLotsModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
                     <div class="modal-header bg-light border-bottom-0 py-3 px-4">
                         <div>
@@ -151,19 +151,27 @@ function ensureLotsModalExists() {
                                         <th class="text-start ps-3">N° de Lote / Partida</th>
                                         <th class="text-center">Vencimiento</th>
                                         <th class="text-center">Disponible</th>
-                                        <th class="text-center">Congelado</th>
+                                        <th class="text-center">Merma pend.</th>
+                                        <th class="text-center">En tránsito</th>
+                                        <th class="text-center">En disputa</th>
+                                        <th class="text-center">En devolución</th>
+                                        <th class="text-center">Retenido muelle</th>
                                         <th class="text-center">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="lotsModalBody">
                                     <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">
+                                        <td colspan="9" class="text-center py-4 text-muted">
                                             <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                        <p class="small text-muted mt-3 mb-0">
+                            El disponible no incluye mermas pendientes, unidades en tránsito,
+                            en disputa, en devolución al Central ni retenidas en muelle.
+                        </p>
                     </div>
                     <div class="modal-footer border-top-0 pt-0 pe-4 pb-4">
                         <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
@@ -190,9 +198,9 @@ async function openLotsModal(locationId, productId, productName, sku) {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-<td colspan="5" class="text-center py-4 text-muted">
-            <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
-        </td>
+                <td colspan="9" class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div> Consultando lotes...
+                </td>
             </tr>
         `;
     }
@@ -207,7 +215,7 @@ async function openLotsModal(locationId, productId, productName, sku) {
             if (result.lots.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             <i class="bi bi-info-circle fs-5 d-block mb-1 text-secondary"></i>
                             No hay partidas de lotes individuales registradas para este insumo en esta sede.
                         </td>
@@ -215,31 +223,34 @@ async function openLotsModal(locationId, productId, productName, sku) {
                 `;
             } else {
                 tbody.innerHTML = result.lots.map(l => {
-                    const disponible = Number(l.quantity != null ? l.quantity : 0).toFixed(2);
-                    const congelado = Number(l.frozen_quantity != null ? l.frozen_quantity : 0).toFixed(2);
-                    const merma = Number(l.frozen_merma_quantity != null ? l.frozen_merma_quantity : 0).toFixed(2);
-                    const transito = Number(l.frozen_transit_quantity != null ? l.frozen_transit_quantity : 0).toFixed(2);
-                    const disputa = Number(l.frozen_disputed_quantity != null ? l.frozen_disputed_quantity : 0).toFixed(2);
-                    const total = (Number(disponible) + Number(congelado)).toFixed(2);
-                    const hasCancelled = Number(congelado) > 0;
-                    const breakdownParts = [];
-                    if (Number(merma) > 0) breakdownParts.push(`Mermas ${merma}`);
-                    if (Number(transito) > 0) breakdownParts.push(`Tránsito ${transito}`);
-                    if (Number(disputa) > 0) breakdownParts.push(`En disputa ${disputa}`);
+                    const disponible = Number(l.quantity || 0);
+                    const congelado = Number(l.frozen_quantity || 0);
+                    const merma = Number(l.frozen_merma_quantity || 0);
+                    const transito = Number(l.frozen_transit_quantity || 0);
+                    const disputa = Number(l.frozen_disputed_quantity || 0);
+                    const devolucion = Number(l.return_transit_quantity || 0);
+                    const retenido = Number(l.retained_incoming_quantity || 0);
+                    const total = disponible + congelado;
+                    const fmt = (valor) => Number(valor).toFixed(2);
+                    const celda = (valor, clase) => Number(valor) > 0
+                        ? `<span class="fw-semibold ${clase}">${fmt(valor)}</span>`
+                        : '<span class="text-muted">—</span>';
+                    const vence = l.expiration_date
+                        ? `<span class="badge bg-warning text-dark border font-monospace">
+                                <i class="bi bi-calendar-event me-1"></i>${l.expiration_date}
+                           </span>`
+                        : '<span class="text-muted">—</span>';
                     return `
                     <tr>
                         <td class="ps-3 fw-bold text-dark font-monospace">${l.lot_number}</td>
-                        <td class="text-center">
-                            <span class="badge bg-warning text-dark border font-monospace">
-                                <i class="bi bi-calendar-event me-1"></i>${l.expiration_date}
-                            </span>
-                        </td>
-                        <td class="text-center fw-bold text-success">${disponible}</td>
-                        <td class="text-center">
-                            <span class="fw-bold ${hasCancelled ? 'text-warning' : 'text-muted'}">${congelado}</span>
-                            ${hasCancelled ? `<small class="d-block text-muted fs-7">${breakdownParts.join(' · ')}</small>` : ''}
-                        </td>
-                        <td class="text-center fw-bold text-primary">${total}</td>
+                        <td class="text-center">${vence}</td>
+                        <td class="text-center">${celda(disponible, 'text-success')}</td>
+                        <td class="text-center">${celda(merma, 'text-warning')}</td>
+                        <td class="text-center">${celda(transito, 'text-info')}</td>
+                        <td class="text-center">${celda(disputa, 'text-danger')}</td>
+                        <td class="text-center">${celda(devolucion, 'text-secondary')}</td>
+                        <td class="text-center">${celda(retenido, 'text-primary')}</td>
+                        <td class="text-center fw-bold text-dark">${fmt(total)}</td>
                     </tr>
                 `;
                 }).join('');
@@ -250,7 +261,7 @@ async function openLotsModal(locationId, productId, productName, sku) {
     } catch (e) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="text-center text-danger py-4">
+                <td colspan="9" class="text-center text-danger py-4">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i> No se pudo cargar el desglose de lotes.
                 </td>
             </tr>
@@ -427,10 +438,12 @@ function renderTableRows(items, emptySearchReason = null) {
         const reservedQty = item.reserved_quantity != null ? Number(item.reserved_quantity) : 0;
         const transitQty = item.transit_quantity != null ? Number(item.transit_quantity) : 0;
         const disputedQty = item.disputed_quantity != null ? Number(item.disputed_quantity) : 0;
-        // El tránsito "normal" excluye el faltante en disputa (se muestra aparte).
+        const returnTransitQty = item.return_transit_quantity != null ? Number(item.return_transit_quantity) : 0;
+        const retainedQty = item.retained_incoming_quantity != null ? Number(item.retained_incoming_quantity) : 0;
+        // El tránsito "normal" excluye disputas y devoluciones (se muestran aparte).
         const normalTransitQty = item.normal_transit_quantity != null
             ? Number(item.normal_transit_quantity)
-            : Math.max(0, transitQty - disputedQty);
+            : Math.max(0, transitQty - disputedQty - returnTransitQty);
 
         const isLow = isItemLow(item);
 
@@ -446,6 +459,12 @@ function renderTableRows(items, emptySearchReason = null) {
             : '';
         const disputedHint = disputedQty > 0
             ? `<small class="d-block text-danger fs-7 fw-semibold"><i class="bi bi-shield-exclamation me-1"></i>+${disputedQty.toFixed(2)} en disputa</small>`
+            : '';
+        const returnTransitHint = returnTransitQty > 0
+            ? `<small class="d-block text-secondary fs-7 fw-semibold"><i class="bi bi-arrow-return-left me-1"></i>+${returnTransitQty.toFixed(2)} en devolución al central</small>`
+            : '';
+        const retainedHint = retainedQty > 0
+            ? `<small class="d-block text-warning fs-7 fw-semibold"><i class="bi bi-hourglass-split me-1"></i>+${retainedQty.toFixed(2)} retenidos por recibir</small>`
             : '';
 
         return `
@@ -467,6 +486,8 @@ function renderTableRows(items, emptySearchReason = null) {
                     ${frozenHint}
                     ${transitHint}
                     ${disputedHint}
+                    ${returnTransitHint}
+                    ${retainedHint}
                 </td>
                 <td data-label="Stock Mínimo" class="text-center text-muted">${minQty}</td>
                 <td data-label="Estado" class="text-center">${badge}</td>

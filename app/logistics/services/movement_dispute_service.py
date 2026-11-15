@@ -418,6 +418,19 @@ def resolve_dispute(movement_id, payload, user_id):
         extra_units = _to_decimal(disc_data.get("extra_units", 0))
         novelty_type = disc_data.get("type")
 
+        # REGLA DEL RECHAZO POR ESPACIO: si el renglón (o el traslado) es un
+        # rechazo por falta de espacio, la ÚNICA salida válida es devolver la
+        # mercancía al Central. Por definición física la sede no tiene dónde
+        # guardarla, así que no se permite "dejarla" ni darla de baja. La UI
+        # ya oculta las demás opciones; esto protege el path por API/script.
+        if (novelty_type == 'RECHAZO_POR_ESPACIO'
+                or movement.status == 'RECHAZO_POR_ESPACIO'):
+            if action not in RETURN_ACTIONS:
+                raise ValueError(
+                    "El rechazo por espacio solo admite devolver la mercancía al "
+                    "almacén central. No es posible dejarla en la sede."
+                )
+
         _snapshot_origin_inventory(detail.product_id)
 
         inv_origin = Inventory.query.filter_by(
@@ -441,7 +454,10 @@ def resolve_dispute(movement_id, payload, user_id):
             # Decisión "dejar": el producto se queda, solo se corrige el lote.
             if new_lot:
                 detail.lot_number = new_lot
-            credited_qty = conforming_qty
+            # Un sobrante que se queda en la sede también entra al inventario:
+            # acreditar solo lo conforme deja el excedente sin dueño (el origen
+            # ya lo debitó al recibir y aquí se libera su tránsito de disputa).
+            credited_qty = received_qty if extra_units > Decimal('0.00') else conforming_qty
             _credit_inventory(inv_dest, credited_qty)
             # El faltante no declarado como baja vuelve al origen.
             if qty_missing > Decimal('0.00') and inv_origin is not None:
@@ -477,16 +493,33 @@ def resolve_dispute(movement_id, payload, user_id):
             # Decisión 3: DEVOLVER.
             has_returns = True
 
+            # 'Rechazo por espacio' es un rechazo PARCIAL: la sede descargó
+            # únicamente lo que cabía y el remanente se quedó en el camión. Ese
+            # remanente (dispatch - recibido = qty_missing) es exactamente lo que
+            # debe retornar a Central; la porción descargada (conforming_qty) se
+            # queda y se acredita en destino. Antes se trataba como rechazo TOTAL
+            # y se devolvía todo lo recibido, dejando la sede sin stock y
+            # contando el remanente como pérdida.
+            rechazo_parcial = (
+                novelty_type == 'RECHAZO_POR_ESPACIO'
+                or movement.status == 'RECHAZO_POR_ESPACIO'
+            )
             rechazo_total = (
-                novelty_type in ('RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA')
-                or movement.status in ('RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA')
+                novelty_type in ('RETORNO_EMERGENCIA',)
+                or movement.status in ('RETORNO_EMERGENCIA',)
             )
 
-            if novelty_type in QUALITATIVE_NOVELTY_TYPES or rechazo_total:
-                # La carga llegó completa pero NO se queda: o está en mal estado
-                # (calidad) o no cupo / fue rechazada por espacio. Se regresa
-                # TODO lo recibido; no se acredita nada en destino. BUGFIX vs
-                # código viejo que calculaba extra+missing = 0 y no creaba nada.
+            if rechazo_parcial:
+                # Lo descargado se queda en la sede; lo rechazado vuelve a Central.
+                credited_qty = conforming_qty
+                _credit_inventory(inv_dest, credited_qty)
+                qty_to_return = qty_missing
+                lost_qty = Decimal('0.00')
+            elif novelty_type in QUALITATIVE_NOVELTY_TYPES or rechazo_total:
+                # La carga llegó completa pero NO se queda: está en mal estado
+                # (calidad) o se devuelve completa. Se regresa TODO lo recibido;
+                # no se acredita nada en destino. BUGFIX vs código viejo que
+                # calculaba extra+missing = 0 y no creaba nada.
                 qty_to_return = received_qty
                 detail.received_quantity = Decimal('0.00')
                 # Lo que nunca llegó no puede devolverse: se registra como
@@ -498,19 +531,15 @@ def resolve_dispute(movement_id, payload, user_id):
                 # (extra_units) y/o el remanente que no se descargó (missing).
                 #
                 # REGLA DEL SOBRANTE (definida por el negocio): cuando llega más
-                # de lo que dice la guía, el origen sacó FÍSICAMENTE el excedente
-                # aunque la guía no lo refleje. Ese excedente se devuelve al
-                # origen, así que se debita del current_quantity del origen y
-                # regresa vía el traslado de retorno. Así el lote del origen
-                # termina en su conforme (despachado - excedente) y el destino en
-                # lo conforme (min(recibido, autorizado)).
+                # de lo que dice la guía, el excedente salió físicamente del
+                # origen aunque la guía no lo refleje. Ese excedente YA se debitó
+                # del current_quantity del origen y se resguardó en su
+                # transit_quantity al registrar la recepción (ver
+                # MovementReceptionService / debit_origin_surplus). Aquí solo se
+                # devuelve vía el traslado de retorno y se libera el resguardo de
+                # tránsito; NO se vuelve a debitar el current (doble asiento).
                 credited_qty = conforming_qty
                 _credit_inventory(inv_dest, credited_qty)
-                if inv_origin is not None and extra_units > Decimal('0.00'):
-                    inv_origin.current_quantity = max(
-                        Decimal('0.00'),
-                        _to_decimal(inv_origin.current_quantity) - extra_units
-                    )
                 qty_to_return = extra_units + qty_missing
 
             if qty_to_return > Decimal('0.00'):
@@ -523,8 +552,10 @@ def resolve_dispute(movement_id, payload, user_id):
         else:
             # Decisión 2 (dejar): 'ACEPTAR_RECEPCION', 'RECEPCION_CONFORME_FEFO',
             # 'INCIDENCIA_INTERNA' y cualquier acción de conformidad: se
-            # acredita la porción conforme recibida en destino.
-            credited_qty = conforming_qty
+            # acredita la porción conforme recibida en destino. Si además hubo
+            # SOBRANTE, el excedente físico también se queda aquí: acreditar
+            # solo lo conforme lo dejaría sin dueño (el origen ya lo debitó).
+            credited_qty = received_qty if extra_units > Decimal('0.00') else conforming_qty
             _credit_inventory(inv_dest, credited_qty)
 
             # Reintegro al ORIGEN de la porción que no llegó (missing_qty):
@@ -536,18 +567,21 @@ def resolve_dispute(movement_id, payload, user_id):
                 inv_origin.current_quantity = current_origin + qty_missing
                 reintegrated_qty = qty_missing
 
-        # El faltante estaba resguardado en el tránsito del ORIGEN desde la
-        # recepción con novedad (para mostrarse como "en disputa"). Al cerrar
-        # la disputa se libera: ya sea porque vuelve al current (reintegro) o
-        # porque se da de baja. Se usa max(0, ...) para no romper movimientos
-        # viejos donde el tránsito ya se había liberado por completo.
-        # ÚNICO punto donde se descuenta el faltante del tránsito: antes había
+        # El faltante y/o el excedente del sobrante estaban resguardados en el
+        # tránsito del ORIGEN desde la recepción con novedad (para mostrarse
+        # como "en disputa"). Al cerrar la disputa se libera TODO ese resguardo:
+        # tras la recepción, transit = |despachado - recibido|, que es
+        # exactamente qty_missing + extra_units (uno de los dos es 0). Se usa
+        # max(0, ...) para no romper movimientos viejos donde el tránsito ya se
+        # había liberado por completo.
+        # ÚNICO punto donde se descuenta el resguardo del tránsito: antes había
         # un segundo bloque al inicio del bucle que lo restaba otra vez (el
         # tránsito del origen quedaba subestimado si había otros despachos).
-        if inv_origin is not None and qty_missing > Decimal('0.00'):
+        held_transit = qty_missing + extra_units
+        if inv_origin is not None and held_transit > Decimal('0.00'):
             inv_origin.transit_quantity = max(
                 Decimal('0.00'),
-                _to_decimal(inv_origin.transit_quantity) - qty_missing
+                _to_decimal(inv_origin.transit_quantity) - held_transit
             )
 
         # La pérdida efectiva queda escrita en el detalle: tras resolver, el

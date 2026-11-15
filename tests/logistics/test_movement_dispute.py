@@ -203,13 +203,14 @@ class ResolveDisputeTest(unittest.TestCase):
         )
 
     # =========================================================================
-    # CASO 2: RECHAZO POR ESPACIO -> se devuelve TODO, no se acredita destino
+    # CASO 2: RECHAZO POR ESPACIO -> rechazo PARCIAL: lo descargado se queda y
+    # el remanente retorna al central.
     # =========================================================================
-    def test_rechazo_por_espacio_devuelve_todo_sin_acreditar_destino(self):
-        # Envían 10 y llegan 10, pero la carga NO cupo y se rechaza.
+    def test_rechazo_por_espacio_devuelve_lo_rechazado_y_deja_lo_descargado(self):
+        # Envían 10, se descargan 6 (lo que cupo) y 4 se rechazan por espacio.
         env = self._seed(
             status="RECHAZO_POR_ESPACIO", novelty_type="RECHAZO_POR_ESPACIO",
-            dispatched=10, received=10
+            dispatched=10, received=6
         )
 
         resolve_dispute(env["mov"].id, {
@@ -220,6 +221,7 @@ class ResolveDisputeTest(unittest.TestCase):
         inv_dest = Inventory.query.filter_by(
             location_id=env["dest"].id, product_id=env["product"].id
         ).first()
+        db.session.refresh(env["inv_origin"])
 
         returns = Movement.query.filter_by(
             return_of_dispute_id=env["mov"].id
@@ -227,15 +229,34 @@ class ResolveDisputeTest(unittest.TestCase):
 
         # 1) La disputa queda cerrada.
         self.assertEqual(env["mov"].status, "COMPLETADO")
-        # 2) NADA se acreditó en destino (no se queda mercancía rechazada).
+        # 2) Lo descargado (6) se queda acreditado en destino.
         self.assertIsNotNone(inv_dest)
-        self.assertEqual(float(inv_dest.current_quantity), 0.00)
+        self.assertEqual(float(inv_dest.current_quantity), 6.00)
         # 3) Se creó el traslado de retorno hacia el origen...
         self.assertEqual(len(returns), 1)
         self.assertEqual(returns[0].status, "EN_TRANSITO")
-        # 4) ... con la cantidad completa (10), en el detalle correcto.
+        # 4) ... con SOLO lo rechazado (4), no con la carga completa.
         self.assertEqual(len(returns[0].details), 1)
-        self.assertEqual(float(returns[0].details[0].quantity), 10.00)
+        self.assertEqual(float(returns[0].details[0].quantity), 4.00)
+        # 5) El resguardo en tránsito del origen queda liberado.
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
+
+    def test_rechazo_por_espacio_solo_admite_devolver(self):
+        # Por definición física no hay espacio en la sede: dejarla o darla de
+        # baja no es una salida válida. El servidor lo bloquea aunque la UI
+        # muestre otra opción.
+        env = self._seed(
+            status="RECHAZO_POR_ESPACIO", novelty_type="RECHAZO_POR_ESPACIO",
+            dispatched=10, received=6
+        )
+        with self.assertRaises(ValueError):
+            resolve_dispute(env["mov"].id, {
+                f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+                "general_notes": "Me la quedo en la sede"
+            }, user_id=env["user"].id)
+        db.session.rollback()
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "RECHAZO_POR_ESPACIO")
 
 
 # =========================================================================
@@ -392,9 +413,12 @@ class ResolveDisputeTest(unittest.TestCase):
             status="SOBRANTE_EXCEDENTE", novelty_type="SOBRANTE_EXCEDENTE",
             dispatched=10, received=12
         )
-        # El origen arranca con 10 (ya despachó 10 de 20) y debe perder además los
-        # 2 excedentes que físicamente salieron aunque la guía no los reflejara.
-        env["inv_origin"].current_quantity = Decimal("10.00")
+        # Estado REAL tras la recepción con novedad (ver process_reception /
+        # debit_origin_surplus): el origen ya debitó el excedente físico (2) de
+        # su current y lo dejó resguardado en su tránsito. Aquí se reproduce ese
+        # estado: current 8, transit 2.
+        env["inv_origin"].current_quantity = Decimal("8.00")
+        env["inv_origin"].transit_quantity = Decimal("2.00")
         # En un sobrante no hay faltante: el muelle nunca registra missing negativo.
         env["detail"].missing_quantity = Decimal("0.00")
         db.session.commit()
@@ -416,8 +440,10 @@ class ResolveDisputeTest(unittest.TestCase):
         # 2) El destino queda con lo conforme (10).
         self.assertIsNotNone(inv_dest)
         self.assertEqual(float(inv_dest.current_quantity), 10.00)
-        # 3) El origen pasa de 10 a 8: debita el excedente (2) que regresa vía retorno.
+        # 3) El origen NO vuelve a debitar el excedente (ya se debitó al recibir):
+        #    el current se mantiene en 8 y el resguardo de tránsito (2) se libera.
         self.assertEqual(float(env["inv_origin"].current_quantity), 8.00)
+        self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
         # 4) Se crea el traslado de retorno con el excedente (2).
         self.assertEqual(len(returns), 1)
         self.assertEqual(float(returns[0].details[0].quantity), 2.00)
