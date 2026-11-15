@@ -1,9 +1,11 @@
 import json
 import logging
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from flask import current_app
 from app.time_utils import current_ve_time
 from app import db
-from app.models import Product
+from app.models import Product, ProductType
 from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
 from app.logistics.requests.movement_reception_validators import validate_reception_payload
 
@@ -134,7 +136,14 @@ class MovementReceptionService:
         raw_details = MovementReceptionRepository.get_movement_details(movement_id)
         details_map = {d.id: d for d in raw_details}
 
-        is_valid, validation_res = validate_reception_payload(payload, details_map)
+        is_valid, validation_res = validate_reception_payload(
+            payload,
+            details_map,
+            umbral_vencimiento_dias=int(
+                current_app.config.get("VENCIMIENTO_PROXIMO_DIAS", 7)
+            ),
+            hoy=current_ve_time().date(),
+        )
         if not is_valid:
             return False, validation_res
 
@@ -143,6 +152,26 @@ class MovementReceptionService:
         processed_items = validation_res["items"]
         erroneous_products = validation_res.get("erroneous_products", [])
         has_discrepancy = validation_res["has_discrepancy"]
+
+        # GUARD #4: el RECHAZO_POR_ESPACIO solo aplica al flujo de abastecimiento
+        # Central -> sede. En una devolución sede -> Central (RETORNO_EMERGENCIA)
+        # no tiene sentido "rechazar por falta de espacio" la mercancía que la
+        # propia sede devuelve: la UI oculta la opción y aquí se bloquea por API.
+        from app.logistics.requests.movement_dispatch_validators import CENTRAL_LOCATION_ID
+        rechazo_por_espacio_permitido = (
+            movement["type"] != "RETORNO_EMERGENCIA"
+            and movement["origin_location_id"] == CENTRAL_LOCATION_ID
+        )
+        if not rechazo_por_espacio_permitido:
+            usa_rechazo = novelty_type == "RECHAZO_POR_ESPACIO" or any(
+                it.get("item_condition") == "RECHAZO_POR_ESPACIO"
+                for it in processed_items
+            )
+            if usa_rechazo:
+                return False, (
+                    "El 'Rechazo por Espacio' solo aplica a traslados de la Sede Central "
+                    "hacia una sede (abastecimiento). En devoluciones hacia Central no está permitido."
+                )
 
         # Validación de los LOTES DEL SOBRANTE (el excedente puede venir de 1..N lotes).
         # El lote del sobrante es OBLIGATORIO y debe EXISTIR en el sistema (mismo
@@ -218,6 +247,92 @@ class MovementReceptionService:
                 return False, (
                     "Uno de los insumos no solicitados no existe en el catálogo "
                     f"(IDs: {', '.join(map(str, unknown_ids))}). Revise la selección."
+                )
+
+        # VIDA ÚTIL ESTÁNDAR EN RECEPCIÓN: cuando el renglón no trae vencimiento
+        # (lote nuevo, sin fecha de fábrica) y el tipo de producto es perecedero
+        # con vida útil configurada, se deriva la fecha estándar (hoy + días).
+        # Los tipos con requires_manual_date NO se autocalculan: su fecha debe
+        # venir impresa en el empaque. Así el muelle/FEFO tiene una fecha para
+        # lotes nuevos sin obligar a inventarla a mano.
+        for item in processed_items:
+            if item.get("expiration_date"):
+                continue
+            prod = db.session.get(Product, item["product_id"])
+            tipo = (db.session.get(ProductType, prod.product_type_id)
+                    if prod is not None and prod.product_type_id else None)
+            dias_vida = getattr(tipo, 'shelf_life_days', None)
+            if (not dias_vida
+                    or getattr(tipo, 'requires_manual_date', False)):
+                continue
+            item["expiration_date"] = (
+                current_ve_time().date() + timedelta(days=int(dias_vida))
+            )
+            # Se persiste en el renglón (solo si estaba vacío) para que el lote
+            # quede con fecha y el FEFO/auditoría no dependa de recalculario.
+            MovementReceptionRepository.update_detail_expiration(
+                item["detail_id"], item["expiration_date"]
+            )
+
+        # GUARD #2: la condición 'Vencimiento Próximo' debe corresponder a un lote
+        # cuya fecha real esté DENTRO del umbral configurado (default 7 días).
+        # La fecha se resuelve, en este orden, desde:
+        #   1) el lote observado / lote de la guía consultado en el sistema,
+        #   2) la fecha observada físicamente en el empaque,
+        #   3) la fecha de vencimiento registrada en el renglón de la guía.
+        # Si NO hay ninguna fecha no se puede evaluar la condición: se rechaza en
+        # vez de aceptarla a ciegas (antes se permitía bajo cualquier circunstancia).
+        umbral_dias = int(current_app.config.get("VENCIMIENTO_PROXIMO_DIAS", 7))
+        hoy = current_ve_time().date()
+        for item in processed_items:
+            if item.get("item_condition") != "VENCIMIENTO_PROXIMO":
+                continue
+            fecha_exp = None
+            for lot_candidate in (item.get("observed_physical_lot"), item.get("lot_number")):
+                lot_fisico = str(lot_candidate or "").strip()
+                if not lot_fisico:
+                    continue
+                exp_str = MovementReceptionRepository.get_expiration_for_lot(
+                    item["product_id"], lot_fisico
+                )
+                if exp_str:
+                    try:
+                        fecha_exp = datetime.strptime(exp_str, "%Y-%m-%d").date()
+                    except (ValueError, TypeError):
+                        fecha_exp = None
+                if fecha_exp is not None:
+                    break
+            if fecha_exp is None:
+                raw_exp = item.get("observed_physical_expiration") or item.get("expiration_date")
+                if raw_exp:
+                    if isinstance(raw_exp, datetime):
+                        fecha_exp = raw_exp.date()
+                    elif isinstance(raw_exp, date):
+                        fecha_exp = raw_exp
+                    else:
+                        try:
+                            fecha_exp = datetime.strptime(str(raw_exp).strip(), "%Y-%m-%d").date()
+                        except (ValueError, TypeError):
+                            fecha_exp = None
+            detail_obj = details_map.get(item["detail_id"])
+            prod_name = getattr(detail_obj, "product_name", None) or "el insumo"
+            if fecha_exp is None:
+                return False, (
+                    f"El insumo '{prod_name}' se marcó como 'Vencimiento Próximo', pero no hay "
+                    "una fecha de vencimiento registrada para su lote. Registre la fecha real del "
+                    "lote o cambie la condición antes de continuar."
+                )
+            dias_para_vencer = (fecha_exp - hoy).days
+            if dias_para_vencer < 0:
+                return False, (
+                    f"El insumo '{prod_name}' se marcó como 'Vencimiento Próximo', pero su lote "
+                    f"ya venció el {fecha_exp.isoformat()}. No puede ingresarse como próximo a vencer."
+                )
+            if dias_para_vencer > umbral_dias:
+                return False, (
+                    f"El insumo '{prod_name}' se marcó como 'Vencimiento Próximo', pero su lote "
+                    f"vence el {fecha_exp.isoformat()}, más de {umbral_dias} días en el futuro. "
+                    "Corrija la condición o la fecha del lote."
                 )
 
         # DERIVAR vencimiento desde el sistema cuando el lote es reconocido.
@@ -328,17 +443,36 @@ class MovementReceptionService:
                         MovementReceptionRepository.update_origin_transit(
                             movement["origin_location_id"], product_id, conforming_qty
                         )
+                    # GUARD #1 (sobrante): si llegó MÁS de lo despachado, ese
+                    # excedente salió físicamente del origen aunque la guía no lo
+                    # refleje; el inventario del origen quedaría inflado. Se debita
+                    # provisionalmente del current y se deja el mismo monto en
+                    # tránsito ("en disputa"), de modo que tras la recepción el
+                    # origen quede con transit = |despachado - recibido| y el
+                    # inventario general cuadre mientras el Administrador arbitra.
+                    surplus_qty = rec_qty - dispatched_qty
+                    if surplus_qty > Decimal("0.00"):
+                        MovementReceptionRepository.debit_origin_surplus(
+                            movement["origin_location_id"], product_id, surplus_qty
+                        )
 
                 # Observación del muelle por renglón: se deriva de la diferencia física y de la
                 # condición declarada. Se reutiliza tanto en discrepancies (lo que consume la
                 # bandeja de arbitraje) como en items (bitácora detallada).
+                #
+                # PRIORIDAD DE LA ETIQUETA: una condición CUALITATIVA (rechazo por espacio,
+                # vencimiento, lote, temperatura, custodia) manda sobre la diferencia de
+                # cantidad. Antes un "rechazo por espacio" (que por definición llega incompleto)
+                # se guardaba en la auditoría como "FALTANTE", confundiendo dos conceptos
+                # distintos. Solo si el renglón es de cantidad (o conforme) se etiqueta por
+                # la diferencia física.
                 item_diff = float(rec_qty) - float(dispatched_qty)
-                if item_diff < -0.001:
+                if item_cond not in ("CONFORME", "SOBRANTE_EXCEDENTE", "FALTANTE_CONTEO"):
+                    specific_novelty = item_cond
+                elif item_diff < -0.001:
                     specific_novelty = "FALTANTE"
                 elif item_diff > 0.001:
                     specific_novelty = "SOBRANTE"
-                elif item_cond != "CONFORME" and item_cond not in ("SOBRANTE_EXCEDENTE", "FALTANTE_CONTEO"):
-                    specific_novelty = item_cond
                 else:
                     specific_novelty = "CONFORME"
 
@@ -353,6 +487,14 @@ class MovementReceptionService:
                     "physical_received_qty": float(rec_qty),
                     "extra_units": extra_units,
                     "missing_qty": float(mis_qty),
+                    # Etiqueta CUANTITATIVA independiente de la condición: el
+                    # rechazo/lote/calidad manda en `notes`, pero el acta no
+                    # pierde si además hubo faltante o sobrante físico.
+                    "quantity_novelty": (
+                        "FALTANTE" if item_diff < -0.001
+                        else "SOBRANTE" if item_diff > 0.001
+                        else "CONFORME"
+                    ),
                     "observed_physical_lot": item.get("observed_physical_lot"),
                     "observed_physical_expiration": item.get("observed_physical_expiration"),
                     "surplus_lots": item.get("surplus_lots") or [],
@@ -377,6 +519,8 @@ class MovementReceptionService:
 
                 specific_novelty = specific_novelty_map[item["detail_id"]]
 
+                item_diff = (float(item["received_quantity"])
+                             - float(item["quantity"]))
                 audit_items.append({
                     "detail_id": item["detail_id"],
                     "product_id": item["product_id"],
@@ -390,7 +534,12 @@ class MovementReceptionService:
                     "received_qty": float(item["received_quantity"]),
                     "missing_qty": float(item["missing_quantity"]),
                     "item_condition": item_cond,
-                    "specific_novelty": specific_novelty
+                    "specific_novelty": specific_novelty,
+                    "quantity_novelty": (
+                        "FALTANTE" if item_diff < -0.001
+                        else "SOBRANTE" if item_diff > 0.001
+                        else "CONFORME"
+                    )
                 })
 
             erroneous_audit_list = []

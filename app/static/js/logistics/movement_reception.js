@@ -30,6 +30,54 @@ document.addEventListener("DOMContentLoaded", () => {
     let userManuallyChangedNovelty = false;
     let pendingReception = null;
 
+    // Clave de comparación de lotes: mismo criterio que el backend. Recorta los
+    // extremos, colapsa espacios internos y unifica mayúsculas/minúsculas, para
+    // que "LOTE  12 " y "lote 12" no abran una disputa falsa.
+    const normalizarLote = (valor) =>
+        String(valor || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+    // UMBRAL DE VENCIMIENTO PRÓXIMO: mismo valor configurado en el backend
+    // (VENCIMIENTO_PROXIMO_DIAS). Se expone en el formulario para que la UI y el
+    // validador de Flask no queden desalineados.
+    const DIAS_VENCIMIENTO_PROXIMO = (() => {
+        const raw = form ? parseInt(form.dataset.nearExpiryDays, 10) : NaN;
+        return Number.isFinite(raw) && raw >= 0 ? raw : 7;
+    })();
+
+    // Las fechas ISO ('AAAA-MM-DD') se interpretan en hora LOCAL: new Date('2026-01-01')
+    // se parsea como UTC y en Venezuela (UTC-4) restaría un día al comparar.
+    const parseFechaLocal = (valor) => {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor || "").trim());
+        if (!match) return null;
+        const anio = Number(match[1]);
+        const mes = Number(match[2]);
+        const dia = Number(match[3]);
+        const fecha = new Date(anio, mes - 1, dia);
+        if (Number.isNaN(fecha.getTime())) return null;
+        // Rechaza fechas que el constructor "rueda" (p. ej. 2026-02-31 -> marzo).
+        if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+            return null;
+        }
+        return fecha;
+    };
+
+    const diasHastaFecha = (valor) => {
+        const fecha = parseFechaLocal(valor);
+        if (!fecha) return null;
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        return Math.round((fecha - hoy) / 86400000);
+    };
+
+    // Fecha con la que se evalúa la condición del renglón: la captura manual del
+    // vencimiento real tiene prioridad, luego el vencimiento del lote observado y
+    // por último la fecha registrada en la guía.
+    const vencimientoDeFila = (row, expInput, nearExpiryExpInput) => {
+        const manualVencimiento = nearExpiryExpInput ? nearExpiryExpInput.value.trim() : "";
+        const manualLote = expInput ? expInput.value.trim() : "";
+        return manualVencimiento || manualLote || String(row.dataset.expiration || "").trim();
+    };
+
     // Productos que YA vienen en la guía del traslado (renglones autorizados). Un
     // insumo que está en la guía nunca puede declararse como "entregado por error":
     // si va en la guía fue solicitado y, a lo sumo, puede estar completo, faltante o
@@ -204,6 +252,135 @@ document.addEventListener("DOMContentLoaded", () => {
     function hideAlert() {
         if (alertBox) {
             alertBox.classList.add("hidden");
+        }
+    }
+
+    // TOAST FLOTANTE: aviso inmediato de validación sin obligar al operador a
+    // desplazarse hasta el final del formulario. Se reutiliza una sola instancia
+    // para que teclear el lote no apile notificaciones.
+    let toastContainer = null;
+    let toastTimer = null;
+
+    function ensureToastContainer() {
+        if (toastContainer && document.body.contains(toastContainer)) return toastContainer;
+        toastContainer = document.createElement("div");
+        toastContainer.className = "reception-toast-container";
+        toastContainer.setAttribute("role", "status");
+        toastContainer.setAttribute("aria-live", "polite");
+        document.body.appendChild(toastContainer);
+        return toastContainer;
+    }
+
+    function hideToast() {
+        if (!toastContainer) return;
+        const toast = toastContainer.querySelector(".reception-toast");
+        if (toast) toast.classList.remove("is-visible");
+        clearTimeout(toastTimer);
+    }
+
+    function showToast(message, duration = 5000) {
+        const container = ensureToastContainer();
+        const text = Array.isArray(message) ? message.join(" ") : String(message);
+
+        let toast = container.querySelector(".reception-toast");
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.className = "reception-toast";
+            toast.innerHTML = `
+                <i class="bi bi-exclamation-triangle-fill reception-toast-icon"></i>
+                <span class="reception-toast-text"></span>
+                <button type="button" class="reception-toast-close" aria-label="Cerrar aviso">
+                    <i class="bi bi-x-lg"></i>
+                </button>`;
+            toast.querySelector(".reception-toast-close").addEventListener("click", hideToast);
+            container.appendChild(toast);
+        }
+
+        toast.querySelector(".reception-toast-text").textContent = text;
+        // Reinicia la animación de entrada si el aviso ya estaba visible.
+        toast.classList.remove("is-visible");
+        void toast.offsetWidth;
+        toast.classList.add("is-visible");
+
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(hideToast, duration);
+    }
+
+    // FEEDBACK EN VIVO DE LA CONTRADICCIÓN DE LOTE: resalta el campo, muestra el
+    // motivo debajo del lote y lanza el toast solo al entrar en contradicción
+    // (no en cada tecla). No borra otras clases de estado del renglón.
+    function setLotContradictionFeedback(row, isContradiction) {
+        const lotInput = row.querySelector(".input-row-lot");
+        if (lotInput) {
+            lotInput.classList.toggle("is-invalid", isContradiction);
+            lotInput.setAttribute("aria-invalid", isContradiction ? "true" : "false");
+        }
+
+        let hint = row.querySelector(".lot-contradiction-hint");
+        if (isContradiction) {
+            if (!hint) {
+                hint = document.createElement("div");
+                hint.className = "lot-contradiction-hint";
+                hint.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>' +
+                    'El lote físico ingresado coincide con el de la guía; no puedes reportar esta novedad.';
+                const anchor = row.querySelector(".single-lot-field");
+                if (anchor) anchor.appendChild(hint);
+            }
+            hint.classList.remove("hidden");
+            if (row.dataset.lotContradictionShown !== "1") {
+                row.dataset.lotContradictionShown = "1";
+                showToast("El lote físico ingresado coincide con el de la guía; no puedes reportar esta novedad.");
+            }
+        } else if (hint) {
+            hint.classList.add("hidden");
+            row.dataset.lotContradictionShown = "";
+        }
+
+        row.classList.toggle("row-lot-contradiction", isContradiction);
+
+        // Si ya no queda ningún renglón en contradicción (de lote o de
+        // vencimiento), el aviso desaparece en el acto.
+        if (!isContradiction && !document.querySelector(".row-lot-contradiction, .row-near-expiry-contradiction")) {
+            hideToast();
+        }
+    }
+
+    // FEEDBACK EN VIVO DE "ALERTA DE VENCIMIENTO PRÓXIMO": la novedad solo se
+    // sostiene si al lote le quedan DIAS_VENCIMIENTO_PROXIMO días o menos. Si aún
+    // tiene amplia vida útil, se resalta el selector, se explica el motivo debajo
+    // y se avanza con un toast; el envío queda bloqueado hasta corregir.
+    function setNearExpiryFeedback(row, isContradiction, diasRestantes) {
+        const condSelect = row.querySelector(".select-item-condition");
+        if (condSelect) {
+            condSelect.classList.toggle("is-invalid", isContradiction);
+            condSelect.setAttribute("aria-invalid", isContradiction ? "true" : "false");
+        }
+
+        let hint = row.querySelector(".near-expiry-hint");
+        if (isContradiction) {
+            if (!hint) {
+                hint = document.createElement("div");
+                hint.className = "near-expiry-hint";
+                const anchor = row.querySelector(".item-condition-wrapper");
+                if (anchor) anchor.appendChild(hint);
+            }
+            const detalleDias = Number.isFinite(diasRestantes) ? ` (vence en ${diasRestantes} días)` : "";
+            hint.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>' +
+                `Este producto aún tiene amplia vida útil${detalleDias}: no puedes reportar Alerta de Vencimiento Próximo.`;
+            hint.classList.remove("hidden");
+            if (row.dataset.nearExpiryShown !== "1") {
+                row.dataset.nearExpiryShown = "1";
+                showToast("Este producto aún tiene amplia vida útil; no puedes reportar Alerta de Vencimiento Próximo.");
+            }
+        } else if (hint) {
+            hint.classList.add("hidden");
+            row.dataset.nearExpiryShown = "";
+        }
+
+        row.classList.toggle("row-near-expiry-contradiction", isContradiction);
+
+        if (!isContradiction && !document.querySelector(".row-lot-contradiction, .row-near-expiry-contradiction")) {
+            hideToast();
         }
     }
 
@@ -853,6 +1030,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const lotBox = row.querySelector(".row-lot-mismatch");
             const lotExpBox = row.querySelector(".lot-exp-lookup");
             const singleLotField = row.querySelector(".single-lot-field");
+            const expInput = row.querySelector(".input-row-exp");
+            const nearExpiryField = row.querySelector(".near-expiry-date-field");
+            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
             const surplusLotsBox = row.querySelector(".surplus-lots");
             const surplusLotList = row.querySelector(".surplus-lot-list");
 
@@ -890,15 +1070,58 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            const condition = condSelect ? condSelect.value : "CONFORME";
+            const declaredCondition = condSelect ? condSelect.value : "CONFORME";
+
+            // El campo de vencimiento real solo se muestra para "Vencimiento Próximo"
+            // y se prellena con la fecha de la guía para que el operario vea qué se
+            // está evaluando y pueda corregirla si el empaque trae otra.
+            if (nearExpiryField) {
+                nearExpiryField.classList.toggle("hidden", declaredCondition !== "VENCIMIENTO_PROXIMO");
+            }
+            if (nearExpiryExpInput && declaredCondition === "VENCIMIENTO_PROXIMO"
+                && !nearExpiryExpInput.value && row.dataset.nearExpiryPrefilled !== "1") {
+                nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
+                row.dataset.nearExpiryPrefilled = "1";
+            }
+
+            // CONTRADICCIÓN DE "LOTE NO COINCIDE" EN TIEMPO REAL: si declaró esa
+            // condición y el lote observado es idéntico al de la guía (sin espacios
+            // repetidos ni distinción de mayúsculas), no hay discrepancia real. Se
+            // avisa de inmediato (toast + campo resaltado + mensaje inline) y el
+            // envío queda bloqueado hasta que el operador corrija la selección o el
+            // lote; no se asume la corrección de forma invisible.
+            let condition = declaredCondition;
+            let lotContradiction = false;
+            if (declaredCondition === "LOTE_NO_COINCIDE") {
+                const lotRealInput = row.querySelector(".input-row-lot");
+                const observedLot = lotRealInput ? normalizarLote(lotRealInput.value) : "";
+                const guideLot = normalizarLote(row.dataset.lotNumber);
+                lotContradiction = Boolean(observedLot) && Boolean(guideLot) && observedLot === guideLot;
+                if (lotContradiction) {
+                    condition = "CONFORME";
+                }
+            }
+
+            // CONTRADICCIÓN DE "ALERTA DE VENCIMIENTO PRÓXIMO": si el lote aún
+            // conserva más días de vida útil que el umbral permitido, la novedad no
+            // se sostiene (p. ej. huevos que vencen en meses). A diferencia del lote,
+            // NO se degrada la condición: el operario debe cambiarla explícitamente.
+            let nearExpiryContradiction = false;
+            let nearExpiryDays = null;
+            if (declaredCondition === "VENCIMIENTO_PROXIMO") {
+                const dias = diasHastaFecha(vencimientoDeFila(row, expInput, nearExpiryExpInput));
+                if (dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO) {
+                    nearExpiryContradiction = true;
+                    nearExpiryDays = dias;
+                }
+            }
 
             const isSurplus = diff > 0.001;
-
             if (lotBox) {
                 // El lote se pide tanto cuando el lote no coincide (LOTE_NO_COINCIDE)
                 // como cuando hay un SOBRANTE: el excedente físico también debe indicar a
                 // qué lote(es) pertenece. Sin esto el sobrante quedaría sin trazabilidad.
-                const needsSingleLot = condition === "LOTE_NO_COINCIDE";
+                const needsSingleLot = declaredCondition === "LOTE_NO_COINCIDE";
                 if (needsSingleLot || isSurplus) {
                     lotBox.classList.remove("hidden");
                     // Lote no coincide: pide el lote físico real único del producto que
@@ -972,6 +1195,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 diffBadge.textContent = `+${diff.toFixed(2)}`;
                 row.classList.add("row-surplus");
             }
+
+            setLotContradictionFeedback(row, lotContradiction);
+            setNearExpiryFeedback(row, nearExpiryContradiction, nearExpiryDays);
 
             // Las condiciones de CALIDAD (temperatura, custodia, lote, espacio,
             // vencimiento) se resaltan en ámbar. Las diferencias de cantidad ya
@@ -1096,6 +1322,16 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
+        if (nearExpiryExpInput) {
+            // La fecha real es el dato que sostiene (o desmiente) la novedad: al
+            // cambiarla se reevalúa el renglón en el acto.
+            nearExpiryExpInput.addEventListener("change", () => {
+                hideAlert();
+                checkAndAutoCategorize();
+            });
+        }
+
         const lotInput = row.querySelector(".input-row-lot");
         if (lotInput) {
             // Debounce: al escribir el lote (insumo o excedente del sobrante) no se
@@ -1104,6 +1340,10 @@ document.addEventListener("DOMContentLoaded", () => {
             let rowLotDebounce = null;
             lotInput.addEventListener("input", () => {
                 hideAlert();
+                // Re-evaluar de inmediato la condición efectiva del renglón: si el
+                // lote observado coincide con el de la guía, el semáforo pasa a
+                // Conforme al instante (sin esperar el fetch del lookup).
+                checkAndAutoCategorize();
                 clearTimeout(rowLotDebounce);
                 rowLotDebounce = setTimeout(() => handleLotLookup(row), 300);
             });
@@ -1144,25 +1384,50 @@ document.addEventListener("DOMContentLoaded", () => {
             const condSelect = row.querySelector(".select-item-condition");
             const lotInput = row.querySelector(".input-row-lot");
             const expInput = row.querySelector(".input-row-exp");
+            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
 
             let receivedQty = parseFloat(input.value);
             if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
 
-            const condition = condSelect ? condSelect.value : "CONFORME";
+            const declaredCondition = condSelect ? condSelect.value : "CONFORME";
             // Mismo umbral de tolerancia que checkAndAutoCategorize (0.001): una
             // diferencia minúscula dentro del ruido no debe tratarse como sobrante,
             // para que la UI (que muestra el panel de lotes) y este payload coincidan.
             const isSurplus = (receivedQty - dispatched) > 0.001;
+
+            // Contradicción de "Lote no coincide": si el lote observado es el
+            // mismo de la guía (sin espacios repetidos ni mayúsculas), se marca
+            // para bloquear el envío y exigir que el operador corrija la
+            // condición. No se anula la novedad de forma invisible.
+            let condition = declaredCondition;
+            let observedLot = null;
+            let contradictoryLot = false;
+            if (declaredCondition === "LOTE_NO_COINCIDE") {
+                const lotVal = lotInput ? lotInput.value.trim() : "";
+                const guideLot = String(row.dataset.lotNumber || "").trim();
+                if (lotVal && guideLot && normalizarLote(lotVal) === normalizarLote(guideLot)) {
+                    contradictoryLot = true;
+                    observedLot = lotVal;
+                } else {
+                    observedLot = lotVal || null;
+                    if (!observedLot) {
+                        missingLotField = true;
+                    }
+                }
+            }
+
+            // Contradicción de "Alerta de Vencimiento Próximo": si el lote conserva
+            // más vida útil que el umbral, la novedad es falsa. Se marca para bloquear
+            // el envío (el backend la rechaza igual con HTTP 400).
+            let contradictoryNearExpiry = false;
+            if (declaredCondition === "VENCIMIENTO_PROXIMO") {
+                const dias = diasHastaFecha(vencimientoDeFila(row, expInput, nearExpiryExpInput));
+                contradictoryNearExpiry = dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO;
+            }
+
             // El lote del SOBRANTE se captura para trazabilidad (va a la auditoría y al
             // arbitraje), pero NO bloquea el envío: el sobrante legítimo sin lote debe
             // poder ir a disputa. Solo LOTE_NO_COINCIDE exige lote de forma bloqueante.
-            const observedLot = (lotInput && condition === "LOTE_NO_COINCIDE")
-                ? lotInput.value.trim()
-                : null;
-
-            if (condition === "LOTE_NO_COINCIDE" && !observedLot) {
-                missingLotField = true;
-            }
 
             // El excedente puede venir de 1..N lotes: se captura cada fila (lote +
             // cantidad + vencimiento) que el operario agregó en la lista de lotes del
@@ -1236,6 +1501,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             items.push({
                 detail_id: detailId,
+                contradictory_lot: contradictoryLot,
+                contradictory_near_expiry: contradictoryNearExpiry,
                 product_name: row.dataset.product,
                 sku: row.dataset.sku,
                 unit: row.dataset.unit,
@@ -1245,7 +1512,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 observed_physical_lot: observedLot,
                 observed_physical_expiration: (observedLot && expInput && expInput.value)
                     ? expInput.value
-                    : null,
+                    : (declaredCondition === "VENCIMIENTO_PROXIMO" && nearExpiryExpInput && nearExpiryExpInput.value
+                        ? nearExpiryExpInput.value
+                        : null),
                 surplus_lots: surplusLots,
                 extra_units: extraUnits,
                 origin_stock: originStock,
@@ -1293,7 +1562,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const unrecognizedSurplusLot = items.some(it => it.unrecognized_surplus_lot);
         const surplusQtyMismatch = items.some(it => it.surplus_qty_mismatch);
 
-        return { items, erroneous, missingLotField, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch };
+        const contradictoryLot = items.some(it => it.contradictory_lot);
+        const contradictoryNearExpiry = items.some(it => it.contradictory_near_expiry);
+
+        return { items, erroneous, missingLotField, contradictoryLot, contradictoryNearExpiry, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch };
     }
 
     form.addEventListener("submit", (e) => {
@@ -1341,9 +1613,34 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const { items, erroneous, missingLotField, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch } = buildReceptionPayload();
+        const { items, erroneous, missingLotField, contradictoryLot, contradictoryNearExpiry, errInvalid, missingSurplusLot, unrecognizedSurplusLot, surplusQtyMismatch } = buildReceptionPayload();
         const itemsPayload = items;
         const erroneousPayload = erroneous;
+
+        if (contradictoryLot) {
+            // El aviso ya se mostró en vivo; al intentar enviar se enfoca el campo
+            // culpable para que la corrección sea inmediata.
+            const invalidLotInput = form.querySelector(".input-row-lot.is-invalid");
+            if (invalidLotInput) {
+                invalidLotInput.scrollIntoView({ behavior: "smooth", block: "center" });
+                invalidLotInput.focus({ preventScroll: true });
+            }
+            showToast("El lote físico ingresado coincide con el de la guía; no puedes reportar una discrepancia de lote.");
+            showAlert("El lote físico ingresado coincide con el de la guía; no puedes reportar una discrepancia de lote. Corrija la condición del insumo.");
+            return;
+        }
+
+        if (contradictoryNearExpiry) {
+            const invalidCondition = form.querySelector(".select-item-condition.is-invalid");
+            if (invalidCondition) {
+                invalidCondition.scrollIntoView({ behavior: "smooth", block: "center" });
+                invalidCondition.focus({ preventScroll: true });
+            }
+            const mensaje = "Este producto aún tiene amplia vida útil; no puedes reportar Alerta de Vencimiento Próximo.";
+            showToast(mensaje);
+            showAlert(`${mensaje} Corrija la condición del insumo o cambie la fecha de vencimiento.`);
+            return;
+        }
 
         if (missingLotField) {
             showAlert("Debe ingresar el lote físico real impreso en el empaque para el insumo marcado con Lote no coincide.");

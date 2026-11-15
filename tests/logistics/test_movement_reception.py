@@ -16,7 +16,8 @@
 
 import os
 import unittest
-from datetime import date
+from datetime import date, timedelta
+from unittest.mock import patch
 
 from sqlalchemy import create_engine, text
 
@@ -44,7 +45,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from app import create_app, db
 from app.models import (
     AuditLog, Inventory, Location, Movement, MovementDetail,
-    Product, Purchase, PurchaseDetail, Role, Supplier, User,
+    Category, Product, ProductType, Purchase, PurchaseDetail, Role, Supplier, User,
 )
 from app.logistics.services.movement_reception_service import MovementReceptionService
 
@@ -598,13 +599,19 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_rechazo_por_espacio_registra_novedad(self):
         env = self._seed(dispatched=10)
+        # El rechazo por espacio es PARCIAL: se descarga lo que cabe (8) y el
+        # remanente (2) se rechaza. Con recibido == despachado no hay rechazo.
         items = [{
             "detail_id": env["detail"].id,
-            "received_quantity": 10.0,
+            "received_quantity": 8.0,
             "item_condition": "RECHAZO_POR_ESPACIO",
             "observed_physical_lot": None
         }]
-        ok, msg = self._process(env, novelty_type="RECHAZO_POR_ESPACIO", notes="Sin espacio en camara, rechazo parcial", items_override=items)
+        # El 'Rechazo por Espacio' solo se permite cuando el origen es la Sede
+        # Central. El seed crea sedes sintéticas, así que se hace coincidir el
+        # CENTRAL_LOCATION_ID con el origen del escenario.
+        with patch("app.logistics.requests.movement_dispatch_validators.CENTRAL_LOCATION_ID", env["origin"].id):
+            ok, msg = self._process(env, novelty_type="RECHAZO_POR_ESPACIO", notes="Sin espacio en camara, rechazo parcial", items_override=items)
         self.assertTrue(ok, msg)
         db.session.refresh(env["mov"])
         self.assertEqual(env["mov"].status, "RECHAZO_POR_ESPACIO")
@@ -614,13 +621,33 @@ class MovementReceptionTest(unittest.TestCase):
         log = AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first()
         self.assertIsNotNone(log)
 
+    def test_rechazo_por_espacio_no_permitido_en_retorno_a_central(self):
+        # El 'Rechazo por Espacio' NO aplica en una devolución sede -> Central
+        # (RETORNO_EMERGENCIA): la propia sede devuelve su mercancía. Aunque el
+        # origen sea la Central, la novedad debe bloquearse.
+        env = self._seed(dispatched=10)
+        env["mov"].type = "RETORNO_EMERGENCIA"
+        db.session.commit()
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 8.0,
+            "item_condition": "RECHAZO_POR_ESPACIO",
+            "observed_physical_lot": None
+        }]
+        with patch("app.logistics.requests.movement_dispatch_validators.CENTRAL_LOCATION_ID", env["origin"].id):
+            ok, msg = self._process(env, novelty_type="RECHAZO_POR_ESPACIO", notes="sin espacio", items_override=items)
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
     def test_vencimiento_proximo_con_cantidad_exacta_acredita_como_conforme(self):
         env = self._seed(dispatched=10)
         items = [{
             "detail_id": env["detail"].id,
             "received_quantity": 10.0,
             "item_condition": "VENCIMIENTO_PROXIMO",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat(),
         }]
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="Lote vence en 2 dias", items_override=items)
         self.assertTrue(ok, msg)
@@ -635,6 +662,25 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertIsNotNone(log)
         found = next((it for it in log.changed_data["items"] if it["detail_id"] == env["detail"].id), None)
         self.assertEqual(found["item_condition"], "VENCIMIENTO_PROXIMO")
+
+    def test_vencimiento_proximo_fuera_de_umbral_se_rechaza(self):
+        # La condición 'Vencimiento Próximo' solo se sostiene si la fecha real
+        # del lote está DENTRO del umbral (default 7 días). Una fecha conocida
+        # muy lejana invalida la novedad.
+        from datetime import date, timedelta
+        env = self._seed(dispatched=10)
+        futura = (date.today() + timedelta(days=30)).isoformat()
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "VENCIMIENTO_PROXIMO",
+            "observed_physical_lot": None,
+            "observed_physical_expiration": futura,
+        }]
+        ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="Lote vence lejos", items_override=items)
+        self.assertFalse(ok)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
 
     # =========================================================================
     # CASO 8: LOTE NO COINCIDE -> registra el lote físico observado
@@ -663,6 +709,32 @@ class MovementReceptionTest(unittest.TestCase):
         found = next((it for it in log.changed_data["items"] if it["detail_id"] == env["detail"].id), None)
         self.assertEqual(found["observed_physical_lot"], "LOTE-FISICO-NUEVO")
         self.assertEqual(found["observed_physical_expiration"], "2027-12-31")
+
+    def test_lote_observado_igual_a_guia_rechaza_recepcion(self):
+        # Contradicción: el operario marcó "Lote no coincide" pero el lote
+        # observado ES el de la guía (aunque cambien espacios/mayúsculas).
+        # No se anula en silencio: se rechaza para que corrija la condición.
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "LOTE_NO_COINCIDE",
+            "observed_physical_lot": "  l-001  ",   # mismo lote que la guía (L-001)
+            "observed_physical_expiration": "2027-12-31"
+        }]
+        ok, msg = self._process(env, novelty_type="LOTE_NO_COINCIDE", notes="El lote parece otro", items_override=items)
+
+        self.assertFalse(ok)
+        mensajes = msg if isinstance(msg, list) else [msg]
+        self.assertTrue(any(
+            "coincide con el de la guía" in str(m).lower()
+            and "no puedes reportar" in str(m).lower()
+            for m in mensajes
+        ))
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+        self.assertIsNone(AuditLog.query.filter_by(action="RECEPCION_CONFORME").first())
+        self.assertIsNone(AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first())
 
     # =========================================================================
     # CASO 9: SOBRANTE en UN renglón + ERRONEO -> PRODUCTO_ERRONEO
@@ -842,10 +914,12 @@ class MovementReceptionTest(unittest.TestCase):
         inv_dest = Inventory.query.filter_by(
             location_id=env["dest"].id, product_id=env["product"].id).first()
         self.assertEqual(float(inv_dest.current_quantity), 0.0)
-        # El origen libera el tránsito completo en novedades.
+        # En novedades el origen libera del tránsito la porción conforme (10) y
+        # deja resguardado en tránsito el excedente físico (2) "en disputa", para
+        # que el inventario general cuadre mientras se arbitra.
         inv_origin = Inventory.query.filter_by(
             location_id=env["origin"].id, product_id=env["product"].id).first()
-        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+        self.assertEqual(float(inv_origin.transit_quantity), 2.0)
         # La discrepancia registra el lote físico y los lotes del sobrante.
         log = AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first()
         self.assertIsNotNone(log)
@@ -1458,7 +1532,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 10.0,
             "item_condition": "VENCIMIENTO_PROXIMO",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat(),
         }]
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="Lote vence proximo", items_override=items)
         self.assertTrue(ok, msg)
@@ -1482,7 +1557,8 @@ class MovementReceptionTest(unittest.TestCase):
             "detail_id": env["detail"].id,
             "received_quantity": 8.0,
             "item_condition": "VENCIMIENTO_PROXIMO",
-            "observed_physical_lot": None
+            "observed_physical_lot": None,
+            "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat(),
         }]
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="Vence y ademas faltan 2", items_override=items)
         self.assertTrue(ok, msg)
@@ -1771,6 +1847,7 @@ class MovementReceptionTest(unittest.TestCase):
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="vence y sobra de mas", items_override=[
             {"detail_id": env["detail"].id, "received_quantity": 12, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None,
+             "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat(),
              "surplus_lots": [{"lot": "L-001", "quantity": 2.0}]}
         ])
         self.assertTrue(ok, msg)
@@ -1783,7 +1860,8 @@ class MovementReceptionTest(unittest.TestCase):
         # Combo típico de Mariuska: un lote por vencer + otro faltante.
         env = self._seed_two_items()
         items = [
-            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None},
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None,
+             "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat()},
             {"detail_id": env["detail_b"].id, "received_quantity": 8.0, "item_condition": "FALTANTE_CONTEO", "observed_physical_lot": None}
         ]
         ok, msg = self._process(env, novelty_type="INCIDENCIA_MIXTA", notes="uno vence y el otro falta", items_override=items)
@@ -1798,20 +1876,74 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertIsNotNone(log)
         self.assertEqual(len(log.changed_data["discrepancies"]), 2)
 
-    def test_vencimiento_general_sin_condicion_en_renglones_acredita(self):
-        # El operario elige "Vencimiento Próximo" general pero no marca ningún
-        # renglón: cantidades exactas => acredita conforme y deja la alerta en la
-        # auditoría (novelty_type). No bloquea stock.
+    def test_vencimiento_general_sin_condicion_en_renglones_se_rechaza(self):
+        # REGLA NUEVA: el umbral de vencimiento se valida contra la fecha REAL
+        # del lote, que es un dato por renglón. Si el operario elige "Vencimiento
+        # Próximo" general sin marcar ningún renglón, no hay fecha que evaluar y
+        # la novedad se aceptaría a ciegas: se rechaza en vez de acreditar.
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="lote general por vencer", items_override=[
             {"detail_id": env["detail"].id, "received_quantity": 10, "item_condition": "CONFORME", "observed_physical_lot": None}
         ])
-        self.assertTrue(ok, msg)
+        self.assertFalse(ok)
+        self.assertTrue(any("vencimiento" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
         db.session.refresh(env["mov"])
-        self.assertEqual(env["mov"].status, "COMPLETADO")
-        log = AuditLog.query.filter_by(action="RECEPCION_CONFORME").first()
-        self.assertIsNotNone(log)
-        self.assertEqual(log.changed_data["novelty_type"], "VENCIMIENTO_PROXIMO")
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_recepcion_deriva_vida_util_estandar_del_tipo(self):
+        # El renglón no trae vencimiento y el tipo es perecedero con vida útil
+        # estándar: la recepción deriva hoy + shelf_life_days y la persiste en
+        # el detalle (solo si estaba vacía).
+        env = self._seed(dispatched=10)
+        categoria = Category(name="Categoría perecederos")
+        db.session.add(categoria)
+        db.session.flush()
+        tipo = ProductType(name="Perecedero", category_id=categoria.id,
+                           shelf_life_days=10, requires_manual_date=False)
+        db.session.add(tipo)
+        db.session.flush()
+        env["product"].product_type_id = tipo.id
+        db.session.commit()
+
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="")
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["detail"])
+        esperada = date.today() + timedelta(days=10)
+        self.assertEqual(env["detail"].expiration_date, esperada)
+
+    def test_recepcion_no_inventa_fecha_para_tipo_manual(self):
+        # Un tipo con lote de fábrica (requires_manual_date) NO se autocalcula:
+        # si la guía no trae fecha, el renglón queda sin vencimiento en vez de
+        # inventar una vida útil que el empaque no respalda.
+        env = self._seed(dispatched=10)
+        categoria = Category(name="Categoría lote de fábrica")
+        db.session.add(categoria)
+        db.session.flush()
+        tipo = ProductType(name="Lote de fábrica", category_id=categoria.id,
+                           shelf_life_days=None, requires_manual_date=True)
+        db.session.add(tipo)
+        db.session.flush()
+        env["product"].product_type_id = tipo.id
+        db.session.commit()
+
+        ok, msg = self._process(env, novelty_type="CONFORME", notes="")
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["detail"])
+        self.assertIsNone(env["detail"].expiration_date)
+
+    def test_vencimiento_proximo_sin_fecha_conocida_se_rechaza(self):
+        # Sin fecha (ni del lote, ni observada, ni de la guía) no se puede
+        # sostener la condición: se rechaza con un mensaje accionable.
+        env = self._seed(dispatched=10)
+        ok, msg = self._process(env, novelty_type="VENCIMIENTO_PROXIMO", notes="no se pudo leer la fecha", items_override=[
+            {"detail_id": env["detail"].id, "received_quantity": 10, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None}
+        ])
+        self.assertFalse(ok)
+        self.assertTrue(any("fecha de vencimiento" in str(e).lower()
+                            for e in (msg if isinstance(msg, list) else [msg])))
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
 
     def test_conforme_general_con_condicion_vencimiento_acredita_como_conforme(self):
         # Payload CONFORME + renglón marcado VENCIMIENTO_PROXIMO con cantidad exacta:
@@ -1820,7 +1952,8 @@ class MovementReceptionTest(unittest.TestCase):
         # etiquetaba genéricamente como NOVEDAD_FALTANTE pese a no faltar nada.
         env = self._seed(dispatched=10)
         ok, msg = self._process(env, novelty_type="CONFORME", notes="lote por vencer en entrega", items_override=[
-            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None}
+            {"detail_id": env["detail"].id, "received_quantity": 10.0, "item_condition": "VENCIMIENTO_PROXIMO", "observed_physical_lot": None,
+             "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat()}
         ])
         self.assertTrue(ok, msg)
         db.session.refresh(env["mov"])
@@ -2018,6 +2151,73 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertTrue(any("justificación" in str(m).lower()
                             for m in (data["message"] if isinstance(data["message"], list) else [data["message"]])))
 
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_e2e_lote_igual_a_guia_rechaza_con_400(self):
+        env = self._seed(dispatched=10)
+        client = self._e2e_login(env)
+
+        payload = {
+            "novelty_type": "LOTE_NO_COINCIDE",
+            "notes": "El lote parece otro",
+            "items": [{
+                "detail_id": env["detail"].id,
+                "received_quantity": 10.0,
+                "item_condition": "LOTE_NO_COINCIDE",
+                "observed_physical_lot": "L-001",
+            }],
+            "erroneous_products": []
+        }
+        resp = client.post(
+            f"/logistics/movements/reception/{env['mov'].id}/process",
+            json=payload
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+        self.assertTrue(any(
+            "coincide con el de la guía" in str(m).lower()
+            for m in (data["message"]
+                      if isinstance(data["message"], list)
+                      else [data["message"]])
+        ))
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_e2e_vencimiento_proximo_fuera_de_umbral_rechaza_con_400(self):
+        # Espejo del guard del navegador: si el lote aún tiene amplia vida útil
+        # (más días que el umbral configurado), saltarse la UI no permite
+        # registrar la novedad. La ruta responde 400 con código estructurado.
+        env = self._seed(dispatched=10)
+        client = self._e2e_login(env)
+
+        futura = (date.today() + timedelta(days=30)).isoformat()
+        payload = {
+            "novelty_type": "VENCIMIENTO_PROXIMO",
+            "notes": "El lote vence lejos",
+            "items": [{
+                "detail_id": env["detail"].id,
+                "received_quantity": 10.0,
+                "item_condition": "VENCIMIENTO_PROXIMO",
+                "observed_physical_lot": None,
+                "observed_physical_expiration": futura,
+            }],
+            "erroneous_products": []
+        }
+        resp = client.post(
+            f"/logistics/movements/reception/{env['mov'].id}/process",
+            json=payload
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+        self.assertEqual(data["code"], "VENCIMIENTO_PROXIMO_INVALIDO")
+        self.assertTrue(any(
+            "amplia vida útil" in str(m) for m in data["errors"]
+        ))
         db.session.refresh(env["mov"])
         self.assertEqual(env["mov"].status, "EN_TRANSITO")
 
@@ -2369,8 +2569,10 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_persistencia_sobrante_no_acredita_excedente(self):
         # El sobrante físico acredita solo lo conforme; el excedente queda para
-        # arbitraje, NUNCA se acredita de más en destino ni se restringe el
-        # tránsito del origen más allá de lo despachado.
+        # arbitraje, NUNCA se acredita de más en destino. El excedente que salió
+        # físicamente del origen se debita provisionalmente de su current y se
+        # resguarda en su tránsito ("en disputa"), para que el inventario general
+        # cuadre mientras el Administrador arbitra.
         env = self._seed(dispatched=10, origin_current=40.0)
         ok, msg = self._process(env, novelty_type="SOBRANTE_EXCEDENTE", notes="llegaron 2 de mas",
                                 items_override=[{
@@ -2396,7 +2598,10 @@ class MovementReceptionTest(unittest.TestCase):
 
         inv_origin = db.session.query(Inventory).filter_by(
             location_id=env["origin"].id, product_id=env["product"].id).first()
-        self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+        # El excedente (2) salió físicamente: se debitó del current (40 -> 38) y
+        # quedó resguardado en tránsito (10 conformes liberados + 2 en disputa).
+        self.assertEqual(float(inv_origin.current_quantity), 38.0)
+        self.assertEqual(float(inv_origin.transit_quantity), 2.0)
 
         disc = db.session.query(AuditLog).filter_by(action="RECEPCION_NOVEDAD").first()
         self.assertIsNotNone(disc)
@@ -2496,12 +2701,15 @@ class MovementReceptionTest(unittest.TestCase):
         ]:
             with self.subTest(cond=cond):
                 env = self._seed(dispatched=10)
-                ok, msg = self._process(env, novelty_type=cond, notes=nota, items_override=[{
-                    "detail_id": env["detail"].id,
-                    "received_quantity": 10.0,
-                    "item_condition": cond,
-                    "observed_physical_lot": "OTRO-LOT" if cond == "LOTE_NO_COINCIDE" else None,
-                }])
+                with patch("app.logistics.requests.movement_dispatch_validators.CENTRAL_LOCATION_ID", env["origin"].id):
+                    # El rechazo por espacio solo es coherente con recibo < guía.
+                    recibido = 8.0 if cond == "RECHAZO_POR_ESPACIO" else 10.0
+                    ok, msg = self._process(env, novelty_type=cond, notes=nota, items_override=[{
+                        "detail_id": env["detail"].id,
+                        "received_quantity": recibido,
+                        "item_condition": cond,
+                        "observed_physical_lot": "OTRO-LOT" if cond == "LOTE_NO_COINCIDE" else None,
+                    }])
                 self.assertTrue(ok, msg)
                 db.session.refresh(env["mov"])
                 self.assertNotEqual(env["mov"].status, "COMPLETADO")
@@ -2511,7 +2719,9 @@ class MovementReceptionTest(unittest.TestCase):
                     self.assertEqual(float(inv_dest.current_quantity), 0.0)
                 inv_origin = Inventory.query.filter_by(
                     location_id=env["origin"].id, product_id=env["product"].id).first()
-                self.assertEqual(float(inv_origin.transit_quantity), 0.0)
+                # El tránsito del origen conserva SOLO lo que no llegó (queda
+                # resguardado como "en disputa" hasta el arbitraje).
+                self.assertEqual(float(inv_origin.transit_quantity), 10.0 - recibido)
                 self._reset_tables()
 
     def test_custodia_sin_condicion_da_error(self):
@@ -2568,13 +2778,15 @@ class MovementReceptionTest(unittest.TestCase):
                     observed = None
                 item = {
                     "detail_id": env["detail"].id,
-                    "received_quantity": 8.0 if cond == "FALTANTE_CONTEO" else (12.0 if cond == "SOBRANTE_EXCEDENTE" else 10.0),
+                    "received_quantity": (8.0 if cond in ("FALTANTE_CONTEO", "RECHAZO_POR_ESPACIO")
+                                          else (12.0 if cond == "SOBRANTE_EXCEDENTE" else 10.0)),
                     "item_condition": cond,
                     "observed_physical_lot": observed,
                 }
                 if surplus:
                     item["surplus_lots"] = surplus
-                ok, msg = self._process(env, novelty_type=cond, notes=notas[cond], items_override=[item])
+                with patch("app.logistics.requests.movement_dispatch_validators.CENTRAL_LOCATION_ID", env["origin"].id):
+                    ok, msg = self._process(env, novelty_type=cond, notes=notas[cond], items_override=[item])
                 self.assertTrue(ok, msg)
                 log = AuditLog.query.filter_by(action=esperada).first()
                 self.assertIsNotNone(log, f"esperaba audit {esperada} para {cond}")
@@ -2825,10 +3037,15 @@ class MovementReceptionTest(unittest.TestCase):
         disc = log.changed_data["discrepancies"][0]
         # type = condición declarada (lo que la bandeja muestra como item_condition)
         self.assertEqual(disc["type"], "LOTE_NO_COINCIDE")
-        # notes = observación derivada del conteo físico; el faltante queda registrado
-        self.assertEqual(disc["notes"], "FALTANTE")
+        # notes = condición declarada (prioridad cualitativa); la diferencia
+        # física NO se pierde: queda en el campo independiente quantity_novelty.
+        self.assertEqual(disc["notes"], "LOTE_NO_COINCIDE")
+        self.assertEqual(disc["quantity_novelty"], "FALTANTE")
         self.assertEqual(disc["missing_qty"], 2.0)
         self.assertEqual(disc["observed_physical_lot"], "L-FISICO-9")
+        found = next(it for it in log.changed_data["items"]
+                     if it["detail_id"] == env["detail"].id)
+        self.assertEqual(found["quantity_novelty"], "FALTANTE")
 
     def test_mixta_condicion_mas_surplus_en_dos_renglones(self):
         # LOTE_NO_COINCIDE (1) + SOBRANTE (1) en dos renglones => MIXTA y refleja ambos.

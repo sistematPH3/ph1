@@ -63,7 +63,7 @@
             </div>
         </div>
 
-        <form id="receptionForm" data-movement-id="{{ movement.id }}" data-origin-name="{{ movement.origin_name }}" data-destination-name="{{ movement.destination_name }}">
+        <form id="receptionForm" data-movement-id="{{ movement.id }}" data-origin-name="{{ movement.origin_name }}" data-destination-name="{{ movement.destination_name }}" data-near-expiry-days="{{ config.get('VENCIMIENTO_PROXIMO_DIAS', 7) }}">
             
             <div class="table-container">
                 <table class="ph-table">
@@ -79,7 +79,7 @@
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-origin-stock="{{ item.origin_stock | default(0) }}">
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-lot-number="{{ item.lot_number or '' }}" data-expiration="{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '' }}" data-origin-stock="{{ item.origin_stock | default(0) }}">
                             <td data-label="Insumo">
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
@@ -127,8 +127,16 @@
                                         <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
                                         <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
                                         <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
+                                        {% if allow_rechazo_por_espacio %}
                                         <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Espacio</option>
+                                        {% endif %}
                                     </select>
+                                    <div class="near-expiry-date-field hidden mt-1">
+                                        <span class="lot-exp-label">Venc. real:</span>
+                                        <input type="date" class="form-control form-control-sm input-near-expiry-exp font-monospace"
+                                               aria-label="Fecha de vencimiento real del lote"
+                                               title="Fecha de vencimiento real del lote; si la guía no la trae, ingrésela para evaluar la novedad">
+                                    </div>
                                     <div class="row-lot-mismatch hidden mt-1">
                                         <div class="single-lot-field">
                                             <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real del insumo que se queda...">
@@ -199,7 +207,9 @@
                             <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
                             <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
                             <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
+                            {% if allow_rechazo_por_espacio %}
                             <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Falta de Espacio</option>
+                            {% endif %}
                             <option value="INCIDENCIA_MIXTA">Incidencia Mixta (Múltiples Novedades)</option>
                         </select>
                         <span class="field-help-text" id="noveltyHelpText">Carga completa y en condiciones óptimas. Se acredita en destino.</span>
@@ -280,5 +290,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=97"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=99"></script>
 {% endblock %}

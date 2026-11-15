@@ -3,6 +3,10 @@ from flask_login import current_user, login_required
 from app.decorators.roles import require_roles
 from app.models import Product
 from app.logistics.services.movement_reception_service import MovementReceptionService
+from app.logistics.requests.movement_reception_validators import (
+    is_lot_mismatch_contradiction,
+    is_near_expiry_contradiction,
+)
 
 movement_reception_bp = Blueprint("movement_reception", __name__, url_prefix="/logistics/movements")
 
@@ -34,11 +38,21 @@ def view_reception(movement_id):
 
     catalog_products = Product.query.filter_by(is_active=True).order_by(Product.name.asc()).all()
 
+    # El 'Rechazo por Espacio' solo tiene sentido en el flujo de abastecimiento
+    # Central -> sede. En devoluciones sede -> Central (RETORNO_EMERGENCIA) se
+    # oculta la opción (el servicio además la bloquea por API).
+    from app.logistics.requests.movement_dispatch_validators import CENTRAL_LOCATION_ID
+    allow_rechazo_por_espacio = (
+        data["movement"]["type"] != "RETORNO_EMERGENCIA"
+        and data["movement"]["origin_location_id"] == CENTRAL_LOCATION_ID
+    )
+
     return render_template(
         "logistics/movement_reception.html",
         movement=data["movement"],
         details=data["details"],
-        catalog_products=catalog_products
+        catalog_products=catalog_products,
+        allow_rechazo_por_espacio=allow_rechazo_por_espacio
     )
 
 @movement_reception_bp.route("/reception/lot-expiration", methods=["GET"])
@@ -81,6 +95,19 @@ def process_reception(movement_id):
     )
 
     if not success:
+        # Las contradicciones explícitas (lote igual a la guía o "Vencimiento
+        # Próximo" sin sustento) son errores de datos del cliente (400); el resto
+        # de validaciones conserva el 422 existente.
+        if is_lot_mismatch_contradiction(message):
+            return jsonify({"success": False, "message": message}), 400
+        if is_near_expiry_contradiction(message):
+            errores = message if isinstance(message, list) else [message]
+            return jsonify({
+                "success": False,
+                "code": "VENCIMIENTO_PROXIMO_INVALIDO",
+                "message": message,
+                "errors": errores,
+            }), 400
         return jsonify({"success": False, "message": message}), 422
 
     flash("Cargamento recibido y procesado con éxito.", "recibido")

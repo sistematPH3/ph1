@@ -113,12 +113,37 @@ class MovementReceptionRepository:
             # devolución: tanto el faltante (despachado - recibido) que nunca
             # llegó, como el SOBRANTE (recibido - despachado) que el origen
             # debitó de su inventario en resolve_dispute (extra_units) y que
-            # regresa físicamente vía el retorno. Con el flujo viejo el origen
-            # solo debitaba la guía, por lo que un sobrante daba 0 y el retorno
-            # nunca se acreditaba de vuelta (el inventario quedaba corto).
-            total += max(dispatched - received, Decimal("0.00")) \
-                   + max(received - dispatched, Decimal("0.00"))
+            # regresa físicamente vía el retorno.
+            #
+            # RECIBIDO 0 = rechazo total o devolución por CALIDAD: en ambos
+            # casos resolve_dispute fuerza received_quantity a 0 porque la
+            # mercancía NO se quedó en destino, pero SÍ salió del origen al
+            # despachar. El saldo recuperable es entonces TODO lo despachado;
+            # con la resta simple daba 0 y el Central perdía esa mercancía
+            # cuando el retorno llegaba (fuga de stock).
+            if received == Decimal("0.00"):
+                total += dispatched
+            else:
+                total += abs(dispatched - received)
         return total
+
+    @staticmethod
+    def update_detail_expiration(detail_id, expiration_date):
+        """Completa el vencimiento del renglón cuando la guía no lo traía.
+
+        Solo escribe si la fecha está vacía: un vencimiento ya registrado en la
+        guía (dato real del lote) nunca se pisa con la vida útil estándar.
+        """
+        sql = text("""
+            UPDATE movement_details
+            SET expiration_date = :expiration_date
+            WHERE id = :detail_id
+              AND expiration_date IS NULL
+        """)
+        db.session.execute(sql, {
+            "detail_id": detail_id,
+            "expiration_date": expiration_date
+        })
 
     @staticmethod
     def update_detail_quantities(detail_id, received_quantity, missing_quantity):
@@ -197,6 +222,31 @@ class MovementReceptionRepository:
             "location_id": location_id,
             "product_id": product_id,
             "decrement_transit": decrement_transit
+        })
+
+    @staticmethod
+    def debit_origin_surplus(location_id, product_id, extra_units):
+        """Resguarda provisionalmente el EXCEDENTE físico recibido de un sobrante.
+
+        Cuando llega más mercancía que la despachada, ese excedente salió
+        FÍSICAMENTE del origen aunque la guía no lo refleje: el inventario del
+        origen quedaba inflado. Se debita del current_quantity y se deja el mismo
+        monto en transit_quantity ("en disputa"), de modo que el inventario
+        general del origen cuadre mientras el Administrador arbitra:
+          - si se devuelve, el retorno repone el excedente al origen;
+          - si se acepta en destino, el excedente se acredita allí.
+        Se usa GREATEST(0.00, ...) para no dejar stock negativo por datos viejos.
+        """
+        sql = text("""
+            UPDATE inventory
+            SET current_quantity = GREATEST(0.00, current_quantity - :extra_units),
+                transit_quantity = transit_quantity + :extra_units
+            WHERE location_id = :location_id AND product_id = :product_id
+        """)
+        db.session.execute(sql, {
+            "location_id": location_id,
+            "product_id": product_id,
+            "extra_units": extra_units
         })
 
     @staticmethod

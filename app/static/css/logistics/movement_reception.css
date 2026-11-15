@@ -1578,3 +1578,116 @@
         padding: 12px 14px;
     }
 }
+
+/* ==========================================================================
+   VALIDACIÓN EN VIVO: contradicción "Lote no coincide"
+   ========================================================================== */
+
+.input-row-lot.is-invalid,
+.select-item-condition.is-invalid {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.lot-contradiction-hint,
+.near-expiry-hint {
+    margin-top: 5px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.near-expiry-date-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.near-expiry-date-field .input-near-expiry-exp {
+    max-width: 170px;
+}
+
+/* El borde rojo del renglón gana sobre los estados verde/ámbar/azul. */
+.row-lot-contradiction,
+.row-near-expiry-contradiction {
+    border-left: 4px solid #dc2626 !important;
+}
+
+.reception-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: min(420px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.reception-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background-color: #ffffff;
+    border: 1px solid #fecaca;
+    border-left: 5px solid #dc2626;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    color: #7f1d1d;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: auto;
+}
+
+.reception-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reception-toast-icon {
+    flex: 0 0 auto;
+    color: #dc2626;
+    font-size: 18px;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+.reception-toast-text {
+    flex: 1 1 auto;
+}
+
+.reception-toast-close {
+    flex: 0 0 auto;
+    background: transparent;
+    border: none;
+    color: #991b1b;
+    font-size: 14px;
+    line-height: 1;
+    padding: 1px 2px;
+    cursor: pointer;
+}
+
+.reception-toast-close:hover {
+    color: #7f1d1d;
+}
+
+@media (max-width: 576px) {
+    .reception-toast-container {
+        top: 12px;
+        right: 12px;
+        left: 12px;
+        max-width: none;
+    }
+}

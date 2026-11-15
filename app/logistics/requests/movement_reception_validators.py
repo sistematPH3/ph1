@@ -1,5 +1,5 @@
 from decimal import Decimal, InvalidOperation
-from datetime import datetime
+from datetime import date, datetime
 
 VALID_NOVELTY_TYPES = {
     'CONFORME',
@@ -25,6 +25,71 @@ VALID_ITEM_CONDITIONS = {
     'RECHAZO_POR_ESPACIO'
 }
 
+LOTE_MISMATCH_CONTRADICTION_MESSAGE = (
+    "El lote físico ingresado coincide con el de la guía; "
+    "no puedes reportar una discrepancia de lote."
+)
+
+
+def is_lot_mismatch_contradiction(message):
+    """True si la respuesta de validación corresponde a la contradicción de lote.
+
+    Permite que la ruta responda 400 a este rechazo puntual sin alterar el 422
+    que usan las demás validaciones de recepción.
+    """
+    mensajes = message if isinstance(message, (list, tuple)) else [message]
+    return any(
+        LOTE_MISMATCH_CONTRADICTION_MESSAGE in str(m) for m in mensajes
+    )
+
+
+NEAR_EXPIRY_CONTRADICTION_MESSAGE = (
+    "Este producto aún tiene amplia vida útil; "
+    "no puedes reportar Alerta de Vencimiento Próximo."
+)
+
+
+def is_near_expiry_contradiction(message):
+    """True si el rechazo corresponde a un 'Vencimiento Próximo' sin sustento.
+
+    Cubre el mensaje de este validador (fecha explícita fuera del umbral) y el
+    del servicio (fecha resuelta por lote, vencida o inexistente), para que la
+    ruta responda 400 en todos los casos sin alterar el 422 de las demás reglas.
+    """
+    mensajes = message if isinstance(message, (list, tuple)) else [message]
+    for m in mensajes:
+        texto = str(m)
+        if NEAR_EXPIRY_CONTRADICTION_MESSAGE in texto:
+            return True
+        if "se marcó como 'Vencimiento Próximo'" in texto:
+            return True
+    return False
+
+
+def _parse_fecha(value):
+    """Convierte a date un valor ISO 'YYYY-MM-DD', datetime o date; None si no se puede."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value).strip(), '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalizar_lote(value):
+    """Clave de comparación de lotes: mayúsculas/minúsculas y espacios.
+
+    Se colapsan los espacios internos además de recortar los extremos, para que
+    "LOTE  12 " y "lote 12" se consideren el MISMO lote y no abran una disputa
+    falsa por un detalle de tipeo.
+    """
+    return " ".join(str(value or "").split()).casefold()
+
+
 def _is_valid_date(value):
     """True si value es una fecha válida en formato 'YYYY-MM-DD' (o está vacío)."""
     if value is None or not str(value).strip():
@@ -35,7 +100,8 @@ def _is_valid_date(value):
     except ValueError:
         return False
 
-def validate_reception_payload(payload, movement_details_map):
+def validate_reception_payload(payload, movement_details_map,
+                               umbral_vencimiento_dias=7, hoy=None):
     errors = []
     
     if not isinstance(payload, dict):
@@ -91,6 +157,24 @@ def validate_reception_payload(payload, movement_details_map):
             errors.append(f"La condición del insumo '{prod_name}' no es válida.")
             continue
 
+        # CONTRADICCIÓN EN "LOTE NO COINCIDE": si el operario marcó esa
+        # condición pero el lote físico observado ES el mismo que trae la guía
+        # (comparación sin espacios repetidos ni distinción de mayúsculas), no
+        # hay discrepancia real. Se rechaza la recepción para que el operador
+        # corrija la condición; no se anula en silencio.
+        if (
+            item_condition == "LOTE_NO_COINCIDE"
+            and observed_lot
+            and str(observed_lot).strip()
+            and detail.lot_number
+            and _normalizar_lote(observed_lot) == _normalizar_lote(detail.lot_number)
+        ):
+            errors.append(
+                f"{LOTE_MISMATCH_CONTRADICTION_MESSAGE} "
+                f"Insumo: '{prod_name}'."
+            )
+            continue
+
         try:
             received_qty = Decimal(str(raw_received))
         except (InvalidOperation, TypeError):
@@ -134,6 +218,16 @@ def validate_reception_payload(payload, movement_details_map):
                 "no es MENOR a la despachada. Un faltante exige recibir menos de lo despachado."
             )
             continue
+        # 'Rechazo por espacio' implica que una parte de la carga NO se descargó
+        # (no cupo en la sede). Si la cantidad recibida es igual a la despachada
+        # no hubo rechazo alguno y la condición es incoherente.
+        if item_condition == "RECHAZO_POR_ESPACIO" and not row_has_missing_qty:
+            errors.append(
+                f"Indicó 'Rechazo por Espacio' para '{prod_name}', pero la cantidad recibida "
+                "no es MENOR a la despachada. La cantidad que no cupo debe quedar como "
+                "faltante de descarga para que retorne al almacén central."
+            )
+            continue
 
         if item_has_issue:
             row_issue_count += 1
@@ -146,6 +240,23 @@ def validate_reception_payload(payload, movement_details_map):
         if observed_exp_raw and not _is_valid_date(observed_exp_raw):
             errors.append(f"La fecha de vencimiento observada para '{prod_name}' no es válida (use AAAA-MM-DD).")
             continue
+
+        # CONTRADICCIÓN DE "ALERTA DE VENCIMIENTO PRÓXIMO": la novedad solo se
+        # sostiene si el lote vence dentro del umbral configurado. Con la fecha
+        # explícita (vencimiento manual observado o el de la guía) se rechaza de
+        # inmediato; el servicio repite la regla con la fecha resuelta por lote.
+        if item_condition == "VENCIMIENTO_PROXIMO":
+            fecha_exp = _parse_fecha(observed_exp_raw) or _parse_fecha(
+                getattr(detail, "expiration_date", None)
+            )
+            if fecha_exp is not None:
+                dias_para_vencer = (fecha_exp - (hoy or date.today())).days
+                if dias_para_vencer > int(umbral_vencimiento_dias):
+                    errors.append(
+                        f"{NEAR_EXPIRY_CONTRADICTION_MESSAGE} "
+                        f"Insumo: '{prod_name}' (vence en {dias_para_vencer} días)."
+                    )
+                    continue
 
         # Validación estructural de los LOTES DEL SOBRANTE (multilote). La existencia
         # en BD y la coherencia de sumas se verifican en el servicio (que sí tiene
@@ -301,7 +412,10 @@ def validate_reception_payload(payload, movement_details_map):
     #   - Calidad (TEMPERATURA/VIOLACION/LOTE/RECHAZO): exige la misma condición en
     #     al menos un renglón.
     #   - INCIDENCIA_MIXTA   : exige DOS o más renglones afectados (regla de diseño).
-    # VENCIMIENTO_PROXIMO queda eximido (alerta FEFO general sin renglón requerido) y
+    #   - VENCIMIENTO_PROXIMO: exige la condición en al menos un renglón. El umbral
+    #     se valida con la fecha REAL del lote, que es un dato por renglón: sin
+    #     renglón marcado no hay fecha que evaluar y la novedad se aceptaría a
+    #     ciegas (era el hueco que permitía "cualquier fecha").
     # CONFORME/PRODUCTO_ERRONEO se regulan en sus bloques propios.
     any_missing_row = any(
         Decimal(str(it["received_quantity"])) < Decimal(str(it["quantity"]))
@@ -320,10 +434,16 @@ def validate_reception_payload(payload, movement_details_map):
     novelty_requiring_backing = (
         'FALTANTE_CONTEO', 'SOBRANTE_EXCEDENTE', 'INCIDENCIA_TEMPERATURA',
         'LOTE_NO_COINCIDE', 'VIOLACION_CUSTODIA', 'RECHAZO_POR_ESPACIO',
-        'INCIDENCIA_MIXTA'
+        'INCIDENCIA_MIXTA', 'VENCIMIENTO_PROXIMO'
     )
 
-    if novelty_type in novelty_requiring_backing and not has_discrepancy:
+    if novelty_type == 'VENCIMIENTO_PROXIMO' and 'VENCIMIENTO_PROXIMO' not in row_conditions:
+        errors.append(
+            "La clasificación general 'Vencimiento Próximo' exige marcar el renglón del lote "
+            "afectado: el umbral se valida contra la fecha real del lote y sin renglón no hay "
+            "fecha que evaluar. Marque el insumo o cambie la clasificación."
+        )
+    elif novelty_type in novelty_requiring_backing and not has_discrepancy:
         errors.append(
             "La clasificación general no coincide con los renglones: no hay ninguna "
             "condición ni diferencia de cantidad registrada que la respalde. "
