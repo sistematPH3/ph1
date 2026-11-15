@@ -349,6 +349,9 @@ MOVEMENT_EVENT_ACTIONS = {
     'CANCELACION_PRE_SALIDA',
     'RECEPCION_CONFORME',
     'RECEPCION_NOVEDAD',
+    # Sin esta acción el log caía en el formateador genérico de stock (que busca
+    # product_name/quantity_changed) y la auditoría mostraba 'N/A' con 0 → 0.
+    'RECEPCION_INCIDENCIA_CALIDAD',
     'RESOLUCION_DISPUTA',
 }
 
@@ -816,7 +819,7 @@ def get_inventory_audit_entries(filters, user, is_admin):
                 _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
             elif act == 'CANCELACION_PRE_SALIDA':
                 _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
-            elif act in ('RECEPCION_CONFORME', 'RECEPCION_NOVEDAD'):
+            elif act in ('RECEPCION_CONFORME', 'RECEPCION_NOVEDAD', 'RECEPCION_INCIDENCIA_CALIDAD'):
                 _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
             elif act == 'RESOLUCION_DISPUTA':
                 _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)

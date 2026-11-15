@@ -1,5 +1,6 @@
 # app/logistics/services/movement_audit_service.py
 import datetime
+import json
 
 from app.extensions import db
 # IMPORTANTE: Asegúrate de importar User y Location desde tus modelos
@@ -34,7 +35,21 @@ class MovementAuditService:
         for log in logs:
             log.user = db.session.get(User, log.user_id) if log.user_id else None
             log.location = db.session.get(Location, log.location_id) if log.location_id else None
+            # Normaliza payloads legados guardados como texto para que la plantilla
+            # pueda tratarlos siempre como diccionario (nunca como JSON crudo).
+            log.changed_data = MovementAuditService._changed_dict(log)
         return logs
+
+    @staticmethod
+    def _changed_dict(log):
+        """Devuelve el payload JSONB como dict, aunque venga serializado como texto."""
+        data = getattr(log, 'changed_data', None) or {}
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                data = {}
+        return data if isinstance(data, dict) else {}
 
     @staticmethod
     def _location_name(location_id, cache):
@@ -67,7 +82,7 @@ class MovementAuditService:
         # --- Agrupación de eventos por traslado ---
         groups = {}  # movement_id -> {'movement_id', 'origin', 'dest', 'events'}
         for log in logs:
-            data = log.changed_data or {}
+            data = MovementAuditService._changed_dict(log)
             movement_id = data.get('movement_id')
             if movement_id is None:
                 continue
@@ -130,7 +145,7 @@ class MovementAuditService:
             dispatch_items = None
             dispatch_user = None
             for e in entry['events']:
-                data = e.changed_data or {}
+                data = MovementAuditService._changed_dict(e)
                 if e.action == 'DESPACHO_EMISION':
                     dispatch_items = data.get('items', [])
                     dispatch_user = e.user
@@ -139,7 +154,7 @@ class MovementAuditService:
             for e in entry['events']:
                 if e.action != 'CANCELACION_PRE_SALIDA':
                     continue
-                data = e.changed_data or {}
+                data = MovementAuditService._changed_dict(e)
                 bajas.append({
                     'movement_id': movement_id,
                     'timestamp': e.timestamp,

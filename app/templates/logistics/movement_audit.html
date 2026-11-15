@@ -152,6 +152,10 @@
                             {% set tl_style = 'warning' %}
                             {% set tl_label = 'Recepción con Novedad' %}
                             {% set tl_icon = 'bi-exclamation-triangle-fill' %}
+                        {% elif evt.action == 'RECEPCION_INCIDENCIA_CALIDAD' %}
+                            {% set tl_style = 'danger' %}
+                            {% set tl_label = 'Recepción con Incidencia de Calidad' %}
+                            {% set tl_icon = 'bi-shield-exclamation' %}
                         {% elif evt.action == 'RESOLUCION_DISPUTA' %}
                             {% set tl_style = 'warning' %}
                             {% set tl_label = 'Resolución de Disputa' %}
@@ -245,7 +249,7 @@
                                         </div>
                                         {% endif %}
 
-                                    {% elif evt.action in ['RECEPCION_CONFORME', 'RECEPCION_NOVEDAD'] %}
+                                    {% elif evt.action in ['RECEPCION_CONFORME', 'RECEPCION_NOVEDAD', 'RECEPCION_INCIDENCIA_CALIDAD'] %}
                                         {% if data.get('notes') %}
                                         <div class="alert alert-info border-0 mb-3 py-2 d-flex align-items-center">
                                             <i class="bi bi-chat-left-text-fill me-3 fs-4 text-info"></i>
@@ -264,7 +268,8 @@
                                                     <tr>
                                                         <th>Producto</th><th>Lote</th>
                                                         <th class="text-center">Despachada</th><th class="text-center">Recibida</th>
-                                                        <th class="text-center text-danger">Faltante</th><th>Novedad</th>
+                                                        <th class="text-center text-danger">Faltante</th>
+                                                        <th>Condición</th><th>Novedad</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody class="small">
@@ -276,11 +281,15 @@
                                                             <td class="text-center">{{ item.get('dispatched_qty', 0) }}</td>
                                                             <td class="text-center">{{ item.get('received_qty', item.get('dispatched_qty', 0)) }}</td>
                                                             <td class="text-center text-danger fw-bold">{{ item.get('missing_qty', 0) if item.get('missing_qty', 0) > 0 else '-' }}</td>
+                                                            <td>
+                                                                {% set cond = item.get('item_condition') or 'CONFORME' %}
+                                                                <span class="badge {{ 'bg-danger' if cond != 'CONFORME' else 'bg-success' }}">{{ cond | replace('_', ' ') | title }}</span>
+                                                            </td>
                                                             <td>{{ item.get('specific_novelty', 'CONFORME') | replace('_', ' ') | title }}</td>
                                                         </tr>
                                                         {% endfor %}
                                                     {% else %}
-                                                        <tr><td colspan="6" class="text-center text-muted py-3">Sin desglose de insumos.</td></tr>
+                                                        <tr><td colspan="7" class="text-center text-muted py-3">Sin desglose de insumos.</td></tr>
                                                     {% endif %}
                                                 </tbody>
                                             </table>
@@ -364,10 +373,49 @@
                                         {% endif %}
 
                                     {% else %}
-                                        <p class="text-muted small mb-0">
-                                            <i class="bi bi-info-circle me-1"></i>
-                                            {{ data | tojson }}
-                                        </p>
+                                        {# Evento sin plantilla específica: se pinta el payload como tabla
+                                           legible en lugar de volcar el JSON crudo en la interfaz. #}
+                                        {% if data %}
+                                        <div class="table-responsive rounded border">
+                                            <table class="table table-sm align-middle mb-0 bg-white ph-tbl-generico">
+                                                <thead class="table-light text-muted small">
+                                                    <tr><th style="width: 30%">Campo</th><th>Valor</th></tr>
+                                                </thead>
+                                                <tbody class="small">
+                                                    {% for key, value in data.items() %}
+                                                    <tr>
+                                                        <td class="fw-bold text-muted">{{ key | replace('_', ' ') | title }}</td>
+                                                        <td>
+                                                            {% if value is mapping %}
+                                                                {% for k2, v2 in value.items() %}
+                                                                    <span class="d-inline-block me-3"><span class="text-muted">{{ k2 | replace('_', ' ') | title }}:</span> {{ v2 }}</span>
+                                                                {% endfor %}
+                                                            {% elif value is sequence and value is not string %}
+                                                                {% if value %}
+                                                                <ul class="mb-0 ps-3">
+                                                                    {% for v in value %}
+                                                                    <li>
+                                                                        {% if v is mapping %}
+                                                                            {% for k3, v3 in v.items() %}<span class="d-inline-block me-2"><span class="text-muted">{{ k3 | replace('_', ' ') | title }}:</span> {{ v3 }}</span>{% endfor %}
+                                                                        {% else %}{{ v }}{% endif %}
+                                                                    </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                                {% else %}<span class="text-muted">—</span>{% endif %}
+                                                            {% elif value is none %}
+                                                                <span class="text-muted">—</span>
+                                                            {% else %}
+                                                                {{ value }}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% else %}
+                                        <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>Este evento no registró datos adicionales.</p>
+                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
