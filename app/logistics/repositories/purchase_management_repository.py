@@ -1,6 +1,7 @@
 from app.models import Purchase, PurchaseDetail, Supplier, PurchaseAuditLog, Product, ProductType, Inventory, AppParameter, ExchangeRateHistory
 from decimal import ROUND_HALF_UP, Decimal
 from datetime import datetime, timedelta
+from flask import current_app
 from sqlalchemy import func, text
 import json
 from app.logistics.requests.purchase_validators import (es_moneda_bs,
@@ -25,6 +26,40 @@ class PurchaseManagementRepository:
     # ------------------------------------------------------------------
     def _get_product(self, product_id):
         return self.db.session.get(Product, product_id)
+
+    def _exigir_fecha_manual(self, expiration_date, product_id):
+        """Valida la caducidad de un insumo con lote de fábrica.
+
+        Estos insumos (requires_manual_date) no pueden quedar sin fecha: la
+        caducidad impresa en el empaque es la única fuente y sin ella el lote
+        queda sin trazabilidad FEFO. Además se exige una vida útil mínima para
+        no ingresar mercancía a punto de vencer. Eleva ValueError, que la ruta
+        de edición ya traduce a un 400 con mensaje claro.
+        """
+        if not product_id:
+            return
+        producto = self._get_product(product_id)
+        tipo = (
+            self.db.session.get(ProductType, producto.product_type_id)
+            if producto is not None and producto.product_type_id else None
+        )
+        if tipo is None or not getattr(tipo, 'requires_manual_date', False):
+            return
+
+        nombre = producto.name if producto is not None else f"insumo #{product_id}"
+        if not expiration_date:
+            raise ValueError(
+                f"'{nombre}' exige la fecha de caducidad impresa en el empaque."
+            )
+
+        min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30))
+        dias_restantes = (expiration_date - current_ve_time().date()).days
+        if dias_restantes < min_dias:
+            raise ValueError(
+                f"La fecha de caducidad de '{nombre}' está a {dias_restantes} "
+                f"día(s) y el mínimo permitido es {min_dias}. Verifique la fecha "
+                "impresa en el empaque."
+            )
 
     def _get_inventory(self, product_id):
         # Se bloquea la fila (SELECT ... FOR UPDATE). Todas las rutas que usan
@@ -406,6 +441,9 @@ class PurchaseManagementRepository:
                                    if 'lot_number' in item
                                    else detail.lot_number),
                 }
+                self._exigir_fecha_manual(
+                    cambios[item_id]['expiration_date'], detail.product_id
+                )
 
             nuevos = []
             for item in new_items:
@@ -436,6 +474,7 @@ class PurchaseManagementRepository:
                     'lot_number': (str(item.get('lot_number')).strip() or None
                                    if item.get('lot_number') else None),
                 })
+                self._exigir_fecha_manual(nuevos[-1]['expiration_date'], product_id)
 
             # -------- Fase 2: validar el impacto neto de stock --------------
             # Se valida el delta NETO por producto: la validación por renglón
@@ -563,7 +602,10 @@ class PurchaseManagementRepository:
                 exp_date_obj = nuevo['expiration_date']
                 if exp_date_obj is None and getattr(nuevo['product'], 'product_type_id', None):
                     p_type = self.db.session.get(ProductType, nuevo['product'].product_type_id)
-                    if p_type is not None and getattr(p_type, 'shelf_life_days', None):
+                    # Un tipo con fecha MANUAL no autogenera una fecha estándar al
+                    # editar la compra: se respeta el campo abierto/manual.
+                    if (p_type is not None and getattr(p_type, 'shelf_life_days', None)
+                            and not getattr(p_type, 'requires_manual_date', False)):
                         exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
 
                 lot_val = nuevo['lot_number'] or self._generar_lote(

@@ -576,11 +576,20 @@ function fechaLocalInput(d) {
     return `${d.getFullYear()}-${m}-${dia}`;
 }
 
-function configureDatePickerLimits(expInput) {
+function minDiasManual() {
+    // El backend es la autoridad (VENCIMIENTO_MANUAL_MIN_DIAS), pero el
+    // formulario necesita el mismo umbral para no dejar escribir una fecha que
+    // el servidor va a rechazar. Se inyecta desde la plantilla.
+    const form = document.getElementById('purchaseForm');
+    const dias = parseInt(form ? form.getAttribute('data-vencimiento-min-dias') : '0', 10);
+    return Number.isFinite(dias) && dias > 0 ? dias : 30;
+}
+
+function configureDatePickerLimits(expInput, minDays = 0) {
     if (!expInput) return;
 
     const minDateObj = new Date();
-    minDateObj.setDate(minDateObj.getDate() + 1);
+    minDateObj.setDate(minDateObj.getDate() + (minDays > 0 ? minDays : 1));
     expInput.min = fechaLocalInput(minDateObj);
 
     const maxDateObj = new Date();
@@ -606,14 +615,28 @@ function attachRowValidationListeners(row) {
                 
                 const selectedOpt = prodId.options[prodId.selectedIndex];
                 const days = parseInt(selectedOpt.getAttribute('data-days')) || 0;
-                
-                if (expInput) {
-                    configureDatePickerLimits(expInput);
+                const isManualDate = selectedOpt.getAttribute('data-manual') === 'true';
 
-                    if (days > 0 && !expInput.value) {
-                        const autoDateObj = new Date();
-                        autoDateObj.setDate(autoDateObj.getDate() + days);
-                        expInput.value = fechaLocalInput(autoDateObj);
+                if (expInput) {
+                    // Un insumo con fecha MANUAL (lote de fábrica, ej. harina /
+                    // empacados) NO autogenera ninguna fecha estándar: el campo
+                    // queda OBLIGATORIO para que el usuario escriba la fecha real
+                    // del empaque. Solo los tipos con vida útil preconfigurada
+                    // (shelf_life_days) sugieren la fecha calculada.
+                    if (isManualDate) {
+                        expInput.value = '';
+                        expInput.required = true;
+                        expInput.title = 'Fecha de caducidad impresa en el empaque (obligatoria)';
+                        configureDatePickerLimits(expInput, minDiasManual());
+                    } else {
+                        expInput.required = false;
+                        expInput.title = '';
+                        configureDatePickerLimits(expInput);
+                        if (days > 0 && !expInput.value) {
+                            const autoDateObj = new Date();
+                            autoDateObj.setDate(autoDateObj.getDate() + days);
+                            expInput.value = fechaLocalInput(autoDateObj);
+                        }
                     }
                 }
             }
@@ -805,8 +828,34 @@ function validateFormBeforeSubmit() {
         const prodId = row.querySelector('.prod-id');
         const prodQty = row.querySelector('.prod-qty');
         const prodPrice = row.querySelector('.prod-price');
+        const prodExp = row.querySelector('.prod-exp');
 
         if (!prodId.value) { setFieldError(prodId, 'Selecciona producto.'); isValid = false; }
+
+        // Obligatoriedad y coherencia de la fecha MANUAL (lote de fábrica):
+        // sin fecha no se puede rastrear el lote, y una fecha a punto de vencer
+        // no debe ingresar al almacén. El backend repite esta validación.
+        if (prodId.value && prodExp) {
+            const selectedOpt = prodId.options[prodId.selectedIndex];
+            const esManual = selectedOpt && selectedOpt.getAttribute('data-manual') === 'true';
+            if (esManual) {
+                if (!prodExp.value) {
+                    setFieldError(prodExp, 'La fecha de caducidad impresa es obligatoria para este insumo.');
+                    isValid = false;
+                } else {
+                    const minDateObj = new Date();
+                    minDateObj.setDate(minDateObj.getDate() + minDiasManual());
+                    if (prodExp.value < fechaLocalInput(minDateObj)) {
+                        setFieldError(prodExp, `Debe conservar al menos ${minDiasManual()} días de vida útil.`);
+                        isValid = false;
+                    } else {
+                        clearFieldError(prodExp);
+                    }
+                }
+            } else {
+                clearFieldError(prodExp);
+            }
+        }
         
         const qtyVal = parseNum(prodQty.value);
         if (!prodQty.value || isNaN(qtyVal)) { 

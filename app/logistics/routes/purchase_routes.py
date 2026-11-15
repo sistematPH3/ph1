@@ -18,6 +18,7 @@ from app.logistics.requests.purchase_validators import (
     normalizar_moneda,
 )
 from app.logistics.services.purchase_service import PurchaseService
+from app.time_utils import current_ve_time
 from app import db 
 from app.models import ProductType, Inventory
 from app.models.inventory_model import Product
@@ -64,7 +65,8 @@ def new_purchase_form():
             'name': prod.name,
             'sku': prod.sku,
             'unit_of_measure': prod.unit_of_measure,
-            'shelf_life_days': ptype.shelf_life_days if ptype else 0
+            'shelf_life_days': ptype.shelf_life_days if ptype else 0,
+            'requires_manual_date': ptype.requires_manual_date if ptype else False
         })
         
     suppliers = Supplier.query.filter(func.upper(Supplier.status).in_(['ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA'])).order_by(Supplier.name.asc()).all()
@@ -74,7 +76,8 @@ def new_purchase_form():
         'logistics/register_purchase.html', 
         products=products, 
         suppliers=suppliers, 
-        users=users
+        users=users,
+        vencimiento_manual_min_dias=current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30),
     )
 
 def _total_linea(item):
@@ -501,12 +504,35 @@ def create_purchase():
                 except ValueError:
                     date_errors.append(f"fila {i + 1}: fecha de vencimiento inválida '{expiration_dates[i].strip()}' (formato esperado AAAA-MM-DD)")
             
-            if not exp_date_obj and product_id_val:
-                product = db.session.query(Product).get(product_id_val)
-                if product and getattr(product, 'product_type_id', None):
-                    p_type = db.session.query(ProductType).get(product.product_type_id)
-                    if p_type and getattr(p_type, 'shelf_life_days', None):
-                        exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
+            product = db.session.query(Product).get(product_id_val) if product_id_val else None
+            p_type = (
+                db.session.query(ProductType).get(product.product_type_id)
+                if product and getattr(product, 'product_type_id', None) else None
+            )
+            es_manual = bool(p_type and getattr(p_type, 'requires_manual_date', False))
+            min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30))
+
+            if es_manual:
+                # Insumo con lote de fábrica: la caducidad impresa es
+                # OBLIGATORIA y nunca se autocalcula. Además debe conservar una
+                # vida útil mínima: no se ingresa mercancía a punto de vencer.
+                if not exp_date_obj:
+                    date_errors.append(
+                        f"fila {i + 1}: el insumo '{product.name}' exige la fecha "
+                        "de caducidad impresa en el empaque (obligatoria)."
+                    )
+                else:
+                    dias_restantes = (exp_date_obj - current_ve_time().date()).days
+                    if dias_restantes < min_dias:
+                        date_errors.append(
+                            f"fila {i + 1}: la fecha de caducidad de '{product.name}' "
+                            f"está a {dias_restantes} día(s) y el mínimo permitido es "
+                            f"{min_dias}. Verifique la fecha impresa en el empaque."
+                        )
+            elif not exp_date_obj and p_type and getattr(p_type, 'shelf_life_days', None):
+                # Perecedero con vida útil estándar: se sugiere la fecha
+                # calculada (editable luego en el formulario).
+                exp_date_obj = (datetime.now() + timedelta(days=p_type.shelf_life_days)).date()
 
             lot_val = lot_numbers[i].strip() if i < len(lot_numbers) and lot_numbers[i] else None
             if lot_val and len(lot_val) > 50:

@@ -49,9 +49,15 @@ class CategoryService:
         
         shelf_life_days = form_data.get('shelf_life_days', 0)
         try:
-            product_type.shelf_life_days = int(shelf_life_days) if shelf_life_days else None
+            shelf_life_days = int(shelf_life_days) if shelf_life_days else None
         except ValueError:
-            product_type.shelf_life_days = None
+            shelf_life_days = None
+
+        # Coherencia (mismo criterio que create_category): un tipo con fecha
+        # MANUAL no debe arrastrar una vida útil configurada. Si el usuario
+        # marca 'requiere fecha manual', se limpia shelf_life_days para que el
+        # sistema NUNCA autogenere/calcule una fecha estándar para ese insumo.
+        product_type.shelf_life_days = shelf_life_days if not product_type.requires_manual_date else None
 
         if product_type.category_id:
             category = db.session.get(Category, product_type.category_id)

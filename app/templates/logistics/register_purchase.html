@@ -21,7 +21,7 @@
         </a>
     </div>
 
-    <form id="purchaseForm" novalidate enctype="multipart/form-data">
+    <form id="purchaseForm" novalidate enctype="multipart/form-data" data-vencimiento-min-dias="{{ vencimiento_manual_min_dias | default(30) }}">
         <div class="row g-4 align-items-start">
             
             <div class="col-lg-8">
@@ -44,7 +44,10 @@
                                         <div>N° de Lote</div>
                                         <div style="font-size: 0.68rem; text-transform: none; font-weight: 400; opacity: 0.85;">Automático o Manual</div>
                                     </th>
-                                    <th class="text-center text-uppercase tracking-wider" style="width: 17%;">Vencimiento</th>
+                                    <th class="text-center text-uppercase tracking-wider" style="width: 17%;">
+                                        <div>Vencimiento</div>
+                                        <div style="font-size: 0.68rem; text-transform: none; font-weight: 400; opacity: 0.85;">Obligatorio si es fecha de fábrica</div>
+                                    </th>
                                     <th class="text-center text-uppercase tracking-wider" style="width: 15%;">
                                         <div>Total Línea</div>
                                         <div style="font-size: 0.68rem; text-transform: none; font-weight: 400; opacity: 0.85;">Pago total por este producto</div>
@@ -58,9 +61,9 @@
                                         <div class="table-field-wrapper">
                                             <div class="input-group mariuska-select-group">
                                                 <select class="form-select border-0 py-2 bg-transparent cursor-pointer prod-id" required>
-                                                    <option value="" disabled selected data-days="0" data-sku="">Seleccione un producto</option>
+                                                    <option value="" disabled selected data-days="0" data-manual="false" data-sku="">Seleccione un producto</option>
                                                     {% for p in products %}
-                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}" data-sku="{{ p.sku }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
+                                                        <option value="{{ p.id }}" data-days="{{ p.shelf_life_days }}" data-manual="{{ 'true' if p.requires_manual_date else 'false' }}" data-sku="{{ p.sku }}">{{ p.name }} ({{ p.unit_of_measure }})</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
@@ -219,5 +222,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.9"></script>
+<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.10"></script>
 {% endblock %}
