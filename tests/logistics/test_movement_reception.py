@@ -75,7 +75,7 @@ class MovementReceptionTest(unittest.TestCase):
         """Crea el escenario base de una recepción con un movimiento EN_TRANSITO."""
         loc_origin = Location(name="Sede Origen", state="Caracas")
         loc_dest = Location(name="Sede Destino", state="Caracas")
-        product = Product(name="Tomate", sku="TOM-REC", unit_of_measure="kg")
+        product = Product(name="Tomate", sku="TOM-REC", unit_of_measure="kg", min_stock=20)
         role = Role(name="Rol")
         db.session.add(role)
         db.session.flush()
@@ -147,7 +147,7 @@ class MovementReceptionTest(unittest.TestCase):
     def _seed_two_items(self, dispatched_a=10, dispatched_b=10):
         """Escenario con dos renglones de guía (para incidencias multi-renglón)."""
         env = self._seed(dispatched=dispatched_a)
-        product_b = Product(name="Cilantro", sku="CIL-REC", unit_of_measure="kg")
+        product_b = Product(name="Cilantro", sku="CIL-REC", unit_of_measure="kg", min_stock=20)
         db.session.add(product_b)
         db.session.flush()
         detail_b = MovementDetail(
@@ -253,7 +253,7 @@ class MovementReceptionTest(unittest.TestCase):
         env = self._seed(dispatched=10)
 
         # Un producto que NO viene en la guía y llega por error.
-        extra_product = Product(name="Cebolla", sku="CEB-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Cebolla", sku="CEB-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
 
@@ -295,7 +295,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_un_erroneo_con_una_fila_afectada_queda_en_producto_erroneo(self):
         env = self._seed(dispatched=10)
 
-        extra_product = Product(name="Pimenton", sku="PIM-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Pimenton", sku="PIM-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
 
@@ -356,7 +356,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_erroneo_declarado_con_novedad_conforme_se_fuerza_a_erroneo(self):
         env = self._seed(dispatched=10)
 
-        extra_product = Product(name="Papa", sku="PAP-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Papa", sku="PAP-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
 
@@ -400,7 +400,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_erroneo_registra_lote_y_vencimiento(self):
         env = self._seed(dispatched=10)
 
-        extra_product = Product(name="Cebolla", sku="CEB-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Cebolla", sku="CEB-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
 
@@ -495,7 +495,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_erroneo_con_vencimiento_invalido_da_error(self):
         env = self._seed(dispatched=10)
 
-        extra_product = Product(name="Pepinillo", sku="PEP-BAD", unit_of_measure="kg")
+        extra_product = Product(name="Pepinillo", sku="PEP-BAD", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
 
@@ -742,7 +742,7 @@ class MovementReceptionTest(unittest.TestCase):
     # =========================================================================
     def test_un_erroneo_con_una_fila_sobrante_queda_en_producto_erroneo(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Zanahoria", sku="ZAN-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Zanahoria", sku="ZAN-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -768,7 +768,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_erroneo_mas_dos_filas_afectadas_dispara_incidencia_mixta(self):
         # Límite de la regla: erróneos + 2 renglones con incidencia SÍ es MIXTA.
         env = self._seed_two_items()
-        extra_product = Product(name="Papa", sku="PAP-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Papa", sku="PAP-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [
@@ -933,7 +933,7 @@ class MovementReceptionTest(unittest.TestCase):
         # al producto del renglón. Un lote que existe pero es de OTRO producto (p. ej.
         # aceite) en el renglón de tomate es producto erróneo.
         env = self._seed(dispatched=10)
-        otro = Product(name="Aceite", sku="ACE-REC", unit_of_measure="L")
+        otro = Product(name="Aceite", sku="ACE-REC", unit_of_measure="L", min_stock=20)
         db.session.add(otro)
         db.session.flush()
         mdet_otro = MovementDetail(movement_id=env["mov"].id, product_id=otro.id,
@@ -1062,7 +1062,7 @@ class MovementReceptionTest(unittest.TestCase):
     # =========================================================================
     def test_mismo_producto_erroneo_con_dos_lotes_diferentes(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Tomate", sku="TOM-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Tomate", sku="TOM-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1084,7 +1084,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_mismo_producto_con_mismo_lote_duplica_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Cebolla", sku="CEB-DUP", unit_of_measure="kg")
+        extra_product = Product(name="Cebolla", sku="CEB-DUP", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1181,7 +1181,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_como_objeto_unico_se_normaliza(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Auyama", sku="AUY-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Auyama", sku="AUY-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1219,7 +1219,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_cantidad_cero_da_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Cambur", sku="CAM-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Cambur", sku="CAM-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1237,7 +1237,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_duplicado_case_insensitive_da_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Lechuga", sku="LEC-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Lechuga", sku="LEC-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1258,7 +1258,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_duplicado_sin_lote_da_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Remolacha", sku="REM-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Remolacha", sku="REM-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1279,7 +1279,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_sin_justificacion_da_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Pimenton", sku="PIM-EXT2", unit_of_measure="kg")
+        extra_product = Product(name="Pimenton", sku="PIM-EXT2", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{
@@ -1753,7 +1753,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_cantidad_no_numerica_da_error(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Brocoli", sku="BRO-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Brocoli", sku="BRO-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         ok, msg = self._process(env, novelty_type="PRODUCTO_ERRONEO", notes="llego brocoli", items_override=[
@@ -2014,7 +2014,7 @@ class MovementReceptionTest(unittest.TestCase):
     # =========================================================================
     def test_erroneo_con_product_id_y_cantidad_string_se_normaliza(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Apio", sku="API-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Apio", sku="API-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         ok, msg = self._process(env, novelty_type="PRODUCTO_ERRONEO", notes="llego apio de mas", items_override=[
@@ -2029,7 +2029,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_erroneo_con_vencimiento_sin_lote_se_registra(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Vea", sku="VEA-EXT", unit_of_measure="kg")
+        extra_product = Product(name="Vea", sku="VEA-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         ok, msg = self._process(env, novelty_type="PRODUCTO_ERRONEO", notes="llego vea de mas", items_override=[
@@ -2256,7 +2256,7 @@ class MovementReceptionTest(unittest.TestCase):
         db.session.add_all([loc_central, loc_sucu, user])
         db.session.flush()
 
-        guia_prod = Product(name="Tomate", sku="TOM-RET", unit_of_measure="kg")
+        guia_prod = Product(name="Tomate", sku="TOM-RET", unit_of_measure="kg", min_stock=20)
         db.session.add(guia_prod)
         db.session.flush()
 
@@ -2264,7 +2264,7 @@ class MovementReceptionTest(unittest.TestCase):
         guia_lot = lot_number
         ret_lot = guia_lot
         if erroneous:
-            ret_prod = Product(name="Queso", sku="QUE-EXT", unit_of_measure="kg")
+            ret_prod = Product(name="Queso", sku="QUE-EXT", unit_of_measure="kg", min_stock=20)
             db.session.add(ret_prod)
             db.session.flush()
             ret_lot = "QUE-2026-01"
@@ -2614,7 +2614,7 @@ class MovementReceptionTest(unittest.TestCase):
         # El erróneo no debe acreditar stock erróneo en el destino: va a custodia
         # (auditoría) y no altera el inventario del producto erróneo en destino.
         env = self._seed(dispatched=10, origin_current=30.0)
-        otro = Product(name="Papa", sku="PAP-01", unit_of_measure="kg")
+        otro = Product(name="Papa", sku="PAP-01", unit_of_measure="kg", min_stock=20)
         db.session.add(otro)
         db.session.flush()
         ok, msg = self._process(env, novelty_type="PRODUCTO_ERRONEO",
@@ -2870,7 +2870,7 @@ class MovementReceptionTest(unittest.TestCase):
     def test_mixta_calidad_mas_erroneo(self):
         # Regla 2026: con 2+ renglones afectados + erróneo -> INCIDENCIA_MIXTA.
         env = self._seed_two_items()
-        err_product = Product(name="Papa roja", sku="PAPA-MIX", unit_of_measure="kg")
+        err_product = Product(name="Papa roja", sku="PAPA-MIX", unit_of_measure="kg", min_stock=20)
         db.session.add(err_product)
         db.session.flush()
         items = [
@@ -2893,7 +2893,7 @@ class MovementReceptionTest(unittest.TestCase):
         # Con SOLO 1 renglón afectado (condición) + erróneo -> NO es mixta;
         # la regla exige 2+ renglones afectados. Cae en PRODUCTO_ERRONEO.
         env = self._seed(dispatched=10)
-        err_product = Product(name="Papa blanca", sku="PAPA-ERR1", unit_of_measure="kg")
+        err_product = Product(name="Papa blanca", sku="PAPA-ERR1", unit_of_measure="kg", min_stock=20)
         db.session.add(err_product)
         db.session.flush()
         ok, msg = self._process(env, novelty_type="INCIDENCIA_TEMPERATURA", notes="temperatura y producto no pedido",
@@ -2918,7 +2918,7 @@ class MovementReceptionTest(unittest.TestCase):
 
     def test_mixta_tres_renglones_variados(self):
         env = self._seed_two_items()
-        product_c = Product(name="Lechuga", sku="LEC-MIX", unit_of_measure="un")
+        product_c = Product(name="Lechuga", sku="LEC-MIX", unit_of_measure="un", min_stock=20)
         db.session.add(product_c)
         db.session.flush()
         detail_c = MovementDetail(movement_id=env["mov"].id, product_id=product_c.id,
@@ -2990,7 +2990,7 @@ class MovementReceptionTest(unittest.TestCase):
         # renglones de la guía (afectados CON su condición y conformes como CONFORME),
         # para que la bandeja tenga la foto completa del acta de recepción.
         env = self._seed_two_items()
-        product_c = Product(name="Lechuga", sku="LEC-CONFO", unit_of_measure="un")
+        product_c = Product(name="Lechuga", sku="LEC-CONFO", unit_of_measure="un", min_stock=20)
         db.session.add(product_c)
         db.session.flush()
         detail_c = MovementDetail(movement_id=env["mov"].id, product_id=product_c.id,
@@ -3120,7 +3120,7 @@ class MovementReceptionTest(unittest.TestCase):
         #   - La bandeja de arbitraje la lista y lee item_condition/specific_novelty
         #     y el lote físico desde la auditoría.
         env = self._seed_two_items()
-        err_product = Product(name="Papa roja e2e", sku="PAPA-E2E", unit_of_measure="kg")
+        err_product = Product(name="Papa roja e2e", sku="PAPA-E2E", unit_of_measure="kg", min_stock=20)
         db.session.add(err_product)
         db.session.flush()
         db.session.commit()

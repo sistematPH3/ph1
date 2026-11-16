@@ -39,7 +39,7 @@ def obtener_alarmas_para_dashboard():
             'location_name': loc_name,
             'product_name': prod_name or 'Insumo sin nombre',
             'new_quantity': float(inv.current_quantity or 0.0),
-            'min_stock': float(inv.min_stock or 20.0),
+            'min_stock': float(inv.min_stock),
             'unit_of_measure': unit or ''
         })
         

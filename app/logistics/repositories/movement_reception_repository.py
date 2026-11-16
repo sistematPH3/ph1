@@ -175,10 +175,10 @@ class MovementReceptionRepository:
             }).mappings().first()
 
             if not inv:
-                _min = Decimal('20.00')
                 _prod = db.session.get(Product, product_id)
-                if _prod is not None and _prod.min_stock is not None:
-                    _min = Decimal(str(_prod.min_stock))
+                if _prod is None:
+                    raise ValueError('El insumo no existe y no se puede crear su inventario.')
+                _min = _prod.min_stock_efectivo
                 insert_sql = text("""
                     INSERT INTO inventory (location_id, product_id, current_quantity, min_stock, transit_quantity, reserved_quantity)
                     VALUES (:location_id, :product_id, 0.00, :min_stock, 0.00, 0.00)

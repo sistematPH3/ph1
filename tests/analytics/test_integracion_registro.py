@@ -80,6 +80,7 @@ class RegistroSnapshotsTest(unittest.TestCase):
         self.product = Product(
             name="Tomate", sku="TOM-INT", unit_of_measure="kg",
             waste_limit=20.0, is_active=True,
+            min_stock=20,
         )
         db.session.add(self.product)
         db.session.flush()

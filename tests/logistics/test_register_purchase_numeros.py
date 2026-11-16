@@ -201,7 +201,7 @@ class TestPrecioEnBolivares(unittest.TestCase):
                     db.session.add(tipo)
                     db.session.flush()
                 producto = Product(name="Producto Numerico", sku="NUMTEST1",
-                                   product_type_id=tipo.id, is_active=True)
+                                   product_type_id=tipo.id, is_active=True, min_stock=20)
                 db.session.add(producto)
                 db.session.flush()
             cls.producto_id = producto.id

@@ -97,7 +97,9 @@ def _get_or_create_inventory(location_id, product_id):
     inv = Inventory.query.filter_by(location_id=location_id, product_id=product_id).first()
     if not inv:
         _prod = db.session.get(Product, product_id)
-        _min = _prod.min_stock_efectivo if _prod else Decimal('20.00')
+        if _prod is None:
+            raise ValueError('El insumo no existe y no se puede crear su inventario.')
+        _min = _prod.min_stock_efectivo
         inv = Inventory(
             location_id=location_id, product_id=product_id,
             current_quantity=Decimal('0.00'), transit_quantity=Decimal('0.00'), min_stock=_min

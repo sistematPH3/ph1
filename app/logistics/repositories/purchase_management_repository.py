@@ -90,7 +90,9 @@ class PurchaseManagementRepository:
 
         Antes comparaba contra un 20 fijo, ignorando el min_stock por producto.
         """
-        minimo = product.min_stock_efectivo if product is not None else Decimal('20.00')
+        if product is None:
+            raise ValueError('El insumo de la compra no existe o no tiene stock mínimo configurado.')
+        minimo = product.min_stock_efectivo
         return 'REABASTECIDO' if prev_qty <= minimo < new_qty else 'NORMAL'
 
     def _get_or_create_inventory(self, product_id, initial_qty):
@@ -99,11 +101,13 @@ class PurchaseManagementRepository:
         if inventory_record is not None:
             return inventory_record, Decimal(str(inventory_record.current_quantity))
         product = self._get_product(product_id)
+        if product is None:
+            raise ValueError('El insumo no existe y no se puede crear su inventario.')
         nuevo = Inventory(
             location_id=ALMACEN_CENTRAL_ID,
             product_id=product_id,
             current_quantity=initial_qty,
-            min_stock=product.min_stock_efectivo if product is not None else Decimal('20.00'),
+            min_stock=product.min_stock_efectivo,
             transit_quantity=CERO
         )
         self.db.session.add(nuevo)

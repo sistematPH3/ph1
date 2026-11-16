@@ -419,7 +419,7 @@ class RegisterWasteRepository:
                         f"solicitado {qty:.2f}."
                     )
                 new_stock = stock - qty
-                min_stock = float(getattr(inventory_item, 'min_stock', 20))
+                min_stock = float(inventory_item.min_stock)
                 if new_stock <= 0.0:
                     severidad = 'CRITICO'
                 elif new_stock <= min_stock:

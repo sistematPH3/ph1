@@ -756,7 +756,7 @@ class LoteLargoTest(PurchaseManagementTestBase):
 
     def test_lote_generado_cabe_en_la_columna(self):
         largo = Product(name="SKU largo", sku="A" * 50, unit_of_measure="UND",
-                        product_type_id=self.tipo.id, is_active=True)
+                        product_type_id=self.tipo.id, is_active=True, min_stock=20)
         db.session.add(largo)
         db.session.commit()
         compra = self.crear_compra()

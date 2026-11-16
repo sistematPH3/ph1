@@ -85,7 +85,7 @@ class ResolveDisputeTest(unittest.TestCase):
     def _seed(self, status, novelty_type, dispatched, received):
         loc_origin = Location(name="Sede Origen", state="Caracas")
         loc_dest = Location(name="Sede Destino", state="Caracas")
-        product = Product(name="Tomate", sku=f"TOM-{status}")
+        product = Product(name="Tomate", sku=f"TOM-{status}", min_stock=20)
         role = Role(name="Administrator")
         db.session.add(role)
         db.session.flush()
@@ -265,7 +265,7 @@ class ResolveDisputeTest(unittest.TestCase):
     def _seed_multi_lot(self, status, novelty_type):
         loc_origin = Location(name="Sede Origen", state="Caracas")
         loc_dest = Location(name="Sede Destino", state="Caracas")
-        product = Product(name="Tomate", sku="TOM-MULTI")
+        product = Product(name="Tomate", sku="TOM-MULTI", min_stock=20)
         role = Role(name="Administrator")
         db.session.add(role)
         db.session.flush()

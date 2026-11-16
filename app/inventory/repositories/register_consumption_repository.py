@@ -250,7 +250,7 @@ class RegisterConsumptionRepository:
 
     @staticmethod
     def record_lot_consumption_audit(inventory_item, lot_number, quantity_consumed, previous_stock, new_stock, user_id=None, notes=None):
-        min_stock = float(getattr(inventory_item, 'min_stock', 20))
+        min_stock = float(inventory_item.min_stock)
         if new_stock <= 0:
             severidad = 'CRITICO'
         elif new_stock <= min_stock:

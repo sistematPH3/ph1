@@ -65,7 +65,7 @@ class SnapshotsTest(unittest.TestCase):
         self.loc_b = Location(name="Sede B", state="Caracas", is_active=True)
         db.session.add_all([self.loc_a, self.loc_b])
         db.session.flush()
-        self.product = Product(name="Tomate", sku="TOM-SN", unit_of_measure="kg")
+        self.product = Product(name="Tomate", sku="TOM-SN", unit_of_measure="kg", min_stock=20)
         db.session.add(self.product)
         db.session.flush()
 

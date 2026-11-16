@@ -177,8 +177,10 @@ class PurchaseService:
                     inventory_record.current_quantity = prev_qty + quantity
                 else:
                     prev_qty = Decimal('0.00')
-                    # min_stock lo define el insumo (producto) o 20 por defecto.
-                    _min = producto_obj.min_stock_efectivo if producto_obj else Decimal('20.00')
+                    # El mínimo lo define obligatoriamente el insumo.
+                    if producto_obj is None:
+                        raise ValueError('El insumo de la compra no existe.')
+                    _min = producto_obj.min_stock_efectivo
                     new_inv = Inventory(
                         location_id=1, 
                         product_id=product_id, 
@@ -204,8 +206,9 @@ class PurchaseService:
                 
                 # El mínimo es el configurado para el producto; antes se usaba
                 # un 20 fijo que clasificaba mal a productos con otro mínimo.
-                minimo = (producto_obj.min_stock_efectivo
-                          if producto_obj else Decimal('20.00'))
+                if producto_obj is None:
+                    raise ValueError('El insumo de la compra no existe.')
+                minimo = producto_obj.min_stock_efectivo
                 severity = ('REABASTECIDO'
                             if prev_qty <= minimo < new_qty else 'NORMAL')
                 

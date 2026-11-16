@@ -55,7 +55,7 @@ class RegisterPurchaseBsTest(unittest.TestCase):
         db.session.flush()
         self.comprador.role_id = self.rol.id
         self.proveedor = Supplier(name="Proveedor Bs", tax_id="J-0002")
-        self.harina = Product(name="Harina", sku="HAR-BS", unit_of_measure="KG")
+        self.harina = Product(name="Harina", sku="HAR-BS", unit_of_measure="KG", min_stock=20)
         db.session.add_all([self.central, self.comprador, self.proveedor,
                             self.harina])
         db.session.commit()
