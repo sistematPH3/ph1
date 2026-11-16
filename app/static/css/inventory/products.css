@@ -142,6 +142,20 @@
 /* --------------------------------------------------------------------------
    MENSAJES DE ERROR Y ALERTAS
    -------------------------------------------------------------------------- */
+.required-mark {
+    color: #d62300;
+    font-weight: 900;
+    margin-left: 2px;
+}
+
+.field-help {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.4rem;
+    margin-left: 10px;
+    line-height: 1.35;
+}
+
 .error-text {
     color: #d62300;
     font-size: 0.85rem;

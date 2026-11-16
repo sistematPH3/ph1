@@ -1,6 +1,11 @@
 from decimal import Decimal
 from app.extensions import db
 
+# Límite real de una columna NUMERIC(10, 2): 8 dígitos enteros y 2 decimales.
+# Cualquier valor fuera de este rango provoca NumericValueOutOfRange en PostgreSQL.
+PRODUCT_NUMERIC_MAX = Decimal('99999999.99')
+PRODUCT_NUMERIC_MAX_LABEL = '99.999.999,99'
+
 class Category(db.Model):
     """
     Categorías Macro (Contables y de Reportes Financieros)
@@ -49,8 +54,9 @@ class Product(db.Model):
     unit_of_measure = db.Column(db.String(20))
     # CAMPO AÑADIDO: Límite de merma en la unidad del producto (se configura en product_form)
     waste_limit = db.Column(db.Numeric(10, 2))
-    # CAMPO AÑADIDO: Mínimo de stock en la unidad del producto (se configura en
-    # product_form; NULL = usar el valor por defecto 20.00 al auto-crear inventario).
+    # Mínimo de stock en la unidad del producto (obligatorio en el formulario).
+    # Se mantiene nullable=True solo por compatibilidad con registros históricos;
+    # la aplicación exige un valor explícito al crear o editar el insumo.
     min_stock = db.Column(db.Numeric(10, 2), nullable=True)
     technical_description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -59,9 +65,15 @@ class Product(db.Model):
 
     @property
     def min_stock_efectivo(self):
-        """Mínimo de stock efectivo del producto: el configurado, o 20 por defecto."""
+        """Mínimo de stock configurado del producto.
+
+        No hay valor por defecto silencioso: si el insumo no tiene mínimo
+        configurado se lanza un error explícito para que se corrija el dato.
+        """
         if self.min_stock is None:
-            return Decimal('20.00')
+            raise ValueError(
+                f"El insumo '{self.name or self.sku}' no tiene stock mínimo configurado."
+            )
         return Decimal(str(self.min_stock))
 
 

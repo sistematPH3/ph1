@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unitCustomInput = document.getElementById('unit_of_measure_custom');
     const skuInput = document.getElementById('sku');
     const wasteLimitInput = document.getElementById('waste_limit');
+    const minStockInput = document.getElementById('min_stock');
 
     // Fechas y avisos
     const expirationDateGroup = document.getElementById('expiration-date-group');
@@ -127,20 +128,153 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    function validateWasteLimit() {
-        if (!wasteLimitInput) return true;
-        const raw = wasteLimitInput.value.trim();
+    // Límite real de una columna NUMERIC(10, 2) en la base de datos.
+    const NUMERIC_MAX_FALLBACK = 99999999.99;
+
+    function getFieldMax(input) {
+        const parsed = parseFloat(input && input.max);
+        return isNaN(parsed) ? NUMERIC_MAX_FALLBACK : parsed;
+    }
+
+    function getFieldMaxLabel(input) {
+        if (input && input.dataset.maxLabel) return input.dataset.maxLabel;
+        return getFieldMax(input).toLocaleString('es-VE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // ---------------------------------------------------------------------
+    // FORMATEO NUMÉRICO EN VIVO (miles con punto, decimales con coma)
+    // ---------------------------------------------------------------------
+    function normalizeNumericString(raw) {
+        let s = String(raw == null ? '' : raw)
+            .replace(/\s|\u00a0/g, '')
+            .replace(/[^\d.,-]/g, '');
+        if (!s) return '';
+        s = s.replace(/-/g, '');
+
+        if (s.includes(',') && s.includes('.')) {
+            if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+                return s.replace(/\./g, '').replace(',', '.');
+            }
+            return s.replace(/,/g, '');
+        }
+        if (s.includes(',')) {
+            const parts = s.split(',');
+            if (parts.length === 2 && parts[1].length > 0 && parts[1].length <= 2) {
+                return parts[0] + '.' + parts[1];
+            }
+            return s.replace(/,/g, '');
+        }
+        if ((s.match(/\./g) || []).length > 1) {
+            const idx = s.lastIndexOf('.');
+            const integerPart = s.slice(0, idx);
+            const decimalPart = s.slice(idx + 1);
+            if (decimalPart.length === 2 && integerPart) {
+                return integerPart.replace(/\./g, '') + '.' + decimalPart;
+            }
+            return s.replace(/\./g, '');
+        }
+        return s;
+    }
+
+    function parseLocalizedNumber(raw) {
+        const normalized = normalizeNumericString(raw);
+        if (!normalized) return NaN;
+        return parseFloat(normalized);
+    }
+
+    function formatNumericInput(raw, forceDecimals) {
+        const normalized = normalizeNumericString(raw);
+        if (!normalized) return '';
+
+        const value = parseFloat(normalized);
+        if (!Number.isFinite(value)) return '';
+
+        const hasDecimalPoint = normalized.includes('.');
+        let [integerDigits, decimalDigits] = normalized.split('.');
+        integerDigits = (integerDigits || '0').replace(/^0+(?=\d)/, '');
+        decimalDigits = (decimalDigits || '').replace(/\D/g, '').slice(0, 2);
+
+        const grouped = integerDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (forceDecimals) {
+            return grouped + ',' + (decimalDigits + '00').slice(0, 2);
+        }
+        if (hasDecimalPoint) {
+            return grouped + ',' + decimalDigits;
+        }
+        return grouped;
+    }
+
+    function applyNumericFormat(input, forceDecimals) {
+        if (!input) return;
+        const previous = input.value;
+        const caret = input.selectionStart == null ? previous.length : input.selectionStart;
+        const digitsToRight = previous.slice(caret).replace(/\D/g, '').length;
+
+        const formatted = formatNumericInput(previous, forceDecimals);
+        if (formatted === previous) return;
+        input.value = formatted;
+
+        // Conserva el cursor contando dígitos a la derecha, no caracteres.
+        let position = formatted.length;
+        let remaining = digitsToRight;
+        while (position > 0 && remaining > 0) {
+            position -= 1;
+            if (/\d/.test(formatted[position])) remaining -= 1;
+        }
+        input.setSelectionRange(position, position);
+    }
+
+    function showFormAlert(message) {
+        clearFormAlert();
+        if (!mainForm || !mainForm.parentNode) return;
+        const alert = document.createElement('div');
+        alert.className = 'alert-error js-form-alert';
+        alert.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>';
+        alert.appendChild(document.createTextNode(message));
+        mainForm.parentNode.insertBefore(alert, mainForm);
+        alert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function clearFormAlert() {
+        const existingAlert = document.querySelector('.js-form-alert');
+        if (existingAlert) existingAlert.remove();
+    }
+
+    // Devuelve true si es válido, false si hay error y 'out_of_range' si
+    // supera el máximo de la columna NUMERIC(10, 2).
+    function validateDecimalInput(input, label) {
+        if (!input) return true;
+        const raw = input.value.trim();
         if (raw === '') {
-            showFieldError(wasteLimitInput, 'El límite de merma es obligatorio.');
+            showFieldError(input, label + ' es obligatorio.');
             return false;
         }
-        const value = parseFloat(raw);
-        if (isNaN(value) || value < 0) {
-            showFieldError(wasteLimitInput, 'El límite de merma debe ser un número mayor o igual a 0.');
+        const value = parseLocalizedNumber(raw);
+        if (!Number.isFinite(value)) {
+            showFieldError(input, label + ' debe ser un número válido.');
             return false;
         }
-        clearFieldError(wasteLimitInput);
+        if (value < 0) {
+            showFieldError(input, label + ' no puede ser negativo.');
+            return false;
+        }
+        if (value > getFieldMax(input)) {
+            showFieldError(input, label + ' no puede superar ' + getFieldMaxLabel(input) + '.');
+            return 'out_of_range';
+        }
+        clearFieldError(input);
         return true;
+    }
+
+    function validateWasteLimit() {
+        return validateDecimalInput(wasteLimitInput, 'El límite de merma');
+    }
+
+    function validateMinStock() {
+        return validateDecimalInput(minStockInput, 'El mínimo de stock');
     }
 
     function validatePrimaryExpirationDate() {
@@ -169,10 +303,25 @@ document.addEventListener('DOMContentLoaded', () => {
         skuInput.addEventListener('blur', validateSKU);
         skuInput.addEventListener('input', () => { if (skuInput.value.trim()) clearFieldError(skuInput); });
     }
-    if (wasteLimitInput) {
-        wasteLimitInput.addEventListener('blur', validateWasteLimit);
-        wasteLimitInput.addEventListener('input', () => { if (wasteLimitInput.value.trim()) clearFieldError(wasteLimitInput); });
+    function bindNumericInput(input, validateFn) {
+        if (!input) return;
+        input.addEventListener('input', () => {
+            clearFormAlert();
+            applyNumericFormat(input, false);
+            if (input.value.trim()) clearFieldError(input);
+        });
+        input.addEventListener('blur', () => {
+            applyNumericFormat(input, true);
+            validateFn();
+        });
+        // En modo edición los valores existentes se muestran ya formateados.
+        if (input.value.trim()) {
+            input.value = formatNumericInput(input.value, true);
+        }
     }
+
+    bindNumericInput(wasteLimitInput, validateWasteLimit);
+    bindNumericInput(minStockInput, validateMinStock);
 
     [dayInput, monthInput, yearInput].forEach(input => {
         if (input) input.addEventListener('input', validatePrimaryExpirationDate);
@@ -186,14 +335,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const isSkuValid = validateSKU();
             const isDateValid = validatePrimaryExpirationDate();
             const isWasteLimitValid = validateWasteLimit();
+            const isMinStockValid = validateMinStock();
 
-            if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid || !isDateValid || !isWasteLimitValid) {
+            const hasRangeError = isWasteLimitValid === 'out_of_range' || isMinStockValid === 'out_of_range';
+            if (hasRangeError) {
+                showFormAlert('Los valores de límite de merma y mínimo de stock no pueden superar ' +
+                    getFieldMaxLabel(minStockInput || wasteLimitInput) + '. Revise los campos marcados.');
+            }
+
+            if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid ||
+                !isDateValid || !isWasteLimitValid || !isMinStockValid) {
                 e.preventDefault();
                 const firstError = document.querySelector('.js-validation-error');
-                if (firstError) {
+                if (firstError && !hasRangeError) {
                     firstError.parentNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
+                return;
             }
+
+            // Al enviar se quita el formato visual: el backend recibe "1250.50".
+            [wasteLimitInput, minStockInput].forEach((input) => {
+                if (!input || !input.value.trim()) return;
+                const parsed = parseLocalizedNumber(input.value);
+                if (Number.isFinite(parsed)) {
+                    input.value = parsed.toFixed(2);
+                }
+            });
         });
     }
 

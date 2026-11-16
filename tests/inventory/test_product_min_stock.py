@@ -4,14 +4,16 @@
 # Qué verifica:
 #   1) Al crear un insumo con min_stock se guarda y aplica (en la unidad del
 #      producto: si la unidad es KG, 15 = 15 kilogramos).
-#   2) Al crear sin min_stock, el efectivo es 20 (default).
+#   2) Al crear sin min_stock se lanza un error: no existe el respaldo 20.
 #   3) Al editar el insumo, el mínimo se propaga a los inventarios existentes
 #      de todas las sedes.
 #   4) La auto-creación de inventario usa el mínimo del producto (vía
 #      _get_or_create_inventory, el mismo patrón de compras/traslados).
 #   5) END-TO-END: al registrar una COMPRA por el flujo real, el inventario que
-#      se crea toma el mínimo del producto (o 20 si el insumo no lo define).
-#   6) El validador del formulario rechaza negativos y acepta vacío.
+#      se crea toma el mínimo del producto (ya no hay 20 por defecto).
+#   6) El validador del formulario rechaza vacío, negativos y valores fuera del
+#      rango de NUMERIC(10, 2) (máximo 99.999.999,99), y acepta números con
+#      separadores de miles ("1.250,50").
 #
 # Uso (en la carpeta ph1):
 #   .venv/Scripts/python -m unittest tests.inventory.test_product_min_stock -v
@@ -93,11 +95,25 @@ class ProductMinStockTest(unittest.TestCase):
         self.assertEqual(p.min_stock, Decimal("15.00"))
         self.assertEqual(p.min_stock_efectivo, Decimal("15.00"))
 
-    def test_crear_sin_min_stock_usa_default_20(self):
-        self._make("")
+    def test_crear_sin_min_stock_falla_y_no_usa_default_20(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._make("")
+        self.assertIn("obligatorio", str(ctx.exception))
+        self.assertIsNone(Product.query.filter_by(sku="HAR-1").first())
+
+    def test_servicio_acepta_min_stock_con_separadores_de_miles(self):
+        self._make("1.250,50")
         p = Product.query.filter_by(sku="HAR-1").one()
-        self.assertIsNone(p.min_stock)
-        self.assertEqual(p.min_stock_efectivo, Decimal("20.00"))
+        self.assertEqual(p.min_stock, Decimal("1250.50"))
+        self.assertEqual(p.min_stock_efectivo, Decimal("1250.50"))
+
+    def test_min_stock_efectivo_sin_valor_no_devuelve_20(self):
+        # Registro histórico con NULL: no debe haber respaldo silencioso a 20.
+        p = Product(name="Legacy", sku="LEG-1", unit_of_measure="KG")
+        db.session.add(p)
+        db.session.flush()
+        with self.assertRaises(ValueError):
+            _ = p.min_stock_efectivo
 
     def test_editar_propaga_a_inventarios_existentes(self):
         self._make("15")
@@ -168,22 +184,6 @@ class ProductMinStockTest(unittest.TestCase):
         self.assertEqual(inv.min_stock, Decimal("15.00"))
         self.assertEqual(inv.current_quantity, Decimal("50.00"))
 
-    def test_compra_sin_minimo_crea_inventario_con_default_20(self):
-        self._make("")
-        p = Product.query.filter_by(sku="HAR-1").one()
-        supplier_id, user_id = self._make_supplier_user()
-        res = PurchaseService.register_purchase({
-            "supplier_id": supplier_id,
-            "currency": "USD",
-            "exchange_rate": 1,
-            "user_id": user_id,
-            "invoice_url": "factura-test.pdf",
-            "items": [{"product_id": p.id, "quantity": 30, "foreign_price": 2.5}],
-        })
-        self.assertTrue(res["success"], res)
-        inv = Inventory.query.filter_by(product_id=p.id).one()
-        self.assertEqual(inv.min_stock, Decimal("20.00"))
-        self.assertEqual(inv.current_quantity, Decimal("30.00"))
 
     def test_recepcion_traslado_crea_inventario_con_minimo_del_producto(self):
         self._make("7")
@@ -194,14 +194,6 @@ class ProductMinStockTest(unittest.TestCase):
         inv = MovementReceptionRepository.get_or_create_inventory(loc.id, p.id)
         self.assertEqual(Decimal(str(inv["min_stock"])), Decimal("7.00"))
 
-    def test_recepcion_traslado_sin_minimo_usa_default_20(self):
-        self._make("")
-        p = Product.query.filter_by(sku="HAR-1").one()
-        loc = Location(name="Sede Recepción 2", state="Caracas")
-        db.session.add(loc)
-        db.session.flush()
-        inv = MovementReceptionRepository.get_or_create_inventory(loc.id, p.id)
-        self.assertEqual(Decimal(str(inv["min_stock"])), Decimal("20.00"))
 
     def _new_admin(self):
         role = Role(name="admin")
@@ -265,16 +257,81 @@ class ProductMinStockTest(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("min_stock", errors)
 
-    def test_validator_acepta_vacio(self):
-        is_valid, errors, data = validate_product_form({
+    def test_validator_rechaza_min_stock_vacio(self):
+        # El mínimo de stock es obligatorio en el formulario: vacío ya no es válido.
+        is_valid, errors, _ = validate_product_form({
             "name": "Queso",
             "unit_of_measure_select": "KG",
             "sku": "QSO-2",
             "product_type_id": "1",
+            "waste_limit": "10",
             "min_stock": "",
         })
+        self.assertFalse(is_valid)
+        self.assertIn("min_stock", errors)
+
+    def test_validator_rechaza_waste_limit_vacio(self):
+        is_valid, errors, _ = validate_product_form({
+            "name": "Queso",
+            "unit_of_measure_select": "KG",
+            "sku": "QSO-3",
+            "product_type_id": "1",
+            "waste_limit": "",
+            "min_stock": "10",
+        })
+        self.assertFalse(is_valid)
+        self.assertIn("waste_limit", errors)
+
+    def test_validator_rechaza_valores_sobre_el_maximo_de_la_columna(self):
+        is_valid, errors, _ = validate_product_form({
+            "name": "Queso",
+            "unit_of_measure_select": "KG",
+            "sku": "QSO-4",
+            "product_type_id": "1",
+            "waste_limit": "3e+20",
+            "min_stock": "100000000",
+        })
+        self.assertFalse(is_valid)
+        self.assertIn("waste_limit", errors)
+        self.assertIn("min_stock", errors)
+
+    def test_validator_acepta_numeros_con_separadores_de_miles(self):
+        is_valid, errors, data = validate_product_form({
+            "name": "Queso",
+            "unit_of_measure_select": "KG",
+            "sku": "QSO-6",
+            "product_type_id": "1",
+            "waste_limit": "1.250,50",
+            "min_stock": "99.999.999,99",
+        })
         self.assertTrue(is_valid, errors)
-        self.assertIsNone(data["min_stock"])
+        self.assertEqual(data["waste_limit"], Decimal("1250.50"))
+        self.assertEqual(data["min_stock"], Decimal("99999999.99"))
+
+    def test_validator_acepta_valores_en_rango(self):
+        is_valid, errors, data = validate_product_form({
+            "name": "Queso",
+            "unit_of_measure_select": "KG",
+            "sku": "QSO-5",
+            "product_type_id": "1",
+            "waste_limit": "0",
+            "min_stock": "99999999.99",
+        })
+        self.assertTrue(is_valid, errors)
+        self.assertEqual(data["waste_limit"], Decimal("0.00"))
+        self.assertEqual(data["min_stock"], Decimal("99999999.99"))
+
+    def test_validator_rechaza_minimo_formateado_sobre_el_maximo(self):
+        is_valid, errors, _ = validate_product_form({
+            "name": "Queso",
+            "unit_of_measure_select": "KG",
+            "sku": "QSO-7",
+            "product_type_id": "1",
+            "waste_limit": "10",
+            "min_stock": "100.000.000,00",
+        })
+        self.assertFalse(is_valid)
+        self.assertIn("min_stock", errors)
 
 
 if __name__ == "__main__":

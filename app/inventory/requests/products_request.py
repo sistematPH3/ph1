@@ -1,6 +1,35 @@
 import re
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from app.inventory.repositories.products_repository import ProductRepository
+from app.inventory.number_utils import normalize_decimal_string
+from app.models.inventory_model import PRODUCT_NUMERIC_MAX, PRODUCT_NUMERIC_MAX_LABEL
+
+
+def _parse_decimal_field(raw, field_name, label):
+    """Valida un campo NUMERIC(10, 2) del formulario.
+
+    Devuelve (valor, error). El valor es Decimal con 2 decimales o None.
+    """
+    # Acepta tanto "1250.50" como el formato visual "1.250,50".
+    raw_value = '' if raw is None else normalize_decimal_string(raw)
+    if not raw_value:
+        return None, f'{label} es obligatorio.'
+
+    try:
+        value = Decimal(raw_value)
+    except (InvalidOperation, ValueError):
+        return None, f'{label} debe ser un número válido.'
+
+    if not value.is_finite():
+        return None, f'{label} debe ser un número válido.'
+    if value < 0:
+        return None, f'{label} no puede ser negativo.'
+    if value > PRODUCT_NUMERIC_MAX:
+        return None, (f'{label} no puede superar {PRODUCT_NUMERIC_MAX_LABEL}, '
+                      'el máximo que soporta la base de datos.')
+
+    return value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), None
 
 def validate_product_form(data, current_product_id=None):
     errors = {}
@@ -45,31 +74,21 @@ def validate_product_form(data, current_product_id=None):
 
     technical_description = data.get('technical_description', '').strip()
 
-    # Validación del límite de merma (OPCIONAL: vacío = sin límite de cantidad;
-    # si se llena, debe ser un número mayor a 0 en la unidad del producto).
-    raw_waste_limit = data.get('waste_limit', '').strip()
-    waste_limit = None
-    if raw_waste_limit:
-        try:
-            waste_limit = float(raw_waste_limit)
-            if waste_limit <= 0:
-                errors['waste_limit'] = 'El límite de merma debe ser mayor a 0.'
-        except ValueError:
-            errors['waste_limit'] = 'El límite de merma debe ser un número válido.'
+    # Validación del límite de merma (OBLIGATORIO). Se interpreta en la unidad
+    # del producto y debe caber en la columna NUMERIC(10, 2).
+    waste_limit, waste_limit_error = _parse_decimal_field(
+        data.get('waste_limit'), 'waste_limit', 'El límite de merma'
+    )
+    if waste_limit_error:
+        errors['waste_limit'] = waste_limit_error
 
-    # Validación del mínimo de stock (OPCIONAL: vacío = usar el valor por
-    # defecto 20.00; si se llena, debe ser un número mayor o igual a 0 en la
-    # unidad del producto: si la unidad es KG, 15 = 15 kilogramos; si es LT,
-    # 15 = 15 litros; si es GRAMOS, 15 = 15 gramos).
-    raw_min_stock = data.get('min_stock', '').strip()
-    min_stock = None
-    if raw_min_stock:
-        try:
-            min_stock = float(raw_min_stock)
-            if min_stock < 0:
-                errors['min_stock'] = 'El mínimo de stock no puede ser negativo.'
-        except ValueError:
-            errors['min_stock'] = 'El mínimo de stock debe ser un número válido.'
+    # Validación del mínimo de stock (OBLIGATORIO). Se interpreta en la unidad
+    # del producto y debe caber en la columna NUMERIC(10, 2).
+    min_stock, min_stock_error = _parse_decimal_field(
+        data.get('min_stock'), 'min_stock', 'El mínimo de stock'
+    )
+    if min_stock_error:
+        errors['min_stock'] = min_stock_error
 
     # NUEVA VALIDACIÓN: Procesar los cuadritos de fecha de manera unificada
     day = data.get('date_day')
