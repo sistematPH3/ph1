@@ -82,7 +82,26 @@ def login():
         
         elif estado == "sin_sedes":
             flash("No puedes entrar al sistema porque no tienes sedes activas, comunícate con el administrador.", "warning")
-            
+
+        elif estado == "solicitud_rechazada":
+            flash(
+                "Tu solicitud de registro fue rechazada por el administrador, "
+                "por eso no tienes acceso al sistema. Si consideras que es un "
+                "error, comunícate con administración.",
+                "warning",
+            )
+
+        elif estado == "correo_no_registrado":
+            # Guía al alta sin enlaces: el botón Regístrate ya está en la
+            # pantalla. No se usa el mensaje genérico porque ese correo no
+            # tiene cuenta a la que atribuir una contraseña errónea.
+            flash(
+                "El correo ingresado no está registrado en el sistema. "
+                "Si aún no tienes acceso, utiliza la opción Regístrate para "
+                "enviar tu solicitud.",
+                "danger",
+            )
+
         else:
             flash(mensaje_error_generico(), 'danger')
 

@@ -168,6 +168,35 @@ class LoginIntegrationTest(unittest.TestCase):
         self.assertIsNone(self._sesion_activa())
         self.assertIsNone(self._ultimo_acceso(self.admin))
 
+    def test_password_incorrecta_mantiene_mensaje_generico(self):
+        """Un correo registrado nunca revela que la contraseña fue el fallo."""
+        cuerpo = self._login(EMAIL_ADMIN, 'Incorrecta#1').get_data(as_text=True)
+        self.assertIn('erróneos', cuerpo)
+        self.assertNotIn('no está registrado', cuerpo)
+
+    def test_correo_no_registrado_sugiere_el_registro(self):
+        """Correo inexistente: mensaje propio en vez del genérico."""
+        respuesta = self._login('nadie.registrado@test.ph', 'Ph12345.')
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIsNone(self._sesion_activa())
+        self.assertIn('no está registrado', cuerpo)
+        self.assertIn('Regístrate', cuerpo)
+        self.assertNotIn('erróneos', cuerpo)
+
+    def test_servicio_reporta_correo_no_registrado(self):
+        from app.security.services.login_service import LoginService
+        usuario, motivo = LoginService.autenticar(
+            'nadie.registrado@test.ph', PASSWORD)
+        self.assertIsNone(usuario)
+        self.assertEqual(motivo, 'correo_no_registrado')
+
+    def test_servicio_reporta_datos_incorrectos_con_correo_existente(self):
+        from app.security.services.login_service import LoginService
+        usuario, motivo = LoginService.autenticar(EMAIL_ADMIN, 'Incorrecta#1')
+        self.assertIsNone(usuario)
+        self.assertEqual(motivo, 'datos_incorrectos')
+
     def test_fallo_de_auditoria_no_bloquea_el_login(self):
         with patch('app.security.routes.login_routes.LoginAudit',
                    side_effect=RuntimeError('auditoria no disponible')):

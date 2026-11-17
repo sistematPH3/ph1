@@ -51,7 +51,8 @@ def approve_user(user_id):
 def reject_user(user_id):
     """Rechaza una solicitud de registro, eliminando el aspirante de forma segura."""
     # El repositorio ahora se encarga de limpiar auditorías y tablas intermedias primero
-    if UserManagementRepository.delete_user(user_id):
+    if UserManagementRepository.delete_user(user_id,
+                                            responsible_user_id=current_user.id):
         flash("La solicitud ha sido rechazada y eliminada de la base de datos.", "warning")
     else:
         flash("Error al intentar eliminar el registro. Inténtalo de nuevo.", "danger")

@@ -3,7 +3,7 @@ import logging
 from app.models.security_model import User
 from app.models.logistics_model import Location
 from app.extensions import db
-from app.models import LoginAudit
+from app.models import AuditLog, LoginAudit
 from app.security.services.user_activation_service import UserActivationService
 
 logger = logging.getLogger(__name__)
@@ -48,11 +48,17 @@ class UserManagementRepository:
         return None
 
     @staticmethod
-    def delete_user(user_id):
+    def delete_user(user_id, responsible_user_id=None):
         """
         Elimina un usuario de la base de datos de forma segura al ser rechazado.
         Limpia el historial de LoginAudit y desvincula las sedes asignadas temporalmente 
         para prevenir errores de restricción de clave foránea (IntegrityError).
+
+        Antes de borrar deja constancia del rechazo en audit_logs: el correo
+        queda liberado (la persona puede volver a registrarse) y el login
+        puede explicarle que su solicitud fue rechazada. No se guarda el
+        user_id del rechazado para no bloquear el borrado por la llave
+        foránea; el correo viaja en changed_data.
         """
         try:
             usuario = db.session.get(User, user_id)
@@ -62,8 +68,22 @@ class UserManagementRepository:
                 
                 # 2. Vaciamos la relación de sedes para limpiar la tabla intermedia 'user_locations'
                 usuario.locations = []
-                
-                # 3. Borramos al usuario de la tabla 'users'
+
+                # 3. Dejamos el rastro del rechazo (quién lo decidió y a quién).
+                db.session.add(AuditLog(
+                    affected_table='users',
+                    action='RECHAZO_SOLICITUD',
+                    severity='ALERTA',
+                    user_id=responsible_user_id,
+                    changed_data={
+                        'email': usuario.email,
+                        'name': usuario.name,
+                        'role_id': usuario.role_id,
+                        'rejected_by': responsible_user_id,
+                    },
+                ))
+
+                # 4. Borramos al usuario de la tabla 'users'
                 db.session.delete(usuario)
                 db.session.commit()
                 return True

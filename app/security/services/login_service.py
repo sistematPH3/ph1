@@ -9,12 +9,22 @@ class LoginService:
         - 'ok': Acceso correcto.
         - 'cuenta_desactivada': Desactivado manualmente por administrador.
         - 'sin_sedes': Usuario sin sedes activas.
-        - 'datos_incorrectos': Email o contraseña erróneos.
+        - 'correo_no_registrado': El correo no pertenece a ningún usuario.
+        - 'solicitud_rechazada': El correo no tiene cuenta porque su solicitud
+              fue rechazada (queda el rastro en audit_logs).
+        - 'datos_incorrectos': Contraseña errónea de un correo registrado.
         """
         usuario = LoginRepository.obtener_usuario_por_email(email)
-        
-        # Verificar existencia y contraseña
-        if usuario and check_password_hash(usuario.password_hash, password):
+
+        # Sin cuenta: se distingue un rechazo previo de un correo que nunca
+        # se registró, para guiar al usuario con el mensaje correcto.
+        if usuario is None:
+            if LoginRepository.obtener_rechazo_por_email(email) is not None:
+                return None, "solicitud_rechazada"
+            return None, "correo_no_registrado"
+
+        # Verificar contraseña
+        if check_password_hash(usuario.password_hash, password):
             
             # 1. ¿Está desactivado manualmente?
             #    (En un invitado, is_active=False significa "pendiente de
@@ -31,5 +41,6 @@ class LoginService:
             # 3. Acceso permitido
             return usuario, "ok"
             
-        # Fallo por credenciales incorrectas
+        # Contraseña incorrecta de un correo registrado: mensaje genérico,
+        # sin revelar rol, estado ni sedes del usuario.
         return None, "datos_incorrectos"
