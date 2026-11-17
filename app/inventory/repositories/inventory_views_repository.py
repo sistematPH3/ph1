@@ -13,16 +13,37 @@ class InventoryViewRepository:
     
     @staticmethod
     def get_inventory_by_location(location_id, search_term=None):
-        query = Inventory.query.join(Product).join(Location).filter(
-            Inventory.location_id == location_id
+        return InventoryViewRepository.get_inventory_by_locations(
+            [location_id], search_term
         )
-        
+
+    @staticmethod
+    def get_inventory_by_locations(location_ids, search_term=None):
+        """Inventario consolidado de varias sedes en UNA sola consulta.
+
+        Se usa `location_id.in_(...)` para que un usuario con varias sedes
+        asignadas vea todas sus existencias juntas en lugar de una sola sede.
+        """
+        ids = []
+        for location_id in location_ids or []:
+            try:
+                ids.append(int(location_id))
+            except (TypeError, ValueError):
+                continue
+
+        if not ids:
+            return []
+
+        query = Inventory.query.join(Product).join(Location).filter(
+            Inventory.location_id.in_(ids)
+        ).order_by(Location.name, Product.name)
+
         if search_term:
             query = query.filter(
                 Product.name.ilike(f"%{search_term}%") | 
                 Product.sku.ilike(f"%{search_term}%")
             )
-            
+
         return query.all()
 
     @staticmethod

@@ -10,6 +10,13 @@ from app.inventory.services.lot_availability_service import net_consumption_quan
 
 logger = logging.getLogger(__name__)
 
+# La sede Central (id fijo 1) agrupa las compras y desde ella se despacha a la red.
+CENTRAL_LOCATION_ID = 1
+
+# Únicos roles autorizados a ver el Almacén Central. El administrador lo ve
+# junto con todas las sedes; cualquier otro rol solo ve sus sedes asignadas.
+CENTRAL_ACCESS_ROLES = ('admin', 'administrator')
+
 
 class InventoryViewService:
 
@@ -90,14 +97,53 @@ class InventoryViewService:
             }
 
         else:
+            # Rol NO administrador: se consolidan TODAS sus sedes asignadas en
+            # una sola consulta (`location_id.in_(...)`). Antes se mostraba
+            # únicamente `assigned_locations[0]`, de modo que las demás sedes
+            # del usuario quedaban ocultas.
             assigned_locations = InventoryViewRepository.get_user_assigned_locations(current_user.id)
 
-            if assigned_locations:
-                user_location_id = assigned_locations[0].id
-                inventory_data = InventoryViewRepository.get_inventory_by_location(user_location_id, search_term)
-                location_name = assigned_locations[0].name
+            # Regla de negocio: el Almacén Central solo es visible para los
+            # roles autorizados explícitamente (el administrador ya se resolvió
+            # en la rama anterior).
+            if role_name.strip() in CENTRAL_ACCESS_ROLES:
+                visible_locations = list(assigned_locations)
+            else:
+                visible_locations = [
+                    loc for loc in assigned_locations
+                    if loc.id != CENTRAL_LOCATION_ID
+                ]
+
+            visible_location_ids = [loc.id for loc in visible_locations]
+
+            # El filtro por sede solo se honra si cae dentro de su ámbito; si
+            # no, se devuelve el consolidado de todas sus sedes.
+            if selected_location_id and selected_location_id not in visible_location_ids:
+                selected_location_id = None
+
+            if selected_location_id:
+                inventory_data = InventoryViewRepository.get_inventory_by_locations(
+                    [selected_location_id], search_term
+                )
+            elif visible_location_ids:
+                inventory_data = InventoryViewRepository.get_inventory_by_locations(
+                    visible_location_ids, search_term
+                )
             else:
                 inventory_data = []
+
+            displayed_locations = (
+                [loc for loc in visible_locations if loc.id == selected_location_id]
+                if selected_location_id else visible_locations
+            )
+
+            if len(displayed_locations) == 1:
+                location_name = displayed_locations[0].name
+            elif displayed_locations:
+                location_name = "Todas tus sedes: " + ", ".join(
+                    loc.name for loc in displayed_locations
+                )
+            else:
                 location_name = "Sin Sede Asignada"
 
             InventoryViewService._attach_inventory_state_quantities(inventory_data)
@@ -105,9 +151,9 @@ class InventoryViewService:
             return {
                 'is_admin': False,
                 'inventory': inventory_data,
-                'available_locations': assigned_locations,
+                'available_locations': visible_locations,
                 'assigned_location_name': location_name,
-                'selected_location_id': assigned_locations[0].id if assigned_locations else None
+                'selected_location_id': selected_location_id
             }
 
     @staticmethod
