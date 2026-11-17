@@ -76,10 +76,12 @@ class AuditExportFiltrosTest(unittest.TestCase):
         db.session.add_all([self.sede_a, self.sede_b])
         db.session.flush()
 
+        self.rol_guest = Role(id=0, name="Guest")
         self.rol_admin = Role(name="Administrator")
         self.rol_fin = Role(name="Finance")
         self.rol_ops = Role(name="Operaciones")
-        db.session.add_all([self.rol_admin, self.rol_fin, self.rol_ops])
+        db.session.add_all([self.rol_guest, self.rol_admin, self.rol_fin,
+                            self.rol_ops])
         db.session.flush()
 
         self.ana = User(name="Ana Admin", email="ana@ph.test",
@@ -88,7 +90,9 @@ class AuditExportFiltrosTest(unittest.TestCase):
                          password_hash="x", role_id=self.rol_ops.id)
         self.caro = User(name="Caro Fin", email="caro@ph.test",
                          password_hash="x", role_id=self.rol_fin.id)
-        db.session.add_all([self.ana, self.beto, self.caro])
+        self.dani = User(name="Dani Invitado", email="dani@ph.test",
+                         password_hash="x", role_id=0, is_active=False)
+        db.session.add_all([self.ana, self.beto, self.caro, self.dani])
         db.session.flush()
 
         db.session.add_all([
@@ -100,10 +104,14 @@ class AuditExportFiltrosTest(unittest.TestCase):
             LoginAudit(user_id=self.beto.id, role_id=self.rol_ops.id,
                        location_id=self.sede_b.id, action="CERRAR_SESION",
                        timestamp=datetime(2026, 9, 5, 14, 0)),
-            # Log C: sin sede (global), 07:30 AM del 10/08/2026
+            # Log C: sin sede (Almacén Central), 07:30 AM del 10/08/2026
             LoginAudit(user_id=self.caro.id, role_id=self.rol_fin.id,
                        location_id=None, action="INICIO_SESION",
                        timestamp=datetime(2026, 8, 10, 7, 30)),
+            # Log D: invitado sin sede, 08:30 AM del 10/08/2026
+            LoginAudit(user_id=self.dani.id, role_id=self.rol_guest.id,
+                       location_id=None, action="INICIO_SESION",
+                       timestamp=datetime(2026, 8, 10, 8, 30)),
         ])
         db.session.commit()
 
@@ -190,8 +198,10 @@ class AuditExportFiltrosTest(unittest.TestCase):
     # ------------------------------------------------------- accesos ------
     def test_accesos_sin_filtros_trae_todo(self):
         doc = self._exportar()
-        self.assertEqual(doc['header']['registros'], 3)
-        self.assertEqual(len(self._filas(doc)), 3)
+        self.assertEqual(doc['header']['registros'], 4)
+        self.assertEqual(len(self._filas(doc)), 4)
+        self.assertNotIn('Global / Sin Sede',
+                         [fila[5] for fila in self._filas(doc)])
 
     def test_accesos_q_filtra_por_usuario_y_accion(self):
         doc = self._exportar(q='ana')
@@ -207,10 +217,30 @@ class AuditExportFiltrosTest(unittest.TestCase):
         doc = self._exportar(hour='02 PM')
         self.assertEqual(doc['header']['registros'], 1)  # B (14:00)
 
-    def test_accesos_sede_global(self):
+    def test_accesos_filtro_almacen_central(self):
+        doc = self._exportar(sede='central_warehouse')
+        # Administrador con sede física + personal sin sede: ambos son el
+        # Almacén Central lógico. El invitado queda fuera.
+        self.assertEqual(doc['header']['registros'], 2)
+        self.assertEqual([f[5] for f in self._filas(doc)],
+                         ['Almacén Central', 'Almacén Central'])
+        self.assertEqual(doc['header']['sede'], 'Almacén Central')
+
+    def test_accesos_administrador_con_sede_fisica_es_almacen_central(self):
+        doc = self._exportar(q='Ana Admin')
+        self.assertEqual(self._filas(doc)[0][5], 'Almacén Central')
+
+    def test_accesos_filtro_global_rotula_almacen_central(self):
         doc = self._exportar(sede='global')
+        self.assertEqual(doc['header']['sede'], 'Almacén Central')
+        self.assertNotIn('Global / Sin Sede', doc['header']['sede'])
+
+    def test_accesos_filtro_pantalla_invitados(self):
+        doc = self._exportar(sede='guest_screen')
         self.assertEqual(doc['header']['registros'], 1)
-        self.assertEqual(self._filas(doc)[0][5], 'Global / Sin Sede')
+        self.assertEqual(self._filas(doc)[0][5], 'Pantalla de Invitados')
+        self.assertEqual(self._filas(doc)[0][2], 'Dani Invitado')
+        self.assertEqual(doc['header']['sede'], 'Pantalla de Invitados')
 
     def test_accesos_sede_por_id_y_por_nombre(self):
         doc = self._exportar(sede=self.sede_b.id)

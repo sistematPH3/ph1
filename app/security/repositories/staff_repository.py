@@ -33,7 +33,7 @@ class StaffRepository:
     def update_user(user, email, role_id, locations):
         """Actualiza los campos básicos y la relación de sedes."""
         try:
-            user.email = email
+            user.email = (email or '').strip().lower()
             user.role_id = role_id
             user.locations = locations # SQLAlchemy gestiona la relación Many-to-Many
             db.session.commit()

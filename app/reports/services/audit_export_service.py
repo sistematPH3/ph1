@@ -13,6 +13,11 @@ from app.reports.services.export_service import (
     formatear_tasa,
 )
 from app.security.repositories.audit_user_repository import AuditUserRepository
+from app.security.services.audit_location_service import (
+    UBICACION_CENTRAL_LABEL,
+    UBICACION_INVITADOS_LABEL,
+    etiqueta_ubicacion,
+)
 from app.security.services.audit_purchase_service import AuditPurchaseService
 
 
@@ -40,9 +45,25 @@ def _ts(valor):
     return valor.strftime('%d/%m/%Y %I:%M:%S %p')
 
 
+_SEDE_ALMACEN_VALORES = {'central_warehouse', 'almacen_central',
+                         'almacén central', 'almacen central', 'central'}
+_SEDE_INVITADOS_VALORES = {'guest_screen', 'pantalla_invitados',
+                            'pantalla de invitados', 'invitados'}
+
+
 def _nombre_sede(sede_id):
     loc = db.session.get(Location, sede_id) if sede_id else None
     return loc.name if loc else (f'Sede #{sede_id}' if sede_id else None)
+
+
+def _filtro_sede_especial(valor):
+    """Indica si el filtro de sede de accesos pide Almacén Central o Invitados."""
+    v = str(valor or '').strip().lower()
+    if v in _SEDE_ALMACEN_VALORES:
+        return 'almacen'
+    if v in _SEDE_INVITADOS_VALORES:
+        return 'invitados'
+    return None
 
 
 def _resolver_sede(valor):
@@ -224,11 +245,19 @@ def _detalle_evento_traslado(evt):
     return '\n'.join(lineas)
 
 
-def _etiqueta_sede_documento(user, filtros):
+def _etiqueta_sede_documento(user, filtros, tipo=None):
+    filtro_especial = _filtro_sede_especial(filtros.get('sede'))
+    if tipo == 'accesos' and filtro_especial == 'almacen':
+        return UBICACION_CENTRAL_LABEL
+    if tipo == 'accesos' and filtro_especial == 'invitados':
+        return UBICACION_INVITADOS_LABEL
     es_global, sede_id, sede_nombre = _resolver_sede(filtros.get('sede'))
     if getattr(user, 'is_admin', False):
         if es_global:
-            return 'Global / Sin Sede'
+            # El administrador opera siempre en el Almacén Central lógico; el
+            # documento no debe rotularse como "global" aunque no exista una
+            # sede física con ese nombre en la tabla de ubicaciones.
+            return UBICACION_CENTRAL_LABEL
         if sede_id:
             return _nombre_sede(sede_id) or f'Sede #{sede_id}'
         if sede_nombre:
@@ -247,7 +276,7 @@ def _base(tipo, titulo, user, filtros, tablas, registros):
             'metric': tipo,
             'titulo': titulo,
             'rango': _texto_rango(filtros.get('desde'), filtros.get('hasta')),
-            'sede': _etiqueta_sede_documento(user, filtros),
+            'sede': _etiqueta_sede_documento(user, filtros, tipo),
             'generado_por': obtener_nombre_autor(user.id),
             'generado_en': datetime.now().strftime('%d/%m/%Y %H:%M'),
             'registros': registros,
@@ -265,6 +294,7 @@ def construir_accesos(user, filtros):
     is_finance = getattr(user, 'is_finance', False)
 
     es_global, sede_id, sede_nombre = _resolver_sede(filtros.get('sede'))
+    filtro_especial = _filtro_sede_especial(filtros.get('sede'))
 
     query = LoginAudit.query.options(
         joinedload(LoginAudit.user),
@@ -283,7 +313,22 @@ def construir_accesos(user, filtros):
         elif sede_id:
             query = query.filter(LoginAudit.location_id == sede_id)
     else:
-        if es_global:
+        if filtro_especial == 'invitados':
+            query = (query.join(LoginAudit.role)
+                     .filter(db.func.lower(Role.name) == 'guest'))
+        elif filtro_especial == 'almacen':
+            # Almacén Central lógico: administradores (aunque tengan una sede
+            # física asignada o la sede ya no exista), personal sin sede y la
+            # sede institucional fija si está creada.
+            query = (query.join(LoginAudit.role)
+                     .outerjoin(LoginAudit.location)
+                     .filter(db.or_(
+                         db.and_(db.func.lower(Role.name) != 'guest',
+                                 db.or_(LoginAudit.location_id.is_(None),
+                                        db.func.lower(Role.name).in_(
+                                            ('administrator', 'admin')))),
+                         Location.name.ilike('Almacén Central'))))
+        elif es_global:
             query = query.filter(LoginAudit.location_id.is_(None))
         elif sede_id:
             query = query.filter(LoginAudit.location_id == sede_id)
@@ -318,7 +363,7 @@ def construir_accesos(user, filtros):
                 log.user.name if log.user else 'Sistema',
                 log.user.email if log.user else '',
                 log.role.name if log.role else '',
-                log.location.name if log.location else 'Global / Sin Sede',
+                etiqueta_ubicacion(log),
             ))
             return q in texto.lower()
         logs = [log for log in logs if _coincide(log)]
@@ -334,8 +379,7 @@ def construir_accesos(user, filtros):
                 ('Usuario',
                  f"{nombre} ({correo})" if correo else nombre),
                 ('Rol', log.role.name if log.role else '—'),
-                ('Sede', (log.location.name if log.location
-                          else 'Global / Sin Sede')),
+                ('Sede', etiqueta_ubicacion(log)),
             ],
         })
 
@@ -348,8 +392,7 @@ def construir_accesos(user, filtros):
                    log.user.name if log.user else 'Sistema',
                    log.user.email if log.user else '',
                    log.role.name if log.role else '—',
-                   log.location.name if log.location
-                   else 'Global / Sin Sede']
+                   etiqueta_ubicacion(log)]
                   for log in logs],
         'items': items,
     }]

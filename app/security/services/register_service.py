@@ -24,7 +24,7 @@ class RegisterService:
 
         nuevo_usuario = User(
             name=name.strip(),
-            email=email.strip(),
+            email=email.strip().lower(),
             password_hash=generate_password_hash(password),
             role_id=0,
             is_active=False,

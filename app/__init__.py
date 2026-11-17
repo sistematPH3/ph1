@@ -230,6 +230,16 @@ def create_app():
         app.jinja_env.filters['ph_qty'] = ph_qty
         app.jinja_env.filters['ph_amount'] = ph_amount
 
+        # Helpers de ubicación de la Auditoría de Accesos (fuera de app/models).
+        from app.security.services.audit_location_service import (
+            clave_filtro_ubicacion,
+            es_acceso_invitado,
+            etiqueta_ubicacion,
+        )
+        app.jinja_env.filters['ubicacion_key'] = clave_filtro_ubicacion
+        app.jinja_env.filters['ubicacion_label'] = etiqueta_ubicacion
+        app.jinja_env.filters['es_acceso_invitado'] = es_acceso_invitado
+
         # ==========================================================
         # PATRON DE CORREO PARA EL FRONTEND
         # ==========================================================

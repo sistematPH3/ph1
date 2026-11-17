@@ -2,8 +2,8 @@ from app import create_app
 from app.extensions import db
 from app.models.security_model import User, Role
 from app.models import Location, WasteType, AppParameter
-from werkzeug.security import generate_password_hash
-from sqlalchemy import text
+from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import func, text
 
 app = create_app()
 
@@ -51,14 +51,23 @@ def seed_database():
         except Exception:
             db.session.rollback()
 
+        # Cuenta de fábrica. Debe quedar SIEMPRE en un estado que permita
+        # iniciar sesión: si no existe se crea, y si existe pero su hash no
+        # valida contra la contraseña de fábrica (hash de otro esquema, cadena
+        # vacía o truncada) se restablece. Antes el seeder solo creaba cuando
+        # el correo no aparecía: una fila con el hash roto o con el correo en
+        # otra capitalización se quedaba para siempre sin poder entrar.
         email_admin = 'sistemat3.ph@gmail.com'
-        user_exists = User.query.filter_by(email=email_admin).first()
-        
+        password_admin = 'Ph12345.'
+        user_exists = (User.query
+                       .filter(func.lower(func.trim(User.email)) == email_admin)
+                       .first())
+
         if not user_exists:
             admin = User(
                 name='Sistema Admin',
                 email=email_admin,
-                password_hash=generate_password_hash('Ph12345.'),
+                password_hash=generate_password_hash(password_admin),
                 role_id=1,
                 is_active=True
             )
@@ -72,6 +81,26 @@ def seed_database():
             except Exception:
                 db.session.rollback()
         else:
+            reparado = False
+            try:
+                hash_valido = bool(user_exists.password_hash) and check_password_hash(
+                    user_exists.password_hash, password_admin)
+            except Exception:
+                hash_valido = False
+
+            if not hash_valido:
+                user_exists.password_hash = generate_password_hash(password_admin)
+                reparado = True
+                print(f"Hash inválido para {email_admin}: restablecido a la contraseña de fábrica.")
+
+            if not user_exists.is_active:
+                user_exists.is_active = True
+                reparado = True
+                print(f"Usuario {email_admin} reactivado.")
+
+            if reparado:
+                db.session.commit()
+
             print(f"El usuario {email_admin} ya existe en el sistema.")
 
         seed_waste_types()

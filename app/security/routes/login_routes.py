@@ -1,11 +1,47 @@
-from flask import render_template, request, redirect, url_for, flash
+from flask import (
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import login_user, logout_user, login_required, current_user
 from .. import security_bp
 from ..services.login_service import LoginService
 from ..requests.auth_validators import mensaje_error_generico
 from ..requests.login_validators import validar_formulario_login
 from app.extensions import db
-from app.models import LoginAudit 
+from app.models import LoginAudit
+
+
+def _registrar_acceso(usuario, accion):
+    """Registra el acceso en la auditoría sin bloquear la sesión.
+
+    Si la escritura del log falla (por ejemplo, una validación o un problema
+    de base de datos), se revierte solo esa transacción y se registra el
+    error técnico. El usuario ya autenticado no debe perder su sesión por un
+    fallo de auditoría.
+    """
+    try:
+        sede_id = (usuario.locations[0].id
+                   if getattr(usuario, 'locations', None) else None)
+        db.session.add(LoginAudit(
+            user_id=usuario.id,
+            location_id=sede_id,
+            role_id=usuario.role_id,
+            action=accion,
+        ))
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "No se pudo registrar el acceso %s del usuario %s",
+            accion,
+            getattr(usuario, 'id', '?'),
+        )
+        return False
 
 @security_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -22,16 +58,7 @@ def login():
             # El invitado pendiente tiene is_active=False; sin force, Flask-Login
             # no crea la sesión y nunca llegaría a la sala de espera.
             login_user(usuario, force=usuario.is_guest)
-            
-            sede_id = usuario.locations[0].id if (hasattr(usuario, 'locations') and usuario.locations) else None
-            nuevo_ingreso = LoginAudit(
-                user_id=usuario.id,
-                location_id=sede_id,
-                role_id=usuario.role_id,
-                action='INICIO_SESION'
-            )
-            db.session.add(nuevo_ingreso)
-            db.session.commit()
+            _registrar_acceso(usuario, 'INICIO_SESION')
 
             if usuario.is_admin:
                 return redirect(url_for('dashboard.admin_dashboard'))
@@ -64,17 +91,7 @@ def login():
 @security_bp.route('/logout')
 @login_required
 def logout():
-    sede_id = current_user.locations[0].id if (hasattr(current_user, 'locations') and current_user.locations) else None
-        
-    cierre_sesion = LoginAudit(
-        user_id=current_user.id,
-        location_id=sede_id,
-        role_id=current_user.role_id,
-        action='CERRAR_SESION'
-    )
-    db.session.add(cierre_sesion)
-    db.session.commit()
-    
+    _registrar_acceso(current_user, 'CERRAR_SESION')
     logout_user()
     flash('Has cerrado sesión correctamente.', 'success')
     return redirect(url_for('security.login'))
