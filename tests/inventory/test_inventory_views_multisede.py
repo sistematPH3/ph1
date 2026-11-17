@@ -186,7 +186,7 @@ class InventoryViewsMultisedeTest(unittest.TestCase):
         )
 
 
-    def test_vista_renderiza_el_consolidado_para_no_admin(self):
+    def test_vista_renderiza_el_panel_de_sedes_para_no_admin(self):
         env = self._seed()
 
         cliente = self.app.test_client()
@@ -195,12 +195,38 @@ class InventoryViewsMultisedeTest(unittest.TestCase):
             sesion["_fresh"] = True
 
         respuesta = cliente.get("/inventory/views")
+        html = respuesta.data.decode("utf-8")
 
         self.assertEqual(respuesta.status_code, 200)
+        # Paridad con la vista del administrador: panel lateral de sedes.
+        self.assertIn("Búsqueda por Sede", html)
+        self.assertIn('id="locationListGroup"', html)
         self.assertIn(b"Todas tus sedes", respuesta.data)
-        self.assertIn(b"Sede A", respuesta.data)
-        self.assertIn(b"Sede B", respuesta.data)
-        self.assertNotIn(b"Sede Ajena", respuesta.data)
+        # Solo sus sedes asignadas: ni la sede ajena ni el Almacén Central.
+        self.assertIn('data-location-name="Sede A"', html)
+        self.assertIn('data-location-name="Sede B"', html)
+        self.assertNotIn('data-location-name="Sede Ajena"', html)
+        self.assertNotIn('data-location-name="Central"', html)
+        # La opción consolidada vuelve a "todas sus sedes".
+        self.assertIn('data-location-name="Todas tus sedes"', html)
+
+    def test_vista_de_no_admin_con_una_sede_tambien_muestra_el_panel(self):
+        env = self._seed()
+        env["operador"].locations = [env["sede_a"]]
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion["_user_id"] = str(env["operador"].id)
+            sesion["_fresh"] = True
+
+        respuesta = cliente.get("/inventory/views")
+        html = respuesta.data.decode("utf-8")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("Búsqueda por Sede", html)
+        self.assertIn('data-location-name="Sede A"', html)
+        self.assertNotIn('data-location-name="Sede B"', html)
 
 
 if __name__ == "__main__":
