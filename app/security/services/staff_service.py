@@ -4,6 +4,7 @@ from app.security.repositories.staff_repository import StaffRepository
 from app.extensions import db
 from flask_login import current_user
 from app.security.services.audit_user_service import AuditUserService
+from app.security.services.user_activation_service import UserActivationService
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +67,13 @@ class StaffService:
         if not usuario:
             return False, "Usuario no encontrado."
 
+        sedes_previas = list(usuario.locations)
+
         estado_anterior = {
             'email': usuario.email,
             'rol': usuario.role.name if usuario.role else 'Ninguno',
-            'sedes': ', '.join([loc.name for loc in usuario.locations if loc.is_active]) or 'Ninguna'
+            'sedes': ', '.join([loc.name for loc in usuario.locations if loc.is_active]) or 'Ninguna',
+            'estado': 'Activo' if usuario.is_active else 'Inactivo'
         }
 
         nuevo_email = data.get('email')
@@ -93,14 +97,20 @@ class StaffService:
         )
 
         if exito:
+            # Si es usuario nuevo y recibe sus primeras sedes activas, queda
+            # activo sin necesidad de una activación manual adicional.
+            if UserActivationService.activar_en_alta_inicial(usuario, sedes_previas):
+                db.session.commit()
+
             estado_nuevo = {
                 'email': usuario.email,
                 'rol': usuario.role.name if usuario.role else 'Ninguno',
-                'sedes': ', '.join([loc.name for loc in usuario.locations if loc.is_active]) or 'Ninguna'
+                'sedes': ', '.join([loc.name for loc in usuario.locations if loc.is_active]) or 'Ninguna',
+                'estado': 'Activo' if usuario.is_active else 'Inactivo'
             }
 
             cambios = {}
-            for campo in ['email', 'rol', 'sedes']:
+            for campo in ['email', 'rol', 'sedes', 'estado']:
                 if estado_anterior[campo] != estado_nuevo[campo]:
                     cambios[campo] = {
                         'old': estado_anterior[campo], 

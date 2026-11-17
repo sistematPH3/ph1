@@ -4,6 +4,7 @@ from app.models.security_model import User
 from app.models.logistics_model import Location
 from app.extensions import db
 from app.models import LoginAudit
+from app.security.services.user_activation_service import UserActivationService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ class UserManagementRepository:
         """Actualiza el rol, asigna sedes (vía user_locations) y activa al usuario mediante sincronización."""
         usuario = db.session.get(User, user_id)
         if usuario:
+            # Sedes que tenía antes de la aprobación (un pendiente no tiene).
+            sedes_previas = list(usuario.locations)
+
             usuario.role_id = int(role_id)
             
             # Buscamos las sedes según los IDs recibidos
@@ -34,6 +38,10 @@ class UserManagementRepository:
             
             # Ejecutamos tu función centralizada para definir si se activa o inhabilita
             usuario.sync_activation_status() 
+
+            # Alta inicial: el usuario nacía inactivo aunque ya tuviera rol y
+            # sedes activas, obligando a una activación manual posterior.
+            UserActivationService.activar_en_alta_inicial(usuario, sedes_previas)
             
             db.session.commit()
             return usuario
