@@ -78,43 +78,122 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (categoryForm) {
         categoryForm.addEventListener('submit', (e) => {
-            if (!validateName()) {
+            const nameOk = validateName();
+            const expirationOk = validateExpirationControl();
+
+            if (!nameOk || !expirationOk) {
                 e.preventDefault(); // Detener envío si no es válido
-                nameInput.focus();
+                if (!nameOk && nameInput) {
+                    nameInput.focus();
+                } else if (!expirationOk) {
+                    const firstRadio = document.querySelector('input[name="expiration_control"]');
+                    if (firstRadio) firstRadio.focus();
+                }
             }
         });
     }
 
-    // Lógica de switches/checkboxes de Días de Vida Útil
-    const hasShelfLifeCheckbox = document.getElementById('has_shelf_life');
+    // -------------------------------------------------------------------------
+    // REGLA DE VENCIMIENTO (OBLIGATORIA Y EXCLUYENTE) DE LA CATEGORÍA
+    // -------------------------------------------------------------------------
+    const expirationRadios = document.querySelectorAll('input[name="expiration_control"]');
     const shelfLifeDaysContainer = document.getElementById('shelf_life_days_container');
     const shelfLifeDaysInput = document.getElementById('shelf_life_days');
-    const requiresManualCheckbox = document.getElementById('requires_manual_date');
+    const expirationControlError = document.getElementById('expiration-control-error');
+    const shelfLifeDaysError = document.getElementById('shelf-life-days-error');
 
-    function toggleShelfLifeInput() {
-        if (!hasShelfLifeCheckbox || !shelfLifeDaysContainer) return;
+    function getSelectedExpirationControl() {
+        const checked = document.querySelector('input[name="expiration_control"]:checked');
+        return checked ? checked.value : '';
+    }
 
-        if (hasShelfLifeCheckbox.checked) {
-            shelfLifeDaysContainer.style.display = 'flex';
-            if (shelfLifeDaysInput.value == 0) shelfLifeDaysInput.value = '';
-            shelfLifeDaysInput.setAttribute('required', 'required');
-            if (requiresManualCheckbox) requiresManualCheckbox.checked = false; 
-        } else {
-            shelfLifeDaysContainer.style.display = 'none';
-            shelfLifeDaysInput.removeAttribute('required');
-            shelfLifeDaysInput.value = 0;
+    function showExpirationError(message) {
+        if (expirationControlError) {
+            expirationControlError.textContent = message;
+            expirationControlError.classList.remove('d-none');
+            expirationControlError.style.display = 'block';
         }
     }
 
-    if (requiresManualCheckbox && hasShelfLifeCheckbox) {
-        requiresManualCheckbox.addEventListener('change', () => {
-            if (requiresManualCheckbox.checked) {
-                hasShelfLifeCheckbox.checked = false;
-                toggleShelfLifeInput();
-            }
-        });
-
-        hasShelfLifeCheckbox.addEventListener('change', toggleShelfLifeInput);
-        toggleShelfLifeInput();
+    function clearExpirationError() {
+        if (expirationControlError) {
+            expirationControlError.classList.add('d-none');
+            expirationControlError.style.display = 'none';
+        }
     }
+
+    function showShelfLifeDaysError(message) {
+        if (shelfLifeDaysError) {
+            shelfLifeDaysError.textContent = message;
+            shelfLifeDaysError.classList.remove('d-none');
+            shelfLifeDaysError.style.display = 'block';
+        }
+        if (shelfLifeDaysInput) shelfLifeDaysInput.style.borderColor = '#d62300';
+    }
+
+    function clearShelfLifeDaysError() {
+        if (shelfLifeDaysError) {
+            shelfLifeDaysError.classList.add('d-none');
+            shelfLifeDaysError.style.display = 'none';
+        }
+        if (shelfLifeDaysInput) shelfLifeDaysInput.style.borderColor = '';
+    }
+
+    // El campo de días solo aplica con la regla 'days'.
+    function toggleShelfLifeInput() {
+        if (!shelfLifeDaysContainer || !shelfLifeDaysInput) return;
+
+        if (getSelectedExpirationControl() === 'days') {
+            shelfLifeDaysContainer.style.display = 'flex';
+            shelfLifeDaysInput.disabled = false;
+            shelfLifeDaysInput.setAttribute('required', 'required');
+        } else {
+            shelfLifeDaysContainer.style.display = 'none';
+            shelfLifeDaysInput.value = '';
+            shelfLifeDaysInput.disabled = true;
+            shelfLifeDaysInput.removeAttribute('required');
+            clearShelfLifeDaysError();
+        }
+    }
+
+    function validateExpirationControl() {
+        const control = getSelectedExpirationControl();
+        let isValid = true;
+
+        if (!control) {
+            showExpirationError('Debe seleccionar la regla de vencimiento: fecha manual en compra o días de vida útil.');
+            return false;
+        }
+        clearExpirationError();
+
+        if (control === 'days') {
+            const raw = shelfLifeDaysInput ? shelfLifeDaysInput.value.trim() : '';
+            const days = Number(raw);
+            if (!raw || !Number.isInteger(days) || days < 1 || days > 365) {
+                showShelfLifeDaysError('Indique los días de vida útil: un número entero entre 1 y 365.');
+                isValid = false;
+            } else {
+                clearShelfLifeDaysError();
+            }
+        } else {
+            clearShelfLifeDaysError();
+        }
+
+        return isValid;
+    }
+
+    expirationRadios.forEach((radio) => {
+        radio.addEventListener('change', () => {
+            clearExpirationError();
+            toggleShelfLifeInput();
+        });
+    });
+
+    if (shelfLifeDaysInput) {
+        shelfLifeDaysInput.addEventListener('input', () => {
+            if (shelfLifeDaysInput.value.trim()) clearShelfLifeDaysError();
+        });
+    }
+
+    toggleShelfLifeInput();
 });

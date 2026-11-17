@@ -6,6 +6,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 from app import db
 from app.inventory import inventory_bp
 from app.inventory.services.category_service import CategoryService
+from app.inventory.requests.categories_request import validate_expiration_control
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,15 @@ def create_category():
                 data=request.form,
                 existing_categories=existing_names,
                 errors={'name': f'La categoría "{match.name}" ya se encuentra registrada.'}
+            )
+
+        expiration_errors, _, _ = validate_expiration_control(request.form)
+        if expiration_errors:
+            return render_template(
+                'inventory/category_form.html',
+                data=request.form,
+                existing_categories=existing_names,
+                errors=expiration_errors
             )
 
         try:
@@ -123,6 +133,16 @@ def edit_category(type_id):
                 errors={'name': f'La categoría "{match.name}" ya se encuentra registrada.'}
             )
 
+        expiration_errors, _, _ = validate_expiration_control(request.form)
+        if expiration_errors:
+            return render_template(
+                'inventory/category_form.html',
+                product_type=product_type,
+                data=request.form,
+                existing_categories=existing_names,
+                errors=expiration_errors
+            )
+
         try:
             CategoryService.update_category(type_id, request.form)
             flash('Categoría actualizada exitosamente.', 'success')
@@ -151,8 +171,12 @@ def edit_category(type_id):
 
     data = {
         'name': product_type.name,
-        'shelf_life_days': product_type.shelf_life_days or 0,
-        'requires_manual_date': product_type.requires_manual_date
+        'expiration_control': (
+            'manual' if product_type.requires_manual_date
+            else ('days' if product_type.shelf_life_days else '')
+        ),
+        'shelf_life_days': product_type.shelf_life_days or '',
+        'requires_manual_date': product_type.requires_manual_date,
     }
 
     return render_template('inventory/category_form.html', product_type=product_type, data=data, existing_categories=existing_names, errors={})
@@ -202,9 +226,16 @@ def api_create_category():
 
         formatted_data = {
             'name': cat_name,
-            'requires_manual_date': 'true' if str(raw_data.get('requires_manual_date')).lower() in ['true', '1', 'on'] else '',
-            'shelf_life_days': str(raw_data.get('shelf_life_days', 0))
+            'expiration_control': raw_data.get('expiration_control'),
+            'shelf_life_days': raw_data.get('shelf_life_days', ''),
         }
+
+        expiration_errors, _, _ = validate_expiration_control(formatted_data)
+        if expiration_errors:
+            return jsonify({
+                'success': False,
+                'error': next(iter(expiration_errors.values())),
+            }), 400
 
         new_category = CategoryService.create_category(formatted_data)
 

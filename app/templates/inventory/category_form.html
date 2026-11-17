@@ -36,30 +36,44 @@
                 </span>
             </div>
 
-            <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 0.5rem 10px;">
-                <label for="requires_manual_date" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
-                    ¿Lleva fecha de vencimiento manual? <br>
-                    <small style="font-weight: 400; color: #6c757d; font-size: 0.8rem;">(Se digita manualmente en cada compra)</small>
-                </label>
-                <input type="checkbox" id="requires_manual_date" name="requires_manual_date" value="true"
-                       {% if (data and data.get('requires_manual_date')) or (product_type and product_type.requires_manual_date) %}checked{% endif %}
-                       style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
-            </div>
+            {% set expiration_control = data.get('expiration_control') if data and data.get('expiration_control') else ('manual' if product_type and product_type.requires_manual_date else ('days' if product_type and product_type.shelf_life_days else '')) %}
 
-            <div class="form-group" id="shelf_life_toggle_group" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 0.5rem 10px;">
-                <label for="has_shelf_life" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
-                    ¿Cuenta con días de vida útil estándar?
-                </label>
-                <input type="checkbox" id="has_shelf_life" 
-                       {% if (data and data.get('shelf_life_days', 0)|int > 0) or (product_type and product_type.shelf_life_days) %}checked{% endif %}
-                       style="width: 24px; height: 24px; cursor: pointer; accent-color: #d62300;">
+            <div class="form-group" id="expiration_control_group">
+                <label>Regla de Vencimiento <span class="required-mark" aria-hidden="true">*</span></label>
+
+                <div class="expiration-option" style="display: flex; align-items: flex-start; gap: 10px; padding: 0.45rem 0;">
+                    <input type="radio" id="expiration_control_manual" name="expiration_control" value="manual"
+                           {% if expiration_control == 'manual' %}checked{% endif %} required>
+                    <label for="expiration_control_manual" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
+                        Fecha manual en compra
+                        <small style="display: block; font-weight: 400; color: #6c757d; font-size: 0.8rem;">Se digita la fecha impresa de fábrica en cada compra.</small>
+                    </label>
+                </div>
+
+                <div class="expiration-option" style="display: flex; align-items: flex-start; gap: 10px; padding: 0.45rem 0;">
+                    <input type="radio" id="expiration_control_days" name="expiration_control" value="days"
+                           {% if expiration_control == 'days' %}checked{% endif %} required>
+                    <label for="expiration_control_days" style="margin: 0; font-weight: 800; font-size: 0.9rem;">
+                        Días de vida útil estándar
+                        <small style="display: block; font-weight: 400; color: #6c757d; font-size: 0.8rem;">El sistema calcula el vencimiento al registrar la compra.</small>
+                    </label>
+                </div>
+
+                <small class="field-help">Obligatorio. La regla se aplica a todos los insumos de esta categoría.</small>
+                <span id="expiration-control-error" class="error-text {% if not (errors and errors.get('expiration_control')) %}d-none{% endif %}" style="color: #d62300; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">
+                    {% if errors and errors.get('expiration_control') %}{{ errors.get('expiration_control') }}{% endif %}
+                </span>
             </div>
 
             <div class="form-group" id="shelf_life_days_container" style="display: none;">
-                <label for="shelf_life_days">Cantidad de Días Hábiles en Cocina</label>
-                <input type="number" id="shelf_life_days" name="shelf_life_days" 
-                       value="{% if data and data.get('shelf_life_days') %}{{ data.get('shelf_life_days') }}{% elif product_type and product_type.shelf_life_days %}{{ product_type.shelf_life_days }}{% else %}0{% endif %}" 
-                       min="0" max="365" placeholder="Ej. 7, 15, 30">
+                <label for="shelf_life_days">Días de Vida Útil Estándar <span class="required-mark" aria-hidden="true">*</span></label>
+                <input type="number" id="shelf_life_days" name="shelf_life_days"
+                       value="{% if data and data.get('expiration_control') == 'days' and data.get('shelf_life_days') %}{{ data.get('shelf_life_days') }}{% elif product_type and product_type.shelf_life_days %}{{ product_type.shelf_life_days }}{% endif %}"
+                       min="1" step="1" max="365" placeholder="Ej. 7, 15, 30">
+                <small class="field-help">Obligatorio con esta regla. Número entero mayor o igual a 1.</small>
+                <span id="shelf-life-days-error" class="error-text {% if not (errors and errors.get('shelf_life_days')) %}d-none{% endif %}" style="color: #d62300; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">
+                    {% if errors and errors.get('shelf_life_days') %}{{ errors.get('shelf_life_days') }}{% endif %}
+                </span>
             </div>
 
             <div class="form-actions">

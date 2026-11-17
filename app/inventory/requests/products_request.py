@@ -1,5 +1,4 @@
 import re
-from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from app.inventory.repositories.products_repository import ProductRepository
 from app.inventory.number_utils import normalize_decimal_string
@@ -90,24 +89,11 @@ def validate_product_form(data, current_product_id=None):
     if min_stock_error:
         errors['min_stock'] = min_stock_error
 
-    # NUEVA VALIDACIÓN: Procesar los cuadritos de fecha de manera unificada
-    day = data.get('date_day')
-    month = data.get('date_month')
-    year = data.get('date_year')
-
-    expiration_date = None
-
-    if day and month and year:
-        try:
-            # Intentar estructurar la fecha ingresada manualmente
-            expiration_date = date(int(year), int(month), int(day))
-            if expiration_date < date.today():
-                errors['expiration_date'] = 'La fecha ingresada no puede ser menor a la fecha actual.'
-        except ValueError:
-            errors['expiration_date'] = 'La fecha ingresada en los casilleros no es válida.'
-    else:
-        # Si venían vacíos o bloqueados por ser un tipo de producto automático, se registra la fecha actual por defecto
-        expiration_date = date.today()
+    # VENCIMIENTOS: el producto/insumo del catálogo NO maneja fecha de
+    # vencimiento ni regla propia. Esa configuración pertenece exclusivamente a
+    # la categoría (ProductType), que el módulo de compras consulta a través
+    # del product_type_id del insumo. Cualquier fecha o modalidad enviada por un
+    # cliente antiguo se ignora aquí.
 
     is_valid = len(errors) == 0
 
@@ -120,7 +106,6 @@ def validate_product_form(data, current_product_id=None):
         'technical_description': technical_description,
         'waste_limit': waste_limit,
         'min_stock': min_stock,
-        'expiration_date': expiration_date,  # Se inyecta la fecha limpia calculada
         'is_active': True
     }
 

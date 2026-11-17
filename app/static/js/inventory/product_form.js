@@ -13,15 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const wasteLimitInput = document.getElementById('waste_limit');
     const minStockInput = document.getElementById('min_stock');
 
-    // Fechas y avisos
-    const expirationDateGroup = document.getElementById('expiration-date-group');
-    const dayInput = document.querySelector('input[name="date_day"]');
-    const monthInput = document.querySelector('input[name="date_month"]');
-    const yearInput = document.querySelector('input[name="date_year"]');
-    const manualDateNotice = document.getElementById('manual-date-notice');
-    const autoDateNotice = document.getElementById('auto-date-notice');
-    const noticeDaysCount = document.getElementById('notice-days-count');
-
     // Elementos del Modal de Categoría
     const modalOverlay = document.getElementById('categoryModalOverlay');
     const btnCloseModal = document.getElementById('btnCloseCategoryModal');
@@ -31,10 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCatNameInput = document.getElementById('modal_cat_name');
     const catNameError = document.getElementById('modal_cat_name_error');
 
-    const modalRequiresManual = document.getElementById('modal_requires_manual_date');
-    const modalHasShelfLife = document.getElementById('modal_has_shelf_life');
+    const modalExpirationRadios = document.querySelectorAll('#quickCategoryForm input[name="expiration_control"]');
     const modalShelfLifeContainer = document.getElementById('modal_shelf_life_days_container');
     const modalShelfLifeInput = document.getElementById('modal_shelf_life_days');
+    const modalExpirationError = document.getElementById('modal_expiration_control_error');
+    const modalShelfLifeError = document.getElementById('modal_shelf_life_days_error');
 
     let lastSelectedProductType = productTypeSelect ? productTypeSelect.value : '';
 
@@ -61,14 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         errorSpan.style.display = 'block';
         errorSpan.textContent = message;
 
-        if (inputElement.name && inputElement.name.startsWith('date_')) {
-            const dateContainer = expirationDateGroup;
-            if (!dateContainer.querySelector('.js-validation-error')) {
-                dateContainer.appendChild(errorSpan);
-            }
-        } else {
-            inputElement.parentNode.appendChild(errorSpan);
-        }
+        inputElement.parentNode.appendChild(errorSpan);
 
         inputElement.style.borderColor = '#d62300';
     }
@@ -76,13 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearFieldError(inputElement) {
         if (!inputElement) return;
         inputElement.style.borderColor = '';
-        if (inputElement.name && inputElement.name.startsWith('date_')) {
-            const existingError = expirationDateGroup.querySelector('.js-validation-error');
-            if (existingError) existingError.remove();
-        } else {
-            const existingError = inputElement.parentNode.querySelector('.js-validation-error');
-            if (existingError) existingError.remove();
-        }
+        const existingError = inputElement.parentNode.querySelector('.js-validation-error');
+        if (existingError) existingError.remove();
     }
 
     function validateName() {
@@ -277,21 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return validateDecimalInput(minStockInput, 'El mínimo de stock');
     }
 
-    function validatePrimaryExpirationDate() {
-        if (expirationDateGroup && expirationDateGroup.style.display !== 'none') {
-            const day = parseInt(dayInput.value, 10);
-            const month = parseInt(monthInput.value, 10);
-            const year = parseInt(yearInput.value, 10);
-
-            if (!day || day < 1 || day > 31 || !month || month < 1 || month > 12 || !year || year < 2026) {
-                showFieldError(dayInput, 'Ingrese una fecha de vencimiento válida (DD/MM/AAAA).');
-                return false;
-            }
-        }
-        clearFieldError(dayInput);
-        return true;
-    }
-
     if (nameInput) {
         nameInput.addEventListener('blur', validateName);
         nameInput.addEventListener('input', () => { if (nameInput.value.trim()) clearFieldError(nameInput); });
@@ -323,17 +288,12 @@ document.addEventListener('DOMContentLoaded', () => {
     bindNumericInput(wasteLimitInput, validateWasteLimit);
     bindNumericInput(minStockInput, validateMinStock);
 
-    [dayInput, monthInput, yearInput].forEach(input => {
-        if (input) input.addEventListener('input', validatePrimaryExpirationDate);
-    });
-
     if (mainForm) {
         mainForm.addEventListener('submit', (e) => {
             const isNameValid = validateName();
             const isTypeValid = validateProductType();
             const isUnitValid = validateUnit();
             const isSkuValid = validateSKU();
-            const isDateValid = validatePrimaryExpirationDate();
             const isWasteLimitValid = validateWasteLimit();
             const isMinStockValid = validateMinStock();
 
@@ -344,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!isNameValid || !isTypeValid || !isUnitValid || !isSkuValid ||
-                !isDateValid || !isWasteLimitValid || !isMinStockValid) {
+                !isWasteLimitValid || !isMinStockValid) {
                 e.preventDefault();
                 const firstError = document.querySelector('.js-validation-error');
                 if (firstError && !hasRangeError) {
@@ -365,38 +325,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // 3. LÓGICA DE AVISOS Y UNIDAD DE MEDIDA
+    // 3. LÓGICA DE UNIDAD DE MEDIDA Y ALTA RÁPIDA DE CATEGORÍA
     // =========================================================================
-    function updateProductTypeUI() {
-        if (!productTypeSelect) return;
-        const selectedOption = productTypeSelect.options[productTypeSelect.selectedIndex];
-        
-        if (!selectedOption || !selectedOption.value || selectedOption.value === '__ADD_NEW__') {
-            if (expirationDateGroup) expirationDateGroup.style.display = 'none';
-            if (manualDateNotice) manualDateNotice.style.display = 'none';
-            if (autoDateNotice) autoDateNotice.style.display = 'none';
-            return;
-        }
-
-        const isManual = selectedOption.dataset.manual === 'true';
-        const shelfLifeDays = parseInt(selectedOption.dataset.days || '0', 10);
-
-        if (isManual) {
-            if (manualDateNotice) manualDateNotice.style.display = 'block';
-            if (autoDateNotice) autoDateNotice.style.display = 'none';
-            if (expirationDateGroup) expirationDateGroup.style.display = 'none';
-        } else if (shelfLifeDays > 0) {
-            if (noticeDaysCount) noticeDaysCount.textContent = shelfLifeDays;
-            if (autoDateNotice) autoDateNotice.style.display = 'block';
-            if (manualDateNotice) manualDateNotice.style.display = 'none';
-            if (expirationDateGroup) expirationDateGroup.style.display = 'none';
-        } else {
-            if (expirationDateGroup) expirationDateGroup.style.display = 'block';
-            if (manualDateNotice) manualDateNotice.style.display = 'none';
-            if (autoDateNotice) autoDateNotice.style.display = 'none';
-        }
-    }
-
+    // El insumo solo se vincula a la categoría: la regla de vencimiento vive
+    // exclusivamente en la categoría, no en el producto.
     if (productTypeSelect) {
         productTypeSelect.addEventListener('change', (e) => {
             const val = e.target.value;
@@ -405,10 +337,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 productTypeSelect.value = lastSelectedProductType;
             } else {
                 lastSelectedProductType = val;
-                updateProductTypeUI();
             }
         });
-        updateProductTypeUI();
     }
 
     function handleUnitSelectChange() {
@@ -444,31 +374,91 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     // 4. LÓGICA Y VALIDACIÓN EN TIEMPO REAL DEL MODAL DE CATEGORÍA
     // =========================================================================
+    function getModalExpirationControl() {
+        const checked = document.querySelector('#quickCategoryForm input[name="expiration_control"]:checked');
+        return checked ? checked.value : '';
+    }
+
     function toggleModalShelfLife() {
-        if (modalHasShelfLife.checked) {
+        if (!modalShelfLifeContainer || !modalShelfLifeInput) return;
+        if (getModalExpirationControl() === 'days') {
             modalShelfLifeContainer.style.display = 'flex';
-            if (modalShelfLifeInput.value === '0') modalShelfLifeInput.value = '';
-            modalRequiresManual.checked = false;
+            modalShelfLifeInput.disabled = false;
+            modalShelfLifeInput.setAttribute('required', 'required');
         } else {
             modalShelfLifeContainer.style.display = 'none';
-            modalShelfLifeInput.value = 0;
+            modalShelfLifeInput.value = '';
+            modalShelfLifeInput.disabled = true;
+            modalShelfLifeInput.removeAttribute('required');
+            clearModalShelfLifeError();
         }
     }
 
-    if (modalRequiresManual && modalHasShelfLife) {
-        modalRequiresManual.addEventListener('change', () => {
-            if (modalRequiresManual.checked) {
-                modalHasShelfLife.checked = false;
-                toggleModalShelfLife();
+    function showModalExpirationError(msg) {
+        if (modalExpirationError) {
+            modalExpirationError.textContent = msg;
+            modalExpirationError.style.display = 'block';
+        }
+    }
+
+    function clearModalExpirationError() {
+        if (modalExpirationError) modalExpirationError.style.display = 'none';
+    }
+
+    function showModalShelfLifeError(msg) {
+        if (modalShelfLifeError) {
+            modalShelfLifeError.textContent = msg;
+            modalShelfLifeError.style.display = 'block';
+        }
+        if (modalShelfLifeInput) modalShelfLifeInput.style.borderColor = '#d62300';
+    }
+
+    function clearModalShelfLifeError() {
+        if (modalShelfLifeError) modalShelfLifeError.style.display = 'none';
+        if (modalShelfLifeInput) modalShelfLifeInput.style.borderColor = '';
+    }
+
+    function validateModalExpirationControl() {
+        const control = getModalExpirationControl();
+        clearModalExpirationError();
+
+        if (!control) {
+            showModalExpirationError('Debe seleccionar la regla de vencimiento: fecha manual en compra o días de vida útil.');
+            return false;
+        }
+
+        if (control === 'days') {
+            clearModalShelfLifeError();
+            const raw = modalShelfLifeInput ? modalShelfLifeInput.value.trim() : '';
+            const days = Number(raw);
+            if (!raw || !Number.isInteger(days) || days < 1 || days > 365) {
+                showModalShelfLifeError('Indique los días de vida útil: un número entero entre 1 y 365.');
+                return false;
             }
+        }
+        return true;
+    }
+
+    modalExpirationRadios.forEach((radio) => {
+        radio.addEventListener('change', () => {
+            clearModalExpirationError();
+            toggleModalShelfLife();
         });
-        modalHasShelfLife.addEventListener('change', toggleModalShelfLife);
+    });
+
+    if (modalShelfLifeInput) {
+        modalShelfLifeInput.addEventListener('input', () => {
+            if (modalShelfLifeInput.value.trim()) clearModalShelfLifeError();
+        });
     }
 
     function openModal() {
         modalOverlay.style.display = 'flex';
         modalErrorBox.style.display = 'none';
         clearModalCatNameError();
+        clearModalExpirationError();
+        clearModalShelfLifeError();
+        toggleModalShelfLife();
         if (modalCatNameInput) modalCatNameInput.focus();
     }
 
@@ -477,6 +467,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (quickCategoryForm) quickCategoryForm.reset();
         toggleModalShelfLife();
         clearModalCatNameError();
+        clearModalExpirationError();
+        clearModalShelfLifeError();
         modalErrorBox.style.display = 'none';
     }
 
@@ -537,15 +529,17 @@ document.addEventListener('DOMContentLoaded', () => {
         quickCategoryForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            if (!validateModalCategoryName()) {
+            const nameOk = validateModalCategoryName();
+            const expirationOk = validateModalExpirationControl();
+            if (!nameOk || !expirationOk) {
                 return;
             }
 
             const catNameValue = modalCatNameInput.value.trim();
             const payload = {
                 name: catNameValue,
-                requires_manual_date: modalRequiresManual.checked ? "true" : "",
-                shelf_life_days: modalShelfLifeInput.value || 0
+                expiration_control: getModalExpirationControl(),
+                shelf_life_days: modalShelfLifeInput.value || ''
             };
 
             const API_URL = quickCategoryForm.dataset.apiUrl || '/inventory/categories/api/create';
@@ -574,7 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     productTypeSelect.value = cat.id;
                     lastSelectedProductType = cat.id;
                     clearFieldError(productTypeSelect);
-                    updateProductTypeUI();
 
                     closeModal();
                 } else {
