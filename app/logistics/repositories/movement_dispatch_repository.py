@@ -7,11 +7,36 @@ from sqlalchemy import func, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Product, Purchase, PurchaseDetail, AuditLog
 from app.inventory.services.lot_availability_service import net_consumption_quantity
+from app.logistics.requests.movement_dispatch_validators import CENTRAL_LOCATION_ID
 
 logger = logging.getLogger(__name__)
 
 
 class MovementDispatchRepository:
+
+    @staticmethod
+    def get_dispatchable_products(location_id=None):
+        """Insumos activos con stock disponible real en la sede de origen.
+
+        Se usa para poblar el selector "Seleccione un producto..." del despacho:
+        solo se ofrecen productos cuyo inventario en esa sede tenga saldo
+        positivo (físico menos lo congelado por mermas pendientes). Así no se
+        pueden emitir despachos de insumos agotados en el Almacén Central.
+        """
+        loc_id = int(location_id if location_id is not None else CENTRAL_LOCATION_ID)
+
+        disponible = (
+            func.coalesce(Inventory.current_quantity, 0)
+            - func.coalesce(Inventory.reserved_quantity, 0)
+        )
+
+        return db.session.query(Product).join(
+            Inventory, Inventory.product_id == Product.id
+        ).filter(
+            Product.is_active.is_(True),
+            Inventory.location_id == loc_id,
+            disponible > 0
+        ).all()
 
     @staticmethod
     def get_inventory_for_update(location_id, product_id):

@@ -502,6 +502,43 @@ class MovementDispatchTest(unittest.TestCase):
         })
         self.assertTrue(ok, errors)
 
+    # =========================================================================
+    # SELECTOR DE PRODUCTOS: solo insumos con saldo real en el Almacén Central
+    # =========================================================================
+    def test_selector_productos_solo_muestra_stock_disponible_en_central(self):
+        env = self._seed_central(lot_qty_100=50.0, lot_qty_101=100.0)
+
+        agotado = Product(name="Agotado", sku="AGO-DSP", unit_of_measure="kg")
+        congelado = Product(name="Congelado", sku="CON-DSP", unit_of_measure="kg")
+        solo_sucursal = Product(name="Solo Sucursal", sku="SUC-DSP", unit_of_measure="kg")
+        inactivo = Product(name="Inactivo", sku="INA-DSP", unit_of_measure="kg", is_active=False)
+        db.session.add_all([agotado, congelado, solo_sucursal, inactivo])
+        db.session.flush()
+
+        db.session.add_all([
+            # Sin existencias en el Central.
+            Inventory(location_id=1, product_id=agotado.id,
+                      current_quantity=0.0, transit_quantity=0.0, min_stock=20),
+            # Todo el saldo está congelado por mermas pendientes.
+            Inventory(location_id=1, product_id=congelado.id,
+                      current_quantity=10.0, reserved_quantity=10.0, min_stock=20),
+            # Tiene stock, pero en otra sede (no en el Central).
+            Inventory(location_id=env["dest"].id, product_id=solo_sucursal.id,
+                      current_quantity=80.0, transit_quantity=0.0, min_stock=20),
+            # Inactivo con stock: tampoco debe ofrecerse.
+            Inventory(location_id=1, product_id=inactivo.id,
+                      current_quantity=80.0, transit_quantity=0.0, min_stock=20),
+        ])
+        db.session.commit()
+
+        ofrecidos = {p.id for p in MovementDispatchRepository.get_dispatchable_products(1)}
+
+        self.assertIn(env["product"].id, ofrecidos)
+        self.assertNotIn(agotado.id, ofrecidos)
+        self.assertNotIn(congelado.id, ofrecidos)
+        self.assertNotIn(solo_sucursal.id, ofrecidos)
+        self.assertNotIn(inactivo.id, ofrecidos)
+
 
 if __name__ == "__main__":
     unittest.main()

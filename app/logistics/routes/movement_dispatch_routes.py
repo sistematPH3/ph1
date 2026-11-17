@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash
 from flask_login import login_required, current_user
-from app.models import Location, Product
+from app.models import Location
+from app.logistics.repositories.movement_dispatch_repository import MovementDispatchRepository
 from app.logistics.services.movement_dispatch_service import MovementDispatchService
 from app.decorators.roles import require_roles, require_roles_api
 
@@ -11,7 +12,9 @@ dispatch_bp = Blueprint('dispatch_bp', __name__)
 @require_roles('admin')
 def dispatch_form_view():
     locations = Location.query.filter_by(is_active=True).all()
-    products = Product.query.filter_by(is_active=True).all()
+    # Solo se ofrecen insumos con saldo disponible real en el Almacén Central
+    # (sede de origen del despacho); los agotados no aparecen en el selector.
+    products = MovementDispatchRepository.get_dispatchable_products()
 
     # Se captura el id de la disputa si viene como parámetro en la URL
     dispute_id = request.args.get('dispute_id')
