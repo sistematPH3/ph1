@@ -6,6 +6,7 @@ from app import db
 from app.models import Inventory, Movement, MovementDetail, Purchase, PurchaseDetail, AuditLog
 from app.models.waste_model import Waste, WasteDetail
 from app.inventory.repositories.inventory_views_repository import InventoryViewRepository
+from app.inventory.services.lot_availability_service import net_consumption_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -291,15 +292,18 @@ class InventoryViewService:
 
             salidas_traslado = {d.lot_number.strip(): float(d.total_out or 0.0) for d in despachos_sucursal if d.lot_number}
 
+        # Solo gastos/consumos base. Las mermas se derivan de Waste/WasteDetail
+        # (estado real), no de sus auditorías: una merma REVERTIDA devuelve el
+        # stock y su audit_log histórico ya no debe descontar el lote.
         audit_consumos = db.session.query(
-            AuditLog.changed_data
+            AuditLog.changed_data, AuditLog.severity
         ).filter(
             AuditLog.location_id == loc_id,
-            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA', 'MERMA'])
+            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA'])
         ).all()
 
         salidas_consumo = {}
-        for (c_data,) in audit_consumos:
+        for c_data, severity in audit_consumos:
             if not c_data:
                 continue
             if isinstance(c_data, str):
@@ -314,10 +318,14 @@ class InventoryViewService:
             if isinstance(c_data, dict):
                 p_id = c_data.get('product_id')
                 l_num = c_data.get('lot_number')
-                qty_change = c_data.get('quantity_changed', 0.0)
                 if (p_id is None or int(p_id) == prod_id) and l_num and l_num != 'N/A':
+                    # Cantidad vigente (editada) o 0 si está anulado: mantiene
+                    # sincronizado el lote con el stock general de la sede.
+                    qty = net_consumption_quantity(c_data, severity)
+                    if qty <= 0:
+                        continue
                     l_num_clean = str(l_num).strip()
-                    salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(float(qty_change))
+                    salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + qty
 
         # Mermas PENDIENTES: la cantidad está congelada (reserved_quantity) y no
         # está disponible para consumo/traslado, así que también se descuenta del
@@ -340,6 +348,26 @@ class InventoryViewService:
             if lot and str(lot).strip() and str(lot).strip() != 'N/A':
                 lote_limpio = str(lot).strip()
                 salidas_mermas_pendientes[lote_limpio] = float(total_pend or 0.0)
+
+        # Mermas APROBADAS: ya descontaron el stock físico y, si se revierten,
+        # su cabecera deja de estar APROBADA, por lo que vuelven a sumar al lote.
+        salidas_mermas_aprobadas = {}
+        aprobadas_rows = db.session.query(
+            WasteDetail.lot_number,
+            func.sum(WasteDetail.quantity).label('total_mermado')
+        ).join(Waste, Waste.id == WasteDetail.waste_id).filter(
+            or_(
+                Waste.status == 'APROBADO',
+                (Waste.status == 'APROBADO_PARCIAL') & (WasteDetail.status == 'APROBADO'),
+            ),
+            Waste.cancelled_at.is_(None),
+            Waste.location_id == loc_id,
+            WasteDetail.product_id == prod_id,
+            WasteDetail.lot_number.isnot(None),
+        ).group_by(WasteDetail.lot_number).all()
+        for lot, total_mermado in aprobadas_rows:
+            if lot and str(lot).strip() and str(lot).strip() != 'N/A':
+                salidas_mermas_aprobadas[str(lot).strip()] = float(total_mermado or 0.0)
 
         # Traslados EN_TRANSITO: esa mercancía ya salió físicamente de la sede
         # (despacho pendiente de recepción), así que no se puede tocar. Se resta
@@ -397,6 +425,7 @@ class InventoryViewService:
             total_out_traslados = salidas_traslado.get(lot_num, 0.0)
             total_out_consumos = salidas_consumo.get(lot_num, 0.0)
             total_out_mermas = salidas_mermas_pendientes.get(lot_num, 0.0)
+            total_out_mermas_aprobadas = salidas_mermas_aprobadas.get(lot_num, 0.0)
             total_out_transito = salidas_transito.get(lot_num, 0.0)
             total_out_disputa = salidas_disputa.get(lot_num, 0.0)
             total_out_retorno = salidas_retorno.get(lot_num, 0.0)
@@ -408,7 +437,7 @@ class InventoryViewService:
             # expone aparte en `frozen_disputed_quantity`.
             disponible = max(0.0, (
                 total_in - total_out_traslados - total_out_consumos
-                - total_out_mermas
+                - total_out_mermas - total_out_mermas_aprobadas
             ))
 
             incidencias = (

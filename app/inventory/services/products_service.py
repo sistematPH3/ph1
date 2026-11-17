@@ -106,7 +106,7 @@ class ProductService:
         product.technical_description = tech_desc
         product.waste_limit = _clean_waste_limit(data.get('waste_limit'))
         product.min_stock = _clean_min_stock(data.get('min_stock'))
-        
+
         if 'is_active' in data:
             product.is_active = data.get('is_active') in ['True', True, 1, '1']
 

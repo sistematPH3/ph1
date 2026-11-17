@@ -10,11 +10,28 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Cada pestaña se renderiza en el servidor con SU propio conjunto de datos
+    // (gastos originales o movimientos compensatorios). Al cambiar de pestaña
+    // se recarga la vista con ?tab=... para no mostrar registros del otro
+    // apartado dentro del panel equivocado.
+    document.querySelectorAll('#kitchenExpenseTabs [data-bs-toggle="tab"]').forEach(function (tabBtn) {
+        tabBtn.addEventListener('click', function (event) {
+            const target = (tabBtn.getAttribute('data-bs-target') || '').replace('#', '');
+            if (!target) return;
+            event.preventDefault();
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', target);
+            window.location.assign(url.toString());
+        });
+    });
+
     const actionLogId = document.getElementById('actionLogId');
     const actionType = document.getElementById('actionType');
     const newQuantityInput = document.getElementById('newQuantityInput');
     const actionNotes = document.getElementById('actionNotes');
     const editQuantityContainer = document.getElementById('editQuantityContainer');
+    const returnLotContainer = document.getElementById('returnLotContainer');
+    const returnLotInput = document.getElementById('returnLotInput');
     const actionModalEl = document.getElementById('actionAuditModal');
     let actionModal = null;
     if (actionModalEl) {
@@ -28,10 +45,17 @@ document.addEventListener('DOMContentLoaded', function () {
             actionType.value = type;
             actionNotes.value = '';
             newQuantityInput.value = '';
-            const editLotInput = document.getElementById('editLotInput');
-            if (editLotInput) editLotInput.value = '';
+            // El lote viene precargado del botón y se bloquea como solo lectura;
+            // el backend lo recibe tal cual sin permitir que el usuario lo edite.
+            const raw_lot = btn.getAttribute('data-lot') || '';
+            returnLotInput.value = raw_lot;
+            returnLotInput.disabled = true;
+            returnLotInput.setAttribute('readonly', '');
             document.getElementById('actionAuditModalLabel').innerText = 'Confirmar Acción: ' + type;
             editQuantityContainer.style.display = type === 'EDITAR' ? 'block' : 'none';
+            // Editar y anular pueden devolver stock: el lote original se muestra
+            // de solo lectura; el usuario no puede modificarlo ni escribirlo a mano.
+            returnLotContainer.style.display = (type === 'EDITAR' || type === 'ANULAR') ? 'block' : 'none';
             if (actionModal) actionModal.show();
         });
     });
@@ -61,6 +85,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 return;
             }
+            if ((type === 'EDITAR' || type === 'ANULAR') && !returnLotInput.value.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Lote Obligatorio',
+                    text: 'El registro original no tiene lote de origen cargado. Contacte al Administrador para poder devolver stock.',
+                    confirmButtonColor: '#B31F24',
+                    confirmButtonText: 'Cerrar'
+                });
+                return;
+            }
             if (type === 'EDITAR' && newQuantityInput.value !== '' && parseFloat(newQuantityInput.value) > 999999.99) {
                 Swal.fire({
                     icon: 'warning',
@@ -84,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         action_type: type,
                         notes: notes,
                         new_quantity: newQuantityInput.value ? parseFloat(newQuantityInput.value) : null,
-                        lot_number: document.getElementById('editLotInput') ? document.getElementById('editLotInput').value.trim() || null : null
+                        lot_number: returnLotInput.value.trim() || null, // precargado y bloqueado (solo lectura)
                     })
                 });
                 const result = await response.json();

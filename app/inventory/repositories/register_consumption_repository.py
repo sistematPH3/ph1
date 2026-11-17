@@ -8,6 +8,7 @@ from app.models.inventory_model import Inventory, Product
 from app.models.logistics_model import Location, Purchase, PurchaseDetail, Movement, MovementDetail
 from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.security_model import User, user_locations
+from app.inventory.services.lot_availability_service import net_consumption_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -135,13 +136,13 @@ class RegisterConsumptionRepository:
 
         salidas_consumo = {}
         audit_records = db.session.query(
-            AuditLog.changed_data
+            AuditLog.changed_data, AuditLog.severity
         ).filter(
             AuditLog.location_id == loc_id,
             AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA'])
         ).all()
 
-        for (c_data,) in audit_records:
+        for c_data, severity in audit_records:
             if not c_data:
                 continue
             if isinstance(c_data, str):
@@ -161,14 +162,12 @@ class RegisterConsumptionRepository:
             except (TypeError, ValueError):
                 p_id = None
             l_num = c_data.get('lot_number')
-            try:
-                qty_change = float(c_data.get('quantity_changed', 0.0))
-            except (TypeError, ValueError):
-                qty_change = 0.0
+            # Cantidad vigente del gasto (editada) o 0 si fue anulado.
+            qty = net_consumption_quantity(c_data, severity)
 
-            if p_id == prod_id and l_num and str(l_num).strip() != 'N/A':
+            if p_id == prod_id and l_num and str(l_num).strip() != 'N/A' and qty > 0:
                 l_num_clean = str(l_num).strip()
-                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(qty_change)
+                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + qty
 
         salidas_aprobadas = {}
         aprobadas = db.session.query(
@@ -274,10 +273,12 @@ class RegisterConsumptionRepository:
             'notes': note_text
         })
 
+        # Trazabilidad: el gasto queda a nombre del usuario autenticado que lo
+        # registra. Nunca se inventa un responsable (antes se usaba el id 1).
         try:
-            user_id_final = int(user_id) if user_id is not None else 1
+            user_id_final = int(user_id) if user_id is not None else None
         except (ValueError, TypeError):
-            user_id_final = 1
+            user_id_final = None
 
         audit_entry = AuditLog(
             user_id=user_id_final,

@@ -2,16 +2,22 @@ import json
 import logging
 import re
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from app.analytics.repositories.analysis_reports_repository import _ultimo_costo_compra
 from app.inventory.repositories.kitchen_expense_audit_repository import (
+    ADJUSTMENT_ACTION_PREFIXES,
     BASE_CONSUMPTION_ACTIONS,
+    CENTRAL_WAREHOUSE_ID,
     KitchenExpenseAuditRepository,
 )
 from app.time_utils import TZ_VENEZUELA
 
 logger = logging.getLogger(__name__)
+
+# Roles con atributos de solo lectura en la auditoría: no pueden editar,
+# anular ni reactivar gastos (solo consultar).
+READ_ONLY_ROLE_IDS = (4, 6)
 
 _SEV_MAP = {
     'NORMAL': ('NORMAL', 'bg-success', 'bi-check-circle-fill'),
@@ -117,6 +123,69 @@ def _valorizar(c, qty_changed):
     return (cantidad * precio).quantize(Decimal('0.01')), moneda
 
 
+def _adjustment_target_id(log):
+    """ID del gasto de cocina original al que apunta un movimiento compensatorio.
+    Se toma de 'target_log_id' y, en registros heredados, de la referencia
+    'log #N' incluida en las notas."""
+    c = _changed_dict(log)
+    raw = c.get('target_log_id')
+    if raw in (None, ''):
+        raw = c.get('adjustment_log_id')
+    if raw in (None, ''):
+        notes = c.get('notes')
+        if isinstance(notes, str):
+            m = re.search(r'log\s*#\s*(\d+)', notes, re.IGNORECASE)
+            raw = m.group(1) if m else None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _base_consumption_ids(allowed_locations, location_id_filter):
+    """IDs de los gastos de cocina originales dentro del alcance de sedes."""
+    logs = KitchenExpenseAuditRepository.get_consumption_logs(
+        allowed_locations=allowed_locations,
+        location_id_filter=location_id_filter,
+        action_mode='base',
+    )
+    return {log.id for log in logs}
+
+
+def _is_compensation_action(log):
+    """True solo para acciones compensatorias reales (AJUSTE_/REVERSION_/
+    ACTIVACION_). Un consumo original puro nunca es una compensación."""
+    act = (log.action or '').upper()
+    return act not in BASE_CONSUMPTION_ACTIONS and act.startswith(ADJUSTMENT_ACTION_PREFIXES)
+
+
+def _only_linked_adjustments(raw_logs, base_ids):
+    """La pestaña de Ajustes es un historial EXCLUSIVO de cambios posteriores:
+    solo se listan movimientos compensatorios reales que apuntan a un gasto de
+    cocina original existente. Ni un consumo histórico puro ni un compensatorio
+    huérfano pueden aparecer aquí."""
+    return [
+        log for log in raw_logs
+        if _is_compensation_action(log) and _adjustment_target_id(log) in base_ids
+    ]
+
+
+def _require_return_lot(lot_number, product_id, location_id):
+    """Lote obligatorio y validado para CUALQUIER devolución de stock (edición a
+    la baja o anulación). Devuelve (lote_normalizado, mensaje_error)."""
+    lot = str(lot_number).strip() if isinstance(lot_number, str) else ''
+    if not lot or lot.upper() in ('N/A', 'NONE', 'SIN LOTE'):
+        return None, (
+            'Debe indicar el lote real de origen del insumo para devolver stock. '
+            'Sin lote no se puede preservar la trazabilidad de vencimientos y FIFO.'
+        )
+    check = KitchenExpenseAuditRepository.validate_return_lot(
+        lot, product_id, location_id)
+    if not check.get('is_valid'):
+        return None, check.get('message') or 'El lote indicado no es válido para esta devolución.'
+    return check.get('lot_number', lot), None
+
+
 def _annulled_target_ids(raw_logs):
     """Detecta, sobre el conjunto completo de logs relacionados, qué consumos
     originales fueron anulados/reactivados mediante los movimientos
@@ -164,6 +233,10 @@ def get_kitchen_expense_entries(filters, user, is_admin):
             location_id_filter = int(location_id_filter)
         except (TypeError, ValueError):
             location_id_filter = None
+    # El Almacén Central no tiene gastos de cocina: si se fuerza el filtro, no
+    # se devuelve ningún registro (nunca se amplía el alcance silenciosamente).
+    if location_id_filter == CENTRAL_WAREHOUSE_ID:
+        return []
     if not is_admin and location_id_filter and location_id_filter not in allowed_locations:
         location_id_filter = None
 
@@ -192,9 +265,14 @@ def get_kitchen_expense_entries(filters, user, is_admin):
             action_mode='all',
         )
         annulled_ids = _annulled_target_ids(scan_logs)
+    else:
+        raw_logs = _only_linked_adjustments(
+            raw_logs,
+            _base_consumption_ids(allowed_locations, location_id_filter),
+        )
 
     role_id = getattr(user, 'role_id', None)
-    read_only_role = role_id in (4, 6)
+    read_only_role = role_id in READ_ONLY_ROLE_IDS
     now = datetime.now(TZ_VENEZUELA)
 
     rows = []
@@ -204,7 +282,10 @@ def get_kitchen_expense_entries(filters, user, is_admin):
         sev = (log.severity or 'NORMAL').upper()
         prev_qty, new_qty, qty_changed = _resolve_qty(c)
 
-        username = log.user_name or f'Usuario ID: {log.user_id}'
+        if log.user_id is None:
+            username = 'Usuario no registrado'
+        else:
+            username = log.user_name or f'Usuario ID: {log.user_id}'
         sede = log.location_name or c.get('location_name') or 'Sede desconocida'
         notes = c.get('notes', '') if isinstance(c.get('notes'), str) else ''
 
@@ -264,10 +345,12 @@ def get_kitchen_expense_entries(filters, user, is_admin):
             'sev_label': sev_label,
             'sev_class': sev_class,
             'sev_icon': sev_icon,
+            'user_id': log.user_id,
             'user_name': username,
             'initial': username[0].upper() if username else 'S',
             'ts': ts_aware,
             'sede': sede,
+            'sede_id': log.location_id,
             'product': c.get('product_name') or 'Insumo no especificado',
             'lot': c.get('lot_number') or 'N/A',
             'loc_id': log.location_id,
@@ -321,25 +404,31 @@ def get_kitchen_expense_entries(filters, user, is_admin):
 
 def _manage_state(act, sev, ts_aware, now, is_admin, read_only_role, location_id):
     """Reglas de edición con límites (portadas de AuditInventory):
-    - Los registros ya editados no se vuelven a tocar; los anulados solo se activan.
-    - Ventanas de tiempo: 24 h sin ser admin, 30 días para administradores.
-    - El Almacén General (sede 1) no admite modificaciones de gastos."""
+    - Los registros ya editados no se vuelven a tocar; los anulados solo los
+      reactiva el Administrador (sin límite de tiempo).
+    - Ventanas de tiempo: 24 h sin ser admin, 7 días para administradores.
+    - El Almacén Central (sede 1) no admite modificaciones de gastos."""
     if read_only_role:
-        return False, None, ''
+        return False, None, 'Perfil de solo lectura: no puede modificar gastos de cocina.'
     if act not in BASE_CONSUMPTION_ACTIONS:
         return False, None, ''
-    if location_id in (1, None):
-        return False, None, 'Los gastos en el Almacén General no admiten modificaciones.'
+    if location_id in (CENTRAL_WAREHOUSE_ID, None):
+        return False, None, (
+            'Los gastos de cocina solo se registran en sedes operativas; '
+            'el Almacén Central no admite modificaciones.'
+        )
     if sev == 'ANULADO':
-        return True, 'ACTIVAR', ''
+        if is_admin:
+            return True, 'ACTIVAR', ''
+        return False, None, 'Registro anulado: solo el Administrador puede reactivarlo.'
     if sev == 'EDITADO':
         return False, None, 'Este registro ya fue editado y quedó como registro contable inmutable.'
 
     hours = ((now - ts_aware).total_seconds() / 3600.0) if ts_aware else 0
     if not is_admin and hours > 24:
         return False, None, 'Tiempo expirado (24h). Solicite la corrección al Administrador.'
-    if is_admin and hours > 720:
-        return False, None, 'Plazo máximo administrativo expirado (30 días).'
+    if is_admin and hours > 168:
+        return False, None, 'Plazo máximo administrativo expirado (7 días).'
 
     return True, 'EDITAR_ANULAR', ''
 
@@ -358,6 +447,8 @@ def get_kitchen_expense_counts(filters, user, is_admin):
             location_id_filter = int(location_id_filter)
         except (TypeError, ValueError):
             location_id_filter = None
+    if location_id_filter == CENTRAL_WAREHOUSE_ID:
+        return {'gastos': 0, 'ajustes': 0}
 
     severity_filter = (filters.get('severity') or '').upper() or None
 
@@ -371,6 +462,11 @@ def get_kitchen_expense_counts(filters, user, is_admin):
             end_date=filters.get('end_date') or None,
             action_mode=mode,
         )
+        if mode == 'adjustments':
+            rows = _only_linked_adjustments(
+                rows,
+                _base_consumption_ids(allowed_locations, location_id_filter),
+            )
         counts[key] = len(rows)
     return counts
 
@@ -389,6 +485,8 @@ def get_consumption_date_range(filters, user, is_admin):
             location_id_filter = int(location_id_filter)
         except (TypeError, ValueError):
             location_id_filter = None
+    if location_id_filter == CENTRAL_WAREHOUSE_ID:
+        return None, None
 
     return KitchenExpenseAuditRepository.get_consumption_logs_date_range(
         allowed_locations=allowed_locations,
@@ -407,6 +505,15 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
     limitaciones que AuditInventory: solo consumos originales, fuera del Almacén
     General, dentro de la ventana de tiempo, con motivo obligatorio y sin exceder
     el stock disponible."""
+    # El motivo es obligatorio en el backend (no solo en el formulario): sin
+    # justificación no se genera ningún movimiento compensatorio.
+    motivo = justification_notes.strip() if isinstance(justification_notes, str) else ''
+    if not motivo:
+        return {
+            'success': False,
+            'message': 'Debe proporcionar un motivo obligatorio para realizar esta acción.',
+        }
+
     log = KitchenExpenseAuditRepository.get_audit_log_by_id(log_id)
     if not log:
         return {'success': False, 'message': 'El registro de auditoría solicitado no existe.'}
@@ -420,18 +527,41 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
             'message': 'Solo los gastos de cocina originales admiten esta acción. Los registros compensatorios son inmutables.',
         }
 
-    if log.location_id == 1:
+    if log.location_id in (CENTRAL_WAREHOUSE_ID, None):
         return {
             'success': False,
-            'message': 'Operación denegada. Los gastos registrados en el Almacén General no admiten modificaciones.',
+            'message': 'Operación denegada. Los gastos de cocina pertenecen a sedes operativas; el Almacén Central no admite modificaciones.',
         }
 
     role_id = getattr(current_user, 'role_id', None)
     is_admin = (role_id == 1)
-    if role_id == 6:
+    if role_id in READ_ONLY_ROLE_IDS:
         return {
             'success': False,
-            'message': 'Operación denegada. El perfil de finanzas posee atributos de solo lectura.',
+            'message': 'Operación denegada. Este perfil posee atributos de solo lectura.',
+        }
+
+    current_sev = (log.severity or 'NORMAL').upper()
+    if action_type == 'ACTIVAR':
+        if not is_admin:
+            return {
+                'success': False,
+                'message': 'Operación denegada. Solo el Administrador puede reactivar un gasto anulado.',
+            }
+        if current_sev != 'ANULADO':
+            return {
+                'success': False,
+                'message': 'Solo se puede reactivar un gasto que se encuentre anulado.',
+            }
+    elif action_type == 'ANULAR' and current_sev == 'ANULADO':
+        return {
+            'success': False,
+            'message': 'Este gasto ya fue anulado. Una anulación solo puede aplicarse una vez.',
+        }
+    elif action_type == 'EDITAR' and current_sev in ('EDITADO', 'ANULADO'):
+        return {
+            'success': False,
+            'message': 'Este gasto ya fue editado o anulado y no admite nuevas ediciones.',
         }
 
     log_timestamp = log.timestamp
@@ -439,19 +569,22 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
         log_timestamp = log_timestamp.replace(tzinfo=TZ_VENEZUELA)
 
     now = datetime.now(TZ_VENEZUELA)
-    diff_hours = (now - log_timestamp).total_seconds() / 3600
-    if not is_admin:
-        if diff_hours > 24:
-            return {
-                'success': False,
-                'message': 'El tiempo límite de 24 horas ha expirado. Solicite la acción al Administrador.',
-            }
-    else:
-        if diff_hours > 30 * 24:
-            return {
-                'success': False,
-                'message': 'El límite máximo de 30 días permitido para administradores ha expirado.',
-            }
+    # La reactivación (exclusiva del Administrador) no está sujeta a la ventana
+    # de edición: puede ejecutarse aunque el gasto supere la semana.
+    if action_type != 'ACTIVAR' and log_timestamp is not None:
+        diff_hours = (now - log_timestamp).total_seconds() / 3600
+        if not is_admin:
+            if diff_hours > 24:
+                return {
+                    'success': False,
+                    'message': 'El tiempo límite de 24 horas ha expirado. Solicite la acción al Administrador.',
+                }
+        else:
+            if diff_hours > 7 * 24:
+                return {
+                    'success': False,
+                    'message': 'El límite máximo de 7 días permitido para administradores ha expirado.',
+                }
 
     c = _changed_dict(log)
 
@@ -477,6 +610,18 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
             except (TypeError, ValueError):
                 original_qty_changed = Decimal('0')
 
+    # Gasto VIGENTE: si el registro ya fue editado, el stock a revertir es la
+    # cantidad corregida, no la original. Así la anulación devuelve exactamente
+    # lo que la sede descontó por ese gasto.
+    base_abs = abs(original_qty_changed)
+    edited_raw = c.get('edited_quantity')
+    try:
+        effective_abs = abs(Decimal(str(edited_raw))) if edited_raw not in (None, '') else base_abs
+    except (InvalidOperation, TypeError, ValueError):
+        effective_abs = base_abs
+    if effective_abs == 0 and base_abs > 0:
+        effective_abs = base_abs
+
     _inv_state = KitchenExpenseAuditRepository.get_inventory_state(log.location_id, product_id)
     physical_stock = Decimal('0.00') if _inv_state.get('current_quantity') is None else Decimal(str(_inv_state.get('current_quantity')))
     reserved_stock = Decimal('0.00') if _inv_state.get('reserved_quantity') is None else Decimal(str(_inv_state.get('reserved_quantity')))
@@ -486,19 +631,21 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
     new_severity_status = None
 
     if action_type == 'ANULAR':
-        required_adjustment = -original_qty_changed
+        # Reversión de stock: se devuelve a la sede el gasto vigente completo,
+        # de forma atómica junto con el movimiento compensatorio.
+        required_adjustment = effective_abs
         final_action = f'REVERSION_{action_name}'
-        final_notes = f'Anulación del log #{log_id}. Motivo: {justification_notes}'
+        final_notes = f'Anulación del log #{log_id}. Motivo: {motivo}'
         new_severity_status = 'ANULADO'
-        gasto_original = abs(original_qty_changed)
-        gasto_editado = Decimal('0')
+        gasto_original = base_abs
+        gasto_editado = effective_abs
     elif action_type == 'ACTIVAR':
-        required_adjustment = original_qty_changed
+        required_adjustment = -effective_abs
         final_action = f'ACTIVACION_{action_name}'
-        final_notes = f'Reactivación del log #{log_id}. Motivo: {justification_notes}'
+        final_notes = f'Reactivación del log #{log_id}. Motivo: {motivo}'
         new_severity_status = 'NORMAL'
-        gasto_original = abs(original_qty_changed)
-        gasto_editado = abs(original_qty_changed)
+        gasto_original = base_abs
+        gasto_editado = effective_abs
     elif action_type == 'EDITAR':
         if new_quantity_requested is None:
             return {
@@ -506,21 +653,30 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
                 'message': 'Debe especificar la cantidad real gastada para procesar la edición.',
             }
         new_requested_dec = Decimal(str(new_quantity_requested))
-        abs_original = abs(original_qty_changed)
+        abs_original = effective_abs
         abs_new = abs(new_requested_dec)
         required_adjustment = abs_original - abs_new
         final_action = f'AJUSTE_{action_name}'
         final_notes = (
             f'Edición del log #{log_id}: cantidad corregida de {_qty_str(abs_original)} '
-            f'a {_qty_str(abs_new)} unidades. Motivo: {justification_notes}'
+            f'a {_qty_str(abs_new)} unidades. Motivo: {motivo}'
         )
-        if lot_number:
-            final_notes = f'{final_notes}\nLote afectado: {lot_number}'
         new_severity_status = 'EDITADO'
         gasto_original = abs_original
         gasto_editado = abs_new
     else:
         return {'success': False, 'message': 'Acción no reconocida.'}
+
+    # Toda devolución de stock (edición a la baja o anulación) exige un lote real
+    # del insumo y de la sede, validado contra compras, traslados y mermas ANTES
+    # de tocar el inventario.
+    lot_return = None
+    if required_adjustment > Decimal('0'):
+        lot_return, lot_error = _require_return_lot(
+            lot_number, product_id, log.location_id)
+        if lot_error:
+            return {'success': False, 'message': lot_error}
+        final_notes = f'{final_notes}\nLote devuelto: {lot_return}'
 
     if required_adjustment < Decimal('0') and current_stock < abs(required_adjustment):
         deficit = abs(required_adjustment) - current_stock
@@ -554,7 +710,9 @@ def process_kitchen_expense_action(log_id, current_user, action_type,
             notes=final_notes,
             original_log_id=log_id,
             new_original_severity=new_severity_status,
-            lot_number=lot_number or c.get('lot_number'),
+            lot_number=(lot_return
+                        or (str(lot_number).strip() if lot_number else None)
+                        or c.get('lot_number')),
         )
     except Exception as e:
         logger.exception("Error en BD al registrar el movimiento de gasto de cocina")

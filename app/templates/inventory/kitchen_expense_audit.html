@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}?v=8">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/kitchen_expense_audit.css') }}?v=5">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/kitchen_expense_audit.css') }}?v=6">
 {% endblock %}
 
 {% block content %}
@@ -18,8 +18,8 @@
                 <i class="bi bi-fire"></i>
             </div>
             <div>
-                <h2 class="ph-title mb-1">Auditoría de Gastos de Cocina</h2>
-                <p class="text-muted mb-0">Consumos registrados en las sedes y movimientos compensatorios (ediciones, anulaciones y activaciones), valorizados al último costo de compra.</p>
+                <h2 class="ph-title mb-1">Gestión y Auditoría de Gastos de Cocina</h2>
+                
             </div>
         </div>
 
@@ -82,6 +82,10 @@
 
             <div class="tab-pane fade {% if active_tab == 'gastos' %}show active{% endif %}" id="gastos" role="tabpanel">
 
+                {# Solo la pestaña activa se renderiza: el servidor entrega únicamente
+                   el conjunto de datos de esa pestaña. Nunca se inyectan consumos en
+                   el panel de Ajustes ni viceversa. #}
+                {% if active_tab == 'gastos' %}
                 {% for e in entries %}
                 {% set det_id = 'det-gasto-' ~ e.id ~ '-' ~ loop.index0 %}
                 {% set side = 'is-egreso' if e.qty < 0 else 'is-ingreso' %}
@@ -95,7 +99,8 @@
                                 <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
                                 <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
                                     <span class="badge-action-pill {{ 'action-red-light' if e.qty < 0 else 'action-blue' }}">{{ e.action | replace('_', ' ') | title }}</span>
-                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    <span class="ph-badge-user"><i class="bi bi-person-fill me-1"></i>{{ e.user_name }}</span>
+                                    <span class="ph-badge-location"><i class="bi bi-geo-alt-fill me-1"></i>{{ e.sede }}</span>
                                     <span class="ph-badge-location">Lote: {{ e.lot if e.lot and e.lot != 'N/A' else 'S/L' }}</span>
                                     {% if e.is_annulled %}
                                     <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Anulado</span>
@@ -155,6 +160,14 @@
                             </div>
 
                             <div class="pt-2 border-top">
+                                <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <div class="col-6">Registrado por</div>
+                                    <div class="col-6">Sede de origen</div>
+                                </div>
+                                <div class="row text-dark mb-3" style="font-size: 0.9rem; font-weight: 600;">
+                                    <div class="col-6"><i class="bi bi-person-fill me-1 text-secondary"></i>{{ e.user_name }}{% if e.user_id %} <span class="text-muted fw-normal">(#{{ e.user_id }})</span>{% endif %}</div>
+                                    <div class="col-6"><i class="bi bi-geo-alt-fill me-1 text-secondary"></i>{{ e.sede }}{% if e.sede_id %} <span class="text-muted fw-normal">(#{{ e.sede_id }})</span>{% endif %}</div>
+                                </div>
                                 <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
                                     <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
                                 </div>
@@ -169,10 +182,10 @@
                                         <i class="bi bi-check-circle me-1"></i>Activar
                                     </button>
                                     {% else %}
-                                    <button class="btn btn-sm btn-outline-primary btn-action-log" data-action="EDITAR" data-id="{{ e.id }}">
+                                    <button class="btn btn-sm btn-outline-primary btn-action-log" data-action="EDITAR" data-id="{{ e.id }}" data-lot="{{ e.lot if e.lot and e.lot != 'N/A' else '' }}">
                                         <i class="bi bi-pencil-square me-1"></i>Editar
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="{{ e.id }}">
+                                    <button class="btn btn-sm btn-outline-danger btn-action-log" data-action="ANULAR" data-id="{{ e.id }}" data-lot="{{ e.lot if e.lot and e.lot != 'N/A' else '' }}">
                                         <i class="bi bi-x-circle me-1"></i>Anular
                                     </button>
                                     {% endif %}
@@ -189,10 +202,12 @@
                     <p class="mb-0">No se encontraron consumos que coincidan con los filtros actuales.</p>
                 </div>
                 {% endfor %}
+                {% endif %}
             </div>
 
             <div class="tab-pane fade {% if active_tab == 'ajustes' %}show active{% endif %}" id="ajustes" role="tabpanel">
 
+                {% if active_tab == 'ajustes' %}
                 {% for e in entries %}
                 {% set det_id = 'det-ajuste-' ~ e.id ~ '-' ~ loop.index0 %}
                 {% set side = 'is-ajuste' if e.qty < 0 else 'is-ingreso' %}
@@ -206,7 +221,8 @@
                                 <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
                                 <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
                                     <span class="badge-action-pill {{ 'action-red-light' if e.qty < 0 else 'action-blue' }}">{{ e.action | replace('_', ' ') | title }}</span>
-                                    <span class="ph-badge-location">{{ e.sede }}</span>
+                                    <span class="ph-badge-user"><i class="bi bi-person-fill me-1"></i>{{ e.user_name }}</span>
+                                    <span class="ph-badge-location"><i class="bi bi-geo-alt-fill me-1"></i>{{ e.sede }}</span>
                                     <span class="ph-badge-location">Lote: {{ e.lot if e.lot and e.lot != 'N/A' else 'S/L' }}</span>
                                 </div>
                             </div>
@@ -311,10 +327,24 @@
                             {% endif %}
 
                             <div class="pt-2 border-top">
-                                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
-                                    <i class="bi bi-chat-left-text me-1"></i>Observaciones / Motivo
+                                <div class="row text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <div class="col-6">Registrado por</div>
+                                    <div class="col-6">Sede de origen</div>
                                 </div>
-                                <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Movimiento compensatorio' }}</div>
+                                <div class="row text-dark mb-3" style="font-size: 0.9rem; font-weight: 600;">
+                                    <div class="col-6"><i class="bi bi-person-fill me-1 text-secondary"></i>{{ e.user_name }}{% if e.user_id %} <span class="text-muted fw-normal">(#{{ e.user_id }})</span>{% endif %}</div>
+                                    <div class="col-6"><i class="bi bi-geo-alt-fill me-1 text-secondary"></i>{{ e.sede }}{% if e.sede_id %} <span class="text-muted fw-normal">(#{{ e.sede_id }})</span>{% endif %}</div>
+                                </div>
+                                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <i class="bi bi-clock-history me-1"></i>Fecha y hora del cambio
+                                </div>
+                                <div class="text-dark mb-3" style="font-size: 0.9rem; font-weight: 600;">
+                                    <i class="bi bi-calendar-event me-1 text-secondary"></i>{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}
+                                </div>
+                                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem;">
+                                    <i class="bi bi-chat-left-text me-1"></i>Motivo del ajuste / anulación
+                                </div>
+                                <div class="text-secondary small mb-0" style="white-space: pre-line;">{{ e.notes or 'Sin motivo registrado' }}</div>
                             </div>
                         </div>
                     </div>
@@ -326,6 +356,7 @@
                     <p class="mb-0">No se encontraron movimientos compensatorios que coincidan con los filtros actuales.</p>
                 </div>
                 {% endfor %}
+                {% endif %}
             </div>
 
         </div>
@@ -352,9 +383,15 @@
                     <div class="mb-3" id="editQuantityContainer" style="display: none;">
                         <label for="newQuantityInput" class="form-label fw-bold small text-muted">Nueva Cantidad Real Gastada</label>
                         <input type="number" step="0.01" min="0" max="999999.99" class="form-control" id="newQuantityInput" placeholder="Ej: 15.5 o 5">
+                    </div>
 
-                        <label for="editLotInput" class="form-label fw-bold small text-muted mt-3">N° de Lote Afectado (Opcional)</label>
-                        <input type="text" class="form-control font-monospace" id="editLotInput" placeholder="Ej: LOTE-001">
+                    <div class="mb-3" id="returnLotContainer" style="display: none;">
+                        <label for="returnLotInput" class="form-label fw-bold small text-muted">Lote de origen (prestablecido)</label>
+                        <input type="text" class="form-control font-monospace" id="returnLotInput" maxlength="50" required readonly
+                               value="" aria-readonly="true">
+                        <div class="form-text">
+                            El lote de origen se carga automáticamente desde el registro original del gasto seleccionado. No es editable: el sistema envía el mismo lote con el que se registró el consumo.
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -374,5 +411,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/inventory/kitchen_expense_audit.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/inventory/kitchen_expense_audit.js') }}?v=3"></script>
 {% endblock %}

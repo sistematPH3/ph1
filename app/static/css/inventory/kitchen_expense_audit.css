@@ -7,6 +7,18 @@
 .ph-audit-card.is-ajuste { border-left-color: #fd7e14; }
 .ph-audit-num.ajuste      { background-color: #fd7e14; }
 
+/* Responsable del gasto (trazabilidad "quién"); la sede usa
+   .ph-badge-location heredada de movement_list.css. */
+.ph-badge-user {
+    background-color: #e7f1ff;
+    color: #0b4c8c;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.4em 0.8em;
+    border-radius: 6px;
+    border: 1px solid #cfe2ff;
+}
+
 /* Monto valorizado al último costo de compra */
 .ke-amount {
     display: inline-block;

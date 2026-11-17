@@ -297,128 +297,29 @@ class InventoryViewRepository:
 
     @staticmethod
     def get_product_lots_by_location(location_id, product_id):
+        """Saldo por lote de una sede usando la MISMA fuente única de verdad que
+        el resto del sistema (_compute_lot_availability): consumos netos
+        (editados/anulados), mermas por estado real y traslados. Evita que el
+        detalle de lotes diverja del inventario general de la sede.
+        """
+        from app.inventory.services.lot_availability_service import (
+            _compute_lot_availability,
+        )
         loc_id = int(location_id)
         prod_id = int(product_id)
-
-        entradas_por_lote = {}
-        salidas_traslados = {}
-
-        if loc_id == 1:
-            purchase_records = db.session.query(
-                PurchaseDetail.lot_number,
-                PurchaseDetail.expiration_date,
-                func.sum(PurchaseDetail.quantity).label('total_qty')
-            ).join(
-                Purchase, PurchaseDetail.purchase_id == Purchase.id
-            ).filter(
-                func.upper(Purchase.status) == 'COMPLETED',
-                PurchaseDetail.product_id == prod_id,
-                PurchaseDetail.lot_number.isnot(None),
-                PurchaseDetail.lot_number != ''
-            ).group_by(
-                PurchaseDetail.lot_number,
-                PurchaseDetail.expiration_date
-            ).all()
-
-            for r in purchase_records:
-                lot = r.lot_number.strip()
-                entradas_por_lote[lot] = {
-                    'expiration_date': r.expiration_date,
-                    'total_in': float(r.total_qty or 0.0)
-                }
-
-            movements_out = db.session.query(
-                MovementDetail.lot_number,
-                func.sum(MovementDetail.quantity).label('total_out')
-            ).join(
-                Movement, MovementDetail.movement_id == Movement.id
-            ).filter(
-                Movement.origin_location_id == 1,
-                Movement.status.notin_(['ANULADO', 'CANCELADO', 'RECHAZADO']),
-                MovementDetail.product_id == prod_id,
-                MovementDetail.lot_number.isnot(None)
-            ).group_by(MovementDetail.lot_number).all()
-
-            salidas_traslados = {r.lot_number.strip(): float(r.total_out or 0.0) for r in movements_out if r.lot_number}
-
-        else:
-            valid_statuses = ['COMPLETED', 'NOVEDAD_FALTANTE', 'CERRADO_POR_ADMIN', 'CERRADO_CON_PERDIDA']
-            movement_records = db.session.query(
-                MovementDetail.lot_number,
-                MovementDetail.expiration_date,
-                func.sum(func.coalesce(MovementDetail.received_quantity, MovementDetail.quantity)).label('total_qty')
-            ).join(
-                Movement, MovementDetail.movement_id == Movement.id
-            ).filter(
-                func.upper(Movement.status).in_(valid_statuses),
-                Movement.destination_location_id == loc_id,
-                MovementDetail.product_id == prod_id,
-                MovementDetail.lot_number.isnot(None),
-                MovementDetail.lot_number != ''
-            ).group_by(
-                MovementDetail.lot_number,
-                MovementDetail.expiration_date
-            ).all()
-
-            for r in movement_records:
-                lot = r.lot_number.strip()
-                entradas_por_lote[lot] = {
-                    'expiration_date': r.expiration_date,
-                    'total_in': float(r.total_qty or 0.0)
-                }
-
-        audit_records = db.session.query(
-            AuditLog.changed_data
-        ).filter(
-            AuditLog.location_id == loc_id,
-            AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA', 'MERMA'])
-        ).all()
-
-        salidas_consumo = {}
-        for (c_data,) in audit_records:
-            if not c_data:
-                continue
-            if isinstance(c_data, str):
-                try:
-                    c_data = json.loads(c_data)
-                except Exception as exc:
-                    logger.warning(
-                        "Registro de auditoría con JSON inválido; se omite la fila: %s",
-                        exc,
-                    )
-                    continue
-            if not isinstance(c_data, dict):
-                continue
-                
-            p_id = c_data.get('product_id')
-            l_num = c_data.get('lot_number')
-            qty_change = c_data.get('quantity_changed', 0.0)
-            
-            if (p_id is None or int(p_id) == prod_id) and l_num and l_num != 'N/A':
-                l_num_clean = str(l_num).strip()
-                salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + abs(float(qty_change))
-
+        avail = _compute_lot_availability(loc_id, [prod_id])
         lots = []
-        for lot_num, data in entradas_por_lote.items():
-            total_in = data['total_in']
-            total_out_traslados = salidas_traslados.get(lot_num, 0.0)
-            total_out_consumos = salidas_consumo.get(lot_num, 0.0)
-            
-            # `salidas_traslados` descuenta la salida física (recibido si hubo
-            # recepción, despachado si no); no hay que restar la disputa aparte.
-            disponible = total_in - total_out_traslados - total_out_consumos
-            
-            if disponible > 0.001:
-                lots.append({
-                    'lot_number': lot_num,
-                    'expiration_date': data['expiration_date'].strftime('%d/%m/%Y') if data['expiration_date'] else 'Sin vencimiento',
-                    'exp_date_raw': data['expiration_date'],
-                    'quantity': round(float(disponible), 2)
-                })
-
+        for (pid, lot_num), data in avail.items():
+            if pid != prod_id or data['availability'] <= 0.001:
+                continue
+            exp = data['expiration_date']
+            lots.append({
+                'lot_number': lot_num,
+                'expiration_date': exp.strftime('%d/%m/%Y') if exp else 'Sin vencimiento',
+                'quantity': round(float(data['availability']), 2),
+                'exp_date_raw': exp,
+            })
         lots.sort(key=lambda x: (x['exp_date_raw'] is None, x['exp_date_raw']))
-        
         for l in lots:
             l.pop('exp_date_raw', None)
-            
         return lots

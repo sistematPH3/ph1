@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, render_template, session
-from flask_login import login_required
+from flask_login import current_user, login_required
 from app.decorators.roles import require_roles, require_roles_api
 from app.inventory.requests.register_consumption_validators import validate_consumption_payload
 from app.inventory.services.register_consumption_service import (
@@ -14,15 +14,23 @@ register_consumption_bp = Blueprint('register_consumption', __name__)
 
 OPERATIVE_ROLES = ('admin', 'management', 'manager', 'assistant_manager', 'operations')
 
+
+def _current_user_id():
+    """Usuario autenticado actual, para dejarlo como responsable en la auditoría."""
+    user_id = getattr(current_user, 'id', None)
+    if user_id:
+        return int(user_id)
+    user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
+    if user_id:
+        return int(user_id)
+    return None
+
 @register_consumption_bp.route('/inventory/register-consumption', methods=['GET'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def show_consumption_form():
-    user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
-    
-    if user_id:
-        user_id = int(user_id)
-        
+    user_id = _current_user_id()
+
     locations, is_admin = get_consumption_form_data(user_id)
     return render_template(
         'inventory/register_consumption.html', 
@@ -33,7 +41,7 @@ def show_consumption_form():
 @register_consumption_bp.route('/api/inventory/locations/<int:location_id>/products', methods=['GET'])
 @require_roles_api(*OPERATIVE_ROLES)
 def fetch_location_products(location_id):
-    user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
+    user_id = _current_user_id()
 
     if not user_can_access_location(user_id, location_id):
         return jsonify({'success': False, 'message': 'No tienes permisos para consultar el inventario de esta sede.'}), 403
@@ -44,7 +52,7 @@ def fetch_location_products(location_id):
 @register_consumption_bp.route('/api/inventory/locations/<int:location_id>/products/<int:product_id>/lots', methods=['GET'])
 @require_roles_api(*OPERATIVE_ROLES)
 def fetch_product_lots(location_id, product_id):
-    user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
+    user_id = _current_user_id()
 
     if not user_can_access_location(user_id, location_id):
         return jsonify({'success': False, 'message': 'No tienes permisos para consultar los lotes de esta sede.'}), 403
@@ -61,7 +69,7 @@ def process_consumption():
     if not validation['is_valid']:
         return jsonify({'success': False, 'errors': validation['errors']}), 400
 
-    user_id = session.get('user_id') or session.get('_user_id') or session.get('id')
+    user_id = _current_user_id()
 
     if not user_can_access_location(user_id, data['location_id']):
         return jsonify({'success': False, 'message': 'No tienes permisos para registrar consumo en esta sede.'}), 403

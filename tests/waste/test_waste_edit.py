@@ -56,6 +56,12 @@ from app.models import (  # noqa: E402
     Movement, MovementDetail, Role, User,
     Waste, WasteDetail, WasteDetailPhoto, WasteType, AuditLog,
 )
+from app.inventory.services.lot_availability_service import (  # noqa: E402
+    _compute_lot_availability,
+)
+from app.inventory.services.inventory_views_service import (  # noqa: E402
+    InventoryViewService,
+)
 
 
 class WasteEditTest(unittest.TestCase):
@@ -421,6 +427,74 @@ class WasteEditTest(unittest.TestCase):
         self.assertTrue(resp.get_json()["success"])
         waste = db.session.query(Waste).get(env["waste"].id)
         self.assertEqual(float(waste.total_quantity), 6.0)
+
+    # ------------------------------------------------------------------
+    # CASO 4b: la devolución al lote queda sincronizada con el stock general
+    # ------------------------------------------------------------------
+    def test_edicion_merma_a_la_baja_sincroniza_saldo_del_lote(self):
+        # El seed no crea el Almacén Central y sin él la primera sede tomaría el
+        # id 1 (rama "central", que suma compras). Se crea para usar una sede real.
+        db.session.add(Location(name="Almacén Central", state="Caracas"))
+        db.session.commit()
+        env = self._seed()
+
+        # Entrada real del lote L-AAA a la Sede A y reserva alineada con la
+        # merma PENDIENTE de 10 (el seed la crea directo, sin pasar por el
+        # servicio que congela la reserva).
+        mov = Movement(
+            type="DESPACHO", origin_location_id=env["loc_b"].id,
+            destination_location_id=env["loc_a"].id,
+            status="COMPLETED", date=datetime.now(),
+        )
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=env["product"].id,
+            lot_number="L-AAA", quantity=100.0, received_quantity=100.0,
+            missing_quantity=0.0, expiration_date=None,
+        ))
+        inv = db.session.query(Inventory).filter_by(
+            location_id=env["loc_a"].id,
+            product_id=env["product"].id,
+        ).first()
+        inv.current_quantity = 100
+        inv.reserved_quantity = 10
+        db.session.commit()
+
+        key = (env["product"].id, "L-AAA")
+        before = _compute_lot_availability(
+            env["loc_a"].id, [env["product"].id]
+        )[key]["availability"]
+        self.assertAlmostEqual(before, 90.0)
+
+        self._login(env["admin"].id)
+        resp = self.client.post(
+            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            data=json.dumps({
+                "waste_type_id": env["waste_type"].id,
+                "notes": "Se ajustó de 10 a 5 kg",
+                "lines": [{"product_id": env["product"].id,
+                           "lot_number": "L-AAA", "quantity": 5}],
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.get_json())
+
+        db.session.expire_all()
+        inv = db.session.query(Inventory).filter_by(
+            location_id=env["loc_a"].id,
+            product_id=env["product"].id,
+        ).first()
+        disponible = float(inv.current_quantity) - float(inv.reserved_quantity or 0)
+        self.assertAlmostEqual(disponible, 95.0)
+
+        after = _compute_lot_availability(
+            env["loc_a"].id, [env["product"].id]
+        )[key]["availability"]
+        self.assertAlmostEqual(after, 95.0)
+        lots = InventoryViewService.get_lots_for_product(
+            env["loc_a"].id, env["product"].id)
+        self.assertAlmostEqual(sum(l["quantity"] for l in lots), disponible)
 
     # ------------------------------------------------------------------
     # CASO 5: cantidad > saldo del lote -> rechazada

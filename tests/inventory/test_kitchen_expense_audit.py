@@ -43,14 +43,22 @@ from app.models import (  # noqa: E402
 )
 from app.inventory.requests.kitchen_expense_audit_validators import (  # noqa: E402
     validate_kitchen_expense_action,
+    validate_kitchen_expense_filters,
 )
 from app.inventory.services.kitchen_expense_audit_service import (  # noqa: E402
     get_kitchen_expense_counts,
     get_kitchen_expense_entries,
+    get_kitchen_expense_locations,
     process_kitchen_expense_action,
 )
 from app.inventory.services.register_consumption_service import (  # noqa: E402
     register_consumption,
+)
+from app.inventory.services.lot_availability_service import (  # noqa: E402
+    _compute_lot_availability,
+)
+from app.inventory.services.inventory_views_service import (  # noqa: E402
+    InventoryViewService,
 )
 
 
@@ -204,6 +212,11 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         self.assertEqual(entry["product"], "Tomate")
         self.assertEqual(entry["qty"], -30.0)
         self.assertTrue(entry["can_manage"])
+        # Trazabilidad obligatoria: quién registró y en qué sede se originó.
+        self.assertEqual(entry["user_name"], "Admin")
+        self.assertEqual(entry["user_id"], env["admin"].id)
+        self.assertEqual(entry["sede"], "Sede A")
+        self.assertEqual(entry["sede_id"], env["sede_a"].id)
 
     def test_visor_valoriza_monto_con_ultimo_costo(self):
         env = self._seed(with_purchase=True)
@@ -235,7 +248,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="EDITAR",
+            action_type="EDITAR", lot_number="L-001",
             new_quantity_requested=15,
             justification_notes="Se gastaron menos",
         )
@@ -247,13 +260,74 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         self.assertEqual(len(ajustes), 1)
         self.assertEqual(ajustes[0]["action"], "AJUSTE_GASTO_COCINA")
 
+    def test_ajustes_excluye_consumos_historicos_puros(self):
+        """Un gasto histórico nunca modificado jamás aparece en Ajustes, aunque
+        sus notas mencionen 'ajuste' o su acción contenga esa palabra."""
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        log = AuditLog.query.get(log_id)
+        data = json.loads(log.changed_data)
+        data['notes'] = 'ajuste de inventario histórico sin compensación'
+        log.changed_data = json.dumps(data)
+        db.session.commit()
+        self._direct_log(env, action="GASTO_COCINA_AJUSTE", qty=-5,
+                         prev=70.0, new=65.0)
+
+        ajustes = get_kitchen_expense_entries(
+            {"tab": "ajustes"}, env["admin"], is_admin=True)
+        self.assertEqual(ajustes, [])
+        self.assertEqual(
+            get_kitchen_expense_counts(
+                {"tab": "ajustes"}, env["admin"], is_admin=True)["ajustes"],
+            0,
+        )
+
+    def test_ajustes_excluye_compensatorios_huerfanos(self):
+        """La pestaña de Ajustes solo lista cambios posteriores de un gasto real."""
+        env = self._seed()
+        self._consume(env, 30.0)
+        self._direct_log(env, action="AJUSTE_GASTO_COCINA", qty=10,
+                         prev=70.0, new=80.0)
+
+        ajustes = get_kitchen_expense_entries(
+            {"tab": "ajustes"}, env["admin"], is_admin=True)
+        self.assertEqual(ajustes, [])
+        self.assertEqual(
+            get_kitchen_expense_counts(
+                {"tab": "ajustes"}, env["admin"], is_admin=True)["ajustes"],
+            0,
+        )
+
+    def test_ajustes_muestra_trazabilidad_completa(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="Se registró en la sede equivocada",
+        )
+
+        ajustes = get_kitchen_expense_entries(
+            {"tab": "ajustes"}, env["admin"], is_admin=True)
+        self.assertEqual(len(ajustes), 1)
+        ajuste = ajustes[0]
+        self.assertEqual(ajuste["user_id"], env["admin"].id)
+        self.assertEqual(ajuste["user_name"], "Admin")
+        self.assertEqual(ajuste["sede_id"], env["sede_a"].id)
+        self.assertEqual(ajuste["sede"], "Sede A")
+        self.assertIsNotNone(ajuste["ts"])
+        self.assertEqual(ajuste["target_log_id"], log_id)
+        self.assertIn("Se registró en la sede equivocada", ajuste["notes"])
+        self.assertIn(f"log #{log_id}", ajuste["notes"])
+
     def test_gasto_corregido_muestra_disponible_actual(self):
         env = self._seed()
         log_id = self._consume(env, 30.0)  # 100 -> 70
         process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="EDITAR",
+            action_type="EDITAR", lot_number="L-001",
             new_quantity_requested=15,
             justification_notes="Se gastaron menos",
         )
@@ -280,6 +354,61 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         self.assertEqual(float(entries[0]["current_qty"]), 100.5)
 
     # ------------------------------------------------------------------
+    # ALMACÉN CENTRAL FUERA DE GASTOS DE COCINA
+    # ------------------------------------------------------------------
+    def _add_central(self):
+        central = Location(id=1, name="Almacén Central", state="Zulia",
+                           is_active=True)
+        db.session.add(central)
+        db.session.commit()
+        return central
+
+    def test_selectores_de_sedes_excluyen_almacen_central(self):
+        env = self._seed()
+        self._add_central()
+        sedes = get_kitchen_expense_locations(env["admin"], is_admin=True)
+        ids = [s.id for s in sedes]
+        self.assertNotIn(1, ids)
+        self.assertIn(env["sede_a"].id, ids)
+
+    def test_visor_excluye_gastos_y_ajustes_del_almacen_central(self):
+        env = self._seed()
+        central = self._add_central()
+        self._consume(env, 10.0)
+        self._direct_log(env, qty=-5, prev=50.0, new=45.0, location=central)
+        self._direct_log(env, qty=5, prev=45.0, new=50.0, location=central,
+                         action="AJUSTE_GASTO_COCINA")
+
+        entradas = get_kitchen_expense_entries(
+            {"tab": "gastos"}, env["admin"], is_admin=True)
+        self.assertEqual(len(entradas), 1)
+        self.assertEqual(entradas[0]["sede"], "Sede A")
+
+        ajustes = get_kitchen_expense_entries(
+            {"tab": "ajustes"}, env["admin"], is_admin=True)
+        self.assertEqual(ajustes, [])
+
+        counts = get_kitchen_expense_counts(
+            {"tab": "gastos"}, env["admin"], is_admin=True)
+        self.assertEqual(counts, {"gastos": 1, "ajustes": 0})
+
+    def test_filtro_por_almacen_central_no_devuelve_nada(self):
+        env = self._seed()
+        self._consume(env, 10.0)
+        filtros = {"tab": "gastos", "location_id": 1}
+        self.assertEqual(
+            get_kitchen_expense_entries(filtros, env["admin"], is_admin=True), [])
+        self.assertEqual(
+            get_kitchen_expense_counts(filtros, env["admin"], is_admin=True),
+            {"gastos": 0, "ajustes": 0})
+
+    def test_validador_de_filtros_descarta_almacen_central(self):
+        self.assertNotIn(
+            "location_id", validate_kitchen_expense_filters({"location_id": "1"}))
+        validos = validate_kitchen_expense_filters({"location_id": "7"})
+        self.assertEqual(validos["location_id"], 7)
+
+    # ------------------------------------------------------------------
     # EDICIÓN CON LÍMITES (portada de AuditInventory)
     # ------------------------------------------------------------------
     def test_editar_corrige_cantidad_y_restaura_stock(self):
@@ -290,7 +419,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="EDITAR",
+            action_type="EDITAR", lot_number="L-001",
             new_quantity_requested=15,
             justification_notes="Se gastaron 15, no 30",
         )
@@ -312,7 +441,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="ANULAR",
+            action_type="ANULAR", lot_number="L-001",
             justification_notes="Error de registro",
         )
         self.assertTrue(res["success"], res)
@@ -325,13 +454,100 @@ class KitchenExpenseAuditTest(unittest.TestCase):
                .order_by(AuditLog.id.desc()).first())
         self.assertIsNotNone(rev)
 
+    def test_anulacion_solo_funciona_una_vez(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        first = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="Error de registro",
+        )
+        self.assertTrue(first["success"], first)
+        self.assertEqual(float(self._inv(env).current_quantity), 100.0)
+
+        second = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="Segundo intento de anulación",
+        )
+        self.assertFalse(second["success"])
+        self.assertIn("ya fue anulado", second["message"])
+        self.assertEqual(float(self._inv(env).current_quantity), 100.0)
+        self.assertEqual(
+            AuditLog.query.filter(
+                AuditLog.action == 'REVERSION_GASTO_COCINA').count(),
+            1,
+        )
+
+    def test_reactivacion_solo_la_hace_el_administrador(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        jefe = DummyUser(user_id=env["admin"].id, role_id=2)
+        res = process_kitchen_expense_action(
+            log_id=log_id, current_user=jefe, action_type="ANULAR", lot_number="L-001",
+            justification_notes="Anulación por jefe de sede",
+        )
+        self.assertTrue(res["success"], res)
+        self.assertEqual(float(self._inv(env).current_quantity), 100.0)
+
+        denied = process_kitchen_expense_action(
+            log_id=log_id, current_user=jefe, action_type="ACTIVAR",
+            justification_notes="Intento de reactivación",
+        )
+        self.assertFalse(denied["success"])
+        self.assertIn("Solo el Administrador", denied["message"])
+        self.assertEqual(float(self._inv(env).current_quantity), 100.0)
+
+        allowed = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ACTIVAR",
+            justification_notes="Reactivación autorizada",
+        )
+        self.assertTrue(allowed["success"], allowed)
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+
+    def test_anular_tras_editar_devuelve_el_gasto_vigente(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)  # 100 -> 70
+        edit = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number="L-001",
+            new_quantity_requested=10,
+            justification_notes="Solo se gastaron 10",
+        )
+        self.assertTrue(edit["success"], edit)
+        self.assertEqual(float(self._inv(env).current_quantity), 90.0)
+
+        annul = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="El gasto no existió",
+        )
+        self.assertTrue(annul["success"], annul)
+        # Devuelve solo lo que la sede tenía descontado (10), no el original (30).
+        self.assertEqual(float(self._inv(env).current_quantity), 100.0)
+
+        reactivate = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ACTIVAR",
+            justification_notes="Se confirma el gasto corregido",
+        )
+        self.assertTrue(reactivate["success"], reactivate)
+        self.assertEqual(float(self._inv(env).current_quantity), 90.0)
+
     def test_activar_anulado_vuelve_a_descontar(self):
         env = self._seed()
         log_id = self._consume(env, 30.0)
         process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="ANULAR",
+            action_type="ANULAR", lot_number="L-001",
             justification_notes="Anulación de prueba",
         )
         self.assertEqual(float(self._inv(env).current_quantity), 100.0)
@@ -346,18 +562,237 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         self.assertEqual(float(self._inv(env).current_quantity), 70.0)
         self.assertEqual(AuditLog.query.get(log_id).severity, "NORMAL")
 
-    def test_expirado_30_dias_admin_bloqueado(self):
+    # ------------------------------------------------------------------
+    # SINCRONIZACIÓN DEL SALDO POR LOTE EN DEVOLUCIONES
+    # ------------------------------------------------------------------
+    def _lot_availability(self, env):
+        key = (env["product"].id, "L-001")
+        return _compute_lot_availability(
+            env["sede_a"].id, [env["product"].id]
+        )[key]["availability"]
+
+    def test_edicion_a_la_baja_sincroniza_el_saldo_del_lote(self):
         env = self._seed()
-        log_id = self._direct_log(
-            env, ts=datetime.now() - timedelta(days=31))
+        log_id = self._consume(env, 30.0)
+        self.assertAlmostEqual(self._lot_availability(env), 70.0)
+
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="ANULAR",
+            action_type="EDITAR", lot_number="L-001",
+            new_quantity_requested=10,
+            justification_notes="Se devolvieron 20 al lote L-001",
+        )
+        self.assertTrue(res["success"], res)
+
+        stock = float(self._inv(env).current_quantity)
+        self.assertEqual(stock, 90.0)
+        # El lote debe reflejar la MISMA devolución que el stock general.
+        self.assertAlmostEqual(self._lot_availability(env), stock)
+        lots = InventoryViewService.get_lots_for_product(
+            env["sede_a"].id, env["product"].id)
+        self.assertAlmostEqual(sum(l["quantity"] for l in lots), stock)
+
+    def test_anulacion_sincroniza_el_saldo_del_lote(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="Anulación total del gasto",
+        )
+        self.assertTrue(res["success"], res)
+        stock = float(self._inv(env).current_quantity)
+        self.assertEqual(stock, 100.0)
+        self.assertAlmostEqual(self._lot_availability(env), stock)
+        lots = InventoryViewService.get_lots_for_product(
+            env["sede_a"].id, env["product"].id)
+        self.assertAlmostEqual(sum(l["quantity"] for l in lots), stock)
+
+    # ------------------------------------------------------------------
+    # LOTE OBLIGATORIO Y VALIDACIÓN TRIPLE EN DEVOLUCIONES
+    # ------------------------------------------------------------------
+    def test_devolucion_rechaza_lote_inexistente(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-FANTASMA",
+            justification_notes="Se anula pero el lote no existe",
+        )
+        self.assertFalse(res["success"])
+        self.assertIn("no existe", res["message"])
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+        self.assertEqual(
+            AuditLog.query.filter(
+                AuditLog.action == 'REVERSION_GASTO_COCINA').count(),
+            0,
+        )
+
+    def test_devolucion_rechaza_lote_de_otro_producto(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+
+        otro = Product(name="Papa", sku="PAP-KEA",
+                       unit_of_measure="kg", is_active=True)
+        db.session.add(otro)
+        db.session.flush()
+        compra = Purchase(
+            user_id=env["admin"].id, supplier_id=None, currency="USD",
+            status="COMPLETADO", purchase_date=datetime.now(),
+            invoice_url="",
+        )
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=otro.id,
+            lot_number="L-OTRO", quantity=50.0,
+            foreign_price=1.00, price_bs=0.00,
+        ))
+        db.session.commit()
+
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number="L-OTRO",
+            new_quantity_requested=10,
+            justification_notes="Intenta devolver con lote de otro insumo",
+        )
+        self.assertFalse(res["success"])
+        self.assertIn("otro insumo", res["message"])
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+
+    def test_devolucion_rechaza_lote_de_otra_sede(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+
+        sede_b = Location(name="Sede B", state="Caracas")
+        db.session.add(sede_b)
+        db.session.flush()
+        mov = Movement(
+            type="TRASLADO", origin_location_id=env["central"].id,
+            destination_location_id=sede_b.id, status="COMPLETED",
+            user_id=env["admin"].id, date=datetime.now(),
+        )
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=env["product"].id,
+            lot_number="L-SEDE-B", quantity=20.0, received_quantity=20.0,
+            missing_quantity=0.00, expiration_date=None,
+        ))
+        db.session.commit()
+
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="ANULAR", lot_number="L-SEDE-B",
+            justification_notes="Lote que nunca estuvo en esta sede",
+        )
+        self.assertFalse(res["success"])
+        self.assertIn("sede de origen", res["message"])
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+
+    def test_devolucion_exige_lote_en_edicion_y_anulacion(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        for accion, kwargs in (
+            ("ANULAR", {}),
+            ("EDITAR", {"new_quantity_requested": 10}),
+        ):
+            res = process_kitchen_expense_action(
+                log_id=log_id,
+                current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+                action_type=accion, lot_number=None,
+                justification_notes="Intento sin lote",
+                **kwargs,
+            )
+            self.assertFalse(res["success"])
+            self.assertIn("lote", res["message"].lower())
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+
+    def test_devolucion_acepta_lote_valido_y_lo_registra(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number="L-001",
+            new_quantity_requested=10,
+            justification_notes="Volvió mercancía del lote L-001",
+        )
+        self.assertTrue(res["success"], res)
+        self.assertEqual(float(self._inv(env).current_quantity), 90.0)
+        ajuste = (AuditLog.query
+                  .filter(AuditLog.action == 'AJUSTE_GASTO_COCINA')
+                  .order_by(AuditLog.id.desc()).first())
+        data = ajuste.changed_data
+        if isinstance(data, str):
+            data = json.loads(data)
+        self.assertEqual(data["lot_number"], "L-001")
+        self.assertIn("Lote devuelto: L-001", data["notes"])
+
+    def test_edicion_al_alza_no_exige_lote(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)  # stock 70
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number=None,
+            new_quantity_requested=50,
+            justification_notes="Se gastó más de lo registrado",
+        )
+        self.assertTrue(res["success"], res)
+        self.assertEqual(float(self._inv(env).current_quantity), 50.0)
+
+    def test_validador_exige_lote_en_acciones_con_devolucion(self):
+        sin_lote = validate_kitchen_expense_action({
+            "log_id": 1, "action_type": "ANULAR", "notes": "Motivo",
+        })
+        self.assertFalse(sin_lote["is_valid"])
+        self.assertIn("lot_number", sin_lote["errors"])
+
+        lote_na = validate_kitchen_expense_action({
+            "log_id": 1, "action_type": "EDITAR", "notes": "Motivo",
+            "new_quantity": 5, "lot_number": "N/A",
+        })
+        self.assertFalse(lote_na["is_valid"])
+        self.assertIn("lot_number", lote_na["errors"])
+
+        con_lote = validate_kitchen_expense_action({
+            "log_id": 1, "action_type": "ANULAR", "notes": "Motivo",
+            "lot_number": "L-001",
+        })
+        self.assertTrue(con_lote["is_valid"], con_lote)
+
+    def test_expirado_7_dias_admin_bloqueado(self):
+        env = self._seed()
+        log_id = self._direct_log(
+            env, ts=datetime.now() - timedelta(days=8))
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number="L-001",
+            new_quantity_requested=10,
             justification_notes="Intento tardío",
         )
         self.assertFalse(res["success"])
-        self.assertIn("30 días", res["message"])
+        self.assertIn("7 días", res["message"])
+
+    def test_admin_puede_editar_dentro_de_7_dias(self):
+        env = self._seed()
+        log_id = self._direct_log(
+            env, ts=datetime.now() - timedelta(days=6))
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+            action_type="EDITAR", lot_number="L-001",
+            new_quantity_requested=10,
+            justification_notes="Corrección dentro del plazo",
+        )
+        self.assertTrue(res["success"], res)
 
     def test_expirado_24h_sin_ser_admin_bloqueado(self):
         env = self._seed()
@@ -366,7 +801,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["finance"].id, role_id=2),
-            action_type="ANULAR",
+            action_type="ANULAR", lot_number="L-001",
             justification_notes="Intento tardío",
         )
         self.assertFalse(res["success"])
@@ -378,9 +813,39 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["finance"].id, role_id=6),
-            action_type="EDITAR",
+            action_type="EDITAR", lot_number="L-001",
             new_quantity_requested=5,
             justification_notes="Quiere corregir",
+        )
+        self.assertFalse(res["success"])
+        self.assertIn("solo lectura", res["message"])
+
+    def test_motivo_obligatorio_en_el_servicio(self):
+        env = self._seed()
+        log_id = self._consume(env, 30.0)
+        for vacio in (None, '', '   '):
+            res = process_kitchen_expense_action(
+                log_id=log_id,
+                current_user=DummyUser(user_id=env["admin"].id, role_id=1),
+                action_type="ANULAR", lot_number="L-001",
+                justification_notes=vacio,
+            )
+            self.assertFalse(res["success"])
+            self.assertIn("motivo obligatorio", res["message"])
+        self.assertIsNone(
+            AuditLog.query.filter(
+                AuditLog.action == 'REVERSION_GASTO_COCINA').first())
+        self.assertEqual(float(self._inv(env).current_quantity), 70.0)
+        self.assertEqual(AuditLog.query.get(log_id).severity, "NORMAL")
+
+    def test_rol_operaciones_solo_lectura(self):
+        env = self._seed()
+        log_id = self._consume(env, 10.0)
+        res = process_kitchen_expense_action(
+            log_id=log_id,
+            current_user=DummyUser(user_id=env["admin"].id, role_id=4),
+            action_type="ANULAR", lot_number="L-001",
+            justification_notes="Intento sin permiso",
         )
         self.assertFalse(res["success"])
         self.assertIn("solo lectura", res["message"])
@@ -394,11 +859,11 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="ANULAR",
+            action_type="ANULAR", lot_number="L-001",
             justification_notes="Intento en central",
         )
         self.assertFalse(res["success"])
-        self.assertIn("Almacén General", res["message"])
+        self.assertIn("Almacén Central", res["message"])
 
     def test_no_admite_registros_compensatorios(self):
         env = self._seed()
@@ -407,7 +872,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="ANULAR",
+            action_type="ANULAR", lot_number="L-001",
             justification_notes="Intentar tocar un ajuste",
         )
         self.assertFalse(res["success"])
@@ -419,7 +884,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
         res = process_kitchen_expense_action(
             log_id=log_id,
             current_user=DummyUser(user_id=env["admin"].id, role_id=1),
-            action_type="EDITAR",
+            action_type="EDITAR", lot_number="L-001",
             new_quantity_requested=150,  # exige +120 del stock de 70
             justification_notes="Cantidad imposible",
         )
@@ -433,6 +898,7 @@ class KitchenExpenseAuditTest(unittest.TestCase):
     def test_validator_contrato_obligatorio(self):
         valid = validate_kitchen_expense_action({
             "log_id": "3", "action_type": "ANULAR", "notes": "Motivo",
+            "lot_number": "L-001",
         })
         self.assertTrue(valid["is_valid"])
 
@@ -474,9 +940,33 @@ class KitchenExpenseAuditTest(unittest.TestCase):
 
         ok = validate_kitchen_expense_action({
             "log_id": "3", "action_type": "EDITAR",
-            "notes": "Motivo", "new_quantity": 15.5,
+            "notes": "Motivo", "new_quantity": 15.5, "lot_number": "L-001",
         })
         self.assertTrue(ok["is_valid"])
+
+
+class KitchenExpenseTemplateTraceabilityTest(unittest.TestCase):
+    """La vista debe renderizar responsable y sede de cada gasto."""
+
+    def test_plantilla_muestra_responsable_y_sede(self):
+        ruta = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))),
+            "app", "templates", "inventory", "kitchen_expense_audit.html",
+        )
+        with open(ruta, encoding="utf-8") as fh:
+            html = fh.read()
+        self.assertIn("e.user_name", html)
+        self.assertIn("Registrado por", html)
+        self.assertIn("Sede de origen", html)
+        # Cada pestaña se renderiza solo con su propio conjunto de datos: el
+        # panel de Ajustes no puede contener consumos originales.
+        self.assertIn("{% if active_tab == 'gastos' %}", html)
+        self.assertIn("{% if active_tab == 'ajustes' %}", html)
+        # Trazabilidad obligatoria del apartado de Ajustes y Anulaciones.
+        self.assertIn("Fecha y hora del cambio", html)
+        self.assertIn("Motivo del ajuste / anulación", html)
+        self.assertIn("Sin motivo registrado", html)
 
 
 if __name__ == "__main__":

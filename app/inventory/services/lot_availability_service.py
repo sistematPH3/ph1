@@ -16,6 +16,40 @@ from app.models.security_model import User
 from app.time_utils import current_ve_time
 
 
+def net_consumption_quantity(changed_data, severity=None):
+    """Cantidad NETA descontada por un gasto/consumo de cocina sobre su lote.
+
+    El stock por lote es derivado (no hay tabla de saldo por lote): por eso hay
+    que descontar la cantidad VIGENTE y no la original.
+      - Registro ANULADO: 0 (el stock ya fue devuelto a la sede).
+      - Registro EDITADO: 'edited_quantity' (cantidad corregida vigente).
+      - Resto: abs('quantity_changed').
+    """
+    if (severity or '').upper() == 'ANULADO':
+        return 0.0
+    c = changed_data
+    if isinstance(c, str):
+        try:
+            c = json.loads(c)
+        except (json.JSONDecodeError, TypeError):
+            return 0.0
+    if not isinstance(c, dict):
+        return 0.0
+    try:
+        base = abs(float(c.get('quantity_changed', 0.0) or 0.0))
+    except (TypeError, ValueError):
+        base = 0.0
+    edited = c.get('edited_quantity')
+    if edited not in (None, ''):
+        try:
+            eff = abs(float(edited))
+        except (TypeError, ValueError):
+            eff = None
+        if eff is not None and (eff > 0 or base == 0):
+            return eff
+    return base
+
+
 def _compute_lot_availability(loc_id, prod_ids):
     """Disponibilidad por (producto, lote) en una sede, para varios productos.
 
@@ -107,11 +141,13 @@ def _compute_lot_availability(loc_id, prod_ids):
             salidas_traslados[(int(pid), lot.strip())] = float(total_out or 0.0)
 
     salidas_consumo = {}
-    audit_records = db.session.query(AuditLog.changed_data).filter(
+    audit_records = db.session.query(
+        AuditLog.changed_data, AuditLog.severity
+    ).filter(
         AuditLog.location_id == loc_id,
         AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA'])
     ).all()
-    for (c_data,) in audit_records:
+    for c_data, severity in audit_records:
         if not c_data:
             continue
         if isinstance(c_data, str):
@@ -127,14 +163,15 @@ def _compute_lot_availability(loc_id, prod_ids):
             p_id = None
         if p_id not in prod_ids:
             continue
+        # La cantidad vigente (editada) o 0 si fue anulado: así la suma de lotes
+        # siempre coincide con el inventario general de la sede.
+        qty = net_consumption_quantity(c_data, severity)
+        if qty <= 0:
+            continue
         l_num = c_data.get('lot_number')
-        try:
-            qty_change = float(c_data.get('quantity_changed', 0.0))
-        except (TypeError, ValueError):
-            qty_change = 0.0
         l_clean = str(l_num).strip() if l_num else 'N/A'
         key = (p_id, l_clean)
-        salidas_consumo[key] = salidas_consumo.get(key, 0.0) + abs(qty_change)
+        salidas_consumo[key] = salidas_consumo.get(key, 0.0) + qty
 
     salidas_aprobadas = {}
     aprobadas_rows = db.session.query(

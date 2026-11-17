@@ -6,10 +6,14 @@ def obtener_movimientos_resta():
     Obtiene el listado de restas de stock.
     Filtra por la sede asignada si el usuario no es administrador.
     """
-    # Por ahora solo incluye el flujo de GASTO_COCINA
+    # Por ahora solo incluye el flujo de GASTO_COCINA. Los gastos de cocina
+    # corresponden a sedes operativas: se excluye el Almacén Central (id 1) y
+    # cualquier registro sin sede (dato heredado sin trazabilidad).
     query = AuditLog.query.filter(
         AuditLog.affected_table == 'inventory',
-        AuditLog.action == 'GASTO_COCINA' 
+        AuditLog.action == 'GASTO_COCINA',
+        AuditLog.location_id.isnot(None),
+        AuditLog.location_id != 1,
     )
     
     if not current_user.is_admin:

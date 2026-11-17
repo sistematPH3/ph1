@@ -2,6 +2,9 @@ from datetime import datetime
 
 _VALID_SEVERITIES = ('NORMAL', 'ALERTA', 'CRITICO', 'EDITADO', 'ANULADO')
 
+# El Almacén Central (id 1) no origina gastos de cocina: no es un filtro válido.
+CENTRAL_WAREHOUSE_ID = 1
+
 
 def validate_kitchen_expense_filters(request_args):
     """Parámetros del visor: sede, severidad, rango de fechas y pestaña."""
@@ -9,7 +12,9 @@ def validate_kitchen_expense_filters(request_args):
 
     location_id = request_args.get('location_id')
     if location_id and location_id.isdigit():
-        filters['location_id'] = int(location_id)
+        location_id = int(location_id)
+        if location_id != CENTRAL_WAREHOUSE_ID:
+            filters['location_id'] = location_id
 
     severity = request_args.get('severity')
     if severity in _VALID_SEVERITIES:
@@ -59,6 +64,17 @@ def validate_kitchen_expense_action(data):
     notes = data.get('notes')
     if not notes or not str(notes).strip():
         errors['notes'] = 'Debe proporcionar un motivo obligatorio para realizar esta acción.'
+
+    # El lote de origen es obligatorio al editar o anular: ambas acciones pueden
+    # devolver stock y sin lote real se pierde la trazabilidad FIFO/vencimientos.
+    # (El servicio exige además que exista, sea del mismo insumo y de la sede.)
+    if action_type in ('EDITAR', 'ANULAR'):
+        lot = data.get('lot_number')
+        lot_clean = str(lot).strip() if lot is not None else ''
+        if not lot_clean:
+            errors['lot_number'] = 'Debe indicar el lote real de origen del insumo.'
+        elif lot_clean.upper() in ('N/A', 'NONE', 'SIN LOTE'):
+            errors['lot_number'] = 'El valor indicado no es un lote válido del insumo.'
 
     if action_type == 'EDITAR':
         new_qty = data.get('new_quantity')

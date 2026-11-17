@@ -100,7 +100,7 @@ def edit_product(product_id):
         'sku': product.sku,
         'technical_description': product.technical_description,
         'waste_limit': product.waste_limit,
-        'min_stock': product.min_stock
+        'min_stock': product.min_stock,
     }
 
     return render_template('inventory/product_form.html',

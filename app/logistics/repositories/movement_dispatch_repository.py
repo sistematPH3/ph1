@@ -6,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import func, case
 from app import db
 from app.models import Inventory, Movement, MovementDetail, Product, Purchase, PurchaseDetail, AuditLog
+from app.inventory.services.lot_availability_service import net_consumption_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -182,14 +183,14 @@ class MovementDispatchRepository:
             salidas_traslado = {d.lot_number.strip(): float(d.total_out or 0.0) for d in despachos_sucursal if d.lot_number}
 
         audit_consumos = db.session.query(
-            AuditLog.changed_data
+            AuditLog.changed_data, AuditLog.severity
         ).filter(
             AuditLog.location_id == loc_id,
             AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA', 'MERMA'])
         ).all()
 
         salidas_consumo = {}
-        for (c_data,) in audit_consumos:
+        for c_data, severity in audit_consumos:
             if not c_data:
                 continue
             if isinstance(c_data, str):
@@ -204,13 +205,16 @@ class MovementDispatchRepository:
             if isinstance(c_data, dict):
                 p_id = c_data.get('product_id')
                 l_num = c_data.get('lot_number')
-                qty_change = c_data.get('quantity_changed', 0.0)
                 try:
                     p_matches = p_id is not None and int(p_id) == prod_id
-                    qty_delta = abs(float(qty_change))
                 except (ValueError, TypeError):
                     p_matches = False
-                    qty_delta = 0.0
+                # Cantidad NETA vigente: la corregida si el gasto fue editado a
+                # la baja y 0 si fue anulado. Así el selector de lotes del
+                # despacho suma de vuelta lo devuelto, igual que la vista de
+                # inventario (antes usaba abs(quantity_changed) y el lote se
+                # quedaba corto).
+                qty_delta = net_consumption_quantity(c_data, severity)
                 if p_matches and l_num and l_num != 'N/A':
                     l_num_clean = str(l_num).strip()
                     salidas_consumo[l_num_clean] = salidas_consumo.get(l_num_clean, 0.0) + qty_delta
