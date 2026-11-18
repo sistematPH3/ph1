@@ -12,9 +12,46 @@ class StaffRepository:
     def get_all_approved_staff():
         return User.query.filter(User.role_id != 0).all()
 
+    # Label establecido como fuente de verdad para la sede central del directorio.
+    # Se escribe con el carácter UTF-8 real (no la secuencia de escape) para que
+    # nunca llegue a plantillas ni a representaciones con ``\u00e9`` visible.
+    _CENTRAL_NAME = 'Almacén Central'
+
+    @staticmethod
+    def _central_location():
+        """Sede representativa del Almacén Central (id=1) para el directorio.
+
+        Devuelve siempre un dict con ``id`` entero y ``name`` limpio UTF-8, sin
+        secuencias de escape en la cadena. Si el registro existe en BD, se conserva
+        su id real y se reemplaza el nombre por la etiqueta de negocio; si no existe,
+        se crea una sede en memoria con id=1 y nombre limpio.
+        """
+        row = Location.query.get(1)
+        if row is not None:
+            return {
+                'id': int(row.id),
+                'name': StaffRepository._CENTRAL_NAME,
+            }
+        return {
+            'id': 1,
+            'name': StaffRepository._CENTRAL_NAME,
+        }
+
     @staticmethod
     def get_active_locations():
-        return Location.query.filter(Location.is_active == True, Location.id != 1).all()
+        """Sedes listadas en el directorio de personal.
+
+        El Almacén Central (id=1) se incluye siempre como primera opción del
+        filtro, con nombre normalizado, incluso si su registro en ``locations`` est\u00e1
+        desactivado, renombrado o ausente.
+        """
+        entradas = [StaffRepository._central_location()]
+        for loc in Location.query.filter(
+            Location.is_active == True,
+            Location.id != 1,
+        ).order_by(Location.id):
+            entradas.append({'id': int(loc.id), 'name': loc.name})
+        return entradas
 
     @staticmethod
     def get_all_roles():

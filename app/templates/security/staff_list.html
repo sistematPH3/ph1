@@ -51,14 +51,11 @@
                     {% for role in roles %}
                         <option value="{{ role.id }}">{{ traduccion_roles.get(role.name.lower(), role.name) }}</option>
                     {% endfor %}
-                </select>
-                <select id="locationFilter" class="form-select rounded-pill bg-light border-0 fw-medium"
+                </select>                    <select id="locationFilter" class="form-select rounded-pill bg-light border-0 fw-medium"
                         style="height: 36px; width: auto; min-width: 150px;">
                     <option value="all">Todas las sedes</option>
                     {% for loc in locations %}
-                        {% if loc.is_active %}
-                            <option value="{{ loc.id }}">{{ loc.name }}</option>
-                        {% endif %}
+                        <option value="{{ loc.id }}">{{ loc.name }}</option>
                     {% endfor %}
                 </select>
                 <button type="button" id="bulkActivateBtn" class="btn btn-outline-light d-none text-nowrap rounded-pill"
@@ -110,7 +107,7 @@
                             <div class="d-flex flex-wrap gap-1">
                                 {# Validación para Administradores #}
                                 {% if user.role and user.role.name.lower() in ['admin', 'administrator'] %}
-                                    <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Global / Sin sede</span>
+                                    <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Almacén Central</span>
                                 {% else %}
                                     {% set ns = namespace(tiene_sedes=false) %}
                                     {% for loc in user.locations %}
@@ -204,21 +201,17 @@
                         <!-- Contenedor donde se muestran TODAS las sedes simultáneamente -->
                         <div class="d-flex flex-wrap gap-2 p-1" id="allLocationsPills">
                             {% for loc in locations %}
-                                {% if loc.is_active %}
-                                    <div class="ph-interactive-pill" data-id="{{ loc.id }}">
-                                        <span class="pill-text">{{ loc.name }}</span>
-                                        <i class="bi bi-x-lg pill-x-icon ms-1"></i>
-                                    </div>
-                                {% endif %}
+                                <div class="ph-interactive-pill" data-id="{{ loc.id }}">
+                                    <span class="pill-text">{{ loc.name }}</span>
+                                    <i class="bi bi-x-lg pill-x-icon ms-1"></i>
+                                </div>
                             {% endfor %}
                         </div>
 
                         <!-- Mantenemos tu select múltiple original oculto en 'd-none' para la sincronización del backend -->
                         <select id="editLocations" multiple class="d-none">
                             {% for loc in locations %}
-                                {% if loc.is_active %}
-                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                {% endif %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
