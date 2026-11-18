@@ -1,7 +1,28 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=93">
+{# CATÁLOGO ÚNICO DE NOVEDADES (fuente de verdad de ambos selectores).
+   El selector de condición por renglón y la clasificación general se renderizan
+   desde esta MISMA lista, de modo que no puedan divergir ni perder opciones.
+     item: true    -> la condición tiene sentido a nivel de renglón (el backend la
+                      acepta en VALID_ITEM_CONDITIONS).
+     item: false   -> novedad de nivel despacho (Producto Erróneo, Incidencia Mixta):
+                      el API la rechaza como condición de un solo renglón, por eso
+                      solo aparece en la clasificación general.
+     rechazo: true -> sujeta a la regla de negocio de Rechazo Parcial por Espacio. #}
+{% set novelty_catalog = [
+    {'value': 'CONFORME', 'label_item': 'Conforme (Buen Estado)', 'label_general': 'Recepción Conforme (Sin Discrepancia)', 'item': true, 'rechazo': false},
+    {'value': 'FALTANTE_CONTEO', 'label_item': 'Faltante de Conteo (Descuadre)', 'label_general': 'Faltante de Conteo (Descuadre Físico)', 'item': true, 'rechazo': false},
+    {'value': 'SOBRANTE_EXCEDENTE', 'label_item': 'Sobrante / Excedente en Muelle', 'label_general': 'Sobrante / Excedente en Muelle', 'item': true, 'rechazo': false},
+    {'value': 'PRODUCTO_ERRONEO', 'label_item': 'Producto Erróneo / SKU Cruzado', 'label_general': 'Producto Erróneo / SKU Cruzado', 'item': false, 'rechazo': false},
+    {'value': 'INCIDENCIA_TEMPERATURA', 'label_item': 'Ruptura Cadena de Frío', 'label_general': 'Ruptura de Cadena de Frío', 'item': true, 'rechazo': false},
+    {'value': 'VENCIMIENTO_PROXIMO', 'label_item': 'Alerta de Vencimiento Próximo', 'label_general': 'Alerta de Vencimiento Próximo', 'item': true, 'rechazo': false},
+    {'value': 'LOTE_NO_COINCIDE', 'label_item': 'Lote no coincide con Guía', 'label_general': 'Lote no coincide con Guía', 'item': true, 'rechazo': false},
+    {'value': 'VIOLACION_CUSTODIA', 'label_item': 'Violación de Custodia / Precinto Roto', 'label_general': 'Violación de Custodia / Precinto Roto', 'item': true, 'rechazo': false},
+    {'value': 'RECHAZO_POR_ESPACIO', 'label_item': 'Rechazo Parcial por Espacio', 'label_general': 'Rechazo Parcial por Falta de Espacio', 'item': true, 'rechazo': true},
+    {'value': 'INCIDENCIA_MIXTA', 'label_item': 'Incidencia Mixta (Múltiples Novedades)', 'label_general': 'Incidencia Mixta (Múltiples Novedades)', 'item': false, 'rechazo': false}
+] %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=94">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -119,17 +140,12 @@
                             </td>
                             <td data-label="Condición">
                                 <div class="item-condition-wrapper">
-                                    <select class="form-select form-select-sm select-item-condition">
-                                        <option value="CONFORME" selected>Conforme (Buen Estado)</option>
-                                        <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre)</option>
-                                        <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
-                                        <option value="INCIDENCIA_TEMPERATURA">Ruptura Cadena de Frío</option>
-                                        <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
-                                        <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
-                                        <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
-                                        {% if allow_rechazo_por_espacio %}
-                                        <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Espacio</option>
+                                    <select class="form-select form-select-sm select-item-condition" aria-label="Condición del insumo">
+                                        {% for opt in novelty_catalog if opt.item %}
+                                        {% if not opt.rechazo or allow_rechazo_por_espacio %}
+                                        <option value="{{ opt.value }}"{% if opt.value == 'CONFORME' %} selected{% endif %}>{{ opt.label_item }}</option>
                                         {% endif %}
+                                        {% endfor %}
                                     </select>
                                     <div class="near-expiry-date-field hidden mt-1">
                                         <span class="lot-exp-label">Venc. real:</span>
@@ -174,6 +190,23 @@
                 </table>
             </div>
 
+            <div id="receptionLiveValidation" class="live-validation-panel hidden" aria-live="polite">
+                <div id="rejectionMinAlert" class="live-validation-alert hidden" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill live-validation-alert-icon"></i>
+                    <div class="live-validation-alert-body">
+                        <strong>Rechazo parcial no permitido.</strong>
+                        <span id="rejectionMinAlertText"></span>
+                    </div>
+                </div>
+                <div id="noveltyRejectionAlert" class="live-validation-alert hidden" role="alert">
+                    <i class="bi bi-x-octagon-fill live-validation-alert-icon"></i>
+                    <div class="live-validation-alert-body">
+                        <strong>Novedad contradictoria.</strong>
+                        <span id="noveltyRejectionAlertText"></span>
+                    </div>
+                </div>
+            </div>
+
             <div class="novelty-interactive-panel" id="smartNoveltyPanel">
                 <div class="panel-header-row">
                     <div class="panel-title-with-icon">
@@ -198,19 +231,12 @@
                 <div class="form-grid-2col">
                     <div class="input-card-box">
                         <label class="ph-label" for="noveltyType">Clasificación General del Despacho</label>
-                        <select id="noveltyType" class="ph-select">
-                            <option value="CONFORME">Recepción Conforme (Sin Discrepancia)</option>
-                            <option value="FALTANTE_CONTEO">Faltante de Conteo (Descuadre Físico)</option>
-                            <option value="SOBRANTE_EXCEDENTE">Sobrante / Excedente en Muelle</option>
-                            <option value="PRODUCTO_ERRONEO">Producto Erróneo / SKU Cruzado</option>
-                            <option value="INCIDENCIA_TEMPERATURA">Ruptura de Cadena de Frío</option>
-                            <option value="VENCIMIENTO_PROXIMO">Alerta de Vencimiento Próximo</option>
-                            <option value="LOTE_NO_COINCIDE">Lote no coincide con Guía</option>
-                            <option value="VIOLACION_CUSTODIA">Violación de Custodia / Precinto Roto</option>
-                            {% if allow_rechazo_por_espacio %}
-                            <option value="RECHAZO_POR_ESPACIO">Rechazo Parcial por Falta de Espacio</option>
+                        <select id="noveltyType" class="ph-select" aria-label="Clasificación general del despacho">
+                            {% for opt in novelty_catalog %}
+                            {% if not opt.rechazo or allow_rechazo_por_espacio %}
+                            <option value="{{ opt.value }}"{% if opt.value == 'CONFORME' %} selected{% endif %}>{{ opt.label_general }}</option>
                             {% endif %}
-                            <option value="INCIDENCIA_MIXTA">Incidencia Mixta (Múltiples Novedades)</option>
+                            {% endfor %}
                         </select>
                         <span class="field-help-text" id="noveltyHelpText">Carga completa y en condiciones óptimas. Se acredita en destino.</span>
                     </div>
@@ -290,5 +316,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=99"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=101"></script>
 {% endblock %}

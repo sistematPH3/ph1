@@ -12,6 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const alertBox = document.getElementById("receptionAlertBox");
     const noveltyStatusBadge = document.getElementById("noveltyStatusBadge");
 
+    const liveValidationPanel = document.getElementById("receptionLiveValidation");
+    const rejectionMinAlert = document.getElementById("rejectionMinAlert");
+    const rejectionMinAlertText = document.getElementById("rejectionMinAlertText");
+    const noveltyRejectionAlert = document.getElementById("noveltyRejectionAlert");
+    const noveltyRejectionAlertText = document.getElementById("noveltyRejectionAlertText");
+
     const dynamicGuideBox = document.getElementById("dynamicProtocolGuideBox");
     const protocolGuideTitle = document.getElementById("protocolGuideTitle");
     const protocolGuideBody = document.getElementById("protocolGuideBody");
@@ -28,7 +34,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnAcceptModal = document.getElementById("btnAcceptModal");
 
     let userManuallyChangedNovelty = false;
+
+    // ¿La clasificación existe entre las opciones realmente renderizadas? Asignar un
+    // value inexistente (p. ej. RECHAZO_POR_ESPACIO en un retorno, donde la opción no
+    // se renderiza) deja el select en blanco y el envío viajaría sin clasificación.
+    const noveltyOptionExists = (value) =>
+        !!noveltySelect && Array.from(noveltySelect.options).some(opt => opt.value === value);
+
     let pendingReception = null;
+
+    // REGLA DE NEGOCIO (validación en vivo): un rechazo parcial por debajo de este
+    // umbral no se permite; el operador debe aceptar el envío completo del insumo.
+    // La cantidad de rechazo se deriva del conteo: despachado − recibido.
+    const MIN_RECHAZO_PERMITIDO = 5;
+
+    // Novedades que implican NO admitir (total o parcialmente) la mercancía. Si se
+    // declara alguna y las cantidades recibidas suman el 100% de lo despachado, hay
+    // una contradicción lógica que se avisa en vivo y bloquea el envío.
+    const NOVELTIES_DE_NO_ADMISION = ["RECHAZO_POR_ESPACIO"];
 
     // Clave de comparación de lotes: mismo criterio que el backend. Recorta los
     // extremos, colapsa espacios internos y unifica mayúsculas/minúsculas, para
@@ -382,6 +405,103 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isContradiction && !document.querySelector(".row-lot-contradiction, .row-near-expiry-contradiction")) {
             hideToast();
         }
+    }
+
+    // VALIDACIÓN EN VIVO DE RECHAZOS (eventos input/change): evalúa dos reglas de
+    // negocio sobre el conteo declarado y pinta el panel de alertas del formulario.
+    //   (1) Rechazo parcial mínimo: un rechazo > 0 pero < MIN_RECHAZO_PERMITIDO no se
+    //       permite; el operador debe aceptar el envío completo del insumo.
+    //   (2) Contradicción novedad vs cantidades: "Rechazo por falta de espacio" (u otra
+    //       novedad de no admisión) con el 100% de la mercancía recibida (rechazo = 0).
+    // Devuelve los errores activos para que el submit pueda bloquearse.
+    function updateLiveRejectionValidation() {
+        const errors = [];
+        const shortRejections = [];
+        let totalRejected = 0;
+        let hasNonAdmissionCondition = NOVELTIES_DE_NO_ADMISION.includes(
+            noveltySelect ? noveltySelect.value : ""
+        );
+
+        rows.forEach(row => {
+            const input = row.querySelector(".input-received");
+            if (!input) return;
+
+            const dispatched = parseFloat(row.dataset.dispatched) || 0;
+            let received = parseFloat(input.value);
+            if (isNaN(received) || received < 0) received = 0;
+
+            const rejection = dispatched - received;
+            if (rejection > 0.001) totalRejected += rejection;
+
+            const condSelect = row.querySelector(".select-item-condition");
+            if (condSelect && NOVELTIES_DE_NO_ADMISION.includes(condSelect.value)) {
+                hasNonAdmissionCondition = true;
+            }
+
+            const isShortPartialRejection =
+                rejection > 0.001 && rejection < MIN_RECHAZO_PERMITIDO;
+            input.classList.toggle("is-invalid", isShortPartialRejection);
+            input.setAttribute("aria-invalid", isShortPartialRejection ? "true" : "false");
+            row.classList.toggle("row-rejection-min", isShortPartialRejection);
+
+            if (isShortPartialRejection) {
+                const unit = row.dataset.unit || "UN";
+                shortRejections.push(
+                    `«${row.dataset.product || "Insumo"}»: rechazo de ${rejection.toFixed(2)} ${unit} ` +
+                    `(mínimo permitido ${MIN_RECHAZO_PERMITIDO} ${unit}; despachado ${dispatched.toFixed(2)} ${unit}).`
+                );
+            }
+        });
+
+        if (shortRejections.length > 0) {
+            if (rejectionMinAlertText) {
+                rejectionMinAlertText.textContent = ` Por debajo de ${MIN_RECHAZO_PERMITIDO} unidades ` +
+                    "no se permite rechazo parcial: debe aceptar el envío completo del insumo. " +
+                    shortRejections.join(" ");
+            }
+            errors.push(
+                `El rechazo parcial por debajo de ${MIN_RECHAZO_PERMITIDO} unidades no está permitido: ` +
+                "acepte el envío completo del insumo. " + shortRejections.join(" ")
+            );
+        }
+
+        const rejectionNoveltyConflict = hasNonAdmissionCondition && totalRejected <= 0.001;
+        if (rejectionNoveltyConflict) {
+            if (noveltyRejectionAlertText) {
+                noveltyRejectionAlertText.textContent = " Indicó «Rechazo Parcial por Falta de Espacio», pero las " +
+                    "cantidades recibidas suman el 100% de lo despachado (cantidad rechazada = 0). " +
+                    "Registre la cantidad que no se descargó o cambie la clasificación.";
+            }
+            errors.push(
+                "Indicó 'Rechazo Parcial por Falta de Espacio', pero las cantidades recibidas suman el 100% " +
+                "de lo despachado (cantidad rechazada = 0). No se puede reportar falta de espacio si la " +
+                "mercancía ingresó completa: registre la cantidad que no se descargó o cambie la clasificación."
+            );
+        }
+
+        if (rejectionMinAlert) rejectionMinAlert.classList.toggle("hidden", shortRejections.length === 0);
+        if (noveltyRejectionAlert) noveltyRejectionAlert.classList.toggle("hidden", !rejectionNoveltyConflict);
+        if (liveValidationPanel) {
+            liveValidationPanel.classList.toggle(
+                "hidden",
+                shortRejections.length === 0 && !rejectionNoveltyConflict
+            );
+        }
+
+        const blocked = shortRejections.length > 0 || rejectionNoveltyConflict;
+        if (btnSubmit) {
+            btnSubmit.classList.toggle("is-blocked", blocked);
+            btnSubmit.setAttribute("aria-disabled", blocked ? "true" : "false");
+            btnSubmit.title = blocked
+                ? "Corrija las validaciones de rechazo resaltadas antes de procesar la recepción."
+                : "";
+        }
+
+        return {
+            minRejectionBlocked: shortRejections.length > 0,
+            rejectionNoveltyConflict,
+            liveValidationErrors: errors
+        };
     }
 
     function addErroneousItemRow() {
@@ -919,7 +1039,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         btnSubmit.textContent = guide.buttonText;
+        // Se conserva el bloqueo de la validación en vivo: este método se invoca después
+        // de recalcular el estado y no debe reactivar visualmente el botón.
+        const validationBlocked = btnSubmit.classList.contains("is-blocked");
         btnSubmit.className = guide.buttonAlert ? "btn-ph-primary btn-alert-state" : "btn-ph-primary";
+        if (validationBlocked) btnSubmit.classList.add("is-blocked");
 
         // La declaración de insumos no solicitados (erróneos) solo se muestra cuando
         // la novedad es "Producto Erróneo"/"Incidencia Mixta" O mientras existan filas
@@ -1239,7 +1363,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        if (applyToSelect && !userManuallyChangedNovelty) {
+        // Si ya no queda ninguna incidencia, una Incidencia Mixta declarada a mano
+        // pierde sustento: se libera el bloqueo manual para que el selector vuelva a
+        // la clasificación derivada (Conforme).
+        if (!hasAnyIssue && noveltySelect.value === "INCIDENCIA_MIXTA") {
+            userManuallyChangedNovelty = false;
+        }
+
+        if (applyToSelect && !userManuallyChangedNovelty && noveltyOptionExists(autoNovelty)) {
             noveltySelect.value = autoNovelty;
         }
 
@@ -1253,7 +1384,11 @@ document.addEventListener("DOMContentLoaded", () => {
             notesTextarea.required = false;
         }
 
-        return { hasAnyIssue, rowsAffected, hasUnsolicitedItems, autoNovelty };
+        // Se evalúa al final, cuando la novedad ya quedó resuelta: así la alerta de
+        // contradicción usa la clasificación que realmente se enviará.
+        const liveValidation = updateLiveRejectionValidation();
+
+        return { hasAnyIssue, rowsAffected, hasUnsolicitedItems, autoNovelty, ...liveValidation };
     }
 
     noveltySelect.addEventListener("change", () => {
@@ -1267,7 +1402,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = checkAndAutoCategorize(false);
         const isManualChoice = chosen !== "CONFORME" && chosen !== result.autoNovelty;
         userManuallyChangedNovelty = isManualChoice;
-        noveltySelect.value = isManualChoice ? chosen : result.autoNovelty;
+        // Se conserva la elección manual (incluidas las combinaciones mixtas) y solo
+        // se re-deriva cuando el operario no personalizó la clasificación o cuando el
+        // valor derivado no existe en el catálogo renderizado.
+        if (isManualChoice) {
+            noveltySelect.value = chosen;
+        } else if (noveltyOptionExists(result.autoNovelty)) {
+            noveltySelect.value = result.autoNovelty;
+        }
         updateBadgeAndGuidance();
         if (noveltySelect.value !== "CONFORME" || result.hasAnyIssue) {
             notesRequiredFlag.classList.remove("hidden");
@@ -1293,8 +1435,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 hideAlert();
                 // Al marcar una condición específica en un renglón (p. ej. LOTE_NO_COINCIDE),
                 // la clasificación general se sincroniza con esa condición en lugar de
-                // quedarse clavada en una elección previa.
-                userManuallyChangedNovelty = false;
+                // quedarse clavada en una elección previa. La excepción es una Incidencia
+                // Mixta declarada a mano: es la combinación explícita de varias novedades
+                // y tocar la condición de un renglón NO debe deshacerla.
+                if (noveltySelect.value !== "INCIDENCIA_MIXTA") {
+                    userManuallyChangedNovelty = false;
+                }
 
                 // Aviso claro cuando una condición DE CANTIDAD no está respaldada por el
                 // conteo real. En lugar de solo re-categorizar en silencio, se le dice al
@@ -1573,9 +1719,22 @@ document.addEventListener("DOMContentLoaded", () => {
         hideAlert();
 
         try {
-        const { hasAnyIssue, rowsAffected } = checkAndAutoCategorize();
+        const { hasAnyIssue, rowsAffected, minRejectionBlocked, rejectionNoveltyConflict, liveValidationErrors } =
+            checkAndAutoCategorize();
         const noveltyType = noveltySelect.value;
         const notes = notesTextarea.value.trim();
+
+        // BLOQUEO POR VALIDACIÓN EN VIVO: rechazo parcial por debajo del mínimo o
+        // novedad de no admisión con el 100% recibido. El aviso ya está visible en el
+        // panel; al enviar se impide el submit y se lleva al operador hasta él.
+        if (minRejectionBlocked || rejectionNoveltyConflict) {
+            if (liveValidationPanel) {
+                liveValidationPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+            showToast(liveValidationErrors[0]);
+            showAlert(liveValidationErrors);
+            return;
+        }
 
         if (hasAnyIssue && notes.length < 5) {
             showAlert("Debe ingresar una justificación detallada en las notas de muelle (mínimo 5 caracteres).");

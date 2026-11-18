@@ -1584,6 +1584,7 @@
    ========================================================================== */
 
 .input-row-lot.is-invalid,
+.input-received.is-invalid,
 .select-item-condition.is-invalid {
     border-color: #dc2626 !important;
     background-color: #fef2f2 !important;
@@ -1615,8 +1616,64 @@
 
 /* El borde rojo del renglón gana sobre los estados verde/ámbar/azul. */
 .row-lot-contradiction,
-.row-near-expiry-contradiction {
+.row-near-expiry-contradiction,
+.row-rejection-min {
     border-left: 4px solid #dc2626 !important;
+}
+
+/* ==========================================================================
+   VALIDACIÓN EN VIVO: rechazo parcial mínimo y novedad de no admisión
+   ========================================================================== */
+
+.live-validation-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.live-validation-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #dc2626;
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.live-validation-alert-icon {
+    flex: 0 0 auto;
+    font-size: 16px;
+    line-height: 1.2;
+    color: #dc2626;
+}
+
+.live-validation-alert-body {
+    flex: 1 1 auto;
+}
+
+.live-validation-alert-body strong {
+    display: block;
+    margin-bottom: 2px;
+    color: #991b1b;
+    font-weight: 800;
+}
+
+/* Estado del botón cuando la validación en vivo impide procesar la recepción. */
+.btn-ph-primary.is-blocked {
+    background: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.btn-ph-primary.is-blocked:hover {
+    background: #94a3b8;
 }
 
 .reception-toast-container {
