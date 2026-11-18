@@ -52,6 +52,72 @@
 }
 
 /* ==========================================================================
+   FRANJA DE TRAZABILIDAD: Fecha · Responsable · Acción · Detalles
+   Solo datos que no repiten los distintivos de la cabecera de la tarjeta.
+   ========================================================================== */
+.ph-trace {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #fff;
+}
+
+.ph-audit-card table.ph-tbl-trace {
+    margin-bottom: 0;
+    font-size: 0.8rem;
+}
+
+.ph-audit-card table.ph-tbl-trace thead th {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    color: #6c757d;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0.55rem 0.9rem;
+}
+
+.ph-audit-card table.ph-tbl-trace tbody td {
+    border: 0;
+    padding: 0.7rem 0.9rem;
+    vertical-align: middle;
+}
+
+.ph-trace-col-date { width: 175px; }
+.ph-trace-col-user { width: 220px; }
+.ph-trace-col-action { width: 170px; }
+
+.ph-trace-date {
+    color: #495057;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ph-trace-user {
+    display: block;
+    color: #212529;
+    font-weight: 600;
+}
+
+.ph-trace-email {
+    display: block;
+    color: #6c757d;
+    font-size: 0.72rem;
+}
+
+.ph-trace-action {
+    color: #495057;
+    font-weight: 600;
+}
+
+.ph-trace-detail {
+    color: #6c757d;
+    white-space: pre-line;
+}
+
+/* ==========================================================================
    DESBORDAMIENTO DE TEXTO: evita que notas/badges/productos largos
    rompan el ancho de la tarjeta en móviles (el texto debe cortarse y
    saltar de línea, nunca salirse del contenedor)
@@ -188,4 +254,20 @@
     .ph-audit-card {
         padding: 1rem !important;
     }
+
+    /* Trazabilidad: una tarjeta interna con etiquetas por columna. */
+    .ph-trace {
+        border: 0;
+        border-radius: 0;
+        background-color: transparent;
+    }
+
+    .ph-audit-card table.ph-tbl-trace tbody td {
+        padding: 0.25rem 0 !important;
+    }
+
+    .ph-audit-card table.ph-tbl-trace td:nth-child(1)::before { content: "Fecha"; }
+    .ph-audit-card table.ph-tbl-trace td:nth-child(2)::before { content: "Responsable"; }
+    .ph-audit-card table.ph-tbl-trace td:nth-child(3)::before { content: "Acción"; }
+    .ph-audit-card table.ph-tbl-trace td:nth-child(4)::before { content: "Detalles"; }
 }

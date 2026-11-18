@@ -1,5 +1,10 @@
 from app.extensions import db
-from app.waste.repositories.auditinventory_repository import AuditInventoryRepository
+from app.waste.repositories.auditinventory_repository import (
+    AuditInventoryRepository,
+    NON_INVENTORY_TABLES,
+    NON_INVENTORY_ACTIONS,
+    NON_INVENTORY_ACTION_PREFIXES,
+)
 from app.models import Location, Movement, PurchaseAuditLog, Product, WasteDetail
 from datetime import datetime, timedelta
 from app.time_utils import current_ve_time, TZ_VENEZUELA
@@ -17,6 +22,167 @@ _MERMA_NOVEDADES = {
     'TIEMPO': 'supera la frecuencia de mermas esperada de la sede',
     'VENCIDO': 'lote vencido',
 }
+
+# Catálogo de novedades oficiales que el operario puede declarar al recibir
+# (ver logistics/movement_reception.html). La auditoría muestra el texto
+# oficial de la novedad en lugar de reinterpretarla como un faltante.
+RECEPTION_NOVELTY_LABELS = {
+    'CONFORME': 'Conforme',
+    'FALTANTE': 'Faltante de conteo',
+    'SOBRANTE': 'Sobrante / excedente',
+    'FALTANTE_CONTEO': 'Faltante de conteo',
+    'SOBRANTE_EXCEDENTE': 'Sobrante / excedente',
+    'PRODUCTO_ERRONEO': 'Producto erróneo / SKU cruzado',
+    'INCIDENCIA_TEMPERATURA': 'Ruptura de cadena de frío',
+    'VIOLACION_CUSTODIA': 'Violación de custodia / precinto roto',
+    'VENCIMIENTO_PROXIMO': 'Alerta de vencimiento próximo',
+    'LOTE_NO_COINCIDE': 'Lote no coincide con la guía',
+    'RECHAZO_POR_ESPACIO': 'Rechazo parcial por falta de espacio',
+    'RETORNO_EMERGENCIA': 'Retorno de emergencia',
+    'NOVEDAD_FALTANTE': 'Novedad con faltante',
+    'INCIDENCIA_MIXTA': 'Incidencia mixta (múltiples novedades)',
+}
+
+# Títulos del banner de la recepción según la causa real registrada. Se arman
+# con el sujeto (La recepción / La devolución) para no forzar "llegó
+# incompleta" cuando la novedad es espacio, frío, custodia, lote, etc.
+RECEPTION_NOVELTY_HEADLINES = {
+    'RECHAZO_POR_ESPACIO': '{subject} presentó rechazo por falta de espacio',
+    'INCIDENCIA_TEMPERATURA': '{subject} presentó ruptura de cadena de frío',
+    'VIOLACION_CUSTODIA': '{subject} presentó violación de custodia / precinto roto',
+    'VENCIMIENTO_PROXIMO': '{subject} presentó alerta de vencimiento próximo',
+    'LOTE_NO_COINCIDE': '{subject} presentó un lote distinto al de la guía',
+    'PRODUCTO_ERRONEO': '{subject} presentó producto erróneo / SKU cruzado',
+    'INCIDENCIA_MIXTA': '{subject} presentó múltiples novedades',
+    'RETORNO_EMERGENCIA': '{subject} ingresó como retorno de emergencia',
+}
+
+# Icono del banner por causa, para que el aviso se identifique de un vistazo.
+RECEPTION_NOVELTY_ICONS = {
+    'FALTANTE': 'bi-exclamation-triangle-fill',
+    'FALTANTE_CONTEO': 'bi-exclamation-triangle-fill',
+    'SOBRANTE': 'bi-box-seam-fill',
+    'SOBRANTE_EXCEDENTE': 'bi-box-seam-fill',
+    'RECHAZO_POR_ESPACIO': 'bi-x-octagon-fill',
+    'PRODUCTO_ERRONEO': 'bi-exclamation-octagon-fill',
+    'INCIDENCIA_TEMPERATURA': 'bi-thermometer-high',
+    'VIOLACION_CUSTODIA': 'bi-shield-exclamation',
+    'VENCIMIENTO_PROXIMO': 'bi-calendar-x-fill',
+    'LOTE_NO_COINCIDE': 'bi-upc-scan',
+    'INCIDENCIA_MIXTA': 'bi-exclamation-diamond-fill',
+    'RETORNO_EMERGENCIA': 'bi-arrow-counterclockwise',
+}
+
+# Códigos que describen una diferencia de cantidad y no una causa cualitativa.
+RECEPTION_QUANTITY_NOVELTIES = {
+    'FALTANTE', 'SOBRANTE', 'FALTANTE_CONTEO', 'SOBRANTE_EXCEDENTE',
+}
+
+# Novedades de NO ADMISIÓN: la mercancía llegó físicamente al muelle pero no
+# ingresó por decisión operativa de la sede (p. ej. falta de espacio). La
+# porción no recibida es un RECHAZO en sitio, no un faltante del proveedor.
+RECEPTION_REJECTION_NOVELTIES = {'RECHAZO_POR_ESPACIO'}
+
+# Códigos agrupadores de logs antiguos: indican "hubo novedad" pero no la
+# causa, así que nunca deben ganarle a la novedad real del renglón.
+RECEPTION_GENERIC_NOVELTIES = {
+    'CALIDAD', 'NOVEDAD', 'INCIDENCIA', 'OTRO', 'OTRA', 'SIN_NOVEDAD',
+}
+
+# Alias de los textos que ya vienen legibles desde el formulario de recepción
+# (o de payloads históricos) hacia el código oficial del catálogo.
+RECEPTION_NOVELTY_ALIASES = {
+    'RECHAZO_PARCIAL_POR_FALTA_DE_ESPACIO': 'RECHAZO_POR_ESPACIO',
+    'RECHAZO_PARCIAL_POR_ESPACIO': 'RECHAZO_POR_ESPACIO',
+    'RECHAZO_POR_FALTA_DE_ESPACIO': 'RECHAZO_POR_ESPACIO',
+    'RUPTURA_DE_CADENA_DE_FRIO': 'INCIDENCIA_TEMPERATURA',
+    'RUPTURA_CADENA_DE_FRIO': 'INCIDENCIA_TEMPERATURA',
+    'TEMPERATURA_FUERA_DE_RANGO': 'INCIDENCIA_TEMPERATURA',
+    'ALERTA_DE_VENCIMIENTO_PROXIMO': 'VENCIMIENTO_PROXIMO',
+    'VENCIMIENTO_CERCANO': 'VENCIMIENTO_PROXIMO',
+    'LOTE_NO_COINCIDE_CON_LA_GUIA': 'LOTE_NO_COINCIDE',
+    'VIOLACION_DE_CUSTODIA': 'VIOLACION_CUSTODIA',
+    'VIOLACION_DE_CUSTODIA_PRECINTO_ROTO': 'VIOLACION_CUSTODIA',
+    'PRECINTO_ROTO': 'VIOLACION_CUSTODIA',
+    'FALTANTE_DE_CONTEO': 'FALTANTE_CONTEO',
+    'FALTANTE_FISICO_DE_CONTEO': 'FALTANTE_CONTEO',
+    'EXCEDENTE_SOBRANTE_EN_MUELLE': 'SOBRANTE_EXCEDENTE',
+    'SOBRANTE_EXCEDENTE_EN_MUELLE': 'SOBRANTE_EXCEDENTE',
+    'PRODUCTO_ERRONEO_SKU_CRUZADO': 'PRODUCTO_ERRONEO',
+    'SKU_CRUZADO': 'PRODUCTO_ERRONEO',
+    'INCIDENCIA_MIXTA_MULTIPLES_NOVEDADES': 'INCIDENCIA_MIXTA',
+    'MULTIPLES_NOVEDADES': 'INCIDENCIA_MIXTA',
+}
+
+
+def _canonical_novelty(code):
+    """Código oficial de una novedad, normalizando texto libre y alias."""
+    key = re.sub(r'[^A-Z0-9]+', '_', str(code or '').upper()).strip('_')
+    if not key:
+        return ''
+    return RECEPTION_NOVELTY_ALIASES.get(key, key)
+
+
+def _novelty_label(code):
+    """Texto legible de una novedad; tolera códigos nuevos sin catálogo."""
+    raw = str(code or '').strip()
+    canon = _canonical_novelty(raw)
+    if not canon or canon == 'CONFORME':
+        return RECEPTION_NOVELTY_LABELS['CONFORME']
+    if canon in RECEPTION_NOVELTY_LABELS:
+        return RECEPTION_NOVELTY_LABELS[canon]
+    # Novedad nueva sin catálogo: si ya viene como texto legible se respeta;
+    # si viene como código, se muestra sin guiones bajos.
+    if ' ' in raw:
+        return raw[:1].upper() + raw[1:]
+    return raw.replace('_', ' ').capitalize()
+
+
+def _novelty_headline(subject, novelty, label):
+    """Título del banner según la causa real de la novedad."""
+    template = RECEPTION_NOVELTY_HEADLINES.get(novelty)
+    if template:
+        return template.format(subject=subject)
+    return f'{subject} presentó una novedad: {label}'
+
+
+def _novelty_icon(novelty):
+    return RECEPTION_NOVELTY_ICONS.get(novelty, 'bi-info-circle-fill')
+
+
+def _resolve_reception_novelty(general_novelty, item_novelty='', movement_status=''):
+    """Elige la novedad que debe encabezar el aviso de recepción.
+
+    Una causa cualitativa real (espacio, frío, vencimiento, lote, custodia,
+    producto erróneo) manda sobre la diferencia de cantidad: un rechazo por
+    espacio llega incompleto por definición, pero no es un "faltante".
+    Los códigos agrupadores (p. ej. "CALIDAD") se descartan para no tapar la
+    novedad concreta que trae el renglón.
+    """
+    codes = []
+    for raw in (general_novelty, item_novelty):
+        canon = _canonical_novelty(raw)
+        if canon and canon != 'CONFORME' and canon not in RECEPTION_GENERIC_NOVELTIES:
+            if canon not in codes:
+                codes.append(canon)
+
+    if not codes:
+        # Respaldo: logs sin novelty_type donde solo quedó el estado del traslado.
+        canon = _canonical_novelty(movement_status)
+        if canon in RECEPTION_NOVELTY_LABELS and canon != 'CONFORME':
+            codes.append(canon)
+
+    if not codes:
+        return ''
+    qualitative = [
+        c for c in codes
+        if c not in RECEPTION_QUANTITY_NOVELTIES and c != 'INCIDENCIA_MIXTA'
+    ]
+    if qualitative:
+        return qualitative[0]
+    if 'INCIDENCIA_MIXTA' in codes:
+        return 'INCIDENCIA_MIXTA'
+    return codes[0]
 
 def _novedad_merma(motivos):
     if not isinstance(motivos, dict):
@@ -95,6 +261,8 @@ def fetch_filtered_audit_logs(user, is_admin, filters):
 
     formatted_logs = []
     for log in raw_logs:
+        if _is_non_inventory_log(log):
+            continue
         changed_data = log.changed_data or {}
         if isinstance(changed_data, str):
             try:
@@ -403,6 +571,59 @@ def _qty_str(value):
     return ("%f" % float(d)).rstrip("0").rstrip(".")
 
 
+def _is_non_inventory_log(log):
+    """True si el log es de usuarios/seguridad y no debe verse en inventario.
+
+    El repositorio ya filtra en SQL; esto es una salvaguarda adicional para
+    payloads antiguos que pudieran llegar sin `affected_table`.
+    """
+    affected = (getattr(log, 'affected_table', '') or '').lower()
+    action = (getattr(log, 'action', '') or '').upper()
+    if affected in NON_INVENTORY_TABLES:
+        return True
+    if action in NON_INVENTORY_ACTIONS:
+        return True
+    return any(action.startswith(prefix) for prefix in NON_INVENTORY_ACTION_PREFIXES)
+
+
+_PRODUCT_ID_KEYS = ('product_id', 'insumo_id', 'id_producto', 'id_insumo')
+
+
+def _item_product_id(item):
+    """Id numérico del producto de un ítem/lote, tolerando payloads heterogéneos."""
+    for key in _PRODUCT_ID_KEYS:
+        val = item.get(key)
+        if val in (None, ''):
+            continue
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _display_product(item, product_names=None):
+    """Nombre exacto del producto del ítem/lote; nunca queda vacío.
+
+    Prioriza el nombre que ya trae el payload y, si no viene, lo resuelve con
+    el mapa de productos de la base de datos. El último recurso es el id, para
+    que un renglón jamás quede sin identificar el alimento.
+    """
+    name = (
+        item.get('product_name') or item.get('nombre_producto')
+        or item.get('producto') or item.get('nombre')
+    )
+    if name:
+        return name
+    pid = _item_product_id(item)
+    if pid is not None:
+        resolved = (product_names or {}).get(pid)
+        if resolved:
+            return resolved
+        return f'Insumo #{pid}'
+    return 'N/A'
+
+
 def _entry_seed(row, sede, product, c, is_admin, read_only_role, now):
     sev = (row.severity or 'NORMAL').upper()
     username = getattr(row, 'user_name', None) or 'Sistema'
@@ -414,13 +635,18 @@ def _entry_seed(row, sede, product, c, is_admin, read_only_role, now):
     entry = {
         'id': row.id,
         'action': row.action or '',
+        'action_label': (row.action or '').replace('_', ' ').title() or '—',
         'sev': sev,
         'sev_label': _sev_badge(sev)[0],
         'sev_class': _sev_badge(sev)[1],
         'sev_icon': _sev_badge(sev)[2],
         'user_name': username,
+        # Correo del responsable (trazabilidad); puede venir vacío en logs antiguos.
+        'user_email': getattr(row, 'user_email', None) or '',
         'initial': username[0].upper() if username else 'S',
         'ts': ts,
+        # Marca de tiempo exacta ya formateada para la vista.
+        'ts_display': ts.strftime('%Y-%m-%d %H:%M:%S') if ts else '—',
         'sede': sede,
         'movement_id': c.get('movement_id'),
         'notes': c.get('notes', '') if isinstance(c.get('notes'), str) else '',
@@ -433,6 +659,18 @@ def _entry_seed(row, sede, product, c, is_admin, read_only_role, now):
         'can_view_purchase': False,
     }
     return entry, ts_aware, sev
+
+
+def _trace_detail(row):
+    """Detalle legible sin repetir datos ya visibles en la cabecera de la tarjeta.
+
+    El producto, la sede y el traslado ya se muestran como distintivos arriba;
+    aquí solo interesa la observación/motivo del movimiento.
+    """
+    notes = row.get('notes')
+    if isinstance(notes, str) and notes.strip():
+        return notes.strip()
+    return 'Sin observaciones registradas.'
 
 
 def _apply_manage(entry, ts_aware, sev, act, is_admin, read_only_role, now):
@@ -462,7 +700,7 @@ def _apply_manage(entry, ts_aware, sev, act, is_admin, read_only_role, now):
     entry['manage_mode'] = 'EDITAR_ANULAR'
 
 
-def _push_inventory_rows(rows, log, c, sev, ts_aware, sede, entry, is_admin, read_only_role, now, annulled_target_ids):
+def _push_inventory_rows(rows, log, c, sev, ts_aware, sede, entry, is_admin, read_only_role, now, annulled_target_ids, product_names=None):
     """Crea las filas de un log operativo de stock (quantity_changed)."""
     qty_changed = _fmt_amount(c.get('quantity_changed', 0)) or 0.0
     prev_qty = _fmt_amount(c.get('previous_quantity'))
@@ -500,7 +738,7 @@ def _push_inventory_rows(rows, log, c, sev, ts_aware, sede, entry, is_admin, rea
     row_data = dict(entry)
     row_data.update({
         'event_type': 'inventory',
-        'product': c.get('product_name') or c.get('producto') or c.get('nombre') or 'N/A',
+        'product': _display_product(c, product_names),
         'sku': c.get('sku', 'N/A'),
         'lot': c.get('lot_number', 'N/A'),
         'qty': qty_changed,
@@ -513,30 +751,39 @@ def _push_inventory_rows(rows, log, c, sev, ts_aware, sede, entry, is_admin, rea
     rows.append(row_data)
 
 
-def _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+def _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status, product_names=None):
     items = c.get('items') or []
     if not items:
         return
     total = sum(float(i.get('dispatched_qty', 0)) for i in items)
     for it in items:
+        product = _display_product(it, product_names)
+        lot = it.get('lot_number') or 'N/A'
+        dispatched = float(it.get('dispatched_qty', 0))
         row = dict(entry)
         row.update({
             'event_type': 'despacho',
-            'product': it.get('product_name') or 'N/A',
+            'product': product,
             'sku': it.get('sku') or 'N/A',
-            'lot': it.get('lot_number') or 'N/A',
+            'lot': lot,
             'expiration': it.get('expiration_date') or 'N/A',
-            'qty': -float(it.get('dispatched_qty', 0)),
-            'dispatched_qty': float(it.get('dispatched_qty', 0)),
+            'qty': -dispatched,
+            'dispatched_qty': dispatched,
             'origin': origin_name,
             'destination': destination_name,
             'movement_status': mov_status,
+            # Detalle del renglón para la trazabilidad: producto + lote + cantidad.
+            'notes': entry['notes'] or (
+                f"Despacho de {_qty_str(dispatched)} de {product} "
+                f"(lote {lot}) desde {origin_name} hacia {destination_name}."
+            ),
         })
         rows.append(row)
 
 
 def _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
     delta = _fmt_amount((c.get('stock_impact') or {}).get('origin_current_delta')) or 0.0
+    reason = c.get('reason', '') or ''
     row = dict(entry)
     row.update({
         'event_type': 'cancelacion',
@@ -544,46 +791,154 @@ def _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, m
         'sku': 'N/A',
         'lot': 'N/A',
         'qty': abs(delta),
-        'reason': c.get('reason', ''),
+        'reason': reason,
         'origin': origin_name,
         'destination': destination_name,
         'movement_status': mov_status,
+        'notes': entry['notes'] or (
+            f"Cancelación del traslado #{c.get('movement_id')}."
+            + (f" Motivo: {reason}" if reason else '')
+        ),
     })
     rows.append(row)
 
 
-def _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+def _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status, product_names=None):
     items = c.get('items') or []
     notes = entry['notes']
     if not items:
         return
     for it in items:
-        missing = float(it.get('missing_qty', 0))
-        novelty = it.get('specific_novelty', 'CONFORME')
+        product = _display_product(it, product_names)
+        lot = it.get('lot_number') or 'N/A'
+        dispatched = float(it.get('dispatched_qty') or 0)
+        received = float(it.get('received_qty', it.get('dispatched_qty', 0)) or 0)
+        missing = float(it.get('missing_qty') or 0)
+        if missing <= 0.001 and dispatched - received > 0.001:
+            missing = dispatched - received
+        # Sobrante: llegó más de lo despachado. No es un faltante y no debe
+        # pintarse como "recepción incompleta".
+        surplus = max(0.0, received - dispatched)
+        raw_novelty = (
+            it.get('specific_novelty')
+            or it.get('item_condition')
+            or it.get('novelty')
+            or it.get('novedad')
+            or 'CONFORME'
+        )
+        novelty = _resolve_reception_novelty(
+            c.get('novelty_type'), raw_novelty, mov_status
+        )
+        is_qualitative = bool(novelty) and novelty not in RECEPTION_QUANTITY_NOVELTIES
+
+        # Rechazo en sitio: lo no ingresado se reporta como rechazado, nunca
+        # como faltante del proveedor (la mercancía sí llegó al muelle).
+        is_rejection = novelty in RECEPTION_REJECTION_NOVELTIES
+        rejected = 0.0
+        if is_rejection:
+            rejected = float(it.get('rejected_qty') or 0)
+            if rejected <= 0.001:
+                rejected = max(missing, max(0.0, dispatched - received))
+            missing = 0.0
+
+        if is_rejection:
+            novelty_kind = 'rechazo'
+        elif is_qualitative:
+            novelty_kind = 'novedad'
+        elif surplus > 0.001:
+            novelty = 'SOBRANTE'
+            novelty_kind = 'sobrante'
+        elif missing > 0.001:
+            novelty = 'FALTANTE'
+            novelty_kind = 'faltante'
+        elif novelty:
+            # Novedad de cantidad declarada sin diferencia numérica registrada.
+            novelty_kind = 'novedad'
+        else:
+            novelty = 'CONFORME'
+            novelty_kind = 'ninguna'
+
+        label = _novelty_label(novelty)
+        subject = 'La devolución' if entry.get('is_retorno') else 'La recepción'
+        if is_rejection:
+            qty_note = f"Rechazado: {_qty_str(rejected)}" if rejected > 0.001 else ''
+        elif surplus > 0.001:
+            qty_note = f"Sobrante: {_qty_str(surplus)}"
+        elif missing > 0.001:
+            qty_note = f"Faltante: {_qty_str(missing)}"
+        else:
+            qty_note = ''
+
+        if novelty_kind == 'rechazo':
+            novelty_title = _novelty_headline(subject, novelty, label)
+            novelty_summary = ' · '.join(
+                x for x in (f'Novedad: {label}', qty_note) if x
+            )
+            detail = (
+                f"Recepción de {product} (lote {lot}) con rechazo en sitio: "
+                f"{_qty_str(rejected)} no ingresadas de {_qty_str(dispatched)} "
+                f"despachadas ({_qty_str(received)} recibidas)."
+            )
+        elif novelty_kind == 'faltante':
+            novelty_title = f"{subject} llegó incompleta"
+            novelty_summary = f"Novedad: {label}" + (f" · {qty_note}" if qty_note else '')
+            detail = f"Recepción incompleta de {product} (lote {lot}): faltante de {_qty_str(missing)}."
+        elif novelty_kind == 'sobrante':
+            novelty_title = f"{subject} llegó con sobrante"
+            novelty_summary = f"Novedad: {label}" + (f" · {qty_note}" if qty_note else '')
+            detail = f"Recepción con sobrante de {product} (lote {lot}): {_qty_str(surplus)} de más."
+        elif novelty_kind == 'novedad':
+            # El título refleja la causa real registrada (espacio, frío, lote,
+            # custodia, producto erróneo…) en lugar de un genérico de faltante.
+            novelty_title = _novelty_headline(subject, novelty, label)
+            novelty_summary = ' · '.join(
+                x for x in (f'Novedad: {label}', qty_note) if x
+            )
+            detail = f"Recepción de {product} (lote {lot}) con novedad: {label.lower()}."
+            if qty_note:
+                detail += f" Diferencia física: {qty_note.lower()}."
+        else:
+            novelty_title = f"{subject} conforme"
+            novelty_summary = ''
+            detail = f"Recepción conforme de {product} (lote {lot}): {_qty_str(received)} recibidas."
+
         row = dict(entry)
         row.update({
             'event_type': 'recepcion',
-            'product': it.get('product_name') or 'N/A',
+            'product': product,
             'sku': it.get('sku') or 'N/A',
-            'lot': it.get('lot_number') or 'N/A',
+            'lot': lot,
             'expiration': it.get('expiration_date') or 'N/A',
-            'qty': float(it.get('received_qty', it.get('dispatched_qty', 0))),
-            'dispatched_qty': float(it.get('dispatched_qty', 0)),
-            'received_qty': float(it.get('received_qty', it.get('dispatched_qty', 0))),
+            'qty': received,
+            'dispatched_qty': dispatched,
+            'received_qty': received,
             'missing_qty': missing,
+            'surplus_qty': surplus,
+            'rejected_qty': rejected,
             'novelty': novelty,
-            'notes': notes,
+            'novelty_label': label,
+            'novelty_kind': novelty_kind,
+            'novelty_title': novelty_title,
+            'novelty_summary': novelty_summary,
+            'novelty_icon': _novelty_icon(novelty),
+            'notes': notes or detail,
             'origin': origin_name,
             'destination': destination_name,
             'movement_status': mov_status,
-            'has_novedad': missing > 0.001 or (novelty or '').upper() != 'CONFORME',
+            'has_novedad': novelty_kind != 'ninguna',
         })
         rows.append(row)
 
 
-def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status):
+def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status, product_names=None):
     summary = c.get('resolution_summary') or {}
-    items = c.get('items') or []
+    # Cada renglón de la resolución lleva el nombre del producto resuelto: la
+    # tabla de detalle muestra producto + lote, nunca solo el código del lote.
+    items = [
+        dict(it, product_name=_display_product(it, product_names))
+        for it in (c.get('items') or [])
+        if isinstance(it, dict)
+    ]
     notes = c.get('general_notes', '') or ''
     credited = _fmt_amount(summary.get('credited_total')) or 0.0
     returned = _fmt_amount(summary.get('returned_total')) or 0.0
@@ -600,6 +955,10 @@ def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mo
             'movement_status': mov_status,
             'resolution_items': items,
             'resolution_notes': notes,
+            'notes': notes or (
+                f"Resolución de la disputa del traslado {c.get('movement_id')}: "
+                f"acreditadas {_qty_str(credited)} en destino."
+            ),
         })
         rows.append(row)
 
@@ -614,6 +973,10 @@ def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mo
             'movement_status': mov_status,
             'resolution_items': items,
             'resolution_notes': notes,
+            'notes': notes or (
+                f"Resolución de la disputa del traslado {c.get('movement_id')}: "
+                f"devueltas {_qty_str(returned)} al origen."
+            ),
         })
         rows.append(row)
 
@@ -628,6 +991,10 @@ def _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mo
             'movement_status': mov_status,
             'resolution_items': items,
             'resolution_notes': notes,
+            'notes': notes or (
+                f"Resolución de la disputa del traslado {c.get('movement_id')}: "
+                f"{_qty_str(lost)} dadas de baja por extravío."
+            ),
         })
         rows.append(row)
 
@@ -746,6 +1113,24 @@ def get_inventory_audit_entries(filters, user, is_admin):
             })
             product_ids_all.add(wd.product_id)
 
+    # --- Nombres de producto de TODOS los renglones/lotes de la auditoría ---
+    # Despachos, recepciones, resoluciones y logs de stock guardan product_id;
+    # se resuelven en bloque para que el nombre del alimento siempre llegue a
+    # la plantilla (aunque el payload no traiga product_name).
+    def _collect_product_ids(payload):
+        ids = set()
+        pid = _item_product_id(payload)
+        if pid is not None:
+            ids.add(pid)
+        for key in ('items', 'productos', 'decisiones', 'resolution_items'):
+            for it in payload.get(key) or []:
+                if isinstance(it, dict):
+                    ids |= _collect_product_ids(it)
+        return ids
+
+    for raw in raw_logs:
+        product_ids_all |= _collect_product_ids(_changed_dict(raw))
+
     product_map = {}
     if product_ids_all:
         for pr in Product.query.filter(Product.id.in_(product_ids_all)).all():
@@ -787,6 +1172,10 @@ def get_inventory_audit_entries(filters, user, is_admin):
 
     rows = []
     for log in raw_logs:
+        if _is_non_inventory_log(log):
+            # Salvaguarda: usuarios/seguridad (p. ej. RECHAZO_SOLICITUD) no son
+            # eventos de inventario y no deben caer en el formateador genérico.
+            continue
         c = _changed_dict(log)
         act = (log.action or '').upper()
         aff = (getattr(log, 'affected_table', '') or '').lower()
@@ -816,13 +1205,22 @@ def get_inventory_audit_entries(filters, user, is_admin):
             entry['is_retorno'] = bool(mov_obj and mov_obj.type == 'RETORNO_EMERGENCIA')
 
             if act == 'DESPACHO_EMISION':
-                _push_despacho_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+                _push_despacho_rows(
+                    rows, log, c, entry, origin_name, destination_name,
+                    mov_status, product_map
+                )
             elif act == 'CANCELACION_PRE_SALIDA':
                 _push_cancelacion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
             elif act in ('RECEPCION_CONFORME', 'RECEPCION_NOVEDAD', 'RECEPCION_INCIDENCIA_CALIDAD'):
-                _push_recepcion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+                _push_recepcion_rows(
+                    rows, log, c, entry, origin_name, destination_name,
+                    mov_status, product_map
+                )
             elif act == 'RESOLUCION_DISPUTA':
-                _push_resolucion_rows(rows, log, c, entry, origin_name, destination_name, mov_status)
+                _push_resolucion_rows(
+                    rows, log, c, entry, origin_name, destination_name,
+                    mov_status, product_map
+                )
             continue
 
         # --- Mermas: mostrar TODAS (aprobadas, rechazadas, canceladas, editadas) con su detalle y observación ---
@@ -1191,8 +1589,14 @@ def get_inventory_audit_entries(filters, user, is_admin):
 
         _push_inventory_rows(
             rows, log, c, sev, ts_aware, sede, entry,
-            is_admin, read_only_role, now, annulled_target_ids
+            is_admin, read_only_role, now, annulled_target_ids, product_map
         )
+
+    # Completa la trazabilidad que consume la plantilla (responsable, fecha y detalle).
+    for row in rows:
+        if not row.get('ts_display'):
+            row['ts_display'] = row['ts'].strftime('%Y-%m-%d %H:%M:%S') if row.get('ts') else '—'
+        row['trace_detail'] = _trace_detail(row)
 
     return rows
 

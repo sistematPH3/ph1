@@ -3,10 +3,37 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}?v=8">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/auditinventory.css') }}?v=9">
 {% endblock %}
 
 {% block content %}
+{# Trazabilidad explícita y sin duplicidades: la sede, la acción y el traslado ya
+   se muestran como distintivos en la cabecera; aquí solo el quién, cuándo y qué. #}
+{% macro trace_row(e) %}
+<div class="ph-trace mt-3">
+    <table class="table align-middle mb-0 ph-tbl-trace">
+        <thead>
+            <tr>
+                <th class="ph-trace-col-date">Fecha</th>
+                <th class="ph-trace-col-user">Responsable</th>
+                <th class="ph-trace-col-action">Acción</th>
+                <th>Detalles</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="ph-trace-date"><i class="bi bi-clock me-1"></i>{{ e.ts_display or '—' }}</td>
+                <td>
+                    <span class="ph-trace-user"><i class="bi bi-person me-1"></i>{{ e.user_name or 'Sistema' }}</span>
+                    {% if e.user_email %}<span class="ph-trace-email">{{ e.user_email }}</span>{% endif %}
+                </td>
+                <td class="ph-trace-action">{{ e.action_label or (e.action | replace('_', ' ') | title) }}</td>
+                <td class="ph-trace-detail">{{ e.trace_detail or 'Sin observaciones registradas.' }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
 <div class="container-fluid mt-4 mb-5 px-4">
     <div class="ph-card">
 
@@ -96,8 +123,10 @@
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
                                 <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
-                                    <span class="badge-action-pill action-blue">{{ e.action | replace('_', ' ') | title }}</span>
                                     <span class="ph-badge-location">{{ e.sede }}</span>
+                                    {% if e.lot and e.lot != 'N/A' %}
+                                    <span class="ph-badge-location">Lote: {{ e.lot }}</span>
+                                    {% endif %}
                                     {% if e.movement_id %}
                                     <span class="ph-badge-location">{{ 'Devolución' if e.is_retorno else 'Traslado' }} #{{ e.movement_id }}</span>
                                     {% endif %}
@@ -116,16 +145,19 @@
                             <span>
                                 <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
                             </span>
-                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
                         </div>
                     </div>
 
+                    {{ trace_row(e) }}
+
                     {% if e.event_type == 'recepcion' and e.has_novedad %}
-                    <div class="alert {{ 'alert-danger' if e.missing_qty > 0 else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
-                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
+                    <div class="alert {{ 'alert-danger' if e.novelty_kind in ('faltante', 'rechazo') else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
+                        <i class="bi {{ e.novelty_icon or 'bi-info-circle-fill' }} me-3 fs-4 flex-shrink-0"></i>
                         <div>
-                            <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
-                            <span class="text-dark">Faltante: {{ e.missing_qty | ph_qty }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                            <strong class="d-block text-dark">{{ e.novelty_title }}</strong>
+                            {% if e.novelty_summary %}
+                            <span class="text-dark">{{ e.novelty_summary }}</span>
+                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
@@ -187,16 +219,19 @@
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-recepcion">
                                         <thead class="table-light text-muted small">
-                                            <tr><th>Producto</th><th>Lote</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th>Novedad</th></tr>
+                                            <tr><th>Producto</th><th>Lote</th><th>Vencimiento</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th class="text-center text-warning">Sobrante</th><th class="text-center text-danger">Rechazado</th><th>Novedad</th></tr>
                                         </thead>
                                         <tbody class="small">
                                             <tr>
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
+                                                <td>{{ e.expiration or 'N/A' }}</td>
                                                 <td class="text-center">{{ e.dispatched_qty | ph_qty }}</td>
                                                 <td class="text-center text-success fw-bold">{{ e.received_qty | ph_qty }}</td>
                                                 <td class="text-center text-danger fw-bold">{{ e.missing_qty | ph_qty if e.missing_qty > 0 else '-' }}</td>
-                                                <td>{{ e.novelty | replace('_', ' ') | title }}</td>
+                                                <td class="text-center text-warning fw-bold">{{ e.surplus_qty | ph_qty if e.surplus_qty and e.surplus_qty > 0 else '-' }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.rejected_qty | ph_qty if e.rejected_qty and e.rejected_qty > 0 else '-' }}</td>
+                                                <td>{{ e.novelty_label }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -215,11 +250,12 @@
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-resolucion">
                                         <thead class="table-light text-muted small">
-                                            <tr><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
+                                            <tr><th>Producto</th><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
                                         </thead>
                                         <tbody class="small">
                                             {% for item in e.resolution_items %}
                                             <tr>
+                                                <td class="fw-bold">{{ item.get('product_name') or item.get('producto') or 'N/A' }}</td>
                                                 <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
                                                 <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
                                                 <td class="text-center text-success">{{ item.get('credited_qty', 0) | ph_qty }}</td>
@@ -406,8 +442,10 @@
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">{{ e.product | title }}</h5>
                                 <div class="d-flex align-items-center flex-wrap gap-2 mt-1 small">
-                                    <span class="badge-action-pill action-red-light">{{ e.action | replace('_', ' ') | title }}</span>
                                     <span class="ph-badge-location">{{ e.sede }}</span>
+                                    {% if e.lot and e.lot != 'N/A' %}
+                                    <span class="ph-badge-location">Lote: {{ e.lot }}</span>
+                                    {% endif %}
                                     {% if e.movement_id %}
                                     <span class="ph-badge-location">{{ 'Devolución' if e.is_retorno else 'Traslado' }} #{{ e.movement_id }}</span>
                                     {% endif %}
@@ -426,16 +464,19 @@
                             <span>
                                 <span class="badge {{ e.sev_class }} ph-sev-badge"><i class="bi {{ e.sev_icon }} me-1"></i>{{ e.sev_label }}</span>
                             </span>
-                            <span class="text-muted small">{{ e.ts.strftime('%Y-%m-%d %H:%M:%S') if e.ts else '—' }}</span>
                         </div>
                     </div>
 
+                    {{ trace_row(e) }}
+
                     {% if e.event_type == 'recepcion' and e.has_novedad %}
-                    <div class="alert {{ 'alert-danger' if e.missing_qty > 0 else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
-                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 flex-shrink-0"></i>
+                    <div class="alert {{ 'alert-danger' if e.novelty_kind in ('faltante', 'rechazo') else 'alert-warning' }} border-0 py-2 d-flex align-items-center mb-2">
+                        <i class="bi {{ e.novelty_icon or 'bi-info-circle-fill' }} me-3 fs-4 flex-shrink-0"></i>
                         <div>
-                            <strong class="d-block text-dark">{% if e.is_retorno %}La devolución llegó incompleta{% else %}La recepción llegó incompleta{% endif %}</strong>
-                            <span class="text-dark">Faltante: {{ e.missing_qty | ph_qty }} · Novedad: {{ e.novelty | replace('_', ' ') | title }}</span>
+                            <strong class="d-block text-dark">{{ e.novelty_title }}</strong>
+                            {% if e.novelty_summary %}
+                            <span class="text-dark">{{ e.novelty_summary }}</span>
+                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
@@ -492,16 +533,19 @@
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-recepcion">
                                         <thead class="table-light text-muted small">
-                                            <tr><th>Producto</th><th>Lote</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th>Novedad</th></tr>
+                                            <tr><th>Producto</th><th>Lote</th><th>Vencimiento</th><th class="text-center">Despachada</th><th class="text-center">Recibida</th><th class="text-center text-danger">Faltante</th><th class="text-center text-warning">Sobrante</th><th class="text-center text-danger">Rechazado</th><th>Novedad</th></tr>
                                         </thead>
                                         <tbody class="small">
                                             <tr>
                                                 <td class="fw-bold">{{ e.product | title }}</td>
                                                 <td>{{ e.lot }}</td>
+                                                <td>{{ e.expiration or 'N/A' }}</td>
                                                 <td class="text-center">{{ e.dispatched_qty | ph_qty }}</td>
                                                 <td class="text-center text-success fw-bold">{{ e.received_qty | ph_qty }}</td>
                                                 <td class="text-center text-danger fw-bold">{{ e.missing_qty | ph_qty if e.missing_qty > 0 else '-' }}</td>
-                                                <td>{{ e.novelty | replace('_', ' ') | title }}</td>
+                                                <td class="text-center text-warning fw-bold">{{ e.surplus_qty | ph_qty if e.surplus_qty and e.surplus_qty > 0 else '-' }}</td>
+                                                <td class="text-center text-danger fw-bold">{{ e.rejected_qty | ph_qty if e.rejected_qty and e.rejected_qty > 0 else '-' }}</td>
+                                                <td>{{ e.novelty_label }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -520,11 +564,12 @@
                                 <div class="table-responsive rounded border">
                                     <table class="table table-sm align-middle mb-0 bg-white ph-tbl-resolucion">
                                         <thead class="table-light text-muted small">
-                                            <tr><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
+                                            <tr><th>Producto</th><th>Lote</th><th>Acción</th><th class="text-center">Acreditado en destino</th><th class="text-center">Devuelto al origen</th><th class="text-center text-danger">Dado de baja / Extraviado</th></tr>
                                         </thead>
                                         <tbody class="small">
                                             {% for item in e.resolution_items %}
                                             <tr>
+                                                <td class="fw-bold">{{ item.get('product_name') or item.get('producto') or 'N/A' }}</td>
                                                 <td><code>{{ item.get('lot_number', 'N/A') }}</code></td>
                                                 <td class="fw-bold">{{ item.get('action', 'SIN_ACCION') | replace('_', ' ') | title }}</td>
                                                 <td class="text-center text-success">{{ item.get('credited_qty', 0) | ph_qty }}</td>

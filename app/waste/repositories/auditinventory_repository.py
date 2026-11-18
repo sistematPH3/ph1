@@ -1,8 +1,46 @@
 from app.models.inventory_model import db
 from app.models.logistics_model import Location
 from app.models.security_model import User, user_locations
-from sqlalchemy import text
+from sqlalchemy import text, func
 import json
+
+# Logs que NUNCA pertenecen a la auditoría de inventario: gestión de usuarios,
+# autenticación y demás eventos de seguridad. Se excluyen tanto por tabla
+# afectada como por acción, porque hay registros de seguridad con
+# affected_table NULL.
+NON_INVENTORY_TABLES = ('users', 'roles', 'permissions', 'security')
+NON_INVENTORY_ACTIONS = {
+    'RECHAZO_SOLICITUD',
+    'APROBACION_SOLICITUD',
+    'SOLICITUD_REGISTRO',
+    'LOGIN',
+    'LOGIN_FALLIDO',
+    'LOGOUT',
+    'CAMBIO_PASSWORD',
+    'PASSWORD_RESET',
+    'USUARIO_CREADO',
+    'USUARIO_EDITADO',
+    'USUARIO_ELIMINADO',
+}
+NON_INVENTORY_ACTION_PREFIXES = ('USUARIO_', 'ROL_', 'PERMISO_', 'SOLICITUD_', 'SEGURIDAD_')
+
+
+def exclude_non_inventory_logs(query, audit_table):
+    """Restringe la consulta a eventos propios de inventario.
+
+    Descarta los logs de la tabla `users`/seguridad y las acciones de gestión
+    de usuarios (p. ej. RECHAZO_SOLICITUD), tolerando valores NULL en
+    affected_table y action de registros antiguos.
+    """
+    affected = func.lower(func.coalesce(audit_table.c.affected_table, ''))
+    action = func.upper(func.coalesce(audit_table.c.action, ''))
+
+    query = query.filter(~affected.in_(NON_INVENTORY_TABLES))
+    query = query.filter(~action.in_(NON_INVENTORY_ACTIONS))
+    for prefix in NON_INVENTORY_ACTION_PREFIXES:
+        query = query.filter(~action.like(f'{prefix}%'))
+    return query
+
 
 class AuditInventoryRepository:
     
@@ -26,12 +64,15 @@ class AuditInventoryRepository:
         query = db.session.query(
             audit_table,
             Location.name.label('location_name'),
-            User.name.label('user_name')
+            User.name.label('user_name'),
+            User.email.label('user_email')
         ).outerjoin( 
             Location, audit_table.c.location_id == Location.id
         ).outerjoin( 
             User, audit_table.c.user_id == User.id
         )
+
+        query = exclude_non_inventory_logs(query, audit_table)
 
         if allowed_locations is not None:
             if not allowed_locations:
@@ -79,6 +120,8 @@ class AuditInventoryRepository:
             db.func.min(audit_table.c.timestamp),
             db.func.max(audit_table.c.timestamp)
         ).filter(audit_table.c.timestamp.isnot(None))
+
+        query = exclude_non_inventory_logs(query, audit_table)
 
         if allowed_locations is not None:
             if not allowed_locations:
