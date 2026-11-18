@@ -144,17 +144,18 @@ def _convertir_monto(monto, origen, destino, fecha):
 
 
 def _convertir_buckets(buckets, destino, fecha):
-    """Suma los montos en USD/BS/EUR del dict convertiendo cada uno a la moneda
-    del reporte. Retorna None si alguna moneda con monto no tiene tasa."""
+    """Suma los montos en USD/BS/EUR del dict convirtiendo cada uno a la moneda
+    del reporte. Los componentes en cero no exigen tasa; si una moneda con
+    monto no tiene tasa se omite solo esa porción, en lugar de anular todo el
+    total (una serie EUR incompleta ya no borra los montos en Bs/USD)."""
     total = Decimal('0.00')
     for moneda in MONEDAS:
         monto = buckets.get(moneda, Decimal('0.00')) or Decimal('0.00')
         if not monto:
             continue
         convertido = _convertir_monto(monto, moneda, destino, fecha)
-        if convertido is None:
-            return None
-        total += convertido
+        if convertido is not None:
+            total += convertido
     return total
 
 
@@ -163,14 +164,22 @@ def _monto_en_moneda(buckets, moneda, fecha=None):
     el BS de cada detalle quedó grabado en price_bs con la tasa del día de la
     compra (Purchase.exchange_rate), así que se muestra ese monto sin re-valuarlo
     con la tasa del cierre. Si la moneda elegida no tiene valor registrado, se
-    intenta convertir con la tasa del período; sin tasa (EUR) da 0.00."""
+    convierte UNA sola fuente (el BS registrado, que existe para toda compra;
+    si falta, la moneda original) para no sumar valoraciones paralelas del
+    mismo gasto. Sin tasa disponible da 0.00."""
     moneda = (moneda or 'USD').upper()
     buckets = buckets or {}
     registrado = buckets.get(moneda, Decimal('0.00')) or Decimal('0.00')
     if registrado:
         return _redondear(registrado)
-    total = _convertir_buckets(buckets, moneda, fecha)
-    return _redondear(total) if total is not None else Decimal('0.00')
+    for origen in ('BS', 'USD', 'EUR'):
+        monto = buckets.get(origen, Decimal('0.00')) or Decimal('0.00')
+        if not monto:
+            continue
+        convertido = _convertir_monto(monto, origen, moneda, fecha)
+        if convertido is not None:
+            return _redondear(convertido)
+    return Decimal('0.00')
 
 
 def _convertir_compra_a_moneda(fila, moneda):
@@ -192,6 +201,15 @@ def _convertir_compra_a_moneda(fila, moneda):
         return monto * tasa
     if c == 'BS' and moneda == 'EUR':
         return monto / tasa
+    fecha = fila.get('purchase_date') or datetime.now()
+    if c == 'USD' and moneda == 'EUR':
+        # Triangulado vía Bs: la tasa guardada es Bs/USD; se divide por Bs/EUR.
+        tasa_eur = obtener_tasa_historica('EUR', fecha)
+        return monto * tasa / tasa_eur if tasa_eur else None
+    if c == 'EUR' and moneda == 'USD':
+        # Triangulado vía Bs: la tasa guardada es Bs/EUR; se divide por Bs/USD.
+        tasa_usd = obtener_tasa_historica('USD', fecha)
+        return monto * tasa / tasa_usd if tasa_usd else None
     return None
 
 
@@ -321,7 +339,7 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta):
     lee de las tablas REALES: compras, consumo de cocina, mermas aprobadas y
     traslados valorizados."""
     metric = (metric or 'PURCHASES').upper()
-    if not hay_snapshots_metrico(location_ids, metric):
+    if not hay_snapshots_metrico(location_ids, metric, period_type):
         return obtener_totales_reales(location_ids, metric, desde, hasta)
 
     totales = {
@@ -602,6 +620,47 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
                     mv['direccion'] = 'devueltos'
         else:
             resumen['tiene_enviados'] = True
+        if len(location_ids) > 1:
+            # Ámbito multi-sede: 'recibidos' se mide por sede de DESTINO, no
+            # por la orientación de la Central. Un despacho Central → sucursal
+            # salió de la Central (enviado) pero también llegó a una sede
+            # visible (recibido), igual que 'Mercancía recibida'. Se valoriza
+            # con la cantidad realmente recepcionada, no la despachada.
+            recibidos = {'conteo': 0, 'quantity': Decimal('0.00'),
+                         'buckets': _bucket_vacio()}
+            for fila in datos['filas']:
+                if fila.get('destination_id') not in location_ids:
+                    continue
+                if not fila.get('received_quantity'):
+                    continue
+                recibidos['conteo'] += 1
+                recibidos['quantity'] += fila['received_quantity']
+                for m in MONEDAS:
+                    recibidos['buckets'][m] += fila['buckets_recibido'].get(
+                        m, Decimal('0.00'))
+            costo_recibido = _convertir_buckets(recibidos['buckets'], moneda,
+                                                fin)
+            direccional['recibidos'] = {
+                'conteo': recibidos['conteo'],
+                'quantity': _redondear(recibidos['quantity']),
+                'cost': (_redondear(costo_recibido)
+                         if costo_recibido is not None else Decimal('0.00')),
+            }
+            resumen['recibidos'] = recibidos['conteo']
+        # La fila Total se recalcula con las direcciones que la tabla muestra
+        # (sin los internos que ya se plegaron a recibidos).
+        claves_total = (['devueltos', 'recibidos']
+                        if not resumen['tiene_enviados']
+                        else ['recibidos', 'enviados'])
+        direccional['total'] = {
+            'conteo': sum(direccional[k]['conteo'] for k in claves_total),
+            'quantity': _redondear(sum((direccional[k]['quantity']
+                                        for k in claves_total),
+                                       Decimal('0.00'))),
+            'cost': _redondear(sum((direccional[k]['cost']
+                                    for k in claves_total),
+                                   Decimal('0.00'))),
+        }
         return resumen
     if metric == 'CONSOLIDATED':
         return {'consolidado': consolidado_financiero(location_ids, inicio, fin,
@@ -855,11 +914,41 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
     }
 
 
+def _total_moneda(totales, moneda, fecha):
+    """Convierte a la moneda del reporte un total con buckets DISJUNTOS (cada
+    registro valorizado en una sola moneda: traslados, mermas, consumo). Los
+    snapshots no pasan por aquí: ya traen la valoración en las tres monedas."""
+    total = Decimal('0.00')
+    for origen in MONEDAS:
+        monto = totales.get(f'amount_{origen.lower()}', Decimal('0.00'))
+        monto = monto or Decimal('0.00')
+        if not monto:
+            continue
+        convertido = _convertir_monto(monto, origen, moneda, fecha)
+        if convertido is not None:
+            total += convertido
+    return _redondear(total)
+
+
 def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
                              moneda='USD', incluir_compras=True):
-    """Un renglón por sede para el ranking y la comparativa lateral."""
+    """Un renglón por sede para el ranking y la comparativa lateral.
+
+    ``total_base`` se expresa en la moneda del reporte: los montos reales
+    guardados en su moneda original se convierten con la tasa vigente al cierre
+    del período. Las compras se convierten compra por compra (con la tasa
+    registrada en cada una) para no mezclar las valoraciones paralelas USD/Bs
+    del mismo gasto. Si la sede lee snapshots, se elige la moneda ya calculada.
+    """
+    metric = (metric or 'PURCHASES').upper()
+    moneda = (moneda or 'USD').upper()
     nombres = obtener_nombres_sedes(location_ids)
     renglones = []
+    desde_dt = (inicio if isinstance(inicio, datetime)
+                else datetime.combine(inicio, time.min))
+    hasta_dt = (fin if isinstance(fin, datetime)
+                else datetime.combine(fin, time.max))
+    compras_base = None
     for loc_id in location_ids:
         if metric == 'CONSOLIDATED':
             totales = _consolidado_por_periodo([loc_id], period_type,
@@ -871,6 +960,22 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
         snap = obtener_snapshot(loc_id, metric, period_type, inicio)
         if snap is None:
             snap = obtener_snapshot(loc_id, 'PURCHASES', period_type, inicio)
+        if metric == 'CONSOLIDATED':
+            # El consolidado ya viene expresado en la moneda del reporte.
+            total_base = totales['amount_usd']
+        elif hay_snapshots_metrico([loc_id], metric, period_type):
+            # Los snapshots traen las tres valoraciones: se elige la pedida.
+            total_base = totales.get(f'amount_{moneda.lower()}',
+                                     Decimal('0.00'))
+        elif metric == 'PURCHASES' and moneda == 'BS':
+            # El BS registrado (price_bs) es el valor exacto del día de compra.
+            total_base = totales.get('amount_bs', Decimal('0.00'))
+        elif metric == 'PURCHASES':
+            if compras_base is None:
+                compras_base = _compras_en_moneda(desde_dt, hasta_dt, moneda)
+            total_base = compras_base
+        else:
+            total_base = _total_moneda(totales, moneda, hasta_dt)
         nombre_sede = nombres.get(loc_id) or f'Sede #{loc_id}'
         renglones.append({
             'location_id': loc_id,
@@ -881,7 +986,7 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
             'quantity': _redondear(totales['quantity']),
             'record_count': totales['record_count'],
             'moneda': moneda,
-            'total_base': _redondear(totales[f'amount_{moneda.lower()}']),
+            'total_base': _redondear(total_base),
         })
     return renglones
 
@@ -902,15 +1007,37 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
         previo_inicio, previo_fin = (marco['previous_start'],
                                      marco['previous_end'])
 
+    metric = (metric or 'PURCHASES').upper()
+    moneda = (moneda or 'USD').upper()
     renglones = obtener_metrica_por_sede(location_ids, metric, period_type.upper(),
                                          inicio, fin, moneda,
                                          incluir_compras=incluir_compras)
-    monto_key = f'amount_{moneda.lower()}'
+    previo_desde = (previo_inicio if isinstance(previo_inicio, datetime)
+                    else datetime.combine(previo_inicio, time.min))
+    previo_hasta = (previo_fin if isinstance(previo_fin, datetime)
+                    else datetime.combine(previo_fin, time.max))
     for renglon in renglones:
-        previo = _sumar_rango([renglon['location_id']], metric,
-                              period_type.upper(), previo_inicio, previo_fin)
-        anterior_m = previo[monto_key]
-        actual_m = renglon[monto_key]
+        loc_id = renglon['location_id']
+        if metric == 'CONSOLIDATED':
+            previo = _consolidado_por_periodo(
+                [loc_id], period_type.upper(), previo_inicio, previo_fin,
+                moneda, incluir_compras=incluir_compras)
+            anterior_m = previo['amount_usd']
+        else:
+            previo = _sumar_rango([loc_id], metric,
+                                  period_type.upper(), previo_inicio,
+                                  previo_fin)
+            if hay_snapshots_metrico([loc_id], metric, period_type):
+                anterior_m = previo.get(f'amount_{moneda.lower()}',
+                                        Decimal('0.00'))
+            elif metric == 'PURCHASES' and moneda == 'BS':
+                anterior_m = previo.get('amount_bs', Decimal('0.00'))
+            elif metric == 'PURCHASES':
+                anterior_m = _compras_en_moneda(previo_desde, previo_hasta,
+                                                moneda)
+            else:
+                anterior_m = _total_moneda(previo, moneda, previo_hasta)
+        actual_m = renglon['total_base']
         renglon['anterior'] = _redondear(anterior_m)
         renglon['diferencia'] = _redondear(actual_m - anterior_m)
         renglon['pct'] = (_redondear(((actual_m - anterior_m) / anterior_m) * 100)

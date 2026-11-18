@@ -508,12 +508,21 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
 
         buckets = dict(vacio)
         buckets_despachado = dict(vacio)
+        buckets_recibido = dict(vacio)
         perdidas_mov = dict(vacio)
         cantidad = Decimal('0.00')
         cantidad_despachada = Decimal('0.00')
+        cantidad_recibida = Decimal('0.00')
         faltante = Decimal('0.00')
         for detalle in mov.details:
             despachada = Decimal(str(detalle.quantity or 0))
+            # Lo realmente recepcionado en destino, sin importar la dirección
+            # con la que se narre el movimiento (un despacho desde la Central
+            # también es mercancía recibida por la sucursal). NULL = no llegó.
+            recibida = (Decimal(str(detalle.received_quantity))
+                        if detalle.received_quantity is not None
+                        else Decimal('0.00'))
+            cantidad_recibida += recibida
             # Enviados: lo que salió. Recibidos e internos: lo que llegó. Si no
             # hay recepción registrada (received_quantity NULL) no llegó nada.
             if direccion == 'enviados':
@@ -534,6 +543,9 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             if moneda not in buckets_despachado:
                 buckets_despachado[moneda] = Decimal('0.00')
             buckets_despachado[moneda] += despachada * precio
+            if moneda not in buckets_recibido:
+                buckets_recibido[moneda] = Decimal('0.00')
+            buckets_recibido[moneda] += recibida * precio
             if detalle.missing_quantity and cuenta_direccion:
                 falta = Decimal(str(detalle.missing_quantity))
                 faltante += falta
@@ -545,6 +557,8 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             buckets[moneda] = buckets.get(moneda, Decimal('0.00')).quantize(
                 Decimal('0.01'))
             buckets_despachado[moneda] = buckets_despachado.get(
+                moneda, Decimal('0.00')).quantize(Decimal('0.01'))
+            buckets_recibido[moneda] = buckets_recibido.get(
                 moneda, Decimal('0.00')).quantize(Decimal('0.01'))
             perdidas_mov[moneda] = perdidas_mov.get(
                 moneda, Decimal('0.00')).quantize(Decimal('0.01'))
@@ -564,9 +578,11 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             'cuenta_direccion': cuenta_direccion,
             'quantity': cantidad.quantize(Decimal('0.01')),
             'despachado': cantidad_despachada.quantize(Decimal('0.01')),
+            'received_quantity': cantidad_recibida.quantize(Decimal('0.01')),
             'missing_quantity': faltante.quantize(Decimal('0.01')),
             'buckets': dict(buckets),
             'buckets_despachado': dict(buckets_despachado),
+            'buckets_recibido': dict(buckets_recibido),
             'perdidas': dict(perdidas_mov),
         })
 
@@ -739,12 +755,20 @@ def obtener_gasto_por_categoria(desde, hasta, moneda='USD', conversor=None):
 
 def obtener_tasa_historica(moneda, fecha):
     """Tasa BCV (Bs por unidad de 'moneda') vigente en 'fecha': el registro de
-    ExchangeRateHistory más reciente con timestamp <= fecha. None si no hay."""
-    q = db.session.query(ExchangeRateHistory.rate).filter(
-        ExchangeRateHistory.currency == (moneda or 'USD').upper(),
+    ExchangeRateHistory más reciente con timestamp <= fecha. Si no hay ninguno
+    en o antes de la fecha, usa el más reciente disponible de esa moneda (mismo
+    criterio que product_cost_repository.tasas_bcv): antes, un período anterior
+    al primer registro EUR devolvía None y todos los montos en EUR caían a 0.
+    None solo si esa moneda no tiene ningún registro histórico."""
+    currency = (moneda or 'USD').upper()
+    fila = db.session.query(ExchangeRateHistory.rate).filter(
+        ExchangeRateHistory.currency == currency,
         ExchangeRateHistory.timestamp <= fecha,
-    ).order_by(ExchangeRateHistory.timestamp.desc())
-    fila = q.first()
+    ).order_by(ExchangeRateHistory.timestamp.desc()).first()
+    if fila is None:
+        fila = db.session.query(ExchangeRateHistory.rate).filter(
+            ExchangeRateHistory.currency == currency,
+        ).order_by(ExchangeRateHistory.timestamp.desc()).first()
     if fila is None or fila[0] is None:
         return None
     try:

@@ -648,9 +648,14 @@ class AnalysisReportsTest(unittest.TestCase):
                          _redondo('5.00'))
         self.assertEqual(por_sede[('Sede Bello Monte', 'Harina')],
                          _redondo('15.00'))
-        # El flujo direccional sigue narrado desde la Central.
+        # El flujo direccional suma lo que salió de la Central y, además, lo
+        # que llegó a cualquier sede visible (recepción por destino), sin
+        # importar la orientación con la que se narre el envío.
         self.assertEqual(resumen['enviados'], 2)
-        self.assertEqual(resumen['recibidos'], 0)
+        self.assertEqual(resumen['recibidos'], 2)
+        self.assertEqual(resumen['direccional']['recibidos']['conteo'], 2)
+        self.assertEqual(resumen['direccional']['recibidos']['quantity'],
+                         _redondo('70.00'))
 
     # ---------------------------------------------------- permisos ---------
     def test_usuario_sin_sedes_recibe_error(self):

@@ -112,7 +112,8 @@ def _costo_usd_bs_eur(product_id, fecha, cache=None):
     tasa_usd = tasas.get('USD')
     tasa_eur = tasas.get('EUR')
     unit_bs = _redondear(unit_usd * tasa_usd) if tasa_usd else Decimal('0.00')
-    unit_eur = (_redondear(unit_usd * tasa_eur / tasa_usd)
+    # USD→EUR = USD * (Bs/USD) / (Bs/EUR); la tasa EUR no se multiplica.
+    unit_eur = (_redondear(unit_usd * tasa_usd / tasa_eur)
                 if tasa_eur and tasa_usd else Decimal('0.00'))
     return unit_usd, unit_bs, unit_eur
 
@@ -151,13 +152,13 @@ def _agregar_compras(filas, cache):
             rate_usd = tasas.get('USD')
             usd = _redondear(fila['price_bs'] * qty / rate_usd) if fila['price_bs'] and rate_usd else Decimal('0.00')
             rate_eur = tasas.get('EUR')
-            eur = (_redondear(usd * rate_eur / rate_usd) if usd and rate_eur and rate_usd else Decimal('0.00'))
+            eur = (_redondear(usd * rate_usd / rate_eur) if usd and rate_eur and rate_usd else Decimal('0.00'))
         else:
             usd = _redondear(fila['unit_foreign'] * qty)
             tasas = _tasas_en(fila['date'], cache=cache)
             rate_usd = tasas.get('USD')
             rate_eur = tasas.get('EUR')
-            eur = (_redondear(usd * rate_eur / rate_usd) if rate_eur and rate_usd else Decimal('0.00'))
+            eur = (_redondear(usd * rate_usd / rate_eur) if rate_eur and rate_usd else Decimal('0.00'))
         bs = _redondear(fila['price_bs'] * qty) if fila['price_bs'] else Decimal('0.00')
         if not bs and usd:
             tasas = _tasas_en(fila['date'], cache=cache)
@@ -182,7 +183,7 @@ def _agregar_mermas(filas, cache):
         rate_usd = tasas.get('USD')
         rate_eur = tasas.get('EUR')
         bs = _redondear(usd * rate_usd) if rate_usd else Decimal('0.00')
-        eur = (_redondear(usd * rate_eur / rate_usd) if rate_eur and rate_usd else Decimal('0.00'))
+        eur = (_redondear(usd * rate_usd / rate_eur) if rate_eur and rate_usd else Decimal('0.00'))
         return usd, bs, eur
     return _agregar(filas, valor)
 
@@ -212,7 +213,7 @@ def _agregar_traslados(filas, cache):
         rate_eur = tasas.get('EUR')
         usd = _redondear(unit_usd * qty)
         bs = _redondear(usd * rate_usd) if rate_usd else Decimal('0.00')
-        eur = (_redondear(usd * rate_eur / rate_usd) if rate_eur and rate_usd else Decimal('0.00'))
+        eur = (_redondear(usd * rate_usd / rate_eur) if rate_eur and rate_usd else Decimal('0.00'))
         return usd, bs, eur
     return _agregar(filas, valor)
 

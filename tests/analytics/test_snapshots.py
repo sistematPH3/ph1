@@ -221,9 +221,9 @@ class SnapshotsTest(unittest.TestCase):
             period_start=inicio,
         ).first()
         self.assertIsNotNone(snap)
-        # 100 USD * 38,00 / 36,50 = 104,11 EUR (antes quedaba 0,00).
+        # 100 USD * 36,50 / 38,00 = 96,05 EUR (antes quedaba 0,00 o invertido).
         self.assertEqual(snap.amount_usd, Decimal("100.00"))
-        self.assertEqual(snap.amount_eur, Decimal("104.11"))
+        self.assertEqual(snap.amount_eur, Decimal("96.05"))
 
     def test_genera_snapshots_mermas_excluye_canceladas(self):
         self._merma("APROBADO", 5)
