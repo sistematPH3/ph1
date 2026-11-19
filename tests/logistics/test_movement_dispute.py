@@ -53,6 +53,7 @@ from app.logistics.services.movement_dispute_service import (
     cancel_linked_replenishment,
     resolve_dispute,
 )
+from app.time_utils import current_ve_time
 
 
 class ResolveDisputeTest(unittest.TestCase):
@@ -242,6 +243,38 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertEqual(float(returns[0].details[0].quantity), 4.00)
         # 5) El resguardo en tránsito del origen queda liberado.
         self.assertEqual(float(env["inv_origin"].transit_quantity), 0.00)
+
+    def test_retorno_y_dictamen_se_registran_en_hora_venezuela(self):
+        """Regresión del desfase de 4 h en el histórico de disputas y en las
+        devoluciones al Almacén Central.
+
+        El traslado de retorno y el acta de resolución deben usar el reloj VE
+        (current_ve_time), no el default UTC del modelo.
+        """
+        env = self._seed(
+            status="RECHAZO_POR_ESPACIO", novelty_type="RECHAZO_POR_ESPACIO",
+            dispatched=10, received=6
+        )
+
+        antes = current_ve_time()
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "RETORNO_EMERGENCIA",
+            "general_notes": "Devolución al central"
+        }, user_id=env["user"].id)
+        despues = current_ve_time()
+
+        retorno = Movement.query.filter_by(
+            return_of_dispute_id=env["mov"].id
+        ).one()
+        acta = AuditLog.query.filter_by(action="RESOLUCION_DISPUTA").one()
+
+        # Ambos timestamps caen dentro de la ventana VE del cierre.
+        self.assertGreaterEqual(retorno.date, antes)
+        self.assertLessEqual(retorno.date, despues)
+        self.assertGreaterEqual(acta.timestamp, antes)
+        self.assertLessEqual(acta.timestamp, despues)
+        # El retorno y su acta comparten exactamente el instante del dictamen.
+        self.assertEqual(retorno.date, acta.timestamp)
 
     def test_rechazo_por_espacio_solo_admite_devolver(self):
         # Por definición física no hay espacio en la sede: dejarla o darla de

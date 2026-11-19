@@ -105,8 +105,8 @@
                                     </div>
                                 </td>
                                 <td data-label="Fecha y Hora">
-                                    <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
-                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
+                                    <span class="text-dark d-block">{{ mov.date.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M') }}</span>
                                 </td>
                                 <td data-label="Origen y Destino">
                                     <div class="d-flex flex-column gap-1">
@@ -205,8 +205,8 @@
                                     </div>
                                 </td>
                                 <td data-label="Fecha y Hora">
-                                    <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
-                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
+                                    <span class="text-dark d-block">{{ mov.date.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M') }}</span>
                                 </td>
                                 <td data-label="Origen y Destino">
                                     <div class="d-flex flex-column gap-1">
@@ -306,8 +306,8 @@
                                     </div>
                                 </td>
                                 <td data-label="Fecha y Hora">
-                                    <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
-                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M %p') }}</span>
+                                    <span class="text-dark d-block">{{ mov.date.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M') }}</span>
                                 </td>
                                 <td data-label="Origen y Destino">
                                     <div class="d-flex flex-column gap-1">
@@ -390,7 +390,7 @@
                             <tr>
                                 <th>ID</th>
                                 <th>ORIGEN Y DESTINO</th>
-                                <th>FECHA</th>
+                                <th>FECHA Y HORA</th>
                                 <th>ESTADO</th>
                                 <th class="text-end">ACCIONES</th>
                             </tr>
@@ -417,8 +417,9 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td data-label="Fecha">
-                                    <span class="text-dark d-block">{{ mov.date.strftime('%Y-%m-%d') }}</span>
+                                <td data-label="Fecha y Hora">
+                                    <span class="text-dark d-block">{{ mov.date.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted small">{{ mov.date.strftime('%H:%M') }}</span>
                                 </td>
                                 <td data-label="Estado">
                                     {% if mov.status == 'COMPLETADO' %}

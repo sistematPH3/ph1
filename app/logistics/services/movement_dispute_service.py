@@ -445,6 +445,13 @@ def resolve_dispute(movement_id, payload, user_id):
         )
 
     general_notes = payload.get("general_notes", "")
+    # Reloj de Venezuela (UTC-4) para TODO el cierre de la disputa. El módulo
+    # logístico persiste sus fechas con la hora local (current_ve_time), así
+    # que el traslado de retorno y el acta de resolución deben usar el mismo
+    # reloj: si se omite, el default del modelo (datetime.utcnow) mostraría la
+    # fecha 4 h adelantada en el histórico de disputas y en la bandeja
+    # Arbitraje / devoluciones al Almacén Central.
+    resolved_at = current_ve_time()
     _, erroneous_products, audit_items_map = _get_reception_audit(movement)
 
     # Banderas auxiliares para la creación automatizada del traslado de retorno.
@@ -758,6 +765,7 @@ def resolve_dispute(movement_id, payload, user_id):
             # cancel_linked_replenishment más abajo).
             return_of_dispute_id=movement.id,
             user_id=user_id,
+            date=resolved_at,
             resolution_notes=f"Retorno automático por resolución de disputa en traslado #{movement.id}. {general_notes}"
         )
         db.session.add(linked_movement)
@@ -826,6 +834,9 @@ def resolve_dispute(movement_id, payload, user_id):
         action='RESOLUCION_DISPUTA',
         severity='ALERTA' if has_returns else 'NORMAL',
         user_id=user_id,
+        # La fecha del dictamen se guarda en hora VE: es la que alimenta el
+        # "Histórico de disputas" (bandeja de respuestas) y la bitácora.
+        timestamp=resolved_at,
         # Se asocia a la sede destino (donde ocurrió la recepción/disputa) para
         # que el evento no desaparezca cuando la auditoría filtra por sede.
         location_id=movement.destination_location_id,
@@ -838,7 +849,7 @@ def resolve_dispute(movement_id, payload, user_id):
             "stock_impact": stock_impact,
             "linked_return_movement_id": linked_return_movement_id,
             "user_id": user_id,
-            "timestamp": current_ve_time().isoformat()
+            "timestamp": resolved_at.isoformat()
         }
     ))
 

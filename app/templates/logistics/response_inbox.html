@@ -27,10 +27,10 @@
             </span>
             <span class="text-muted small">
                 <i class="bi bi-calendar3 me-1"></i>Merma:
-                {{ mov.date.strftime('%Y-%m-%d') if mov.date else 'N/D' }}
+                {{ mov.date.strftime('%d/%m/%Y %H:%M') if mov.date else 'N/D' }}
                 <span class="mx-1">·</span>
                 <i class="bi bi-reply-all me-1"></i>Respuesta:
-                {{ mov.response_date.strftime('%Y-%m-%d %H:%M') if mov.response_date else 'N/D' }}
+                {{ mov.response_date.strftime('%d/%m/%Y %H:%M') if mov.response_date else 'N/D' }}
             </span>
         </div>
     </td>
@@ -163,10 +163,10 @@
             </span>
             <span class="text-muted small">
                 <i class="bi bi-calendar3 me-1"></i>Traslado:
-                {{ mov.date.strftime('%Y-%m-%d') if mov.date else 'N/D' }}
+                {{ mov.date.strftime('%d/%m/%Y %H:%M') if mov.date else 'N/D' }}
                 <span class="mx-1">·</span>
                 <i class="bi bi-reply-all me-1"></i>Respuesta:
-                {{ mov.response_date.strftime('%Y-%m-%d %H:%M') if mov.response_date else 'N/D' }}
+                {{ mov.response_date.strftime('%d/%m/%Y %H:%M') if mov.response_date else 'N/D' }}
             </span>
             {% if mov.reported_by %}
             <span class="text-muted small">
