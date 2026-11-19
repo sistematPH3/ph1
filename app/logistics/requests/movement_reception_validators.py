@@ -101,8 +101,16 @@ def _is_valid_date(value):
         return False
 
 def validate_reception_payload(payload, movement_details_map,
-                               umbral_vencimiento_dias=7, hoy=None):
+                               umbral_vencimiento_dias=7, hoy=None,
+                               resolved_expirations=None, is_return=False):
+    """Valida el payload de recepción completo.
+
+    resolved_expirations: {detail_id: date} con el vencimiento REAL heredado
+    (retornos). En un retorno la fecha del lote es inmutable: se ignora lo que el
+    cliente envíe como fecha observada y se evalúa solo la heredada.
+    """
     errors = []
+    resolved_expirations = resolved_expirations or {}
     
     if not isinstance(payload, dict):
         return False, ["Formato de solicitud no válido."]
@@ -144,6 +152,13 @@ def validate_reception_payload(payload, movement_details_map,
         
         detail = movement_details_map[detail_id]
         prod_name = getattr(detail, 'product_name', 'el insumo')
+
+        # Vencimiento REAL del renglón: en un retorno lo aporta la resolución
+        # heredada del despacho original (la fecha es inmutable desde el ingreso).
+        detail_expiration = (
+            resolved_expirations.get(detail_id)
+            or getattr(detail, "expiration_date", None)
+        )
 
         if "received_quantity" not in item or item.get("received_quantity") in (None, ""):
             errors.append(f"Debe indicar la cantidad recibida para '{prod_name}'.")
@@ -246,9 +261,27 @@ def validate_reception_payload(payload, movement_details_map,
         # explícita (vencimiento manual observado o el de la guía) se rechaza de
         # inmediato; el servicio repite la regla con la fecha resuelta por lote.
         if item_condition == "VENCIMIENTO_PROXIMO":
-            fecha_exp = _parse_fecha(observed_exp_raw) or _parse_fecha(
-                getattr(detail, "expiration_date", None)
-            )
+            observed_exp = _parse_fecha(observed_exp_raw)
+            real_exp = _parse_fecha(detail_expiration)
+            if is_return:
+                # En un RETORNO la fecha se hereda del movimiento original: no se
+                # puede alterar ni declarar la novedad sin fecha real.
+                if observed_exp is not None and real_exp is not None and observed_exp != real_exp:
+                    errors.append(
+                        "La fecha de vencimiento de un retorno se hereda del movimiento "
+                        f"original y no puede modificarse. Insumo: '{prod_name}'."
+                    )
+                    continue
+                if real_exp is None:
+                    errors.append(
+                        f"El insumo '{prod_name}' se marcó como 'Vencimiento Próximo', pero su "
+                        "lote no tiene una fecha de vencimiento real registrada en el retorno. "
+                        "Cambie la condición o corrija el lote antes de continuar."
+                    )
+                    continue
+                fecha_exp = real_exp
+            else:
+                fecha_exp = observed_exp or real_exp
             if fecha_exp is not None:
                 dias_para_vencer = (fecha_exp - (hoy or date.today())).days
                 if dias_para_vencer > int(umbral_vencimiento_dias):
@@ -288,7 +321,7 @@ def validate_reception_payload(payload, movement_details_map,
             "received_quantity": received_qty,
             "missing_quantity": missing_qty,
             "lot_number": detail.lot_number,
-            "expiration_date": detail.expiration_date,
+            "expiration_date": detail_expiration,
             "item_condition": item_condition,
             "observed_physical_lot": str(observed_lot).strip() if observed_lot else None,
             "observed_physical_expiration": item.get("observed_physical_expiration") or None,

@@ -100,7 +100,7 @@
                     </thead>
                     <tbody>
                         {% for item in details %}
-                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-lot-number="{{ item.lot_number or '' }}" data-expiration="{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '' }}" data-origin-stock="{{ item.origin_stock | default(0) }}">
+                        <tr class="item-row row-ok" data-detail-id="{{ item.id }}" data-product-id="{{ item.product_id }}" data-dispatched="{{ item.quantity }}" data-unit="{{ item.unit_of_measure }}" data-product="{{ item.product_name }}" data-sku="{{ item.sku }}" data-lot-number="{{ item.lot_number or '' }}" data-expiration="{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '' }}" data-expiration-locked="{% if movement.type == 'RETORNO_EMERGENCIA' %}1{% else %}0{% endif %}" data-expiration-inherited="{% if item.expiration_inherited %}1{% else %}0{% endif %}" data-origin-stock="{{ item.origin_stock | default(0) }}">
                             <td data-label="Insumo">
                                 <div class="product-cell">
                                     <span class="product-title">{{ item.product_name }}</span>
@@ -111,6 +111,12 @@
                                 <div class="lot-cell">
                                     <span class="lot-pill">{{ item.lot_number or 'S/L' }}</span>
                                     <span class="date-text">{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else 'N/A' }}</span>
+                                    {% if movement.type == 'RETORNO_EMERGENCIA' %}
+                                    <span class="badge bg-light text-dark border"
+                                          title="El vencimiento del lote es inmutable: se hereda del despacho original y no puede editarse en el retorno.">
+                                        <i class="bi bi-lock-fill me-1"></i>{% if item.expiration_inherited %}Heredado{% else %}Lote original{% endif %}
+                                    </span>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td class="text-right font-semibold" data-label="Despachado">
@@ -316,5 +322,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=101"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=102"></script>
 {% endblock %}

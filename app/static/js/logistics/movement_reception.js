@@ -95,7 +95,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fecha con la que se evalúa la condición del renglón: la captura manual del
     // vencimiento real tiene prioridad, luego el vencimiento del lote observado y
     // por último la fecha registrada en la guía.
+    // En un RETORNO_EMERGENCIA el vencimiento es INMUTABLE: se hereda del despacho
+    // original y la fila queda marcada con data-expiration-locked="1".
+    const esVencimientoBloqueado = (row) => row.dataset.expirationLocked === "1";
+
     const vencimientoDeFila = (row, expInput, nearExpiryExpInput) => {
+        // Retorno: manda la fecha real heredada; lo capturado en muelle no la altera.
+        if (esVencimientoBloqueado(row)) {
+            return String(row.dataset.expiration || "").trim();
+        }
         const manualVencimiento = nearExpiryExpInput ? nearExpiryExpInput.value.trim() : "";
         const manualLote = expInput ? expInput.value.trim() : "";
         return manualVencimiento || manualLote || String(row.dataset.expiration || "").trim();
@@ -372,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // sostiene si al lote le quedan DIAS_VENCIMIENTO_PROXIMO días o menos. Si aún
     // tiene amplia vida útil, se resalta el selector, se explica el motivo debajo
     // y se avanza con un toast; el envío queda bloqueado hasta corregir.
-    function setNearExpiryFeedback(row, isContradiction, diasRestantes) {
+    function setNearExpiryFeedback(row, isContradiction, diasRestantes, sinFechaReal = false) {
         const condSelect = row.querySelector(".select-item-condition");
         if (condSelect) {
             condSelect.classList.toggle("is-invalid", isContradiction);
@@ -388,12 +396,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (anchor) anchor.appendChild(hint);
             }
             const detalleDias = Number.isFinite(diasRestantes) ? ` (vence en ${diasRestantes} días)` : "";
-            hint.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>' +
-                `Este producto aún tiene amplia vida útil${detalleDias}: no puedes reportar Alerta de Vencimiento Próximo.`;
+            const mensaje = sinFechaReal
+                ? "Este retorno no tiene una fecha de vencimiento real registrada en el lote original: no puedes reportar Alerta de Vencimiento Próximo."
+                : `Este producto aún tiene amplia vida útil${detalleDias}: no puedes reportar Alerta de Vencimiento Próximo.`;
+            hint.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>' + mensaje;
             hint.classList.remove("hidden");
             if (row.dataset.nearExpiryShown !== "1") {
                 row.dataset.nearExpiryShown = "1";
-                showToast("Este producto aún tiene amplia vida útil; no puedes reportar Alerta de Vencimiento Próximo.");
+                showToast(mensaje);
             }
         } else if (hint) {
             hint.classList.add("hidden");
@@ -1202,7 +1212,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (nearExpiryField) {
                 nearExpiryField.classList.toggle("hidden", declaredCondition !== "VENCIMIENTO_PROXIMO");
             }
-            if (nearExpiryExpInput && declaredCondition === "VENCIMIENTO_PROXIMO"
+            if (nearExpiryExpInput && esVencimientoBloqueado(row)) {
+                // Retorno: el campo se bloquea con la fecha REAL heredada del lote
+                // original. El operador no puede reescribir el vencimiento.
+                nearExpiryExpInput.readOnly = true;
+                nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
+            } else if (nearExpiryExpInput && declaredCondition === "VENCIMIENTO_PROXIMO"
                 && !nearExpiryExpInput.value && row.dataset.nearExpiryPrefilled !== "1") {
                 nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
                 row.dataset.nearExpiryPrefilled = "1";
@@ -1232,11 +1247,20 @@ document.addEventListener("DOMContentLoaded", () => {
             // NO se degrada la condición: el operario debe cambiarla explícitamente.
             let nearExpiryContradiction = false;
             let nearExpiryDays = null;
+            let nearExpiryMissingDate = false;
             if (declaredCondition === "VENCIMIENTO_PROXIMO") {
-                const dias = diasHastaFecha(vencimientoDeFila(row, expInput, nearExpiryExpInput));
-                if (dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO) {
+                const vencimientoReal = vencimientoDeFila(row, expInput, nearExpiryExpInput);
+                if (esVencimientoBloqueado(row) && !vencimientoReal) {
+                    // Retorno sin fecha real: no hay nada que evaluar y la novedad no
+                    // puede declararse a ciegas.
                     nearExpiryContradiction = true;
-                    nearExpiryDays = dias;
+                    nearExpiryMissingDate = true;
+                } else {
+                    const dias = diasHastaFecha(vencimientoReal);
+                    if (dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO) {
+                        nearExpiryContradiction = true;
+                        nearExpiryDays = dias;
+                    }
                 }
             }
 
@@ -1321,7 +1345,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             setLotContradictionFeedback(row, lotContradiction);
-            setNearExpiryFeedback(row, nearExpiryContradiction, nearExpiryDays);
+            setNearExpiryFeedback(row, nearExpiryContradiction, nearExpiryDays, nearExpiryMissingDate);
 
             // Las condiciones de CALIDAD (temperatura, custodia, lote, espacio,
             // vencimiento) se resaltan en ámbar. Las diferencias de cantidad ya
@@ -1423,6 +1447,16 @@ document.addEventListener("DOMContentLoaded", () => {
     rows.forEach(row => {
         const input = row.querySelector(".input-received");
         const condSelect = row.querySelector(".select-item-condition");
+
+        // RETORNO: el vencimiento real heredado del lote original se muestra
+        // bloqueado desde que se abre el formulario (no se puede reescribir).
+        if (esVencimientoBloqueado(row)) {
+            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
+            if (nearExpiryExpInput) {
+                nearExpiryExpInput.readOnly = true;
+                nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
+            }
+        }
 
         input.addEventListener("input", () => {
             hideAlert();
@@ -1567,9 +1601,22 @@ document.addEventListener("DOMContentLoaded", () => {
             // el envío (el backend la rechaza igual con HTTP 400).
             let contradictoryNearExpiry = false;
             if (declaredCondition === "VENCIMIENTO_PROXIMO") {
-                const dias = diasHastaFecha(vencimientoDeFila(row, expInput, nearExpiryExpInput));
-                contradictoryNearExpiry = dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO;
+                const vencimientoReal = vencimientoDeFila(row, expInput, nearExpiryExpInput);
+                if (esVencimientoBloqueado(row) && !vencimientoReal) {
+                    contradictoryNearExpiry = true;
+                } else {
+                    const dias = diasHastaFecha(vencimientoReal);
+                    contradictoryNearExpiry = dias !== null && dias > DIAS_VENCIMIENTO_PROXIMO;
+                }
             }
+
+            // Vencimiento con el que viaja el renglón: en un retorno siempre es la
+            // fecha REAL heredada del lote original (nunca la escrita en muelle).
+            const vencimientoEnviado = esVencimientoBloqueado(row)
+                ? (String(row.dataset.expiration || "").trim() || null)
+                : (declaredCondition === "VENCIMIENTO_PROXIMO" && nearExpiryExpInput && nearExpiryExpInput.value
+                    ? nearExpiryExpInput.value
+                    : null);
 
             // El lote del SOBRANTE se captura para trazabilidad (va a la auditoría y al
             // arbitraje), pero NO bloquea el envío: el sobrante legítimo sin lote debe
@@ -1656,11 +1703,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 received_quantity: receivedQty,
                 item_condition: condition,
                 observed_physical_lot: observedLot,
-                observed_physical_expiration: (observedLot && expInput && expInput.value)
-                    ? expInput.value
-                    : (declaredCondition === "VENCIMIENTO_PROXIMO" && nearExpiryExpInput && nearExpiryExpInput.value
-                        ? nearExpiryExpInput.value
-                        : null),
+                observed_physical_expiration: esVencimientoBloqueado(row)
+                    ? vencimientoEnviado
+                    : ((observedLot && expInput && expInput.value)
+                        ? expInput.value
+                        : vencimientoEnviado),
                 surplus_lots: surplusLots,
                 extra_units: extraUnits,
                 origin_stock: originStock,

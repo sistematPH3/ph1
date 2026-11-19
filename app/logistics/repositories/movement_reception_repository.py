@@ -290,6 +290,50 @@ class MovementReceptionRepository:
         db.session.execute(sql, audit_data)
 
     @staticmethod
+    def get_expiration_from_movement(movement_id, product_id, lot_number):
+        """Vencimiento REAL del lote registrado en un movimiento concreto.
+
+        Se usa para heredar la fecha en los RETORNO_EMERGENCIA: el renglón del
+        despacho original es la fuente de verdad del lote, porque esa fecha se
+        capturó al ingresar la mercancía (compra/guía) y es inmutable.
+
+        Se empareja por producto y lote normalizado (mismo criterio que el
+        arbitraje); si el renglón no usa lote (S/L), se buscan los renglones sin
+        lote. Devuelve date | None y NUNCA inventa una fecha.
+        """
+        if not movement_id or not product_id:
+            return None
+        lot = str(lot_number).strip() if lot_number else ""
+        if lot:
+            sql = text("""
+                SELECT expiration_date
+                FROM movement_details
+                WHERE movement_id = :movement_id
+                  AND product_id = :product_id
+                  AND LOWER(TRIM(lot_number)) = LOWER(TRIM(:lot_number))
+                  AND expiration_date IS NOT NULL
+                ORDER BY id ASC
+                LIMIT 1
+            """)
+        else:
+            sql = text("""
+                SELECT expiration_date
+                FROM movement_details
+                WHERE movement_id = :movement_id
+                  AND product_id = :product_id
+                  AND (lot_number IS NULL OR TRIM(lot_number) = '')
+                  AND expiration_date IS NOT NULL
+                ORDER BY id ASC
+                LIMIT 1
+            """)
+        row = db.session.execute(sql, {
+            "movement_id": movement_id,
+            "product_id": product_id,
+            "lot_number": lot
+        }).first()
+        return row[0] if row and row[0] else None
+
+    @staticmethod
     def get_expiration_for_lot(product_id, lot_number):
         """Busca la fecha de vencimiento de un lote de un producto en el histórico.
 

@@ -9,13 +9,14 @@
 # El archivo de rutas (movement_dispute_routes.py) se limita a recibir HTTP,
 # delegar en estas funciones y devolver respuestas.
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from app.time_utils import current_ve_time
 from decimal import Decimal
 import json
 
 from app.extensions import db
 from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Notification, Product, Role, User
+from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
 
 # ---------------------------------------------------------------------------
 # CATÁLOGO DE DECISIONES CONTABLES
@@ -113,6 +114,40 @@ def _credit_inventory(inv, qty):
     if inv is None or qty <= Decimal('0.00'):
         return
     inv.current_quantity = _to_decimal(inv.current_quantity) + qty
+
+
+def _to_date(value):
+    """Convierte 'YYYY-MM-DD', date o datetime a date; None si no es válido."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _resolve_return_expiration(original_movement_id, product_id, lot_number, fallback=None):
+    """Fecha de vencimiento REAL del lote que se devuelve (nunca inventada).
+
+    REGLA DE NEGOCIO: el vencimiento de un lote es inmutable desde su ingreso
+    original. Orden de resolución:
+      1) el renglón del despacho original (fuente de verdad del lote),
+      2) el histórico de movimientos/compras del mismo producto y lote,
+      3) el valor ya auditado en la recepción (fallback).
+    """
+    exp = MovementReceptionRepository.get_expiration_from_movement(
+        original_movement_id, product_id, lot_number
+    )
+    if exp is not None:
+        return exp
+    exp_str = MovementReceptionRepository.get_expiration_for_lot(product_id, lot_number)
+    if exp_str:
+        return _to_date(exp_str)
+    return _to_date(fallback)
 
 
 def _read_changed_data(log):
@@ -548,7 +583,9 @@ def resolve_dispute(movement_id, payload, user_id):
                 return_items_payload.append({
                     "product_id": detail.product_id,
                     "quantity": qty_to_return,
-                    "lot_number": detail.lot_number
+                    "lot_number": detail.lot_number,
+                    # El retorno hereda el vencimiento del despacho original.
+                    "expiration_date": detail.expiration_date
                 })
 
         else:
@@ -626,7 +663,9 @@ def resolve_dispute(movement_id, payload, user_id):
             return_items_payload.append({
                 "product_id": prod_id,
                 "quantity": qty_err,
-                "lot_number": err_p.get("lot_number")
+                "lot_number": err_p.get("lot_number"),
+                # El insumo erróneo también viaja de vuelta con su vencimiento real.
+                "expiration_date": _to_date(err_p.get("expiration_date"))
             })
 
         elif err_action in WRITE_OFF_ACTIONS:
@@ -655,11 +694,21 @@ def resolve_dispute(movement_id, payload, user_id):
         linked_return_movement_id = linked_movement.id
 
         for ret_item in return_items_payload:
+            # Vencimiento heredado del despacho original (inmutable). Si el renglón
+            # original no lo traía, se resuelve del histórico del lote; si no existe
+            # ninguna fecha registrada se deja NULL (nunca se inventa una).
+            exp_date = _resolve_return_expiration(
+                movement.id,
+                ret_item["product_id"],
+                ret_item.get("lot_number"),
+                fallback=ret_item.get("expiration_date")
+            )
             detail_entry = MovementDetail(
                 movement_id=linked_movement.id,
                 product_id=ret_item["product_id"],
                 quantity=ret_item["quantity"],
-                lot_number=ret_item.get("lot_number")
+                lot_number=ret_item.get("lot_number"),
+                expiration_date=exp_date
             )
             db.session.add(detail_entry)
 

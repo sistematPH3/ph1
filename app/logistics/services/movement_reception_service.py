@@ -40,6 +40,49 @@ def _derive_auto_novelty(processed_items):
     return "CONFORME"
 
 
+def _as_date(value):
+    """Normaliza a date los distintos tipos que puede devolver la BD."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _resolve_return_expiration(movement, product_id, lot_number, current=None):
+    """Fecha de vencimiento REAL de un renglón de retorno (heredada, inmutable).
+
+    REGLA DE NEGOCIO: el vencimiento de un producto/lote es inmutable desde su
+    ingreso/compra original. Cuando una sede devuelve mercancía al Almacén
+    Central, la fecha NO se captura de nuevo: se hereda del despacho original
+    (o del histórico del lote) para que el operador no pueda inventarla.
+
+    Orden: fecha ya registrada en el renglón -> despacho original
+    (return_of_dispute_id) -> histórico de movimientos/compras del lote.
+    Devuelve None si no hay ninguna fecha real; nunca inventa una.
+    """
+    exp = _as_date(current)
+    if exp is not None:
+        return exp
+    original_id = movement.get("return_of_dispute_id") if hasattr(movement, "get") else None
+    if original_id:
+        exp = _as_date(
+            MovementReceptionRepository.get_expiration_from_movement(
+                original_id, product_id, lot_number
+            )
+        )
+        if exp is not None:
+            return exp
+    return _as_date(
+        MovementReceptionRepository.get_expiration_for_lot(product_id, lot_number)
+    )
+
+
 def _creditable_return_qty(movement, product_id, lot_number, effective_stock_qty):
     """Cuánto acreditar en el DESTINO al recibir un RETORNO_EMERGENCIA.
 
@@ -92,11 +135,25 @@ class MovementReceptionService:
         # Los rows de get_movement_details son mappings; los convertimos a dict
         # para poder adjuntar origin_stock.
         details_dicts = []
+        # En un RETORNO_EMERGENCIA la fecha de vencimiento es la del lote original:
+        # se resuelve aquí para MOSTRARLA aunque el renglón del retorno se haya
+        # creado sin ella (retornos viejos). No se persiste en el GET; se fija al
+        # procesar la recepción.
+        is_return = str(movement["type"]).upper() == "RETORNO_EMERGENCIA"
         for d in details:
             item = dict(d._mapping if hasattr(d, "_mapping") else d)
             item["origin_stock"] = float(
                 MovementReceptionRepository.get_inventory_quantity(origin_id, d.product_id)
             )
+            item["expiration_inherited"] = False
+            if is_return:
+                own_exp = _as_date(item.get("expiration_date"))
+                resolved = _resolve_return_expiration(
+                    movement, d.product_id, item.get("lot_number"), own_exp
+                )
+                if resolved is not None:
+                    item["expiration_inherited"] = own_exp is None
+                    item["expiration_date"] = resolved
             details_dicts.append(item)
 
         return {"movement": movement, "details": details_dicts}, None
@@ -136,6 +193,19 @@ class MovementReceptionService:
         raw_details = MovementReceptionRepository.get_movement_details(movement_id)
         details_map = {d.id: d for d in raw_details}
 
+        # RETORNO_EMERGENCIA: la fecha de vencimiento se hereda del despacho
+        # original y es inmutable. El validador la recibe resuelta para poder
+        # contrastar VENCIMIENTO_PROXIMO contra la fecha REAL del lote.
+        is_return = str(movement["type"]).upper() == "RETORNO_EMERGENCIA"
+        resolved_expirations = {}
+        if is_return:
+            for d in raw_details:
+                exp = _resolve_return_expiration(
+                    movement, d.product_id, d.lot_number, getattr(d, "expiration_date", None)
+                )
+                if exp is not None:
+                    resolved_expirations[d.id] = exp
+
         is_valid, validation_res = validate_reception_payload(
             payload,
             details_map,
@@ -143,6 +213,8 @@ class MovementReceptionService:
                 current_app.config.get("VENCIMIENTO_PROXIMO_DIAS", 7)
             ),
             hoy=current_ve_time().date(),
+            resolved_expirations=resolved_expirations,
+            is_return=is_return,
         )
         if not is_valid:
             return False, validation_res
@@ -255,24 +327,36 @@ class MovementReceptionService:
         # Los tipos con requires_manual_date NO se autocalculan: su fecha debe
         # venir impresa en el empaque. Así el muelle/FEFO tiene una fecha para
         # lotes nuevos sin obligar a inventarla a mano.
-        for item in processed_items:
-            if item.get("expiration_date"):
-                continue
-            prod = db.session.get(Product, item["product_id"])
-            tipo = (db.session.get(ProductType, prod.product_type_id)
-                    if prod is not None and prod.product_type_id else None)
-            dias_vida = getattr(tipo, 'shelf_life_days', None)
-            if (not dias_vida
-                    or getattr(tipo, 'requires_manual_date', False)):
-                continue
-            item["expiration_date"] = (
-                current_ve_time().date() + timedelta(days=int(dias_vida))
-            )
-            # Se persiste en el renglón (solo si estaba vacío) para que el lote
-            # quede con fecha y el FEFO/auditoría no dependa de recalculario.
-            MovementReceptionRepository.update_detail_expiration(
-                item["detail_id"], item["expiration_date"]
-            )
+        if is_return:
+            # RETORNO_EMERGENCIA: la fecha es la del lote original y es INMUTABLE.
+            # NO se deriva vida útil estándar ("hoy + días"): inventarla falsearía
+            # el vencimiento real del lote y dejaría pasar la novedad de
+            # vencimiento próximo. Solo se persiste la fecha REAL heredada.
+            for item in processed_items:
+                if not item.get("expiration_date"):
+                    continue
+                MovementReceptionRepository.update_detail_expiration(
+                    item["detail_id"], _as_date(item["expiration_date"])
+                )
+        else:
+            for item in processed_items:
+                if item.get("expiration_date"):
+                    continue
+                prod = db.session.get(Product, item["product_id"])
+                tipo = (db.session.get(ProductType, prod.product_type_id)
+                        if prod is not None and prod.product_type_id else None)
+                dias_vida = getattr(tipo, 'shelf_life_days', None)
+                if (not dias_vida
+                        or getattr(tipo, 'requires_manual_date', False)):
+                    continue
+                item["expiration_date"] = (
+                    current_ve_time().date() + timedelta(days=int(dias_vida))
+                )
+                # Se persiste en el renglón (solo si estaba vacío) para que el lote
+                # quede con fecha y el FEFO/auditoría no dependa de recalculario.
+                MovementReceptionRepository.update_detail_expiration(
+                    item["detail_id"], item["expiration_date"]
+                )
 
         # GUARD #2: la condición 'Vencimiento Próximo' debe corresponder a un lote
         # cuya fecha real esté DENTRO del umbral configurado (default 7 días).
@@ -287,33 +371,39 @@ class MovementReceptionService:
         for item in processed_items:
             if item.get("item_condition") != "VENCIMIENTO_PROXIMO":
                 continue
-            fecha_exp = None
-            for lot_candidate in (item.get("observed_physical_lot"), item.get("lot_number")):
-                lot_fisico = str(lot_candidate or "").strip()
-                if not lot_fisico:
-                    continue
-                exp_str = MovementReceptionRepository.get_expiration_for_lot(
-                    item["product_id"], lot_fisico
-                )
-                if exp_str:
-                    try:
-                        fecha_exp = datetime.strptime(exp_str, "%Y-%m-%d").date()
-                    except (ValueError, TypeError):
-                        fecha_exp = None
-                if fecha_exp is not None:
-                    break
-            if fecha_exp is None:
-                raw_exp = item.get("observed_physical_expiration") or item.get("expiration_date")
-                if raw_exp:
-                    if isinstance(raw_exp, datetime):
-                        fecha_exp = raw_exp.date()
-                    elif isinstance(raw_exp, date):
-                        fecha_exp = raw_exp
-                    else:
+            if is_return:
+                # RETORNO: solo la fecha HEREDADA del lote original puede sostener
+                # la novedad. Lo que el operador escriba en muelle no la valida:
+                # el vencimiento de un lote es inmutable desde su ingreso.
+                fecha_exp = _as_date(item.get("expiration_date"))
+            else:
+                fecha_exp = None
+                for lot_candidate in (item.get("observed_physical_lot"), item.get("lot_number")):
+                    lot_fisico = str(lot_candidate or "").strip()
+                    if not lot_fisico:
+                        continue
+                    exp_str = MovementReceptionRepository.get_expiration_for_lot(
+                        item["product_id"], lot_fisico
+                    )
+                    if exp_str:
                         try:
-                            fecha_exp = datetime.strptime(str(raw_exp).strip(), "%Y-%m-%d").date()
+                            fecha_exp = datetime.strptime(exp_str, "%Y-%m-%d").date()
                         except (ValueError, TypeError):
                             fecha_exp = None
+                    if fecha_exp is not None:
+                        break
+                if fecha_exp is None:
+                    raw_exp = item.get("observed_physical_expiration") or item.get("expiration_date")
+                    if raw_exp:
+                        if isinstance(raw_exp, datetime):
+                            fecha_exp = raw_exp.date()
+                        elif isinstance(raw_exp, date):
+                            fecha_exp = raw_exp
+                        else:
+                            try:
+                                fecha_exp = datetime.strptime(str(raw_exp).strip(), "%Y-%m-%d").date()
+                            except (ValueError, TypeError):
+                                fecha_exp = None
             detail_obj = details_map.get(item["detail_id"])
             prod_name = getattr(detail_obj, "product_name", None) or "el insumo"
             if fecha_exp is None:

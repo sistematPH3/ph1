@@ -17,6 +17,7 @@
 
 import os
 import unittest
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -599,6 +600,28 @@ class ResolveDisputeTest(unittest.TestCase):
         self.assertTrue(ok)
         db.session.refresh(rep)
         self.assertEqual(rep.status, "CANCELADO")
+
+
+    def test_retorno_generado_por_disputa_hereda_el_vencimiento_real(self):
+        # El vencimiento del lote es inmutable: el reverso creado al resolver la
+        # disputa debe copiar la fecha del renglón del despacho original en lugar
+        # de crear el renglón en blanco (que dejaba la recepción del retorno sin
+        # fecha y permitía declarar un vencimiento próximo falso).
+        exp = date.today() + timedelta(days=45)
+        env = self._seed(
+            status="RECHAZO_POR_ESPACIO", novelty_type="RECHAZO_POR_ESPACIO",
+            dispatched=10, received=6
+        )
+        env["detail"].expiration_date = exp
+        db.session.commit()
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "RETORNO_EMERGENCIA",
+            "general_notes": "No cupo la carga en el local"
+        }, user_id=env["user"].id)
+
+        ret = Movement.query.filter_by(return_of_dispute_id=env["mov"].id).one()
+        self.assertEqual(ret.details[0].expiration_date, exp)
 
 
 if __name__ == "__main__":

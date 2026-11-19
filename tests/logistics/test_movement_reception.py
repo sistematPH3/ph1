@@ -3204,5 +3204,191 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertEqual(det.observed_physical_lot, "L-PHYS-2026")
 
 
+# =============================================================================
+# RETORNOS (sede -> Almacén Central): VENCIMIENTO HEREDADO E INMUTABLE
+# -----------------------------------------------------------------------------
+# REGLA DE NEGOCIO: el vencimiento de un lote es inmutable desde su ingreso
+# original. Al recibir un RETORNO_EMERGENCIA el sistema debe heredar la fecha del
+# despacho original (nunca inventarla ni aceptar la que escriba el operador) y
+# usarla para validar VENCIMIENTO_PROXIMO.
+# =============================================================================
+
+
+class ReturnExpirationTest(unittest.TestCase):
+    """Reutiliza las fixtures de la suite de recepción SIN heredar sus pruebas."""
+
+    @classmethod
+    def setUpClass(cls):
+        MovementReceptionTest.setUpClass()
+        cls.app = MovementReceptionTest.app
+
+    setUp = MovementReceptionTest.setUp
+    tearDown = MovementReceptionTest.tearDown
+    _seed = MovementReceptionTest._seed
+    _process = MovementReceptionTest._process
+    _seed_two_items = MovementReceptionTest._seed_two_items
+
+    def _seed_return(self, real_expiration=None, qty=5, shelf_life_days=None):
+        """Despacho original con fecha real + retorno EN_TRANSITO sin fecha.
+
+        El renglón del retorno se deja SIN expiration_date a propósito: así se
+        reproduce el caso real en el que la fecha se perdía al crear el reverso.
+        """
+        env = self._seed(dispatched=qty)
+        env["mov"].status = "COMPLETADO"
+        env["detail"].expiration_date = real_expiration
+
+        if shelf_life_days is not None:
+            category = Category(name="perecederos")
+            db.session.add(category)
+            db.session.flush()
+            ptype = ProductType(
+                name="Perecedero", category_id=category.id,
+                shelf_life_days=shelf_life_days, requires_manual_date=False
+            )
+            db.session.add(ptype)
+            db.session.flush()
+            env["product"].product_type_id = ptype.id
+
+        db.session.commit()
+
+        ret_mov = Movement(
+            type="RETORNO_EMERGENCIA",
+            origin_location_id=env["dest"].id,      # la sede devuelve
+            destination_location_id=env["origin"].id,  # el Central recibe
+            status="EN_TRANSITO",
+            user_id=env["user_id"],
+            return_of_dispute_id=env["mov"].id
+        )
+        db.session.add(ret_mov)
+        db.session.flush()
+
+        ret_detail = MovementDetail(
+            movement_id=ret_mov.id,
+            product_id=env["product"].id,
+            lot_number="L-001",
+            quantity=qty,
+            received_quantity=None,
+            missing_quantity=0.00
+        )
+        db.session.add(ret_detail)
+        db.session.commit()
+
+        return {
+            "mov": ret_mov, "detail": ret_detail, "product": env["product"],
+            "origin": env["dest"], "dest": env["origin"],
+            "user": env["user"], "user_id": env["user_id"],
+            "user_location_ids": [env["origin"].id],
+            "original": env["mov"],
+        }
+
+    def _return_items(self, env, condition="CONFORME", observed_expiration=None, qty=None):
+        return [{
+            "detail_id": env["detail"].id,
+            "received_quantity": float(qty if qty is not None else env["detail"].quantity),
+            "item_condition": condition,
+            "observed_physical_lot": None,
+            "observed_physical_expiration": observed_expiration,
+        }]
+
+    def test_recepcion_de_retorno_muestra_el_vencimiento_heredado(self):
+        real = date.today() + timedelta(days=20)
+        env = self._seed_return(real_expiration=real)
+
+        data, error = MovementReceptionService.get_reception_data(
+            env["mov"].id, [env["dest"].id], 1
+        )
+
+        self.assertIsNone(error)
+        item = data["details"][0]
+        self.assertEqual(item["expiration_date"], real)
+        self.assertTrue(item["expiration_inherited"])
+
+    def test_recepcion_de_retorno_persiste_el_vencimiento_en_el_renglon(self):
+        real = date.today() + timedelta(days=20)
+        env = self._seed_return(real_expiration=real)
+
+        ok, msg = self._process(
+            env, novelty_type="CONFORME",
+            items_override=self._return_items(env)
+        )
+
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["detail"])
+        self.assertEqual(env["detail"].expiration_date, real)
+
+        # La fecha real también queda trazada en la auditoría de la recepción.
+        log = AuditLog.query.filter_by(action="RECEPCION_CONFORME").order_by(AuditLog.id.desc()).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.changed_data["items"][0]["expiration_date"], real.isoformat())
+
+    def test_retorno_no_acepta_una_fecha_de_vencimiento_forjada(self):
+        # El lote real vence en 90 días: el operador escribe una fecha cercana para
+        # justificar la novedad. Debe rechazarse: la fecha es heredada.
+        real = date.today() + timedelta(days=90)
+        env = self._seed_return(real_expiration=real)
+        forjada = (date.today() + timedelta(days=2)).isoformat()
+
+        ok, message = self._process(
+            env, novelty_type="VENCIMIENTO_PROXIMO", notes="vencimiento falso",
+            items_override=self._return_items(
+                env, condition="VENCIMIENTO_PROXIMO", observed_expiration=forjada
+            )
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("no puede modificarse", " ".join(message))
+
+    def test_retorno_con_vencimiento_proximo_real_se_acepta(self):
+        real = date.today() + timedelta(days=3)
+        env = self._seed_return(real_expiration=real)
+
+        ok, msg = self._process(
+            env, novelty_type="VENCIMIENTO_PROXIMO", notes="vence esta semana",
+            items_override=self._return_items(env, condition="VENCIMIENTO_PROXIMO")
+        )
+
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["detail"])
+        self.assertEqual(env["detail"].expiration_date, real)
+
+    def test_retorno_con_vencimiento_real_lejano_bloquea_la_novedad(self):
+        real = date.today() + timedelta(days=60)
+        env = self._seed_return(real_expiration=real)
+
+        ok, message = self._process(
+            env, novelty_type="VENCIMIENTO_PROXIMO", notes="no deberia pasar",
+            items_override=self._return_items(env, condition="VENCIMIENTO_PROXIMO")
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("amplia vida útil", " ".join(message))
+
+    def test_retorno_sin_fecha_real_no_inventa_vida_util_estandar(self):
+        # El producto es perecedero con vida útil configurada, pero un retorno NO
+        # puede inventar "hoy + días": la fecha real del lote es desconocida.
+        env = self._seed_return(real_expiration=None, shelf_life_days=30)
+
+        ok, msg = self._process(
+            env, novelty_type="CONFORME",
+            items_override=self._return_items(env)
+        )
+
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["detail"])
+        self.assertIsNone(env["detail"].expiration_date)
+
+    def test_retorno_sin_fecha_real_no_permite_vencimiento_proximo(self):
+        env = self._seed_return(real_expiration=None)
+
+        ok, message = self._process(
+            env, novelty_type="VENCIMIENTO_PROXIMO", notes="no hay fecha real",
+            items_override=self._return_items(env, condition="VENCIMIENTO_PROXIMO")
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("no tiene una fecha de vencimiento real", " ".join(message))
+
+
 if __name__ == "__main__":
     unittest.main()
