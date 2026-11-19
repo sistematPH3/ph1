@@ -53,6 +53,20 @@
             </div>
         </div>
 
+        {% if reporte.monedas_sin_tasa %}
+        <div class="alert alert-warning d-flex align-items-start py-2 mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+            <div class="small">
+                <strong>Faltan tasas BCV:</strong>
+                no hay tasa cargada para
+                {% for moneda in reporte.monedas_sin_tasa %}{{ monedas.get(moneda, moneda) }}{% if not loop.last %} ni {% endif %}{% endfor %}.
+                Los montos valorizados en
+                {% if reporte.monedas_sin_tasa | length == 1 %}esa moneda{% else %}esas monedas{% endif %}
+                no se suman al total, que queda parcial.
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Selector de filtros -->
         <form id="reportFilters" class="reports-filter mb-4" method="get"
               action="{{ url_for('analysis_reports.reports_page') }}">

@@ -106,6 +106,16 @@ def _tasa(moneda, fecha):
     return obtener_tasa_historica(moneda, fecha)
 
 
+_ALIAS_BOLIVARES = ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES')
+
+
+def _moneda_normalizada(codigo):
+    """Homologa el código de moneda a MONEDAS: los registros viejos guardan los
+    bolívares como 'VES', 'BSS' o 'BS.' y sin esto se valoraban en 0."""
+    codigo = (codigo or 'USD').upper()
+    return 'BS' if codigo in _ALIAS_BOLIVARES else codigo
+
+
 def _convertir_monto(monto, origen, destino, fecha):
     """Convierte 'monto' de su moneda de origen a la del reporte con la tasa
     BCV vigente en 'fecha'. Retorna None si la tasa necesaria no existe
@@ -113,8 +123,8 @@ def _convertir_monto(monto, origen, destino, fecha):
     monto = Decimal(str(monto or 0))
     if not monto:
         return Decimal('0.00')
-    origen = (origen or 'USD').upper()
-    destino = (destino or 'USD').upper()
+    origen = _moneda_normalizada(origen)
+    destino = _moneda_normalizada(destino)
     if origen == destino:
         return monto
     if origen not in MONEDAS or destino not in MONEDAS:
@@ -159,6 +169,23 @@ def _convertir_buckets(buckets, destino, fecha):
     return total
 
 
+def _monedas_sin_tasa(buckets_lista, destino, fecha):
+    """Monedas con monto real que no se pudieron sumar al total por falta de
+    tasa BCV. La UI las muestra: el total queda parcial en lugar de omitir esa
+    porción en silencio."""
+    destino = _moneda_normalizada(destino)
+    faltan = set()
+    for buckets in buckets_lista:
+        for clave, valor in (buckets or {}).items():
+            moneda = _moneda_normalizada(clave)
+            monto = valor or Decimal('0.00')
+            if not monto or moneda == destino or moneda not in MONEDAS:
+                continue
+            if _convertir_monto(monto, moneda, destino, fecha) is None:
+                faltan.add(moneda)
+    return sorted(faltan)
+
+
 def _monto_en_moneda(buckets, moneda, fecha=None):
     """Monto de COMPRAS en la moneda del reporte usando el valor REGISTRADO:
     el BS de cada detalle quedó grabado en price_bs con la tasa del día de la
@@ -167,7 +194,7 @@ def _monto_en_moneda(buckets, moneda, fecha=None):
     convierte UNA sola fuente (el BS registrado, que existe para toda compra;
     si falta, la moneda original) para no sumar valoraciones paralelas del
     mismo gasto. Sin tasa disponible da 0.00."""
-    moneda = (moneda or 'USD').upper()
+    moneda = _moneda_normalizada(moneda)
     buckets = buckets or {}
     registrado = buckets.get(moneda, Decimal('0.00')) or Decimal('0.00')
     if registrado:
@@ -186,7 +213,11 @@ def _convertir_compra_a_moneda(fila, moneda):
     """Equivalente de una compra a la moneda del reporte usando la tasa del día
     que el sistema registró (exchange_rate = Bs por unidad de la moneda de la
     compra). None si no hay tasa disponible (p. ej. EUR sin tasa cargada)."""
-    c = (fila.get('currency') or 'USD').upper()
+    # La moneda del registro se homologa ANTES de armar la clave: las compras
+    # viejas guardan 'VES' y no existe la columna total_ves (sí total_bs), así
+    # que se valoraban en 0 y desaparecían del panel "por moneda".
+    c = _moneda_normalizada(fila.get('currency'))
+    moneda = _moneda_normalizada(moneda)
     monto = fila.get('total_' + c.lower(), Decimal('0.00')) or Decimal('0.00')
     if not monto or c == moneda:
         return monto
@@ -229,8 +260,9 @@ def _por_moneda_panel(desde_dt, hasta_dt, moneda):
     el total registrado en su propia moneda, la cantidad de compras y su
     equivalente en la moneda del reporte (con la tasa del día de compra)."""
     agregado = {}
+    moneda = _moneda_normalizada(moneda)
     for fila in obtener_compras_por_moneda(desde_dt, hasta_dt):
-        c = fila['currency']
+        c = _moneda_normalizada(fila['currency'])
         ag = agregado.setdefault(c, {
             'monto': Decimal('0.00'),
             'equivalente': Decimal('0.00'),
@@ -337,7 +369,8 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta):
     """Totales del rango. Si el cajón (statistics_snapshots) tiene resúmenes
     para la métrica los suma; si está vacío (en la práctica nadie lo llena)
     lee de las tablas REALES: compras, consumo de cocina, mermas aprobadas y
-    traslados valorizados."""
+    traslados valorizados. Las columnas que el cajón trae en 0 (snapshots
+    viejos sin tasa EUR/Bs) se completan con la valoración real."""
     metric = (metric or 'PURCHASES').upper()
     if not hay_snapshots_metrico(location_ids, metric, period_type):
         return obtener_totales_reales(location_ids, metric, desde, hasta)
@@ -355,6 +388,29 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta):
         for clave in ('amount_usd', 'amount_bs', 'amount_eur', 'quantity'):
             totales[clave] += parcial[clave]
         totales['record_count'] += parcial['record_count']
+
+    # El cajón nunca se regenera: un snapshot guardado cuando todavía no había
+    # tasa EUR (o cuando los bolívares se registraban como VES) trae 0 en esa
+    # columna aunque el movimiento exista. Se completa SOLO la valoración en 0
+    # con la de las tablas operativas; nunca se pisan montos ya calculados.
+    if not any(totales[clave] for clave in
+               ('amount_usd', 'amount_bs', 'amount_eur')):
+        reales = obtener_totales_reales(location_ids, metric, desde, hasta)
+        if any(reales[clave] for clave in
+               ('amount_usd', 'amount_bs', 'amount_eur')):
+            totales.update(reales)
+    else:
+        reales = None
+        for clave in ('amount_usd', 'amount_bs', 'amount_eur'):
+            if totales[clave]:
+                continue
+            if reales is None:
+                reales = obtener_totales_reales(location_ids, metric,
+                                                desde, hasta)
+            totales[clave] = reales[clave]
+        if not totales['record_count'] and reales is not None:
+            totales['record_count'] = reales['record_count']
+
     for clave in ('amount_usd', 'amount_bs', 'amount_eur', 'quantity'):
         totales[clave] = _redondear(totales[clave])
     return totales
@@ -521,6 +577,9 @@ def construir_reporte(filtros, user_id):
                               datetime.combine(fin, time.max),
                               moneda,
                               incluir_compras=incluir_compras)
+    # Monedas con monto que no se pudieron convertir por falta de tasa BCV: la
+    # plantilla las avisa para que el total no se lea como si estuviera completo.
+    monedas_sin_tasa = detalle.pop('monedas_sin_tasa', [])
 
     return {
         'filters': {
@@ -542,6 +601,7 @@ def construir_reporte(filtros, user_id):
         'previous': anterior,
         'comparative': comparativo,
         'detail': detalle,
+        'monedas_sin_tasa': monedas_sin_tasa,
     }
 
 
@@ -569,25 +629,34 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
                     moneda='USD', incluir_compras=True):
     if metric == 'PURCHASES':
         filas = obtener_compras_por_proveedor(inicio, fin)
+        buckets_filas = []
         for f in filas:
-            f['monto'] = _monto_en_moneda(
-                {'USD': f.get('total_usd', Decimal('0.00')),
-                 'BS': f.get('total_bs', Decimal('0.00')),
-                 'EUR': f.get('total_eur', Decimal('0.00'))}, moneda, fin)
+            buckets = {'USD': f.get('total_usd', Decimal('0.00')),
+                       'BS': f.get('total_bs', Decimal('0.00')),
+                       'EUR': f.get('total_eur', Decimal('0.00'))}
+            buckets_filas.append(buckets)
+            f['monto'] = _monto_en_moneda(buckets, moneda, fin)
             f['moneda'] = moneda
-        return {'por_proveedor': filas}
+        return {'por_proveedor': filas,
+                'monedas_sin_tasa': _monedas_sin_tasa(buckets_filas, moneda,
+                                                      fin)}
     if metric == 'KITCHEN_CONSUMPTION':
         return {'registros': obtener_resumen_consumo(location_ids, inicio, fin)}
     if metric == 'WASTE':
         registros = obtener_mermas_detalle(location_ids, inicio, fin)
+        buckets_filas = []
         for r in registros:
             r['cost_original'] = r['cost']
             r['origin_currency'] = r['currency']
+            buckets_filas.append({_moneda_normalizada(r['origin_currency']):
+                                  r['cost_original']})
             convertido = _convertir_monto(
                 r['cost_original'], r['origin_currency'], moneda, fin)
             r['cost'] = _redondear(convertido) if convertido is not None else Decimal('0.00')
             r['currency'] = moneda
-        return {'mermas': registros}
+        return {'mermas': registros,
+                'monedas_sin_tasa': _monedas_sin_tasa(buckets_filas, moneda,
+                                                      fin)}
     if metric == 'TRANSFERS':
         orientacion = _orientacion_efectiva(location_ids, incluir_compras)
         resumen = obtener_resumen_traslados(location_ids, inicio, fin,
@@ -661,11 +730,22 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
                                     for k in claves_total),
                                    Decimal('0.00'))),
         }
+        # Aviso de tasas faltantes: los costos son parciales si alguna moneda
+        # con monto en el período no tiene tasa BCV para convertirse.
+        buckets_reportados = [f['buckets'] for f in datos['filas']]
+        buckets_reportados.extend(f['buckets_recibido']
+                                  for f in datos['filas'])
+        buckets_reportados.append(datos['perdidas'])
+        resumen['monedas_sin_tasa'] = _monedas_sin_tasa(buckets_reportados,
+                                                        moneda, fin)
         return resumen
     if metric == 'CONSOLIDATED':
-        return {'consolidado': consolidado_financiero(location_ids, inicio, fin,
-                                                      moneda,
-                                                      incluir_compras=incluir_compras)}
+        consolidado = consolidado_financiero(location_ids, inicio, fin, moneda,
+                                             incluir_compras=incluir_compras)
+        return {'consolidado': consolidado,
+                'monedas_sin_tasa': _monedas_sin_tasa(
+                    [f['buckets'] for f in consolidado['por_concepto']],
+                    moneda, fin)}
     return {}
 
 
@@ -930,6 +1010,35 @@ def _total_moneda(totales, moneda, fecha):
     return _redondear(total)
 
 
+def _valor_con_respaldo(location_ids, metric, period_type, inicio, fin,
+                        moneda, totales):
+    """Valor del rango en la moneda pedida, con respaldo a las tablas reales.
+
+    Si el cajón trae 0 en la columna de esa moneda (snapshots viejos sin tasa
+    EUR o con los bolívares como VES) se recalcula al vuelo desde las tablas
+    operativas, para que el KPI, el ranking y la gráfica de evolución no se
+    contradigan mostrando ceros donde sí hubo gasto.
+    """
+    moneda = _moneda_normalizada(moneda)
+    valor = (totales.get(f'amount_{moneda.lower()}', Decimal('0.00'))
+             or Decimal('0.00'))
+    if valor:
+        return valor
+    desde_dt = (inicio if isinstance(inicio, datetime)
+                else datetime.combine(inicio, time.min))
+    hasta_dt = (fin if isinstance(fin, datetime)
+                else datetime.combine(fin, time.max))
+    if metric == 'PURCHASES':
+        # Compra por compra con la tasa del día que quedó registrada.
+        return _compras_en_moneda(desde_dt, hasta_dt, moneda)
+    reales = obtener_totales_reales(location_ids, metric, desde_dt, hasta_dt)
+    if not reales.get('record_count') and not any(
+            reales[clave] for clave in
+            ('amount_usd', 'amount_bs', 'amount_eur')):
+        return valor
+    return _total_moneda(reales, moneda, hasta_dt)
+
+
 def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
                              moneda='USD', incluir_compras=True):
     """Un renglón por sede para el ranking y la comparativa lateral.
@@ -964,9 +1073,10 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
             # El consolidado ya viene expresado en la moneda del reporte.
             total_base = totales['amount_usd']
         elif hay_snapshots_metrico([loc_id], metric, period_type):
-            # Los snapshots traen las tres valoraciones: se elige la pedida.
-            total_base = totales.get(f'amount_{moneda.lower()}',
-                                     Decimal('0.00'))
+            # Los snapshots traen las tres valoraciones: se elige la pedida y,
+            # si quedó en 0, se recalcula desde las tablas reales.
+            total_base = _valor_con_respaldo(
+                [loc_id], metric, period_type, inicio, fin, moneda, totales)
         elif metric == 'PURCHASES' and moneda == 'BS':
             # El BS registrado (price_bs) es el valor exacto del día de compra.
             total_base = totales.get('amount_bs', Decimal('0.00'))
@@ -1028,8 +1138,9 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
                                   period_type.upper(), previo_inicio,
                                   previo_fin)
             if hay_snapshots_metrico([loc_id], metric, period_type):
-                anterior_m = previo.get(f'amount_{moneda.lower()}',
-                                        Decimal('0.00'))
+                anterior_m = _valor_con_respaldo(
+                    [loc_id], metric, period_type.upper(), previo_inicio,
+                    previo_fin, moneda, previo)
             elif metric == 'PURCHASES' and moneda == 'BS':
                 anterior_m = previo.get('amount_bs', Decimal('0.00'))
             elif metric == 'PURCHASES':
@@ -1051,7 +1162,8 @@ def obtener_evolucion(location_ids, metric, period_type='MONTHLY',
                       period_start=None, moneda='USD', limite=6,
                       incluir_compras=True):
     """Serie temporal de los N períodos históricos (hasta e incluyendo el ancla)
-    para el gráfico de evolución. Lee del cajón, igual que los KPIs. Los
+    para el gráfico de evolución. Lee del cajón, igual que los KPIs, pero si un
+    período trae 0 en la moneda pedida se recalcula con los datos reales. Los
     traslados se grafican por cantidad de registros; lo demás por monto en la
     moneda base del reporte."""
     metric = (metric or 'PURCHASES').upper()
@@ -1078,8 +1190,14 @@ def obtener_evolucion(location_ids, metric, period_type='MONTHLY',
                                    inicio, fin)
         if metric == 'TRANSFERS':
             valor = Decimal(str(totales['record_count']))
-        else:
+        elif metric == 'CONSOLIDATED':
+            # El consolidado ya se calculó en la moneda del reporte.
             valor = totales.get(f'amount_{moneda.lower()}', Decimal('0.00'))
+        else:
+            # Si la columna de esa moneda viene en 0 (snapshot viejo), se
+            # recalcula con los datos reales del período.
+            valor = _valor_con_respaldo(location_ids, metric, period_type,
+                                        inicio, fin, moneda, totales)
         puntos.append({
             'label': _etiqueta_periodo(period_type, inicio, fin),
             'value': _redondear(valor),

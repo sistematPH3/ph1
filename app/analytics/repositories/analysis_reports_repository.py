@@ -756,11 +756,14 @@ def obtener_gasto_por_categoria(desde, hasta, moneda='USD', conversor=None):
 def obtener_tasa_historica(moneda, fecha):
     """Tasa BCV (Bs por unidad de 'moneda') vigente en 'fecha': el registro de
     ExchangeRateHistory más reciente con timestamp <= fecha. Si no hay ninguno
-    en o antes de la fecha, usa el más reciente disponible de esa moneda (mismo
-    criterio que product_cost_repository.tasas_bcv): antes, un período anterior
-    al primer registro EUR devolvía None y todos los montos en EUR caían a 0.
-    None solo si esa moneda no tiene ningún registro histórico."""
+    en o antes de la fecha, usa el registro MÁS ANTIGUO disponible de esa moneda
+    (coherencia histórica: una fecha previa al primer registro no debe valorarse
+    con una tasa futura). None solo si esa moneda no tiene ningún registro."""
     currency = (moneda or 'USD').upper()
+    # Los registros viejos de bolívares usan 'VES'/'BS.'; las tasas se guardan
+    # como 'BS', así que se homologa antes de consultar.
+    if currency in ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES'):
+        currency = 'BS'
     fila = db.session.query(ExchangeRateHistory.rate).filter(
         ExchangeRateHistory.currency == currency,
         ExchangeRateHistory.timestamp <= fecha,
@@ -768,7 +771,7 @@ def obtener_tasa_historica(moneda, fecha):
     if fila is None:
         fila = db.session.query(ExchangeRateHistory.rate).filter(
             ExchangeRateHistory.currency == currency,
-        ).order_by(ExchangeRateHistory.timestamp.desc()).first()
+        ).order_by(ExchangeRateHistory.timestamp.asc()).first()
     if fila is None or fila[0] is None:
         return None
     try:
@@ -944,6 +947,7 @@ def obtener_compras_por_moneda(desde, hasta):
         moneda = (compra.currency or 'USD').upper()
         tasa = Decimal(str(compra.exchange_rate or 0))
         if not tasa:
+            # La tasa BCV se archiva como 'BS' aunque la compra diga 'VES'.
             tasa = obtener_tasa_historica(moneda, compra.purchase_date) or Decimal('0.00')
         total_usd = total_bs = total_eur = Decimal('0.00')
         for detalle in compra.details:
