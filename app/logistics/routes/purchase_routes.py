@@ -668,6 +668,29 @@ def create_purchase():
                 )
                 db.session.add(historial_tasa)
                 db.session.commit()
+
+            # La tasa EUR no se registraba en ningún lado salvo que alguien
+            # corriera el script manual: sin esa fila, todo monto en euros de
+            # Estadísticas se calculaba con tasa inexistente (0). Si la compra
+            # no es en euros, se consulta y archiva también la del día. Un
+            # fallo del BCV aquí NUNCA bloquea la compra ya registrada.
+            # TESTING: la suite no debe salir a internet (el guardado de la
+            # tasa es un efecto lateral, no parte del registro de la compra).
+            if moneda_historial != 'EUR' and not current_app.config.get('TESTING'):
+                try:
+                    from app.integrations.api_bcv.routes_api import (
+                        get_bcv_rate_from_web, guardar_tasa,
+                    )
+                    tasa_eur = get_bcv_rate_from_web('EUR', timeout=3)
+                    if tasa_eur:
+                        guardar_tasa('EUR', tasa_eur, data['user_id'],
+                                     source='COMPRA REGISTRADA')
+                except Exception:
+                    db.session.rollback()
+                    current_app.logger.exception(
+                        "No se pudo archivar la tasa EUR al registrar la "
+                        "compra %s. La compra SI quedo registrada.",
+                        purchase_id)
         except Exception:
             db.session.rollback()
             # La compra YA esta guardada: esto solo es el archivo de la tasa.

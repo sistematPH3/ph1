@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import (Blueprint, jsonify, render_template, request, url_for)
+from flask import (Blueprint, current_app, jsonify, render_template, request,
+                    url_for)
 from flask_login import current_user, login_required
 
 from app.decorators.roles import require_roles
@@ -30,6 +31,48 @@ MONEDAS = {
     'EUR': 'Euros (EUR)',
 }
 KPIS_ORDEN = ('compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo')
+
+# Throttle en memoria de la consulta automática al BCV (por proceso).
+_ULTIMA_CONSULTA_TASAS = {'momento': None}
+
+
+def _asegurar_tasas_del_dia(timeout=3):
+    """Respaldo automático de la tasa EUR del día para Estadísticas.
+
+    Si todavía no hay una fila EUR con fecha de hoy, se consulta el BCV y se
+    archiva. Se limita a una consulta cada 10 minutos para no castigar la
+    vista de reportes y NUNCA lanza: la página debe abrir aunque el BCV esté
+    caído (igual que el resto de la automatización, sin scripts manuales).
+    """
+    from app import db
+    from app.models import ExchangeRateHistory
+    from app.integrations.api_bcv.routes_api import (
+        get_bcv_rate_from_web, guardar_tasa,
+    )
+
+    if current_app.config.get('TESTING'):
+        return
+    ahora = datetime.now()
+    ultima = _ULTIMA_CONSULTA_TASAS.get('momento')
+    if ultima is not None and ahora - ultima < timedelta(minutes=10):
+        return
+    _ULTIMA_CONSULTA_TASAS['momento'] = ahora
+    try:
+        inicio_dia = ahora.replace(hour=0, minute=0, second=0,
+                                   microsecond=0)
+        tiene_eur = db.session.query(ExchangeRateHistory.id).filter(
+            ExchangeRateHistory.currency == 'EUR',
+            ExchangeRateHistory.timestamp >= inicio_dia,
+        ).first() is not None
+        if tiene_eur:
+            return
+        tasa_eur = get_bcv_rate_from_web('EUR', timeout=timeout)
+        if tasa_eur:
+            guardar_tasa('EUR', tasa_eur, current_user.id, source='BCV')
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "No se pudo asegurar la tasa EUR del día para estadísticas.")
 
 
 def _url_export(filtros, formato):
@@ -79,6 +122,7 @@ def _metric_efectiva(metric, location_id=None):
 @require_roles('admin', 'finance')
 def reports_page():
     """Página de reportes de estadística (Admin ve todo, Finanzas sus sedes)."""
+    _asegurar_tasas_del_dia()
     datos = _filtros_desde_request()
     datos['metric'] = _metric_efectiva(datos['metric'], datos['location_id'])
     validado = validate_report_filters(datos)
@@ -145,6 +189,7 @@ def reports_page():
 @login_required
 @require_roles('admin', 'finance')
 def reports_api():
+    _asegurar_tasas_del_dia()
     datos = _filtros_desde_request()
     validado = validate_report_filters(datos)
     if not validado['is_valid']:
