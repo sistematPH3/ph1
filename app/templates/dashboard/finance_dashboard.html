@@ -99,6 +99,15 @@
             </select>
         </div>
         <div class="fin-filtro">
+            <label class="fin-filtro-label" for="finMoneda">Moneda</label>
+            <select id="finMoneda" name="moneda" class="form-select form-select-sm"
+                    onchange="this.form.submit()">
+                {% for m in monedas %}
+                <option value="{{ m }}" {% if m == moneda %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="fin-filtro">
             <label class="fin-filtro-label" for="finAplicar">Consultar</label>
             <button id="finAplicar" type="submit" class="btn btn-fin-primary btn-sm">
                 <i class="bi bi-arrow-repeat me-1"></i> Aplicar
@@ -274,7 +283,7 @@
     <div class="panel fin-evo-wrap">
         <div class="panel-header">
             <h2><i class="bi bi-graph-up me-2"></i>Evolución de egresos</h2>
-            <span class="fin-est-marca">ÚLTIMOS 6 MESES · USD{% if ver_compras %} · INCL. COMPRAS{% endif %}</span>
+            <span class="fin-est-marca">ÚLTIMOS 6 MESES · {{ moneda }}{% if ver_compras %} · INCL. COMPRAS{% endif %}</span>
         </div>
         {% set evo_max = namespace(max=0) %}
         {% for evola in evolucion_mes %}
@@ -364,7 +373,7 @@
     <div class="panel fin-cat-wrap">
         <div class="panel-header">
             <h2><i class="bi bi-pie-chart-fill me-2"></i>Compras por categoría</h2>
-            <span class="fin-est-marca">TOP 5 · USD</span>
+            <span class="fin-est-marca">TOP 5 · {{ moneda }}</span>
         </div>
         {% set cat_max = namespace(max=0) %}
         {% for cat in categorias_mes %}

@@ -316,10 +316,15 @@ def finance_dashboard():
             periodo = datetime_cls.strptime(periodo_raw, '%Y-%m-%d').date()
         except ValueError:
             periodo = None
+    # Misma moneda que el panel admin: la configurada en Estadísticas por
+    # defecto, o la elegida en el filtro (antes el panel estaba fijo en USD).
+    default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
+    moneda = validate_moneda(request.args.get('moneda'), default=default_moneda)
     return render_template('dashboard/finance_dashboard.html', alarmas=alarmas, vencidos=vencidos,
                            **get_finance_dashboard_context(
                                current_user, sede_id=sede_id,
-                               period_start=periodo, alarmas=alarmas))
+                               period_start=periodo, alarmas=alarmas,
+                               moneda=moneda))
 
 @dashboard_bp.route('/operations')
 @login_required

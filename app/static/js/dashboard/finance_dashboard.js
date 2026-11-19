@@ -3,6 +3,7 @@
 
     var sel = document.getElementById('finPeriodo');
     var sedeSel = document.getElementById('finSede');
+    var monedaSel = document.getElementById('finMoneda');
     var pdf = document.getElementById('finExportPdf');
     var xls = document.getElementById('finExportExcel');
 
@@ -19,7 +20,9 @@
         params.set('metric', window.FIN_PANEL_METRIC || 'CONSOLIDATED');
         params.set('period_type', 'MONTHLY');
         params.set('period_start', ancla());
-        params.set('moneda', 'USD');
+        // La moneda del panel, no USD fijo: la exportación debe coincidir con
+        // lo que se está viendo en pantalla.
+        params.set('moneda', monedaSel ? monedaSel.value : (window.FIN_MONEDA || 'USD'));
         params.set('formato', formato);
         if (sede()) {
             params.set('location_id', sede());

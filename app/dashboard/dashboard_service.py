@@ -524,14 +524,18 @@ def get_manager_context(current_user, location_id=None, period_start=None):
     }
 
 def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
-                                  alarmas=None):
+                                  alarmas=None, moneda='USD'):
     """Contexto del Panel de Finanzas: KPIs del mes, ranking y filtros de
     sedes/período. Quien no gestiona la sede Central no ve compras; el ranking
     se mide por traslados. Con sede_id se acota el panel a una sede; con
     period_start se consulta otro período (inicio de un ancla). Añade el
     panorama del período: evolución de egresos (6 meses de datos reales),
     resumen (promedio diario, mermas %, costo por traslado, lotes/alertas) y
-    top de compras por categoría si administra la Central."""
+    top de compras por categoría si administra la Central.
+
+    ``moneda`` es la moneda del panel (USD/BS/EUR): antes todas las llamadas
+    estaban fijas en 'USD', así que elegir euros o bolívares no cambiaba nada.
+    """
     from app.analytics.services import analysis_reports_service as reports_svc
     from app.analytics.repositories.analysis_reports_repository import (
         obtener_sedes_opciones,
@@ -542,13 +546,16 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
         sede_ids = [sede_id]
     else:
         sede_ids = list(permitidas)
+    moneda = (moneda or 'USD').upper()
+    if moneda not in reports_svc.MONEDAS:
+        moneda = 'USD'
     hoy = period_start or date_cls.today()
     ver_compras = reports_svc.usuario_administra_central(current_user.id)
     metric_panel = 'PURCHASES' if ver_compras else 'TRANSFERS'
-    kpis = reports_svc.obtener_kpis(sede_ids, 'MONTHLY', hoy, 'USD',
+    kpis = reports_svc.obtener_kpis(sede_ids, 'MONTHLY', hoy, moneda,
                                     incluir_compras=ver_compras)
     ranking = reports_svc.obtener_ranking(sede_ids, metric_panel, hoy,
-                                          'MONTHLY', 'USD',
+                                          'MONTHLY', moneda,
                                           incluir_compras=ver_compras)
     anclas = _anclas_reales(sede_ids, ver_compras, 12)
     periodo = kpis['period']
@@ -561,7 +568,7 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
         sede_ids,
         datetime_cls.combine(periodo['start'], time_cls.min),
         datetime_cls.combine(periodo['end'], time_cls.max),
-        'USD', orientacion_traslados)
+        moneda, orientacion_traslados)
     if orientacion_traslados == reports_svc.SEDE_CENTRAL_ID:
         direccion_principal = 'enviados'
     else:
@@ -583,12 +590,16 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
         'traslados_mes': traslados_mes,
         'traslados_direccion_principal': direccion_principal,
         'evolucion_mes': _evolucion_egresos(sede_ids, periodo['start'],
-                                            ver_compras),
+                                            ver_compras, moneda=moneda),
         'resumen_mes': _resumen_periodo(sede_ids, periodo, kpis,
                                         traslados_mes, ver_compras,
-                                        current_user, alarmas=alarmas),
-        'categorias_mes': (_categorias_compras(sede_ids, periodo['start'])
+                                        current_user, alarmas=alarmas,
+                                        moneda=moneda),
+        'categorias_mes': (_categorias_compras(sede_ids, periodo['start'],
+                                               moneda=moneda)
                            if ver_compras else []),
+        'moneda': moneda,
+        'monedas': reports_svc.MONEDAS,
     }
 
 
@@ -605,16 +616,17 @@ def _anclas_reales(sede_ids, ver_compras, limite=12):
     return meses[:max(1, limite)]
 
 
-def _egresos_del_periodo(sede_ids, inicio, fin, ver_compras):
+def _egresos_del_periodo(sede_ids, inicio, fin, ver_compras, moneda='USD'):
     """Total gastado del rango según datos reales (incluye compras solo si se
-    administra la Central): Compras + Consumo + Mermas + Pérdidas."""
+    administra la Central): Compras + Consumo + Mermas + Pérdidas, convertido a
+    la moneda del panel."""
     from app.analytics.services import analysis_reports_service as reports_svc
     cons = reports_svc.consolidado_financiero(
-        sede_ids, inicio, fin, 'USD', incluir_compras=ver_compras)
+        sede_ids, inicio, fin, moneda, incluir_compras=ver_compras)
     return sum(fila['monto'] for fila in cons['por_concepto'])
 
 
-def _evolucion_egresos(sede_ids, ancla, ver_compras, meses=6):
+def _evolucion_egresos(sede_ids, ancla, ver_compras, meses=6, moneda='USD'):
     """Egresos mensuales reales de los últimos `meses` meses cerrando en el
     mes del ancla (de más antiguo a más reciente), para la gráfica."""
     ancla = ancla.replace(day=1)
@@ -625,18 +637,19 @@ def _evolucion_egresos(sede_ids, ancla, ver_compras, meses=6):
         filas.append({
             'mes': mes,
             'etiqueta': _MESES_ES[mes.month - 1].capitalize(),
-            'monto': _egresos_del_periodo(sede_ids, mes, fin, ver_compras),
+            'monto': _egresos_del_periodo(sede_ids, mes, fin, ver_compras,
+                                          moneda),
         })
     return filas
 
 
 def _resumen_periodo(sede_ids, periodo, kpis, traslados_mes, ver_compras,
-                     user, alarmas=None):
+                     user, alarmas=None, moneda='USD'):
     """Estadísticas generales del período: días, promedio diario, mermas sobre
     el egreso, costo por traslado, alarmas de stock y lotes por vencer."""
     inicio, fin = periodo['start'], periodo['end']
     dias = (fin - inicio).days + 1
-    egresos = _egresos_del_periodo(sede_ids, inicio, fin, ver_compras)
+    egresos = _egresos_del_periodo(sede_ids, inicio, fin, ver_compras, moneda)
     mermas = kpis['kpis']['mermas']['actual']
     mermas_pct = (float(mermas) / float(egresos) * 100
                   if egresos else None)
@@ -663,12 +676,12 @@ def _resumen_periodo(sede_ids, periodo, kpis, traslados_mes, ver_compras,
     }
 
 
-def _categorias_compras(sede_ids, ancla, limite=5):
+def _categorias_compras(sede_ids, ancla, limite=5, moneda='USD'):
     """Top de categorías contables por monto gastado en el período (datos
-    reales de las compras de la Central)."""
+    reales de las compras de la Central), convertido a la moneda del panel."""
     from app.analytics.services import analysis_reports_service as reports_svc
     fin = _sumar_meses(ancla, 1) - timedelta(days=1)
-    cons = reports_svc.consolidado_financiero(sede_ids, ancla, fin, 'USD',
+    cons = reports_svc.consolidado_financiero(sede_ids, ancla, fin, moneda,
                                               incluir_compras=True)
     filas = [f for f in cons.get('por_categoria', []) if f['monto'] > 0]
     filas.sort(key=lambda f: -float(f['monto']))
