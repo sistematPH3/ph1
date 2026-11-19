@@ -1,5 +1,12 @@
 # app/logistics/validators/movement_dispute_validators.py
 
+from app.logistics.requests.qualitative_combination_validators import (
+    get_allowed_actions,
+    get_combination_label,
+    is_allowed_combination,
+)
+
+
 class MovementDisputeValidator:
     """
     Validador con 's' (movement_dispute_validators) — valida el payload del
@@ -18,6 +25,26 @@ class MovementDisputeValidator:
         'RETORNO_EMERGENCIA',
         'INCIDENCIA_INTERNA',
     ]
+
+    @staticmethod
+    def validate_combination_action(primary_condition, secondary_condition, action_type):
+        """Valida la acción elegida contra la matriz de una dupla cualitativa.
+
+        Devuelve (True, None) cuando el renglón no declara una combinación
+        aprobada o cuando la acción respeta la matriz. En caso contrario
+        devuelve (False, mensaje) para que el servicio rechace la resolución.
+        """
+        if not is_allowed_combination(primary_condition, secondary_condition):
+            return True, None
+        allowed_actions = get_allowed_actions(primary_condition, secondary_condition)
+        if action_type in allowed_actions:
+            return True, None
+        return False, (
+            f"La combinación '{get_combination_label(primary_condition, secondary_condition)}' "
+            "prioriza la acción más restrictiva: solo admite "
+            f"{', '.join(allowed_actions)}. "
+            "No puede resolverse con una acción menos restrictiva."
+        )
 
     @staticmethod
     def validate_resolution_payload(form_data, movement):

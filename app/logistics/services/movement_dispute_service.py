@@ -17,6 +17,13 @@ import json
 from app.extensions import db
 from app.models import AuditLog, Inventory, Location, Movement, MovementDetail, Notification, Product, Role, User
 from app.logistics.repositories.movement_reception_repository import MovementReceptionRepository
+from app.logistics.requests.movement_dispute_validators import MovementDisputeValidator
+from app.logistics.requests.qualitative_combination_validators import (
+    combination_requires_lot,
+    get_combination,
+    get_combination_label,
+    get_combination_options,
+)
 
 # ---------------------------------------------------------------------------
 # CATÁLOGO DE DECISIONES CONTABLES
@@ -91,6 +98,11 @@ def _to_decimal(value):
     if value is None:
         return Decimal('0.00')
     return Decimal(str(value))
+
+
+def _normalize_lot(value):
+    """Clave de comparación de lotes (mayúsculas y espacios colapsados)."""
+    return " ".join(str(value or "").split()).casefold()
 
 
 def _get_or_create_inventory(location_id, product_id):
@@ -258,6 +270,23 @@ def get_disputes_context(start_date=None, end_date=None):
             detail.item_condition = detail_audit.get("type", "CONFORME")
             detail.specific_novelty = detail_audit.get("notes", "Sin observaciones")
             detail.observed_physical_lot = detail_audit.get("observed_physical_lot")
+            # Combinación cualitativa mixta declarada en el renglón: la principal
+            # sigue en item_condition y la secundaria viaja en la auditoría.
+            detail.secondary_item_condition = detail_audit.get("secondary_condition")
+            combination = get_combination(
+                detail.item_condition, detail.secondary_item_condition
+            )
+            detail.combination_label = (
+                get_combination_label(
+                    detail.item_condition, detail.secondary_item_condition
+                ) if combination else None
+            )
+            detail.combination_options = get_combination_options(
+                detail.item_condition, detail.secondary_item_condition
+            )
+            detail.combination_requires_lot = combination_requires_lot(
+                detail.item_condition, detail.secondary_item_condition
+            )
 
     return disputes, locations
 
@@ -454,6 +483,22 @@ def resolve_dispute(movement_id, payload, user_id):
         qty_missing = _to_decimal(disc_data.get("missing_qty", getattr(detail, 'missing_quantity', 0)))
         extra_units = _to_decimal(disc_data.get("extra_units", 0))
         novelty_type = disc_data.get("type")
+        secondary_condition = disc_data.get("secondary_condition")
+        is_qualitative_pair = bool(
+            get_combination(novelty_type, secondary_condition)
+        )
+
+        # MATRIZ DE RESOLUCIONES COMBINADAS: cuando el renglón declara una dupla
+        # cualitativa aprobada, solo se aceptan las acciones de su matriz (la más
+        # restrictiva primero). Así un API/script no puede resolver con una simple
+        # corrección de lote una carga con temperatura o custodia comprometidas.
+        action_allowed, combination_error = (
+            MovementDisputeValidator.validate_combination_action(
+                novelty_type, secondary_condition, action
+            )
+        )
+        if not action_allowed:
+            raise ValueError(combination_error)
 
         # REGLA DEL RECHAZO POR ESPACIO: si el renglón (o el traslado) es un
         # rechazo por falta de espacio, la ÚNICA salida válida es devolver la
@@ -489,8 +534,27 @@ def resolve_dispute(movement_id, payload, user_id):
 
         if action == 'CORREGIR_LOTE':
             # Decisión "dejar": el producto se queda, solo se corrige el lote.
-            if new_lot:
-                detail.lot_number = new_lot
+            # El lote de guía ya quedó descartado en la recepción (allí se
+            # verificó que el físico difiere y es de la misma referencia); aquí
+            # solo se impide un "no-op" o un lote de otra referencia.
+            nuevo_lote = str(new_lot or "").strip()
+            if not nuevo_lote:
+                raise ValueError(
+                    "Debe especificar el nuevo número de lote real para autorizar "
+                    "la permanencia del insumo en la sede."
+                )
+            if _normalize_lot(nuevo_lote) == _normalize_lot(detail.lot_number):
+                raise ValueError(
+                    f"El lote '{nuevo_lote}' coincide con el de la guía; no hay "
+                    "corrección que autorizar. Verifique el lote físico real."
+                )
+            lot_owners = MovementReceptionRepository.get_lot_product_ids(nuevo_lote)
+            if lot_owners and detail.product_id not in lot_owners:
+                raise ValueError(
+                    f"El lote '{nuevo_lote}' está registrado para otro producto. "
+                    "No puede autorizarse como corrección de este insumo."
+                )
+            detail.lot_number = nuevo_lote
             # Un sobrante que se queda en la sede también entra al inventario:
             # acreditar solo lo conforme deja el excedente sin dueño (el origen
             # ya lo debitó al recibir y aquí se libera su tránsito de disputa).
@@ -552,7 +616,7 @@ def resolve_dispute(movement_id, payload, user_id):
                 _credit_inventory(inv_dest, credited_qty)
                 qty_to_return = qty_missing
                 lost_qty = Decimal('0.00')
-            elif novelty_type in QUALITATIVE_NOVELTY_TYPES or rechazo_total:
+            elif novelty_type in QUALITATIVE_NOVELTY_TYPES or is_qualitative_pair or rechazo_total:
                 # La carga llegó completa pero NO se queda: está en mal estado
                 # (calidad) o se devuelve completa. Se regresa TODO lo recibido;
                 # no se acredita nada en destino. BUGFIX vs código viejo que
@@ -580,10 +644,16 @@ def resolve_dispute(movement_id, payload, user_id):
                 qty_to_return = extra_units + qty_missing
 
             if qty_to_return > Decimal('0.00'):
+                # El retorno debe viajar con el lote FÍSICO realmente recibido
+                # (el observado en muelle), no con el de la guía: es la
+                # mercancía que se devuelve y su trazabilidad debe ser real.
+                return_lot = detail.lot_number
+                if 'LOTE_NO_COINCIDE' in (novelty_type, secondary_condition):
+                    return_lot = disc_data.get("observed_physical_lot") or return_lot
                 return_items_payload.append({
                     "product_id": detail.product_id,
                     "quantity": qty_to_return,
-                    "lot_number": detail.lot_number,
+                    "lot_number": return_lot,
                     # El retorno hereda el vencimiento del despacho original.
                     "expiration_date": detail.expiration_date
                 })
@@ -634,6 +704,7 @@ def resolve_dispute(movement_id, payload, user_id):
             "product_id": detail.product_id,
             "lot_number": detail.lot_number,
             "action": action or "SIN_ACCION",
+            "secondary_condition": secondary_condition,
             "credited_qty": float(credited_qty),
             "return_qty": float(qty_to_return),
             "lost_qty": float(lost_qty),

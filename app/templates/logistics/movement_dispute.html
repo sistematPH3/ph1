@@ -189,7 +189,8 @@
                                     <thead>
                                         <tr class="bg-light">
                                             <th>Producto / SKU</th>
-                                            <th>Lote</th>
+                                            <th>Lote en Guía</th>
+                                            <th>Lote Físico (Muelle)</th>
                                             <th>Fecha de Vencimiento</th>
                                             <th>Cant. Despachada</th>
                                             <th>Cant. Recibida</th>
@@ -202,7 +203,14 @@
                                         {% set diff = (item.received_quantity | default(0, true) | float) - (item.quantity | float) %}
                                         <tr>
                                             <td class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</td>
-                                            <td><code>{{ item.observed_physical_lot or item.lot_number or 'N/A' }}</code></td>
+                                            <td><code>{{ item.lot_number or 'S/L' }}</code></td>
+                                            <td>
+                                                {% if item.observed_physical_lot %}
+                                                    <code class="text-danger">{{ item.observed_physical_lot }}</code>
+                                                {% else %}
+                                                    <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
                                             <td>
                                                 {% if item.expiration_date %}
                                                     <span class="badge bg-light text-dark border">{{ item.expiration_date.strftime('%Y-%m-%d') }}</span>
@@ -296,6 +304,13 @@
                                                     <span class="ph-badge-guia">En Guía</span>
                                                 {% endif %}
                                             </div>
+                                            {% if item.combination_label %}
+                                            <div class="alert alert-warning border-0 py-2 px-2 mb-2 small">
+                                                <i class="bi bi-layers-fill me-1"></i>
+                                                <strong>Combinación cualitativa mixta:</strong> {{ item.combination_label }}.
+                                                Se prioriza la resolución más restrictiva; las acciones menos restrictivas aparecen al final.
+                                            </div>
+                                            {% endif %}
                                             
                                             <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
                                                 <span>Despachado en guía: <strong class="text-dark">{{ "%.2f"|format(item.quantity | float) }}</strong></span>
@@ -303,7 +318,19 @@
                                                 {% if item.missing_quantity and item.missing_quantity > 0 %}
                                                 <span>En disputa (faltante): <strong class="text-danger">{{ "%.2f"|format(item.missing_quantity | float) }}</strong></span>
                                                 {% endif %}
+                                                <span>Lote en guía: <strong class="text-dark">{{ item.lot_number or 'S/L' }}</strong></span>
+                                                {% if item.observed_physical_lot %}
+                                                <span>Lote físico reportado en muelle: <strong class="text-danger">{{ item.observed_physical_lot }}</strong></span>
+                                                {% endif %}
                                             </div>
+
+                                            {% set row_declares_lot_mismatch = 'LOTE_NO_COINCIDE' in [item.item_condition, item.secondary_item_condition] %}
+                                            {% if row_declares_lot_mismatch and not item.combination_options %}
+                                            <div class="alert alert-info border-0 py-2 px-2 mb-2 small">
+                                                <i class="bi bi-check2-circle me-1"></i>
+                                                <strong>Referencia validada en recepción:</strong> el artículo corresponde a la referencia de la guía y el lote físico difiere del manifestado. Decida si autoriza la permanencia de ese lote corregido o si ordena su devolución al central.
+                                            </div>
+                                            {% endif %}
 
                                             <div class="d-flex flex-column gap-2">
                                                 <!-- Opciones dinámicas segun catálogo -->
@@ -320,7 +347,13 @@
                                                            distinto terminaba con las opciones de otro renglón (o sin las
                                                            suyas). Se conservan TODAS las acciones nativas. #}
                                                         {% set cond = item.item_condition if item.item_condition and item.item_condition != 'CONFORME' else None %}
-                                                        {% if cond == 'RECHAZO_POR_ESPACIO' or (cond is none and mov.status == 'RECHAZO_POR_ESPACIO') %}
+                                                        {% if item.combination_options %}
+                                                            {# Dupla cualitativa aprobada: la matriz del backend solo admite
+                                                               estas salidas. La primera es siempre la más restrictiva. #}
+                                                            {% for opt in item.combination_options %}
+                                                            <option value="{{ opt.code }}">{{ opt.label }}{% if opt.restrictive %} — acción restrictiva{% endif %}</option>
+                                                            {% endfor %}
+                                                        {% elif cond == 'RECHAZO_POR_ESPACIO' or (cond is none and mov.status == 'RECHAZO_POR_ESPACIO') %}
                                                             {# Regla de negocio: no hay espacio físico en la sede, así que la
                                                                ÚNICA salida es devolver. El reverso RETORNO_EMERGENCIA se
                                                                genera automáticamente al emitir el veredicto. #}
@@ -331,7 +364,8 @@
                                                         {% elif cond == 'VENCIMIENTO_PROXIMO' or (cond is none and mov.status == 'VENCIMIENTO_PROXIMO') %}
                                                             <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
                                                         {% elif cond == 'LOTE_NO_COINCIDE' or (cond is none and mov.status == 'LOTE_NO_COINCIDE') %}
-                                                            <option value="CORREGIR_LOTE">Actualizar y corregir número de lote en sistema</option>
+                                                            <option value="CORREGIR_LOTE">Dejar en sede: autorizar y corregir el lote real</option>
+                                                            <option value="RETORNO_EMERGENCIA">Devolver al central (retorno de emergencia)</option>
                                                         {% elif cond == 'SOBRANTE_EXCEDENTE' or (cond is none and (mov.status == 'SOBRANTE_EXCEDENTE' or (item.received_quantity and item.quantity and item.received_quantity > item.quantity))) %}
                                                             <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar en destino (Ingresar excedente al stock local)</option>
                                                             <option value="RESOLUCION_REINTEGRO">Devolver al origen (Reintegro en Transporte)</option>
@@ -354,11 +388,11 @@
                                                     </select>
                                                 </div>
 
-                                                <!-- Campo de Lote condicional solo para LOTE_NO_COINCIDE -->
-                                                {% if mov.status == 'LOTE_NO_COINCIDE' or item.item_condition == 'LOTE_NO_COINCIDE' %}
+                                                <!-- Campo de lote condicional (condición simple o dupla que permite corregirlo) -->
+                                                {% if (item.combination_options and item.combination_requires_lot) or (not item.combination_options and (mov.status == 'LOTE_NO_COINCIDE' or item.item_condition == 'LOTE_NO_COINCIDE')) %}
                                                 <div>
                                                     <label class="form-label small fw-semibold text-secondary mb-1">Nuevo Lote Real:</label>
-                                                    <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm" placeholder="Ej. LOTE-REAL-2026" required>
+                                                    <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm js-item-lot-input" placeholder="Ej. LOTE-REAL-2026">
                                                 </div>
                                                 {% endif %}
                                             </div>

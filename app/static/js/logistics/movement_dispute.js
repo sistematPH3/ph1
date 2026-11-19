@@ -47,6 +47,23 @@ document.addEventListener('DOMContentLoaded', function () {
     if (statusSelect) statusSelect.addEventListener('change', filterTable);
     if (locationSelect) locationSelect.addEventListener('change', filterTable);
 
+    // El lote corregido solo es obligatorio cuando la decisión es DEJAR el
+    // insumo en la sede (CORREGIR_LOTE). Si el administrador ordena devolverlo,
+    // el campo no debe bloquear el envío del dictamen.
+    document.querySelectorAll('.ph-item-decision').forEach(card => {
+        const actionSelect = card.querySelector('select[name$="_action"]');
+        const lotInput = card.querySelector('.js-item-lot-input');
+        if (!actionSelect || !lotInput) return;
+
+        const syncLotRequirement = () => {
+            lotInput.required = actionSelect.value === 'CORREGIR_LOTE';
+            if (!lotInput.required) lotInput.setCustomValidity('');
+        };
+
+        actionSelect.addEventListener('change', syncLotRequirement);
+        syncLotRequirement();
+    });
+
     // Al abandonar la resolución de una novedad (botón "Cancelar" o la "X" del
     // modal) sin emitir el veredicto, se avisa al backend para que cancele
     // cualquier despacho complementario de reposición que se haya generado

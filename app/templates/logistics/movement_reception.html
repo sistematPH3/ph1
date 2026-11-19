@@ -153,6 +153,16 @@
                                         {% endif %}
                                         {% endfor %}
                                     </select>
+                                    <div class="secondary-condition-field hidden mt-1">
+                                        <span class="lot-exp-label">Segunda condición (opcional):</span>
+                                        <select class="form-select form-select-sm select-secondary-condition" aria-label="Condición secundaria del insumo">
+                                            <option value="">Sin segunda condición</option>
+                                            {% for opt in novelty_catalog if opt.value in ['LOTE_NO_COINCIDE', 'VENCIMIENTO_PROXIMO', 'INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA'] %}
+                                            <option value="{{ opt.value }}">{{ opt.label_item }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <span class="secondary-condition-hint text-muted small"></span>
+                                    </div>
                                     <div class="near-expiry-date-field hidden mt-1">
                                         <span class="lot-exp-label">Venc. real:</span>
                                         <input type="date" class="form-control form-control-sm input-near-expiry-exp font-monospace"

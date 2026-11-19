@@ -737,6 +737,108 @@ class MovementReceptionTest(unittest.TestCase):
         self.assertIsNone(AuditLog.query.filter_by(action="RECEPCION_NOVEDAD").first())
 
     # =========================================================================
+    # COMBINACIONES CUALITATIVAS MIXTAS (integración servicio + BD)
+    # =========================================================================
+    def test_recepcion_rechaza_combinacion_cualitativa_no_aprobada(self):
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "INCIDENCIA_TEMPERATURA",
+            "secondary_item_condition": "VIOLACION_CUSTODIA",
+            "observed_physical_lot": None,
+        }]
+        ok, msg = self._process(
+            env, novelty_type="INCIDENCIA_TEMPERATURA",
+            notes="Frío y custodia alterados en el mismo renglón",
+            items_override=items
+        )
+
+        self.assertFalse(ok)
+        mensajes = msg if isinstance(msg, list) else [msg]
+        self.assertTrue(any("no está permitida" in str(m) for m in mensajes))
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_recepcion_dupla_con_lote_exige_lote_fisico_real(self):
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "LOTE_NO_COINCIDE",
+            "secondary_item_condition": "INCIDENCIA_TEMPERATURA",
+            "observed_physical_lot": None,
+        }]
+        ok, msg = self._process(
+            env, novelty_type="LOTE_NO_COINCIDE",
+            notes="Lote distinto y ruptura de cadena de frío",
+            items_override=items
+        )
+
+        self.assertFalse(ok)
+        mensajes = msg if isinstance(msg, list) else [msg]
+        self.assertTrue(any("lote impreso en el empaque" in str(m) for m in mensajes))
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "EN_TRANSITO")
+
+    def test_recepcion_acepta_dupla_lote_temperatura_y_abre_arbitraje(self):
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "LOTE_NO_COINCIDE",
+            "secondary_item_condition": "INCIDENCIA_TEMPERATURA",
+            "observed_physical_lot": "LOTE-FISICO-999",
+            "observed_physical_expiration": "2027-12-31",
+        }]
+        ok, msg = self._process(
+            env, novelty_type="LOTE_NO_COINCIDE",
+            notes="Lote distinto y temperatura fuera de rango",
+            items_override=items
+        )
+
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "LOTE_NO_COINCIDE")
+        log = AuditLog.query.filter_by(action="RECEPCION_INCIDENCIA_CALIDAD").first()
+        self.assertIsNotNone(log)
+        disc = next(
+            d for d in log.changed_data["discrepancies"]
+            if d["detail_id"] == env["detail"].id
+        )
+        self.assertEqual(disc["type"], "LOTE_NO_COINCIDE")
+        self.assertEqual(disc["secondary_condition"], "INCIDENCIA_TEMPERATURA")
+
+    def test_recepcion_acepta_dupla_vencimiento_lote_y_abre_arbitraje(self):
+        env = self._seed(dispatched=10)
+        items = [{
+            "detail_id": env["detail"].id,
+            "received_quantity": 10.0,
+            "item_condition": "VENCIMIENTO_PROXIMO",
+            "secondary_item_condition": "LOTE_NO_COINCIDE",
+            "observed_physical_lot": "LOTE-FISICO-999",
+            "observed_physical_expiration": (date.today() + timedelta(days=2)).isoformat(),
+        }]
+        ok, msg = self._process(
+            env, novelty_type="VENCIMIENTO_PROXIMO",
+            notes="Vence pronto y el lote no coincide con la guía",
+            items_override=items
+        )
+
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        # La dupla SIEMPRE pasa a arbitraje: no se cierra como conforme FEFO.
+        self.assertEqual(env["mov"].status, "VENCIMIENTO_PROXIMO")
+        log = AuditLog.query.filter_by(action="RECEPCION_INCIDENCIA_CALIDAD").first()
+        self.assertIsNotNone(log)
+        disc = next(
+            d for d in log.changed_data["discrepancies"]
+            if d["detail_id"] == env["detail"].id
+        )
+        self.assertEqual(disc["type"], "VENCIMIENTO_PROXIMO")
+        self.assertEqual(disc["secondary_condition"], "LOTE_NO_COINCIDE")
+
+    # =========================================================================
     # CASO 9: SOBRANTE en UN renglón + ERRONEO -> PRODUCTO_ERRONEO
     # (regla 2026: INCIDENCIA_MIXTA exige 2+ renglones afectados)
     # =========================================================================

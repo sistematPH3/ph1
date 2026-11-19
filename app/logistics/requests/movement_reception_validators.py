@@ -1,6 +1,11 @@
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime
 
+from app.logistics.requests.qualitative_combination_validators import (
+    QUALITATIVE_ITEM_CONDITIONS,
+    is_allowed_combination,
+)
+
 VALID_NOVELTY_TYPES = {
     'CONFORME',
     'FALTANTE_CONTEO',
@@ -167,10 +172,51 @@ def validate_reception_payload(payload, movement_details_map,
         raw_received = item.get("received_quantity")
         item_condition = item.get("item_condition", "CONFORME")
         observed_lot = item.get("observed_physical_lot")
+        raw_secondary = item.get("secondary_item_condition")
+        secondary_item_condition = (
+            str(raw_secondary).strip() if raw_secondary not in (None, "") else None
+        )
         
         if item_condition not in VALID_ITEM_CONDITIONS:
             errors.append(f"La condición del insumo '{prod_name}' no es válida.")
             continue
+
+        # COMBINACIONES CUALITATIVAS MIXTAS: un renglón puede declarar una segunda
+        # incidencia de calidad además de la principal. Solo se admiten las cuatro
+        # duplas aprobadas; cualquier otra combinación (o una secundaria sobre una
+        # condición de cantidad) se rechaza para no dejar incidencias sin matriz de
+        # resolución en el arbitraje.
+        if secondary_item_condition:
+            if secondary_item_condition not in QUALITATIVE_ITEM_CONDITIONS:
+                errors.append(
+                    f"La condición secundaria del insumo '{prod_name}' no es válida. "
+                    "Solo se admite otra incidencia cualitativa (lote, vencimiento, "
+                    "temperatura o custodia)."
+                )
+                continue
+            if secondary_item_condition == item_condition:
+                errors.append(
+                    f"La condición secundaria de '{prod_name}' debe ser distinta de la principal."
+                )
+                continue
+            if item_condition not in QUALITATIVE_ITEM_CONDITIONS:
+                errors.append(
+                    f"El insumo '{prod_name}' solo puede declarar una combinación cualitativa "
+                    "cuando su condición principal es de calidad/estado."
+                )
+                continue
+            if not is_allowed_combination(item_condition, secondary_item_condition):
+                errors.append(
+                    f"La combinación cualitativa declarada para '{prod_name}' no está permitida. "
+                    "Las duplas válidas son: Lote no coincide + Temperatura, "
+                    "Vencimiento Próximo + Temperatura, Lote no coincide + Custodia y "
+                    "Vencimiento Próximo + Lote no coincide."
+                )
+                continue
+
+        declared_conditions = {item_condition}
+        if secondary_item_condition:
+            declared_conditions.add(secondary_item_condition)
 
         # CONTRADICCIÓN EN "LOTE NO COINCIDE": si el operario marcó esa
         # condición pero el lote físico observado ES el mismo que trae la guía
@@ -178,7 +224,7 @@ def validate_reception_payload(payload, movement_details_map,
         # hay discrepancia real. Se rechaza la recepción para que el operador
         # corrija la condición; no se anula en silencio.
         if (
-            item_condition == "LOTE_NO_COINCIDE"
+            "LOTE_NO_COINCIDE" in declared_conditions
             and observed_lot
             and str(observed_lot).strip()
             and detail.lot_number
@@ -247,7 +293,7 @@ def validate_reception_payload(payload, movement_details_map,
         if item_has_issue:
             row_issue_count += 1
 
-        if item_condition == "LOTE_NO_COINCIDE":
+        if "LOTE_NO_COINCIDE" in declared_conditions:
             if not observed_lot or len(str(observed_lot).strip()) == 0:
                 errors.append(f"Debe ingresar el lote impreso en el empaque para '{prod_name}'.")
 
@@ -260,7 +306,7 @@ def validate_reception_payload(payload, movement_details_map,
         # sostiene si el lote vence dentro del umbral configurado. Con la fecha
         # explícita (vencimiento manual observado o el de la guía) se rechaza de
         # inmediato; el servicio repite la regla con la fecha resuelta por lote.
-        if item_condition == "VENCIMIENTO_PROXIMO":
+        if "VENCIMIENTO_PROXIMO" in declared_conditions:
             observed_exp = _parse_fecha(observed_exp_raw)
             real_exp = _parse_fecha(detail_expiration)
             if is_return:
@@ -323,6 +369,7 @@ def validate_reception_payload(payload, movement_details_map,
             "lot_number": detail.lot_number,
             "expiration_date": detail_expiration,
             "item_condition": item_condition,
+            "secondary_item_condition": secondary_item_condition,
             "observed_physical_lot": str(observed_lot).strip() if observed_lot else None,
             "observed_physical_expiration": item.get("observed_physical_expiration") or None,
             "surplus_lots": surplus_lots
@@ -458,11 +505,12 @@ def validate_reception_payload(payload, movement_details_map,
         Decimal(str(it["received_quantity"])) > Decimal(str(it["quantity"]))
         for it in processed_items
     )
-    row_conditions = {
-        it.get("item_condition")
-        for it in processed_items
-        if it.get("item_condition") not in (None, "CONFORME")
-    }
+    row_conditions = set()
+    for it in processed_items:
+        for condition_key in ("item_condition", "secondary_item_condition"):
+            condition = it.get(condition_key)
+            if condition not in (None, "CONFORME"):
+                row_conditions.add(condition)
 
     novelty_requiring_backing = (
         'FALTANTE_CONTEO', 'SOBRANTE_EXCEDENTE', 'INCIDENCIA_TEMPERATURA',

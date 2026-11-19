@@ -83,7 +83,7 @@ class ResolveDisputeTest(unittest.TestCase):
     # AYUDA: crea el escenario completo de una disputa en la base
     # (sedes, producto, inventario, traslado EN_TRANSITO y su auditoría).
     # =========================================================================
-    def _seed(self, status, novelty_type, dispatched, received):
+    def _seed(self, status, novelty_type, dispatched, received, secondary_condition=None):
         loc_origin = Location(name="Sede Origen", state="Caracas")
         loc_dest = Location(name="Sede Destino", state="Caracas")
         product = Product(name="Tomate", sku=f"TOM-{status}", min_stock=20)
@@ -143,6 +143,7 @@ class ResolveDisputeTest(unittest.TestCase):
                 "discrepancies": [{
                     "product_id": product.id,
                     "type": novelty_type,
+                    "secondary_condition": secondary_condition,
                     "authorized_qty": float(dispatched),
                     "physical_received_qty": float(received),
                     "extra_units": float(max(0, received - dispatched)),
@@ -601,6 +602,47 @@ class ResolveDisputeTest(unittest.TestCase):
         db.session.refresh(rep)
         self.assertEqual(rep.status, "CANCELADO")
 
+
+    def test_dupla_lote_temperatura_no_admite_corregir_lote(self):
+        env = self._seed(
+            status="LOTE_NO_COINCIDE", novelty_type="LOTE_NO_COINCIDE",
+            dispatched=10, received=10,
+            secondary_condition="INCIDENCIA_TEMPERATURA"
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_dispute(env["mov"].id, {
+                f"item_{env['detail'].id}_action": "CORREGIR_LOTE",
+                f"item_{env['detail'].id}_lot": "L-REAL",
+                "general_notes": "Se intenta corregir el lote sin atender la temperatura"
+            }, user_id=env["user"].id)
+
+        self.assertIn("restrictiva", str(ctx.exception))
+        # La disputa sigue pendiente: no se movió inventario ni se cerró el traslado.
+        db.session.rollback()
+        movimiento = db.session.get(Movement, env["mov"].id)
+        self.assertIn(movimiento.status, ("LOTE_NO_COINCIDE", "INCIDENCIA_TEMPERATURA"))
+
+    def test_dupla_lote_temperatura_devuelve_toda_la_carga_al_central(self):
+        env = self._seed(
+            status="LOTE_NO_COINCIDE", novelty_type="LOTE_NO_COINCIDE",
+            dispatched=10, received=10,
+            secondary_condition="INCIDENCIA_TEMPERATURA"
+        )
+
+        resolve_dispute(env["mov"].id, {
+            f"item_{env['detail'].id}_action": "RETORNO_EMERGENCIA",
+            "general_notes": "Carga con lote alterado y ruptura de cadena de frío"
+        }, user_id=env["user"].id)
+
+        returns = Movement.query.filter_by(return_of_dispute_id=env["mov"].id).all()
+        self.assertEqual(len(returns), 1)
+        self.assertEqual(float(returns[0].details[0].quantity), 10.00)
+        inv_dest = Inventory.query.filter_by(
+            location_id=env["dest"].id, product_id=env["product"].id
+        ).first()
+        # La carga no se queda en la sede: aunque el registro exista, queda en cero.
+        self.assertTrue(inv_dest is None or float(inv_dest.current_quantity) == 0.00)
 
     def test_retorno_generado_por_disputa_hereda_el_vencimiento_real(self):
         # El vencimiento del lote es inmutable: el reverso creado al resolver la

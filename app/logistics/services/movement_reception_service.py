@@ -245,6 +245,40 @@ class MovementReceptionService:
                     "hacia una sede (abastecimiento). En devoluciones hacia Central no está permitido."
                 )
 
+        # SEPARACIÓN DE FASES (recepción): cuando el renglón se reporta con
+        # LOTE_NO_COINCIDE, el lote físico capturado debe pertenecer a la MISMA
+        # referencia de producto de la guía. El muelle no arbitra: aquí solo se
+        # comprueba que no se trate de un artículo ajeno. Si el lote está
+        # registrado en el sistema SOLO para otro producto, el operario debió
+        # declararlo como insumo no solicitado (Producto Erróneo) y no como una
+        # simple corrección de lote. Un lote desconocido no se puede contrastar
+        # y se acepta (queda trazado por su vencimiento observado).
+        for item in processed_items:
+            declared = {
+                item.get("item_condition"),
+                item.get("secondary_item_condition"),
+            }
+            if "LOTE_NO_COINCIDE" not in declared:
+                continue
+            observed_lot = str(item.get("observed_physical_lot") or "").strip()
+            if not observed_lot:
+                # El validador ya exige capturarlo cuando la condición es simple;
+                # en una dupla también debe venir para poder contrastar.
+                return False, (
+                    "Debe ingresar el lote impreso en el empaque para validar la "
+                    "referencia del insumo recibido."
+                )
+            lot_owners = MovementReceptionRepository.get_lot_product_ids(observed_lot)
+            if lot_owners and item["product_id"] not in lot_owners:
+                detail_obj = details_map.get(item["detail_id"])
+                prod_name = getattr(detail_obj, "product_name", None) or "el insumo"
+                return False, (
+                    f"El lote físico '{observed_lot}' está registrado en el sistema para "
+                    f"otro producto, no para '{prod_name}'. Un lote de otra referencia no "
+                    "puede recibirse como corrección de lote: si el artículo es ajeno a la "
+                    "guía, regístrelo como insumo no solicitado (Producto Erróneo)."
+                )
+
         # Validación de los LOTES DEL SOBRANTE (el excedente puede venir de 1..N lotes).
         # El lote del sobrante es OBLIGATORIO y debe EXISTIR en el sistema (mismo
         # criterio que el insumo erróneo); además, la suma de las cantidades de los
@@ -369,7 +403,9 @@ class MovementReceptionService:
         umbral_dias = int(current_app.config.get("VENCIMIENTO_PROXIMO_DIAS", 7))
         hoy = current_ve_time().date()
         for item in processed_items:
-            if item.get("item_condition") != "VENCIMIENTO_PROXIMO":
+            if "VENCIMIENTO_PROXIMO" not in (
+                item.get("item_condition"), item.get("secondary_item_condition")
+            ):
                 continue
             if is_return:
                 # RETORNO: solo la fecha HEREDADA del lote original puede sostener
@@ -463,6 +499,9 @@ class MovementReceptionService:
         near_expiry_credits_like_conforme = (
             final_status == "VENCIMIENTO_PROXIMO"
             and not erroneous_products
+            # Una dupla cualitativa (p. ej. Vencimiento Próximo + Lote no coincide)
+            # nunca puede cerrarse como conforme: siempre requiere arbitraje.
+            and not any(it.get("secondary_item_condition") for it in processed_items)
             and all(
                 Decimal(str(it["received_quantity"])) == Decimal(str(it["quantity"]))
                 for it in processed_items
@@ -587,6 +626,7 @@ class MovementReceptionService:
                     ),
                     "observed_physical_lot": item.get("observed_physical_lot"),
                     "observed_physical_expiration": item.get("observed_physical_expiration"),
+                    "secondary_condition": item.get("secondary_item_condition"),
                     "surplus_lots": item.get("surplus_lots") or [],
                     "notes": specific_novelty
                 })
@@ -599,7 +639,13 @@ class MovementReceptionService:
             if final_status != "COMPLETADO":
                 audit_event = "RECEPCION_NOVEDAD"
                 severity = "ALERTA"
-                if any(it.get("item_condition") in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO'] for it in processed_items):
+                quality_conditions = {'INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA', 'VENCIMIENTO_PROXIMO'}
+                if any(
+                    quality_conditions & {
+                        it.get("item_condition"), it.get("secondary_item_condition")
+                    }
+                    for it in processed_items
+                ):
                     audit_event = "RECEPCION_INCIDENCIA_CALIDAD"
 
             audit_items = []
@@ -624,6 +670,7 @@ class MovementReceptionService:
                     "received_qty": float(item["received_quantity"]),
                     "missing_qty": float(item["missing_quantity"]),
                     "item_condition": item_cond,
+                    "secondary_item_condition": item.get("secondary_item_condition"),
                     "specific_novelty": specific_novelty,
                     "quantity_novelty": (
                         "FALTANTE" if item_diff < -0.001

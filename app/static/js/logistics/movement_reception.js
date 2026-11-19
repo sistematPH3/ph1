@@ -67,6 +67,60 @@ document.addEventListener("DOMContentLoaded", () => {
         return Number.isFinite(raw) && raw >= 0 ? raw : 7;
     })();
 
+    // COMBINACIONES CUALITATIVAS MIXTAS permitidas por renglón. Debe coincidir
+    // con el catálogo del backend (qualitative_combination_validators.py).
+    const QUALITATIVE_CONDITIONS = [
+        "LOTE_NO_COINCIDE", "VENCIMIENTO_PROXIMO",
+        "INCIDENCIA_TEMPERATURA", "VIOLACION_CUSTODIA"
+    ];
+    const ALLOWED_QUALITATIVE_COMBINATIONS = new Set([
+        ["LOTE_NO_COINCIDE", "INCIDENCIA_TEMPERATURA"],
+        ["VENCIMIENTO_PROXIMO", "INCIDENCIA_TEMPERATURA"],
+        ["LOTE_NO_COINCIDE", "VIOLACION_CUSTODIA"],
+        ["VENCIMIENTO_PROXIMO", "LOTE_NO_COINCIDE"]
+    ].map(pair => [...pair].sort().join("|")));
+
+    const SECONDARY_CONDITION_LABELS = {
+        LOTE_NO_COINCIDE: "Lote no coincide con Guía",
+        VENCIMIENTO_PROXIMO: "Vencimiento Próximo",
+        INCIDENCIA_TEMPERATURA: "Ruptura de Cadena de Frío",
+        VIOLACION_CUSTODIA: "Violación de Custodia"
+    };
+
+    const isQualitativeCondition = (value) => QUALITATIVE_CONDITIONS.includes(value);
+    const isAllowedQualitativeCombination = (primary, secondary) => {
+        if (!primary || !secondary || primary === secondary) return false;
+        return ALLOWED_QUALITATIVE_COMBINATIONS.has([primary, secondary].sort().join("|"));
+    };
+
+    // Muestra la segunda condición solo cuando la principal es cualitativa,
+    // deshabilita las duplas no aprobadas y limpia una secundaria que dejó de ser
+    // válida al cambiar la condición principal.
+    function updateSecondaryConditionField(row, primaryCondition) {
+        const select = row.querySelector(".select-secondary-condition");
+        const wrapper = row.querySelector(".secondary-condition-field");
+        if (!select || !wrapper) return "";
+
+        if (!isQualitativeCondition(primaryCondition)) {
+            select.value = "";
+            wrapper.classList.add("hidden");
+            return "";
+        }
+
+        wrapper.classList.remove("hidden");
+        Array.from(select.options).forEach(option => {
+            if (!option.value) return;
+            const allowed = isAllowedQualitativeCombination(primaryCondition, option.value);
+            option.disabled = !allowed;
+            option.hidden = !allowed;
+        });
+
+        if (select.value && !isAllowedQualitativeCombination(primaryCondition, select.value)) {
+            select.value = "";
+        }
+        return select.value || "";
+    }
+
     // Las fechas ISO ('AAAA-MM-DD') se interpretan en hora LOCAL: new Date('2026-01-01')
     // se parsea como UTC y en Venezuela (UTC-4) restaría un día al comparar.
     const parseFechaLocal = (valor) => {
@@ -381,7 +435,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // tiene amplia vida útil, se resalta el selector, se explica el motivo debajo
     // y se avanza con un toast; el envío queda bloqueado hasta corregir.
     function setNearExpiryFeedback(row, isContradiction, diasRestantes, sinFechaReal = false) {
-        const condSelect = row.querySelector(".select-item-condition");
+        const primarySelect = row.querySelector(".select-item-condition");
+        const secondarySelect = row.querySelector(".select-secondary-condition");
+        // Si la novedad viene de la condición secundaria, se resalta ESA lista,
+        // no la principal (que puede ser, por ejemplo, temperatura).
+        const condSelect = (primarySelect && primarySelect.value === "VENCIMIENTO_PROXIMO")
+            ? primarySelect
+            : (secondarySelect || primarySelect);
         if (condSelect) {
             condSelect.classList.toggle("is-invalid", isContradiction);
             condSelect.setAttribute("aria-invalid", isContradiction ? "true" : "false");
@@ -1205,19 +1265,23 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const declaredCondition = condSelect ? condSelect.value : "CONFORME";
+            const secondaryCondition = updateSecondaryConditionField(row, declaredCondition);
+            const effectiveConditions = new Set(
+                [declaredCondition, secondaryCondition].filter(Boolean)
+            );
 
             // El campo de vencimiento real solo se muestra para "Vencimiento Próximo"
             // y se prellena con la fecha de la guía para que el operario vea qué se
             // está evaluando y pueda corregirla si el empaque trae otra.
             if (nearExpiryField) {
-                nearExpiryField.classList.toggle("hidden", declaredCondition !== "VENCIMIENTO_PROXIMO");
+                nearExpiryField.classList.toggle("hidden", !effectiveConditions.has("VENCIMIENTO_PROXIMO"));
             }
             if (nearExpiryExpInput && esVencimientoBloqueado(row)) {
                 // Retorno: el campo se bloquea con la fecha REAL heredada del lote
                 // original. El operador no puede reescribir el vencimiento.
                 nearExpiryExpInput.readOnly = true;
                 nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
-            } else if (nearExpiryExpInput && declaredCondition === "VENCIMIENTO_PROXIMO"
+            } else if (nearExpiryExpInput && effectiveConditions.has("VENCIMIENTO_PROXIMO")
                 && !nearExpiryExpInput.value && row.dataset.nearExpiryPrefilled !== "1") {
                 nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
                 row.dataset.nearExpiryPrefilled = "1";
@@ -1231,12 +1295,12 @@ document.addEventListener("DOMContentLoaded", () => {
             // lote; no se asume la corrección de forma invisible.
             let condition = declaredCondition;
             let lotContradiction = false;
-            if (declaredCondition === "LOTE_NO_COINCIDE") {
+            if (effectiveConditions.has("LOTE_NO_COINCIDE")) {
                 const lotRealInput = row.querySelector(".input-row-lot");
                 const observedLot = lotRealInput ? normalizarLote(lotRealInput.value) : "";
                 const guideLot = normalizarLote(row.dataset.lotNumber);
                 lotContradiction = Boolean(observedLot) && Boolean(guideLot) && observedLot === guideLot;
-                if (lotContradiction) {
+                if (lotContradiction && declaredCondition === "LOTE_NO_COINCIDE" && !secondaryCondition) {
                     condition = "CONFORME";
                 }
             }
@@ -1248,7 +1312,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let nearExpiryContradiction = false;
             let nearExpiryDays = null;
             let nearExpiryMissingDate = false;
-            if (declaredCondition === "VENCIMIENTO_PROXIMO") {
+            if (effectiveConditions.has("VENCIMIENTO_PROXIMO")) {
                 const vencimientoReal = vencimientoDeFila(row, expInput, nearExpiryExpInput);
                 if (esVencimientoBloqueado(row) && !vencimientoReal) {
                     // Retorno sin fecha real: no hay nada que evaluar y la novedad no
@@ -1269,7 +1333,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // El lote se pide tanto cuando el lote no coincide (LOTE_NO_COINCIDE)
                 // como cuando hay un SOBRANTE: el excedente físico también debe indicar a
                 // qué lote(es) pertenece. Sin esto el sobrante quedaría sin trazabilidad.
-                const needsSingleLot = declaredCondition === "LOTE_NO_COINCIDE";
+                const needsSingleLot = effectiveConditions.has("LOTE_NO_COINCIDE");
                 if (needsSingleLot || isSurplus) {
                     lotBox.classList.remove("hidden");
                     // Lote no coincide: pide el lote físico real único del producto que
@@ -1502,6 +1566,15 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        const secondaryConditionSelect = row.querySelector(".select-secondary-condition");
+        if (secondaryConditionSelect) {
+            secondaryConditionSelect.addEventListener("change", () => {
+                row.dataset.condManual = "1";
+                hideAlert();
+                checkAndAutoCategorize();
+            });
+        }
+
         const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
         if (nearExpiryExpInput) {
             // La fecha real es el dato que sostiene (o desmiente) la novedad: al
@@ -1570,6 +1643,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
 
             const declaredCondition = condSelect ? condSelect.value : "CONFORME";
+            const secondarySelect = row.querySelector(".select-secondary-condition");
+            const secondaryCondition = secondarySelect ? secondarySelect.value : "";
+            const effectiveConditions = new Set(
+                [declaredCondition, secondaryCondition].filter(Boolean)
+            );
             // Mismo umbral de tolerancia que checkAndAutoCategorize (0.001): una
             // diferencia minúscula dentro del ruido no debe tratarse como sobrante,
             // para que la UI (que muestra el panel de lotes) y este payload coincidan.
@@ -1582,7 +1660,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let condition = declaredCondition;
             let observedLot = null;
             let contradictoryLot = false;
-            if (declaredCondition === "LOTE_NO_COINCIDE") {
+            if (effectiveConditions.has("LOTE_NO_COINCIDE")) {
                 const lotVal = lotInput ? lotInput.value.trim() : "";
                 const guideLot = String(row.dataset.lotNumber || "").trim();
                 if (lotVal && guideLot && normalizarLote(lotVal) === normalizarLote(guideLot)) {
@@ -1600,7 +1678,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // más vida útil que el umbral, la novedad es falsa. Se marca para bloquear
             // el envío (el backend la rechaza igual con HTTP 400).
             let contradictoryNearExpiry = false;
-            if (declaredCondition === "VENCIMIENTO_PROXIMO") {
+            if (effectiveConditions.has("VENCIMIENTO_PROXIMO")) {
                 const vencimientoReal = vencimientoDeFila(row, expInput, nearExpiryExpInput);
                 if (esVencimientoBloqueado(row) && !vencimientoReal) {
                     contradictoryNearExpiry = true;
@@ -1614,7 +1692,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // fecha REAL heredada del lote original (nunca la escrita en muelle).
             const vencimientoEnviado = esVencimientoBloqueado(row)
                 ? (String(row.dataset.expiration || "").trim() || null)
-                : (declaredCondition === "VENCIMIENTO_PROXIMO" && nearExpiryExpInput && nearExpiryExpInput.value
+                : (effectiveConditions.has("VENCIMIENTO_PROXIMO") && nearExpiryExpInput && nearExpiryExpInput.value
                     ? nearExpiryExpInput.value
                     : null);
 
@@ -1702,6 +1780,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 dispatched_qty: dispatched,
                 received_quantity: receivedQty,
                 item_condition: condition,
+                secondary_item_condition: secondaryCondition || null,
                 observed_physical_lot: observedLot,
                 observed_physical_expiration: esVencimientoBloqueado(row)
                     ? vencimientoEnviado
@@ -1928,6 +2007,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 conditionTag = `<span class="badge bg-danger">Faltante Físico</span>`;
             } else if (it.item_condition === "SOBRANTE_EXCEDENTE") {
                 conditionTag = `<span class="badge bg-primary">Sobrante Físico</span>`;
+            }
+
+            if (it.secondary_item_condition) {
+                const secondaryLabel = SECONDARY_CONDITION_LABELS[it.secondary_item_condition] || it.secondary_item_condition;
+                conditionTag += ` <span class="badge bg-dark">+ ${secondaryLabel}</span>`;
             }
 
             let diffText = `<span class="text-success">0.00 ${it.unit}</span>`;

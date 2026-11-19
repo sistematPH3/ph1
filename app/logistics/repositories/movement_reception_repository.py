@@ -386,6 +386,30 @@ class MovementReceptionRepository:
         return None
 
     @staticmethod
+    def get_lot_product_ids(lot_number):
+        """Productos a los que está asociado un lote en el histórico.
+
+        Se usa para validar la REFERENCIA del lote físico capturado en muelle
+        cuando no coincide con la guía: si el lote solo existe para otro
+        producto, el artículo no es el solicitado (producto ajeno). Un lote
+        desconocido (sin histórico) devuelve un conjunto vacío: no se puede
+        afirmar que sea de otra referencia y se deja pasar.
+        """
+        if not lot_number or not str(lot_number).strip():
+            return set()
+
+        lot = str(lot_number).strip()
+        sql = text("""
+            SELECT DISTINCT product_id FROM movement_details
+            WHERE LOWER(TRIM(lot_number)) = LOWER(TRIM(:lot_number))
+            UNION
+            SELECT DISTINCT product_id FROM purchase_details
+            WHERE LOWER(TRIM(lot_number)) = LOWER(TRIM(:lot_number))
+        """)
+        rows = db.session.execute(sql, {"lot_number": lot}).fetchall()
+        return {row[0] for row in rows if row[0] is not None}
+
+    @staticmethod
     def lot_exists(product_id, lot_number):
         """Indica si un serial/lote ya existe en la base de datos para un producto.
 
