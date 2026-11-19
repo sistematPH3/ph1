@@ -312,32 +312,40 @@
                                                     <select name="item_{{ item.id }}_action" class="form-select form-select-sm" required>
                                                         <option value="" selected disabled>-- Seleccione resolución --</option>
                                                         
-                                                        {% if item.item_condition == 'RECHAZO_POR_ESPACIO' %}
+                                                        {# GRANULARIDAD POR RENGLÓN: las opciones se derivan de la condición
+                                                           REAL de ESTE renglón (item_condition). El estado general del
+                                                           traslado solo se usa como respaldo cuando el renglón no aporta
+                                                           condición propia. Antes se decidía primero por mov.status, y en
+                                                           una incidencia MIXTA un renglón con vencimiento próximo o lote
+                                                           distinto terminaba con las opciones de otro renglón (o sin las
+                                                           suyas). Se conservan TODAS las acciones nativas. #}
+                                                        {% set cond = item.item_condition if item.item_condition and item.item_condition != 'CONFORME' else None %}
+                                                        {% if cond == 'RECHAZO_POR_ESPACIO' or (cond is none and mov.status == 'RECHAZO_POR_ESPACIO') %}
                                                             {# Regla de negocio: no hay espacio físico en la sede, así que la
                                                                ÚNICA salida es devolver. El reverso RETORNO_EMERGENCIA se
                                                                genera automáticamente al emitir el veredicto. #}
                                                             <option value="RETORNO_EMERGENCIA">Devolver al central (única opción: rechazo por espacio)</option>
-                                                        {% elif item.item_condition in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA'] %}
+                                                        {% elif cond in ['INCIDENCIA_TEMPERATURA', 'VIOLACION_CUSTODIA'] %}
                                                             <option value="ACEPTAR_RECEPCION">Dejar en sede (se acredita lo recibido; si está dañado, va a merma)</option>
                                                             <option value="RETORNO_EMERGENCIA">Devolver al central (genera el reverso automático)</option>
-                                                        {% elif mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0) %}
-                                                            <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido: {{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u. (reintegra el faltante a la sede origen)</option>
-                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (el faltante se registra como pérdida en ruta)</option>
-                                                        {% elif mov.status in ['SOBRANTE_EXCEDENTE'] %}
+                                                        {% elif cond == 'VENCIMIENTO_PROXIMO' or (cond is none and mov.status == 'VENCIMIENTO_PROXIMO') %}
+                                                            <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
+                                                        {% elif cond == 'LOTE_NO_COINCIDE' or (cond is none and mov.status == 'LOTE_NO_COINCIDE') %}
+                                                            <option value="CORREGIR_LOTE">Actualizar y corregir número de lote en sistema</option>
+                                                        {% elif cond == 'SOBRANTE_EXCEDENTE' or (cond is none and (mov.status == 'SOBRANTE_EXCEDENTE' or (item.received_quantity and item.quantity and item.received_quantity > item.quantity))) %}
                                                             <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar en destino (Ingresar excedente al stock local)</option>
                                                             <option value="RESOLUCION_REINTEGRO">Devolver al origen (Reintegro en Transporte)</option>
-                                                        {% elif mov.status == 'VIOLACION_CUSTODIA' %}
+                                                        {% elif cond == 'FALTANTE_CONTEO' or (cond is none and (mov.status in ['FALTANTE_CONTEO', 'NOVEDAD_FALTANTE'] or (item.missing_quantity and item.missing_quantity > 0))) %}
+                                                            <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido: {{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u. (reintegra el faltante a la sede origen)</option>
+                                                            <option value="BAJA_EXTRAVIO_PARCIAL">Declarar baja por extravío parcial (el faltante se registra como pérdida en ruta)</option>
+                                                        {% elif cond is none and mov.status == 'VIOLACION_CUSTODIA' %}
                                                             <option value="RESOLUCION_ACREDITAR_DESTINO">Acreditar recepción en destino con acta de auditoría</option>
                                                             <option value="INCIDENCIA_INTERNA">Procesar como incidencia interna local (caja dañada/abierta, el contenido queda en sede)</option>
                                                             <option value="ACEPTAR_RECEPCION">Concluir recepción física local (tomar lo registrado como recibido)</option>
-                                                        {% elif mov.status == 'INCIDENCIA_TEMPERATURA' %}
+                                                        {% elif cond is none and mov.status == 'INCIDENCIA_TEMPERATURA' %}
                                                             <option value="ACEPTAR_RECEPCION">Dejar en sede (tomar lo registrado como recibido, cerrar tránsito y notificar a auditoría)</option>
                                                             <option value="RETORNO_EMERGENCIA">Devolver al central (genera el reverso automático)</option>
-                                                        {% elif mov.status == 'VENCIMIENTO_PROXIMO' %}
-                                                            <option value="RECEPCION_CONFORME_FEFO">Procesar recepción conforme con alerta FEFO</option>
-                                                        {% elif mov.status == 'LOTE_NO_COINCIDE' %}
-                                                            <option value="CORREGIR_LOTE">Actualizar y corregir número de lote en sistema</option>
-                                                        {% elif mov.status in ['RECHAZO_POR_ESPACIO', 'RETORNO_EMERGENCIA'] %}
+                                                        {% elif cond is none and mov.status == 'RETORNO_EMERGENCIA' %}
                                                             <option value="RETORNO_EMERGENCIA">Ordenar Retorno de Emergencia a central</option>
                                                         {% else %}
                                                             <option value="ACEPTAR_RECEPCION">Aceptar lo registrado como recibido ({{ "%.2f"|format(item.received_quantity | default(0, true) | float) }} u.)</option>
@@ -347,7 +355,7 @@
                                                 </div>
 
                                                 <!-- Campo de Lote condicional solo para LOTE_NO_COINCIDE -->
-                                                {% if mov.status == 'LOTE_NO_COINCIDE' %}
+                                                {% if mov.status == 'LOTE_NO_COINCIDE' or item.item_condition == 'LOTE_NO_COINCIDE' %}
                                                 <div>
                                                     <label class="form-label small fw-semibold text-secondary mb-1">Nuevo Lote Real:</label>
                                                     <input type="text" name="item_{{ item.id }}_lot" class="form-control form-control-sm" placeholder="Ej. LOTE-REAL-2026" required>
