@@ -56,16 +56,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setupHeaderValidation();
+
+    // Politica de borrador: se conserva solo si se viene de registrar un
+    // proveedor (flag purchase_draft_keep) o si la pagina se recargo (F5).
+    // En cualquier otra navegacion se borra, para que no aparezcan datos
+    // viejos al entrar desde otra vista.
+    (function aplicarPoliticaBorrador() {
+        let tipoNavegacion = '';
+        try {
+            const entradas = performance.getEntriesByType('navigation');
+            if (entradas && entradas.length) {
+                tipoNavegacion = entradas[0].type || '';
+            }
+        } catch (e) {
+            tipoNavegacion = '';
+        }
+
+        const keepFlag = sessionStorage.getItem('purchase_draft_keep');
+        const esRecarga = (tipoNavegacion === 'reload');
+        const vieneDeProveedor = (keepFlag === '1');
+
+        if (vieneDeProveedor) {
+            sessionStorage.removeItem('purchase_draft_keep');
+        }
+
+        if (!vieneDeProveedor && !esRecarga) {
+            clearDraft();
+        }
+    })();
+
     restoreDraft();
 
     const supplierSelect = document.getElementById('supplier_id');
     if (supplierSelect) {
         supplierSelect.addEventListener('change', function() {
             if (this.value === 'new') {
-                saveDraft();
+                saveDraftImmediate();
+                sessionStorage.setItem('purchase_draft_keep', '1');
                 window.location.href = this.getAttribute('data-new-url');
             } else {
-                saveDraft();
+                saveDraftImmediate();
             }
         });
     }
@@ -134,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rateInput.setAttribute('readonly', true);
                     rateInput.removeAttribute('placeholder');
                     rateInput.classList.replace('text-dark', 'text-muted');
-                    saveDraft();
+                    saveDraftImmediate();
                 } else {
                     throw new Error("Formato de respuesta desconocido");
                 }
@@ -176,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     currencySelect.addEventListener('change', () => {
         updateRateLabel(currencySelect.value);
-        saveDraft();
+        saveDraftImmediate();
         fetchExchangeRate();
     });
 
@@ -212,11 +242,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.querySelectorAll('#itemsContainer tr.main-product-row').forEach(row => {
+        // Las filas del borrador ya traen sus listeners: volver a adjuntarlos
+        // duplicaba los 'change' (y con ello los saveDraft) y repintaba el
+        // limite en mañana.
+        if (row.dataset.listeners === '1') return;
         attachRowValidationListeners(row);
     });
 });
 
-function saveDraft() {
+function saveDraftImmediate() {
     const draft = {
         supplier_id: document.getElementById('supplier_id') ? document.getElementById('supplier_id').value : '',
         currency: document.getElementById('currency') ? document.getElementById('currency').value : 'USD',
@@ -286,6 +320,10 @@ function restoreDraft() {
                 if (prodLot && item.lot_number) prodLot.value = item.lot_number;
                 if (prodExp && item.expiration_date) prodExp.value = item.expiration_date;
                 if (prodPrice && item.foreign_price) prodPrice.value = item.foreign_price;
+
+                // Ya estan los valores del borrador: ahora si se puede fijar el
+                // minimo correcto, sin tocar la fecha restaurada.
+                aplicarLimitesFecha(prodExp, prodId);
             });
         }
     } catch (e) {
@@ -296,6 +334,31 @@ function restoreDraft() {
 function clearDraft() {
     sessionStorage.removeItem('purchase_draft_form');
 }
+
+// Debounce de ~300 ms para los eventos 'input', de modo que una compra
+// masiva (muchas filas) no re-serialice todo sessionStorage en cada tecla.
+// Los eventos 'change' criticos y la navegacion a proveedores llaman a
+// saveDraftImmediate() directamente.
+let _saveDraftTimer = null;
+function saveDraft() {
+    if (_saveDraftTimer) clearTimeout(_saveDraftTimer);
+    _saveDraftTimer = setTimeout(function () {
+        _saveDraftTimer = null;
+        saveDraftImmediate();
+    }, 300);
+}
+function flushDraft() {
+    if (_saveDraftTimer) {
+        clearTimeout(_saveDraftTimer);
+        _saveDraftTimer = null;
+        saveDraftImmediate();
+    }
+}
+window.addEventListener('beforeunload', flushDraft);
+window.addEventListener('pagehide', flushDraft);
+document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushDraft();
+});
 
 /**
  * Estado de la foto: 'vacia' | 'revisando' | 'aceptada' | 'rechazada'
@@ -368,11 +431,16 @@ async function revisarFoto(archivo) {
     const formData = new FormData();
     formData.append('invoice_photo', archivo);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
         const response = await fetch('/logistics/purchases/validar-foto', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         const data = await response.json().catch(() => ({}));
 
         // Si el usuario quito la foto o monto otra mientras se revisaba, este
@@ -390,9 +458,11 @@ async function revisarFoto(archivo) {
             setPhotoError(motivo);
         }
     } catch (error) {
+        clearTimeout(timeoutId);
         if (token !== revisionFotoEnCurso) return;
-        // Si no hay conexion con el servidor no se marca la foto como buena:
-        // se deja en revision y el submit vuelve a validarla.
+        // Si no hay conexion con el servidor (o se agoto el timeout) no se
+        // marca la foto como buena: se deja en revision y el submit vuelve a
+        // validarla.
         estadoFoto = 'vacia';
         pintarEstadoFoto('vacia');
     }
@@ -582,7 +652,7 @@ function minDiasManual() {
     // el servidor va a rechazar. Se inyecta desde la plantilla.
     const form = document.getElementById('purchaseForm');
     const dias = parseInt(form ? form.getAttribute('data-vencimiento-min-dias') : '0', 10);
-    return Number.isFinite(dias) && dias > 0 ? dias : 30;
+    return Number.isFinite(dias) && dias > 0 ? dias : 15;
 }
 
 function configureDatePickerLimits(expInput, minDays = 0) {
@@ -597,6 +667,31 @@ function configureDatePickerLimits(expInput, minDays = 0) {
     expInput.max = fechaLocalInput(maxDateObj);
 }
 
+/**
+ * Aplica el minimo y la obligatoriedad de la fecha segun el producto que ya
+ * tenga seleccionada la fila, SIN borrar el valor del input.
+ *
+ * Hace falta porque el evento 'change' del select es el unico sitio que sabia
+ * aplicar los VENCIMIENTO_MANUAL_MIN_DIAS, y las filas restauradas del borrador
+ * se rellenan por asignacion (prodId.value = ...), que no dispara 'change': la
+ * fecha volvia con min = mañana e inaplicable el minimo. Y no sirve disparar
+ * 'change' a mano, porque la rama manual vacia la fecha del borrador.
+ */
+function aplicarLimitesFecha(expInput, prodSelect) {
+    if (!expInput) return;
+
+    const opt = prodSelect && prodSelect.value
+        ? prodSelect.options[prodSelect.selectedIndex]
+        : null;
+    const esManual = !!(opt && opt.getAttribute('data-manual') === 'true');
+
+    expInput.required = esManual;
+    expInput.title = esManual
+        ? 'Fecha de caducidad impresa en el empaque (obligatoria)'
+        : '';
+    configureDatePickerLimits(expInput, esManual ? minDiasManual() : 0);
+}
+
 function attachRowValidationListeners(row) {
     const prodId = row.querySelector('.prod-id');
     const prodQty = row.querySelector('.prod-qty');
@@ -604,7 +699,7 @@ function attachRowValidationListeners(row) {
     const prodPrice = row.querySelector('.prod-price');
     const expInput = row.querySelector('.prod-exp');
 
-    configureDatePickerLimits(expInput);
+    aplicarLimitesFecha(expInput, prodId);
 
     if (prodId) {
         prodId.addEventListener('change', () => {
@@ -694,6 +789,9 @@ function attachRowValidationListeners(row) {
             saveDraft();
         });
     }
+
+    // Marca para no volver a adjuntar los mismos listeners a esta fila.
+    row.dataset.listeners = '1';
 }
 
 function createProductRowElement() {
@@ -911,7 +1009,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     const textoOriginalBoton = botonEnviar ? botonEnviar.innerHTML : null;
     if (botonEnviar) {
         botonEnviar.disabled = true;
-        botonEnviar.innerHTML = 'Registrando...';
+        botonEnviar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Registrando...';
     }
 
     const formData = new FormData();
@@ -945,11 +1043,16 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
         }
     });
 
+    const submitController = new AbortController();
+    const submitTimeoutId = setTimeout(() => submitController.abort(), 30000);
+
     try {
         const response = await fetch('/logistics/purchases', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: submitController.signal
         });
+        clearTimeout(submitTimeoutId);
 
         // No se asumir que la respuesta es JSON. Un 413 del proxy (foto muy
         // grande), un 500 con pagina de error en HTML o un 302 al login
@@ -1074,13 +1177,26 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
             });
         }
     } catch (error) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Fallo de Conexión',
-            text: 'No se pudo conectar con el servidor backend.',
-            confirmButtonColor: '#B31F24',
-            confirmButtonText: 'Cerrar'
-        });
+        clearTimeout(submitTimeoutId);
+        if (error && error.name === 'AbortError') {
+            // Timeout de red: se conserva el borrador para que el usuario
+            // pueda reintentar sin perder lo escrito.
+            Swal.fire({
+                icon: 'warning',
+                title: 'Tiempo de espera agotado',
+                text: 'La operación tardó demasiado. El borrador se conservó; vuelve a intentarlo.',
+                confirmButtonColor: '#B31F24',
+                confirmButtonText: 'Cerrar'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Fallo de Conexión',
+                text: 'No se pudo conectar con el servidor backend.',
+                confirmButtonColor: '#B31F24',
+                confirmButtonText: 'Cerrar'
+            });
+        }
     } finally {
         // El boton se desbloquea siempre. En el exito no molesta porque el
         // formulario se limpia y se rearma; si no, el usuario se quedaria con

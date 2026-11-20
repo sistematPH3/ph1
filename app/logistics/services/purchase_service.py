@@ -72,7 +72,16 @@ class PurchaseService:
 
             calculated_total = Decimal('0.00')
             es_bs = currency == 'BS'
-            
+
+            # Consulta por lotes para evitar N+1 en register_purchase.
+            _ids_prod = {int(it['product_id']) for it in items
+                         if it.get('product_id') is not None}
+            _productos_por_id = {}
+            if _ids_prod:
+                _productos_por_id = {
+                    p.id: p for p in db.session.query(Product).filter(
+                        Product.id.in_(_ids_prod)).all()}
+
             details_for_audit = []
             sku_lot_counters = {}
 
@@ -103,7 +112,7 @@ class PurchaseService:
                 # del precio unitario es propio de como se guarda el detalle.
                 calculated_total += linea_total
 
-                producto_obj = db.session.query(Product).get(product_id)
+                producto_obj = _productos_por_id.get(product_id)
                 prod_name = producto_obj.name if producto_obj else f"Insumo ID {product_id}"
                 prod_sku = producto_obj.sku if producto_obj and producto_obj.sku else f"PROD{product_id}"
 

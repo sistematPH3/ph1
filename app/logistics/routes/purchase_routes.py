@@ -1,6 +1,8 @@
 import os
 import threading
 import io
+import hashlib
+import time
 from flask import Blueprint, request, jsonify, render_template, current_app, flash, redirect, url_for, send_file
 from flask_login import current_user
 from sqlalchemy import func
@@ -51,6 +53,29 @@ def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
                 purchase_id, e, exc_info=True,
             )
 
+
+def bg_archive_eur_rate(app_instance, user_id):
+    """Archiva la tasa EUR del BCV en segundo plano, sin bloquear la respuesta
+    del registro de compra. Un fallo del BCV nunca afecta la compra ya
+    guardada."""
+    with app_instance.app_context():
+        try:
+            from app.integrations.api_bcv.routes_api import (
+                get_bcv_rate_from_web, guardar_tasa,
+            )
+            tasa_eur = get_bcv_rate_from_web('EUR', timeout=3)
+            if tasa_eur:
+                guardar_tasa('EUR', tasa_eur, user_id,
+                             source='COMPRA REGISTRADA')
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            app_instance.logger.exception(
+                "No se pudo archivar la tasa EUR en segundo plano. "
+                "La compra SI quedo registrada.")
+
 @purchase_bp.route('/purchases/new', methods=['GET'])
 @require_roles('admin')
 def new_purchase_form():
@@ -77,7 +102,7 @@ def new_purchase_form():
         products=products, 
         suppliers=suppliers, 
         users=users,
-        vencimiento_manual_min_dias=current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30),
+        vencimiento_manual_min_dias=current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 15),
     )
 
 def _total_linea(item):
@@ -271,6 +296,34 @@ def _validar_comprobante(file_bytes):
     return evaluacion
 
 
+# Caché en memoria del veredicto del OCR, indexada por el hash SHA-256 de los
+# bytes de la imagen. El preview (/validar-foto) y el submit (/purchases)
+# reciben la MISMA foto; sin caché el motor OCR se ejecuta dos veces por cada
+# compra (decenas de segundos cada vez). El TTL corto evita que un veredicto
+# viejo se reutilice si la imagen cambia o si el proceso vive mucho tiempo.
+_OCR_CACHE_TTL = 300  # segundos
+_OCR_CACHE = {}
+
+
+def _validar_comprobante_cached(file_bytes):
+    clave = hashlib.sha256(file_bytes or b'').hexdigest()
+    ahora = time.monotonic()
+    entrada = _OCR_CACHE.get(clave)
+    if entrada is not None and (ahora - entrada[0]) < _OCR_CACHE_TTL:
+        return entrada[1]
+
+    resultado = _validar_comprobante(file_bytes)
+    _OCR_CACHE[clave] = (ahora, resultado)
+
+    # Limpieza perezosa para que el diccionario no crezca sin limite en un
+    # proceso de larga vida. Se hace solo cuando hay mas de 64 entradas.
+    if len(_OCR_CACHE) > 64:
+        limite = ahora - _OCR_CACHE_TTL
+        for k in [k for k, v in _OCR_CACHE.items() if v[0] < limite]:
+            _OCR_CACHE.pop(k, None)
+    return resultado
+
+
 def _mensaje_factura(validacion):
     """
     Texto de exito del boton, cuando la foto SI fue aceptada.
@@ -412,7 +465,7 @@ def validar_foto_comprobante():
                 "campo": "invoice_photo",
             }), 400
 
-        validacion = _validar_comprobante(info_imagen['bytes'])
+        validacion = _validar_comprobante_cached(info_imagen['bytes'])
         modo = current_app.config.get('INVOICE_VALIDATION_MODE', 'strict')
         umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
 
@@ -494,6 +547,29 @@ def create_purchase():
                     "campo": etiqueta,
                 }), 400
 
+        # Consulta por lotes de Product/ProductType para no hacer N+1 dentro
+        # del bucle de lineas (antes cada iteracion hacia 2 queries).
+        _ids_productos = []
+        for _pid in product_ids:
+            try:
+                if _pid:
+                    _ids_productos.append(int(_pid))
+            except (TypeError, ValueError):
+                pass
+        _productos_por_id = {}
+        if _ids_productos:
+            _productos_por_id = {
+                p.id: p for p in db.session.query(Product).filter(
+                    Product.id.in_(_ids_productos)).all()}
+        _ids_tipos = {getattr(p, 'product_type_id', None)
+                      for p in _productos_por_id.values()
+                      if getattr(p, 'product_type_id', None)}
+        _tipos_por_id = {}
+        if _ids_tipos:
+            _tipos_por_id = {
+                t.id: t for t in db.session.query(ProductType).filter(
+                    ProductType.id.in_(_ids_tipos)).all()}
+
         for i in range(len(product_ids)):
             product_id_val = int(product_ids[i]) if product_ids[i] else None
             exp_date_obj = None
@@ -504,13 +580,13 @@ def create_purchase():
                 except ValueError:
                     date_errors.append(f"fila {i + 1}: fecha de vencimiento inválida '{expiration_dates[i].strip()}' (formato esperado AAAA-MM-DD)")
             
-            product = db.session.query(Product).get(product_id_val) if product_id_val else None
+            product = _productos_por_id.get(product_id_val) if product_id_val else None
             p_type = (
-                db.session.query(ProductType).get(product.product_type_id)
+                _tipos_por_id.get(product.product_type_id)
                 if product and getattr(product, 'product_type_id', None) else None
             )
             es_manual = bool(p_type and getattr(p_type, 'requires_manual_date', False))
-            min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30))
+            min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 15))
 
             if es_manual:
                 # Insumo con lote de fábrica: la caducidad impresa es
@@ -588,7 +664,7 @@ def create_purchase():
 
     missing_products = []
     for item in items:
-        prod = db.session.query(Product).get(item['product_id'])
+        prod = _productos_por_id.get(item['product_id'])
         if not prod or not prod.is_active:
             missing_products.append(item['product_id'])
     if missing_products:
@@ -597,7 +673,7 @@ def create_purchase():
     # --- La foto tiene que parecer un comprobante -----------------------------
     # Va ANTES de registrar la compra: si se rechazara despues, el stock ya se
     # habria descontado y habria que revertirlo.
-    validacion_factura = _validar_comprobante(file_bytes)
+    validacion_factura = _validar_comprobante_cached(file_bytes)
     modo = current_app.config.get('INVOICE_VALIDATION_MODE', 'strict')
     umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
 
@@ -677,20 +753,14 @@ def create_purchase():
             # TESTING: la suite no debe salir a internet (el guardado de la
             # tasa es un efecto lateral, no parte del registro de la compra).
             if moneda_historial != 'EUR' and not current_app.config.get('TESTING'):
-                try:
-                    from app.integrations.api_bcv.routes_api import (
-                        get_bcv_rate_from_web, guardar_tasa,
-                    )
-                    tasa_eur = get_bcv_rate_from_web('EUR', timeout=3)
-                    if tasa_eur:
-                        guardar_tasa('EUR', tasa_eur, data['user_id'],
-                                     source='COMPRA REGISTRADA')
-                except Exception:
-                    db.session.rollback()
-                    current_app.logger.exception(
-                        "No se pudo archivar la tasa EUR al registrar la "
-                        "compra %s. La compra SI quedo registrada.",
-                        purchase_id)
+                # Se archiva en segundo plano para no bloquear la respuesta 201.
+                app_instance = current_app._get_current_object()
+                thread_eur = threading.Thread(
+                    target=bg_archive_eur_rate,
+                    args=(app_instance, data['user_id']),
+                    daemon=True,
+                )
+                thread_eur.start()
         except Exception:
             db.session.rollback()
             # La compra YA esta guardada: esto solo es el archivo de la tasa.

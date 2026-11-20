@@ -21,7 +21,7 @@
         </a>
     </div>
 
-    <form id="purchaseForm" novalidate enctype="multipart/form-data" data-vencimiento-min-dias="{{ vencimiento_manual_min_dias | default(30) }}">
+    <form id="purchaseForm" novalidate enctype="multipart/form-data" data-vencimiento-min-dias="{{ vencimiento_manual_min_dias | default(15) }}">
         <div class="row g-4 align-items-start">
             
             <div class="col-lg-8">
@@ -222,5 +222,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.10"></script>
+<script src="{{ url_for('static', filename='js/logistics/register_purchase.js') }}?v=9.13"></script>
 {% endblock %}
