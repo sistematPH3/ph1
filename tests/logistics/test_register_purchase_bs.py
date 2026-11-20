@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -26,8 +27,10 @@ _ensure_test_database_exists()
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app import create_app, db  # noqa: E402
-from app.models import (ExchangeRateHistory, Inventory, Location,  # noqa: E402
-                        Product, Purchase, PurchaseDetail, Role, Supplier, User)
+from app.models import (Category, ExchangeRateHistory, Inventory,  # noqa: E402
+                        Location, Product, ProductType, Purchase,
+                        PurchaseDetail, Role, Supplier, User)
+from app.time_utils import current_ve_time  # noqa: E402
 from app.logistics.requests.purchase_validators import PurchaseValidator  # noqa: E402
 from app.logistics.services.purchase_service import PurchaseService  # noqa: E402
 
@@ -180,6 +183,106 @@ class RegisterPurchaseBsTest(unittest.TestCase):
             {'supplier_id': self.proveedor.id, 'currency': 'BS',
              'exchange_rate': '977,8778', 'user_id': self.comprador.id})
         self.assertNotIn('exchange_rate', errores)
+
+    # --- Ruta POST: la regla de los 15 dias se aplica al registrar ----------
+    #
+    # El minimo de vida util para insumos con fecha de fabrica se comprobaba
+    # solo en el helper del repositorio (_exigir_fecha_manual, cubierto en
+    # test_purchase_management). Aqui se cubre el camino que usa el boton
+    # "Registrar Compra": POST /logistics/purchases.
+
+    def _producto_de_fecha_manual(self):
+        """Insumo cuyo vencimiento es la fecha impresa en el empaque."""
+        categoria = Category(name="Empacados")
+        db.session.add(categoria)
+        db.session.flush()
+        tipo = ProductType(name="Lote de fabrica", category_id=categoria.id,
+                           requires_manual_date=True, shelf_life_days=None)
+        db.session.add(tipo)
+        db.session.flush()
+        producto = Product(name="Harina de fabrica", sku="HAR-MAN",
+                           unit_of_measure="KG", product_type_id=tipo.id,
+                           min_stock=Decimal("1.00"))
+        db.session.add(producto)
+        db.session.commit()
+        return producto
+
+    def _registrar_por_la_ruta(self, producto, fecha_vencimiento):
+        """Envia el formulario como lo hace la pantalla, sin OCR real."""
+        import io as _io
+        from unittest import mock
+
+        from PIL import Image
+        from app.logistics.routes import purchase_routes as rutas
+
+        buffer = _io.BytesIO()
+        Image.new("RGB", (1200, 1600), (245, 245, 245)).save(
+            buffer, format="JPEG")
+        foto = buffer.getvalue()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion["_user_id"] = str(self.comprador.id)
+            sesion["_fresh"] = True
+
+        veredicto = {
+            "veredicto": "aceptado", "tipo": "factura", "puntaje": 90,
+            "marcas": [], "puede_aceptar": True,
+            "detalle": "simulado para la prueba",
+        }
+
+        # El OCR tarda decenas de segundos por foto y la subida a ImgBB va en
+        # un hilo: lo que se prueba aqui es la regla de fechas de la ruta.
+        with mock.patch.object(rutas, "leer_texto",
+                               lambda archivo: (["FACTURA"], None)), \
+                mock.patch.object(rutas, "evaluar_comprobante",
+                                  lambda lineas, umbral=60: dict(veredicto)), \
+                mock.patch.object(rutas, "bg_upload_invoice",
+                                  lambda *args, **kwargs: None):
+            return cliente.post(
+                "/logistics/purchases",
+                data={
+                    "supplier_id": str(self.proveedor.id),
+                    "currency": "USD",
+                    "exchange_rate": "800",
+                    "user_id": str(self.comprador.id),
+                    "invoice_photo": (_io.BytesIO(foto), "factura.jpg"),
+                    "product_id[]": str(producto.id),
+                    "quantity[]": "10",
+                    "lot_number[]": "LOTE-PRUEBA",
+                    "expiration_date[]": fecha_vencimiento.isoformat(),
+                    "foreign_price[]": "50",
+                },
+                content_type="multipart/form-data",
+            )
+
+    def test_la_ruta_rechaza_una_fecha_de_fabrica_a_catorce_dias(self):
+        producto = self._producto_de_fecha_manual()
+        fecha = current_ve_time().date() + timedelta(days=14)
+        compras_antes = db.session.query(Purchase).count()
+
+        respuesta = self._registrar_por_la_ruta(producto, fecha)
+
+        self.assertEqual(respuesta.status_code, 400,
+                         respuesta.get_data(as_text=True))
+        detalles = respuesta.get_json()["details"]["expiration_date"]
+        self.assertTrue(
+            any("m\u00ednimo permitido es 15" in mensaje for mensaje in detalles),
+            detalles,
+        )
+        # Rechazar la fecha no puede dejar ni cabecera ni stock a medias.
+        self.assertEqual(db.session.query(Purchase).count(), compras_antes)
+
+    def test_la_ruta_acepta_una_fecha_de_fabrica_a_quince_dias(self):
+        producto = self._producto_de_fecha_manual()
+        fecha = current_ve_time().date() + timedelta(days=15)
+
+        respuesta = self._registrar_por_la_ruta(producto, fecha)
+
+        self.assertEqual(respuesta.status_code, 201,
+                         respuesta.get_data(as_text=True))
+        compra = db.session.query(Purchase).get(respuesta.get_json()["purchase_id"])
+        self.assertIsNotNone(compra)
 
 
 if __name__ == '__main__':

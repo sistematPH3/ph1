@@ -1,6 +1,7 @@
 import logging
 
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask import (Blueprint, current_app, render_template, request, jsonify,
+                   flash, redirect, url_for)
 from flask_login import current_user
 from sqlalchemy import func
 from decimal import ROUND_HALF_UP, Decimal
@@ -80,7 +81,10 @@ def index():
             'logistics/purchase_management.html', 
             purchases=purchases,
             suppliers=suppliers,
-            products=products
+            products=products,
+            # El modal de edición replica el mismo umbral del backend para los
+            # insumos con fecha manual (requires_manual_date).
+            vencimiento_manual_min_dias=current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 15),
         )
         
     except ValueError as val_err:

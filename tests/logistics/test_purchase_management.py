@@ -175,6 +175,44 @@ class PurchaseManagementTestBase(unittest.TestCase):
         return base
 
 
+class VencimientoManualQuinceDiasTest(PurchaseManagementTestBase):
+    """CU-046/CU-049: la fecha de fábrica debe conservar 15 días calendario.
+
+    El mínimo se valida en el registro (purchase_routes) y en la edición
+    (_exigir_fecha_manual). Aquí se cubre la regla compartida del repositorio.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.app.config['VENCIMIENTO_MANUAL_MIN_DIAS'] = 15
+        self.addCleanup(self.app.config.pop, 'VENCIMIENTO_MANUAL_MIN_DIAS', None)
+
+        tipo_manual = ProductType(
+            name="Lote de fábrica", category_id=self.categoria.id,
+            requires_manual_date=True, shelf_life_days=None)
+        db.session.add(tipo_manual)
+        db.session.flush()
+        self.prod_manual = Product(
+            name="Insumo manual", sku="PM-01", unit_of_measure="UND",
+            product_type_id=tipo_manual.id, min_stock=Decimal('1.00'))
+        db.session.add(self.prod_manual)
+        db.session.commit()
+
+    def test_rechaza_fecha_a_catorce_dias(self):
+        fecha = current_ve_time().date() + timedelta(days=14)
+
+        with self.assertRaises(ValueError) as ctx:
+            self.repo._exigir_fecha_manual(fecha, self.prod_manual.id)
+
+        self.assertIn("mínimo permitido es 15", str(ctx.exception))
+
+    def test_acepta_fecha_a_quince_dias(self):
+        fecha = current_ve_time().date() + timedelta(days=15)
+
+        # No debe lanzar: 15 días es exactamente el mínimo permitido.
+        self.repo._exigir_fecha_manual(fecha, self.prod_manual.id)
+
+
 class PrecioAnexosTest(PurchaseManagementTestBase):
     """El modal de edición envía el TOTAL de la línea: el unitario del detalle
     se deriva dividiéndolo entre la cantidad (igual que el registro)."""

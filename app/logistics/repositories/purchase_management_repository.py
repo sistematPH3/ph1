@@ -52,7 +52,7 @@ class PurchaseManagementRepository:
                 f"'{nombre}' exige la fecha de caducidad impresa en el empaque."
             )
 
-        min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 30))
+        min_dias = int(current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 15))
         dias_restantes = (expiration_date - current_ve_time().date()).days
         if dias_restantes < min_dias:
             raise ValueError(

@@ -420,7 +420,7 @@
     <option value="" disabled selected>Seleccione...</option>
     {% if products %}
         {% for p in products %}
-            <option value="{{ p.id }}">{{ p.sku }} - {{ p.name }}</option>
+            <option value="{{ p.id }}" data-manual="{{ 'true' if p.product_type and p.product_type.requires_manual_date else 'false' }}">{{ p.sku }} - {{ p.name }}</option>
         {% endfor %}
     {% endif %}
 </template>
@@ -429,7 +429,8 @@
 {% block extra_js %}
 <script>
     window.current_user_role_id = {{ current_user.role_id if current_user else 0 }};
+    window.vencimiento_manual_min_dias = {{ vencimiento_manual_min_dias | default(15) }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=1.9"></script>
+<script src="{{ url_for('static', filename='js/logistics/purchase_management.js') }}?v=2.0"></script>
 {% endblock %}

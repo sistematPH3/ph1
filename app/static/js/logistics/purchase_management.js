@@ -11,6 +11,16 @@ const tenYearsAgo = new Date();
 tenYearsAgo.setFullYear(today.getFullYear() - 10);
 const formattedTenYearsAgo = fmtFechaLocal(tenYearsAgo);
 
+// Vida útil mínima de las fechas MANUALES (lote de fábrica). Se inyecta desde
+// el backend para que el modal no permita fechas que _exigir_fecha_manual()
+// rechazará al guardar. Los insumos automáticos no tienen este mínimo.
+const MIN_DIAS_VENCIMIENTO_MANUAL = Number(window.vencimiento_manual_min_dias) || 15;
+const fechaMinimaManual = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + MIN_DIAS_VENCIMIENTO_MANUAL);
+    return fmtFechaLocal(d);
+};
+
 const dateFilterInput = document.getElementById('date-filter');
 if (dateFilterInput) {
     dateFilterInput.max = formattedToday;
@@ -418,7 +428,7 @@ function loadEditTable(data) {
                 <input type="text" class="form-control text-start edit-lot border-secondary text-dark px-2 font-monospace" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.lot_number === 'N/A' ? '' : item.lot_number)}" placeholder="Opcional">
             </td>
             <td class="text-center px-2">
-                <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${escapeHtml(item.expiration_date || '')}">
+                <input type="date" class="form-control text-center edit-exp border-secondary text-dark px-1" value="${escapeHtml(item.expiration_date || '')}" ${item.requires_manual_date ? `min="${fechaMinimaManual()}"` : ''}>
             </td>
             <td class="px-2" data-currency="${escapeHtml(data.currency)}">
                 <input type="text" inputmode="decimal" class="form-control text-end edit-price border-secondary ps-2 text-dark" data-id="${escapeHtml(item.id)}" data-unit-price="${unitOk ? escapeHtml(unitNum) : ''}" value="${escapeHtml(precioTexto)}" placeholder="0.00">
@@ -483,6 +493,20 @@ if (editTableBody) {
         if (!btn) return;
         const row = btn.closest('tr');
         if (row) row.remove();
+    });
+
+    // Al elegir el producto de un anexo se aplica el mínimo de 15 días solo si
+    // su categoría usa fecha manual (data-manual en las opciones).
+    editTableBody.addEventListener('change', function(e) {
+        const select = e.target.closest('.edit-prod-id');
+        if (!select) return;
+        const row = select.closest('tr');
+        const expInput = row ? row.querySelector('.edit-exp') : null;
+        if (!expInput) return;
+        const opcion = select.options[select.selectedIndex];
+        const esManual = !!(opcion && opcion.getAttribute('data-manual') === 'true');
+        if (esManual) expInput.min = fechaMinimaManual();
+        else expInput.removeAttribute('min');
     });
 
     // El campo de precio es el TOTAL de la línea. Al escribir el total se

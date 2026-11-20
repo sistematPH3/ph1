@@ -97,7 +97,7 @@ class Config:
     # caducidad MANUAL (lote de fábrica) al registrarse una compra o editarse.
     # Evita ingresar mercancía a punto de vencer: si la fecha impresa está más
     # cerca que este umbral, se rechaza. Configurable por entorno.
-    VENCIMIENTO_MANUAL_MIN_DIAS = int(os.environ.get('VENCIMIENTO_MANUAL_MIN_DIAS', '30'))
+    VENCIMIENTO_MANUAL_MIN_DIAS = int(os.environ.get('VENCIMIENTO_MANUAL_MIN_DIAS', '15'))
 
 
 class TestingConfig(Config):
