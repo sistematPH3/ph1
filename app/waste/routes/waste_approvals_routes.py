@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 waste_approvals_bp = Blueprint('waste_approvals', __name__)
 
 
-@waste_approvals_bp.route('/waste/merma/approvals', methods=['GET'])
+@waste_approvals_bp.route('/waste/waste/approvals', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def bandeja_aprobaciones():
@@ -36,7 +36,7 @@ def bandeja_aprobaciones():
     )
 
 
-@waste_approvals_bp.route('/api/waste/merma/approvals', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/waste/approvals', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def bandeja_api():
@@ -49,7 +49,7 @@ def bandeja_api():
         return jsonify({'success': False, 'message': 'No se pudieron listar las mermas. Intenta de nuevo.'}), 500
 
 
-@waste_approvals_bp.route('/api/waste/merma/pending-summary', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/waste/pending-summary', methods=['GET'])
 @login_required
 @require_roles('admin')
 def pending_summary():
@@ -65,7 +65,7 @@ def pending_summary():
         }), 500
 
 
-@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>', methods=['GET'])
+@waste_approvals_bp.route('/api/waste/waste/<int:waste_id>', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations', 'finance')
 def detalle_merma(waste_id):
@@ -86,7 +86,7 @@ def detalle_merma(waste_id):
         }), 500
 
 
-@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/approve', methods=['POST'])
+@waste_approvals_bp.route('/api/waste/waste/<int:waste_id>/approve', methods=['POST'])
 @login_required
 @require_roles('admin')
 def aprobar_merma(waste_id):
@@ -105,7 +105,7 @@ def aprobar_merma(waste_id):
     return jsonify(result), code
 
 
-@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/reject', methods=['POST'])
+@waste_approvals_bp.route('/api/waste/waste/<int:waste_id>/reject', methods=['POST'])
 @login_required
 @require_roles('admin')
 def rechazar_merma(waste_id):
@@ -128,7 +128,7 @@ def rechazar_merma(waste_id):
     return jsonify(result), code
 
 
-@waste_approvals_bp.route('/api/waste/merma/<int:waste_id>/decision', methods=['POST'])
+@waste_approvals_bp.route('/api/waste/waste/<int:waste_id>/decision', methods=['POST'])
 @login_required
 @require_roles('admin')
 def decidir_merma(waste_id):

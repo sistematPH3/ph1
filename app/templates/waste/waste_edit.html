@@ -33,7 +33,7 @@
                     <i class="bi bi-circle-fill me-1" style="font-size:0.55rem;color:{% if waste.status == 'PENDIENTE' %}#f59e0b{% elif waste.status == 'APROBADO' %}#177245{% else %}#b0121a{% endif %};"></i>
                     {{ waste.status }}
                 </span>
-                <a href="/waste/merma/mis-pendientes" class="ph-btn-back">
+                <a href="/waste/waste/mis-pendientes" class="ph-btn-back">
                     <i class="bi bi-arrow-left"></i>Volver
                 </a>
             </div>
@@ -381,5 +381,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/waste_edit.js') }}?v=26"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_edit.js') }}?v=27"></script>
 {% endblock %}

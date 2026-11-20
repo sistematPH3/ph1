@@ -1,8 +1,8 @@
 /* =========================================================
    MODAL DE EDICIÓN DE MERMA PENDIENTE
    ---------------------------------------------------------
-   Se abre desde "Mis Mermas Pendientes" (merma_list.html).
-   - Carga los datos de la merma con GET /api/waste/merma/<id>/edit
+   Se abre desde "Mis Mermas Pendientes" (waste_list.html).
+   - Carga los datos de la merma con GET /api/waste/waste/<id>/edit
    - Permite cambiar tipo, motivo, evidencia general, y ajustar
      las líneas PENDIENTES (producto + lote + cantidad + fotos).
    - Las líneas que YA tomaron decisión (aprobadas/rechazadas por
@@ -11,7 +11,7 @@
    - Cuando el tipo seleccionado es VENCIDO, SOLO se listan los
      productos y lotes vencidos de la sede (nunca los buenos).
    - Las fotos se suben a ImgBB por el endpoint /api/waste/evidence.
-   - Guarda con POST /api/waste/merma/<id>/edit.
+   - Guarda con POST /api/waste/waste/<id>/edit.
    ========================================================= */
 
 (function () {
@@ -547,7 +547,7 @@
 
             let data;
             try {
-                data = await fetchJSON("/api/waste/merma/" + id + "/edit");
+                data = await fetchJSON("/api/waste/waste/" + id + "/edit");
             } catch (e) {
                 showPageAlert("No se pudo cargar la merma para editar.", true);
                 return;
@@ -725,7 +725,7 @@
                 btnConfirmMermaSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
 
                 try {
-                    const res = await fetch("/api/waste/merma/" + current.id + "/edit", {
+                    const res = await fetch("/api/waste/waste/" + current.id + "/edit", {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
                         body: JSON.stringify(pendingSave)

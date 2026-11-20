@@ -7,7 +7,7 @@ waste_edit_bp = Blueprint("waste_edit", __name__)
 
 OPERATIVE_ROLES = ("admin",)
 
-@waste_edit_bp.route("/waste/merma/<int:waste_id>/edit", methods=["GET"])
+@waste_edit_bp.route("/waste/waste/<int:waste_id>/edit", methods=["GET"])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def editar_merma(waste_id):
@@ -25,7 +25,7 @@ def editar_merma(waste_id):
         is_admin=is_admin
     )
 
-@waste_edit_bp.route("/api/waste/merma/<int:waste_id>/edit", methods=["GET", "POST"])
+@waste_edit_bp.route("/api/waste/waste/<int:waste_id>/edit", methods=["GET", "POST"])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def guardar_edicion(waste_id):
@@ -48,7 +48,7 @@ def guardar_edicion(waste_id):
     response_data, status_code = WasteEditService.edit_pending_waste(waste_id, payload, user_id, is_admin)
     return jsonify(response_data), status_code
 
-@waste_edit_bp.route("/api/waste/merma/<int:waste_id>/revert", methods=["POST"])
+@waste_edit_bp.route("/api/waste/waste/<int:waste_id>/revert", methods=["POST"])
 @login_required
 @require_roles("admin")
 def revertir_merma(waste_id):

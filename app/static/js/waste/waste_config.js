@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData(form);
 
             try {
-                const response = await fetch('/api/waste/merma/config', {
+                const response = await fetch('/api/waste/waste/config', {
                     method: 'POST',
                     body: formData
                 });

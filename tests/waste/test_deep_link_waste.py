@@ -55,7 +55,7 @@ ROLE_IDS = {
 }
 
 
-class DeepLinkMermaTest(unittest.TestCase):
+class DeepLinkWasteTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -180,7 +180,7 @@ class DeepLinkMermaTest(unittest.TestCase):
             sess['alarma_vencido'] = {}
 
         response = self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -216,7 +216,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         response = self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -235,7 +235,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         response = self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -254,7 +254,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         response = self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -274,7 +274,7 @@ class DeepLinkMermaTest(unittest.TestCase):
 
         # Primero GET para poblar sesión
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -282,7 +282,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         )
 
         # POST con product_id diferente
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -301,14 +301,14 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
             f'&quantity=10'
         )
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -327,14 +327,14 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
             f'&quantity=10'
         )
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -353,7 +353,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -366,7 +366,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         db.session.add(wt2)
         db.session.commit()
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -385,7 +385,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -397,7 +397,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         db.session.add(loc2)
         db.session.commit()
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': loc2.id,  # distinta
             'items': [{
@@ -419,14 +419,14 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
             f'&quantity=10'
         )
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -465,7 +465,7 @@ class DeepLinkMermaTest(unittest.TestCase):
         self._login(env["user"])
 
         # NO hacemos GET previo, sesión vacía
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -493,7 +493,7 @@ class DeepLinkMermaTest(unittest.TestCase):
 
         try:
             response = self.client.get(
-                f'/waste/merma/new?origin=alarma_vencido&lock=1'
+                f'/waste/waste/new?origin=alarma_vencido&lock=1'
                 f'&location_id=1'
                 f'&product_id={env["product"].id}'
                 f'&lot_number=L-001'

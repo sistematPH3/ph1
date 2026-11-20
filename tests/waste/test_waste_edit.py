@@ -2,10 +2,10 @@
 # PRUEBA AUTOMÁTICA DE EDICIÓN DE MERMAS PENDIENTES (Modal + Página)
 # -----------------------------------------------------------------------------
 # Qué verifica:
-#   1) GET  /api/waste/merma/<id>/edit (datos para el modal) -> Admin: OK.
+#   1) GET  /api/waste/waste/<id>/edit (datos para el modal) -> Admin: OK.
 #   2) Permisos por SEDE: un rol operativo con la sede asignada edita aunque
 #      NO sea el autor (sin ventana de 24h). Sin sede -> 403.
-#   3) POST /api/waste/merma/<id>/edit -> Admin actualiza y persiste
+#   3) POST /api/waste/waste/<id>/edit -> Admin actualiza y persiste
 #      (total, motivo, costo según BD, auditoría MERMA_EDITADA).
 #   4) Con el tipo VENCIDO solo se aceptan lotes REALMENTE vencidos; un lote
 #      bueno -> 400.
@@ -286,7 +286,7 @@ class WasteEditTest(unittest.TestCase):
     def test_get_edit_admin_obtiene_datos(self):
         env = self._seed()
         self._login(env["admin"].id)
-        resp = self.client.get("/api/waste/merma/{}/edit".format(env["waste"].id))
+        resp = self.client.get("/api/waste/waste/{}/edit".format(env["waste"].id))
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertTrue(data["success"])
@@ -304,14 +304,14 @@ class WasteEditTest(unittest.TestCase):
     def test_get_edit_ops_bloqueado(self):
         env = self._seed(sede_asignada=True)
         self._login(env["ops"].id)
-        resp = self.client.get("/api/waste/merma/{}/edit".format(env["waste"].id))
+        resp = self.client.get("/api/waste/waste/{}/edit".format(env["waste"].id))
         self.assertEqual(resp.status_code, 302)  # redirigido por require_roles
 
     def test_post_edit_ops_bloqueado(self):
         env = self._seed(sede_asignada=True)
         self._login(env["ops"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Intento sin permisos de admin",
@@ -329,7 +329,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Corregido a 8 kg",
@@ -373,7 +373,7 @@ class WasteEditTest(unittest.TestCase):
         db.session.commit()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Precisión decimal",
@@ -396,7 +396,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed_vencido()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Intento con lote bueno",
@@ -414,7 +414,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed_vencido()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Ajustado a 6 kg",
@@ -469,7 +469,7 @@ class WasteEditTest(unittest.TestCase):
 
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Se ajustó de 10 a 5 kg",
@@ -503,7 +503,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Exceso",
@@ -522,7 +522,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Con fotos",
@@ -557,7 +557,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         first = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Con fotos",
@@ -575,7 +575,7 @@ class WasteEditTest(unittest.TestCase):
 
         # Segunda edición sin fotos ni evidencia de cabecera -> se limpian
         second = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Sin fotos",
@@ -605,7 +605,7 @@ class WasteEditTest(unittest.TestCase):
     def test_get_marca_decidida_no_editable(self):
         env = self._seed_con_decidida()
         self._login(env["admin"].id)
-        resp = self.client.get("/api/waste/merma/{}/edit".format(env["waste"].id))
+        resp = self.client.get("/api/waste/waste/{}/edit".format(env["waste"].id))
         self.assertEqual(resp.status_code, 200)
         lines = {str(l["lot_number"]): l for l in resp.get_json()["waste"]["lines"]}
 
@@ -624,7 +624,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed_con_decidida()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Ajusto solo la pendiente",
@@ -663,7 +663,7 @@ class WasteEditTest(unittest.TestCase):
         env = self._seed_con_decidida()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/{}/edit".format(env["waste"].id),
+            "/api/waste/waste/{}/edit".format(env["waste"].id),
             data=json.dumps({
                 "waste_type_id": env["waste_type"].id,
                 "notes": "Intento tocar la decidida",

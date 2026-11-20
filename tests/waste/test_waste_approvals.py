@@ -54,7 +54,7 @@ from app.waste.services import waste_approvals_service as svc  # noqa: E402
 from app.waste.services.waste_audit_service import WasteAuditService  # noqa: E402
 
 
-class MermaApprovalsTest(unittest.TestCase):
+class WasteApprovalsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):

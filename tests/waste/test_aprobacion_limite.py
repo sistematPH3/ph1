@@ -163,7 +163,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
 
         # Deep link GET
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -171,7 +171,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         )
 
         # POST
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -225,7 +225,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
 
         # Deep link GET con cantidad 25
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -233,7 +233,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         )
 
         # POST
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -290,14 +290,14 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         db.session.commit()
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
             f'&quantity=20'
         )
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{
@@ -325,7 +325,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         self._login(env["user"])
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
@@ -333,7 +333,7 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         )
 
         # Intentar POST con 2 items
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [
@@ -361,14 +361,14 @@ class AprobacionLimiteVencidoTest(unittest.TestCase):
         db.session.commit()
 
         self.client.get(
-            f'/waste/merma/new?origin=alarma_vencido&lock=1'
+            f'/waste/waste/new?origin=alarma_vencido&lock=1'
             f'&location_id={env["loc"].id}'
             f'&product_id={env["product"].id}'
             f'&lot_number=L-001'
             f'&quantity=25'
         )
 
-        response = self.client.post('/waste/merma/new', json={
+        response = self.client.post('/waste/waste/new', json={
             'origin': 'alarma_vencido',
             'location_id': env["loc"].id,
             'items': [{

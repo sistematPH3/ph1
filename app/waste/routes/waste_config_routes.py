@@ -8,7 +8,7 @@ from app.waste.requests.waste_config_validators import WasteConfigValidators
 waste_config_bp = Blueprint('waste_config', __name__)
 
 
-@waste_config_bp.route('/waste/merma/config', methods=['GET'])
+@waste_config_bp.route('/waste/waste/config', methods=['GET'])
 @login_required
 @require_roles('admin')
 def configuracion():
@@ -16,7 +16,7 @@ def configuracion():
     return render_template('waste/waste_config.html', configs=configs)
 
 
-@waste_config_bp.route('/api/waste/merma/config', methods=['POST'])
+@waste_config_bp.route('/api/waste/waste/config', methods=['POST'])
 @login_required
 @require_roles('admin')
 def guardar_config():

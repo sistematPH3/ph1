@@ -489,7 +489,7 @@ document.addEventListener("DOMContentLoaded", function () {
             btnConfirmSaveEdit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
 
             try {
-                const response = await fetch("/api/waste/merma/" + wasteId + "/edit", {
+                const response = await fetch("/api/waste/waste/" + wasteId + "/edit", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -508,7 +508,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (response.ok && data.success) {
                     showAlert(data.message || "Merma actualizada correctamente.", false);
                     setTimeout(function () {
-                        window.location.href = "/waste/merma/mis-pendientes";
+                        window.location.href = "/waste/waste/mis-pendientes";
                     }, 1200);
                 } else {
                     const msg = data.message || (data.errors ? Object.values(data.errors)[0] : "Error al guardar cambios.");
@@ -576,7 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
             btnConfirmRevert.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Revirtiendo...';
 
             try {
-                const response = await fetch("/api/waste/merma/" + wasteId + "/revert", {
+                const response = await fetch("/api/waste/waste/" + wasteId + "/revert", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

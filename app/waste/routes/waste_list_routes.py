@@ -16,10 +16,10 @@ from app.waste.services import waste_approvals_service as svc
 
 logger = logging.getLogger(__name__)
 
-merma_list_bp = Blueprint('merma_list', __name__)
+waste_list_bp = Blueprint('waste_list', __name__)
 
 
-@merma_list_bp.route('/waste/merma/mis-pendientes', methods=['GET'])
+@waste_list_bp.route('/waste/waste/mis-pendientes', methods=['GET'])
 @login_required
 @require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
 def mis_pendientes():
@@ -30,14 +30,14 @@ def mis_pendientes():
     """
     pendientes, is_admin = svc.get_pending_wastes_for_view(current_user.id)
     return render_template(
-        'waste/merma_list.html',
+        'waste/waste_list.html',
         pendientes=pendientes,
         pending_count=len(pendientes),
         is_admin=is_admin,
     )
 
 
-@merma_list_bp.route('/api/waste/merma/<int:waste_id>/cancel', methods=['POST'])
+@waste_list_bp.route('/api/waste/waste/<int:waste_id>/cancel', methods=['POST'])
 @login_required
 @require_roles('admin')
 def cancelar_merma(waste_id):

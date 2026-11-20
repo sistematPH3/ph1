@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadPending() {
         try {
-            const res = await fetch('/api/waste/merma/approvals', {
+            const res = await fetch('/api/waste/waste/approvals', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             if (!res.ok) throw new Error('No se pudo cargar la bandeja.');
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
         approvalModal.show();
 
         try {
-            const res = await fetch('/api/waste/merma/' + id, {
+            const res = await fetch('/api/waste/waste/' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             if (!res.ok) {
@@ -445,7 +445,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function enviarDecision(detailId, decision, reason) {
         try {
-            const res = await fetch('/api/waste/merma/' + currentWaste.id + '/decision', {
+            const res = await fetch('/api/waste/waste/' + currentWaste.id + '/decision', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({
@@ -561,13 +561,13 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             let res;
             if (pendingDecision.tipo === 'aprobar') {
-                res = await fetch('/api/waste/merma/' + currentWaste.id + '/approve', {
+                res = await fetch('/api/waste/waste/' + currentWaste.id + '/approve', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body: JSON.stringify({})
                 });
             } else {
-                res = await fetch('/api/waste/merma/' + currentWaste.id + '/reject', {
+                res = await fetch('/api/waste/waste/' + currentWaste.id + '/reject', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body: JSON.stringify({ reason: pendingDecision.reason })

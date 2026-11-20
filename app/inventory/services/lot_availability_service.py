@@ -2,7 +2,7 @@
 
 Extraído de register_waste_repository.py para ser la FUENTE ÚNICA de cálculo
 de vencidos. Lo usan: Dashboard (cuadro vencidos), formulario de mermas
-(GET /waste/merma/new), deep link (GET /waste/merma/new?origin=alarma_vencido).
+(GET /waste/waste/new), deep link (GET /waste/waste/new?origin=alarma_vencido).
 """
 import json
 from datetime import date, datetime, timedelta

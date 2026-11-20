@@ -2,9 +2,9 @@
 # PRUEBA AUTOMÁTICA DE LA CONFIGURACIÓN DE MERMAS (Parte 4)
 # -----------------------------------------------------------------------------
 # Qué verifica:
-#   1) GET  /waste/merma/config      -> solo Admin (no-admin redirige).
+#   1) GET  /waste/waste/config      -> solo Admin (no-admin redirige).
 #   2) GET  -> muestra los 2 valores actuales (tolerancia y período base).
-#   3) POST /api/waste/merma/config  -> Admin guarda y PERSISTE en app_parameters.
+#   3) POST /api/waste/waste/config  -> Admin guarda y PERSISTE en app_parameters.
 #   4) POST con tolerancia < 1.00 o días fuera de 1..90 -> 400 con errores.
 #   5) POST como no-admin -> 403 (bloqueado).
 #   6) El clasificador (registro + bandeja) LEE los valores configurados
@@ -103,13 +103,13 @@ class WasteConfigTest(unittest.TestCase):
     def test_get_no_admin_redirige(self):
         env = self._seed()
         self._login(env["ops"].id)
-        resp = self.client.get("/waste/merma/config")
+        resp = self.client.get("/waste/waste/config")
         self.assertEqual(resp.status_code, 302)
 
     def test_get_admin_muestra_valores(self):
         env = self._seed()
         self._login(env["admin"].id)
-        resp = self.client.get("/waste/merma/config")
+        resp = self.client.get("/waste/waste/config")
         self.assertEqual(resp.status_code, 200)
         body = resp.get_data(as_text=True)
         self.assertIn("1.50", body)
@@ -122,7 +122,7 @@ class WasteConfigTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/config",
+            "/api/waste/waste/config",
             data=json.dumps({
                 "WASTE_TIME_TOLERANCE": "2.00",
                 "WASTE_BASE_PERIOD_DAYS": "14",
@@ -149,7 +149,7 @@ class WasteConfigTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/config",
+            "/api/waste/waste/config",
             data=json.dumps({"WASTE_TIME_TOLERANCE": "0.50",
                              "WASTE_BASE_PERIOD_DAYS": "10"}),
             content_type="application/json",
@@ -164,7 +164,7 @@ class WasteConfigTest(unittest.TestCase):
         self._login(env["admin"].id)
         for bad_days in ("0", "91", "abc"):
             resp = self.client.post(
-                "/api/waste/merma/config",
+                "/api/waste/waste/config",
                 data=json.dumps({"WASTE_TIME_TOLERANCE": "1.50",
                                  "WASTE_BASE_PERIOD_DAYS": bad_days}),
                 content_type="application/json",
@@ -181,7 +181,7 @@ class WasteConfigTest(unittest.TestCase):
         env = self._seed()
         self._login(env["ops"].id)
         resp = self.client.post(
-            "/api/waste/merma/config",
+            "/api/waste/waste/config",
             data=json.dumps({"WASTE_TIME_TOLERANCE": "1.50",
                              "WASTE_BASE_PERIOD_DAYS": "10"}),
             content_type="application/json",
@@ -202,7 +202,7 @@ class WasteConfigTest(unittest.TestCase):
         env = self._seed()
         self._login(env["admin"].id)
         resp = self.client.post(
-            "/api/waste/merma/config",
+            "/api/waste/waste/config",
             data=json.dumps({"WASTE_TIME_TOLERANCE": "2.5",
                              "WASTE_BASE_PERIOD_DAYS": "20"}),
             content_type="application/json",

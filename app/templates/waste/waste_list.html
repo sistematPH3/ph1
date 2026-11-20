@@ -123,7 +123,7 @@
                             <td class="text-end acciones-cell">
                                 {% if p['puede_editar'] or p['puede_cancelar'] %}
                                 {% if p['puede_editar'] %}
-                                <a href="/waste/merma/{{ p['id'] }}/edit"
+                                <a href="/waste/waste/{{ p['id'] }}/edit"
                                         class="btn btn-sm btn-outline-primary rounded-pill px-3 me-2"
                                         title="Editar esta merma mientras siga pendiente">
                                     <i class="bi bi-pencil me-1"></i>Editar
@@ -197,11 +197,11 @@
 </div>
 
 <!-- Modal de edición de merma pendiente -->
-<!-- (La edición se abre en una página dedicada: /waste/merma/<id>/edit con estilo "Crear Merma".) -->
+<!-- (La edición se abre en una página dedicada: /waste/waste/<id>/edit con estilo "Crear Merma".) -->
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/waste/merma_list.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/waste/waste_list.js') }}?v=4"></script>
 {% endblock %}
 
 

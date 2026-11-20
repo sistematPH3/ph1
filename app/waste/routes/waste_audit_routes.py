@@ -11,7 +11,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-waste_audit_bp = Blueprint('waste_audit', __name__, url_prefix='/waste/merma')
+waste_audit_bp = Blueprint('waste_audit', __name__, url_prefix='/waste/waste')
 
 @waste_audit_bp.route('/audit', methods=['GET'])
 @login_required

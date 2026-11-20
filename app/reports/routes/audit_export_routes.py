@@ -119,7 +119,7 @@ def descargar_movimientos():
 # =============================================================================
 # 5) MERMAS (admin / finance)
 # =============================================================================
-@audit_exports_bp.route('/waste/merma/audit/export', methods=['GET'])
+@audit_exports_bp.route('/waste/waste/audit/export', methods=['GET'])
 @login_required
 @require_roles('admin', 'finance')
 def descargar_mermas():

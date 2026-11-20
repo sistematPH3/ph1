@@ -13,7 +13,7 @@ from app.time_utils import current_ve_time
 from app.extensions import db
 from app.models.inventory_model import Product
 from app.models.security_model import Notification
-from app.waste.repositories.waste_approvals_repository import MermaApprovalsRepository
+from app.waste.repositories.waste_approvals_repository import WasteApprovalsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ TIPOS_SENSIBLES = ('TEMPERATURA', 'ROBO_SOSPECHA')
 
 def _param_text(clave, default):
     """Lee un parámetro de app_parameters con un valor por defecto."""
-    params = MermaApprovalsRepository.get_app_parameters()
+    params = WasteApprovalsRepository.get_app_parameters()
     try:
         return params.get(clave, default)
     except Exception:
@@ -55,7 +55,7 @@ def _tasa_merma_diaria(location_id):
     """Mermas normales de la sede en los últimos 30 días promediadas por día."""
     hoy = current_ve_time()
     since = hoy - timedelta(days=30)
-    historial = MermaApprovalsRepository.get_merma_history(location_id, since)
+    historial = WasteApprovalsRepository.get_merma_history(location_id, since)
     if not historial:
         return 0.0
     total = sum(h['total_quantity'] for h in historial)
@@ -69,7 +69,7 @@ def _dias_desde_ultima_merma(waste_id, location_id):
     configurado (regla de tiempo de la propuesta).
     """
     hoy = current_ve_time()
-    ultima = MermaApprovalsRepository.get_last_merma_date(location_id, waste_id)
+    ultima = WasteApprovalsRepository.get_last_merma_date(location_id, waste_id)
     if ultima is None:
         return _param_float('WASTE_BASE_PERIOD_DAYS', 7)
     delta = (hoy - ultima).days
@@ -97,8 +97,8 @@ def _clasificar_novedad(waste_id, location_id, total_quantity, type_code, type_r
             razones.append('el tipo de merma exige aprobación')
 
     # -- Regla de CANTIDAD: alguna línea >= su límite de merma --
-    lines = MermaApprovalsRepository.get_waste_lines([waste_id]).get(waste_id, [])
-    prods = MermaApprovalsRepository.get_products_info({l['product_id'] for l in lines})
+    lines = WasteApprovalsRepository.get_waste_lines([waste_id]).get(waste_id, [])
+    prods = WasteApprovalsRepository.get_products_info({l['product_id'] for l in lines})
     excede = False
     for l in lines:
         limite = prods.get(l['product_id'], {}).get('waste_limit')
@@ -119,7 +119,7 @@ def _clasificar_novedad(waste_id, location_id, total_quantity, type_code, type_r
     hoy = current_ve_time()
     desde_30 = hoy - timedelta(days=30)
     fechas = [
-        h['date'] for h in MermaApprovalsRepository.get_merma_history(
+        h['date'] for h in WasteApprovalsRepository.get_merma_history(
             location_id, desde_30)
         if h.get('date')
     ]
@@ -164,20 +164,20 @@ def get_pending_wastes(user_id):
 
     Admin: todas. Resto: solo sus sedes asignadas (solo lectura).
     """
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user:
         return []
     rows = []
     if getattr(user, 'is_admin', False):
-        rows = MermaApprovalsRepository.list_pending(None)
+        rows = WasteApprovalsRepository.list_pending(None)
         # Un Admin no ve sus propias mermas: deben resolverlas otros admins
         rows = [r for r in rows if r.get('created_by') != user.id]
     else:
-        loc_ids = [loc.id for loc in MermaApprovalsRepository.get_user_locations(user_id)]
+        loc_ids = [loc.id for loc in WasteApprovalsRepository.get_user_locations(user_id)]
         if not loc_ids:
             return []
-        rows = MermaApprovalsRepository.list_pending(loc_ids)
-    counts = MermaApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
+        rows = WasteApprovalsRepository.list_pending(loc_ids)
+    counts = WasteApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
     for r in rows:
         decididas, total = counts.get(r['id'], (0, 0))
         r['lineas_decididas'] = decididas
@@ -198,18 +198,18 @@ def get_pending_waste_summary(user_id, limit=5):
     (solo lectura). Es ligero: no recalcula la clasificación de novedad.
     Alimenta el círculo rojo del sidebar junto a "Gestión de Mermas".
     """
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user:
         return {'pending_count': 0, 'items': []}
     rows = []
     if getattr(user, 'is_admin', False):
-        rows = MermaApprovalsRepository.list_pending(None)
+        rows = WasteApprovalsRepository.list_pending(None)
         rows = [r for r in rows if r.get('created_by') != user.id]
     else:
-        loc_ids = [loc.id for loc in MermaApprovalsRepository.get_user_locations(user_id)]
+        loc_ids = [loc.id for loc in WasteApprovalsRepository.get_user_locations(user_id)]
         if not loc_ids:
             return {'pending_count': 0, 'items': []}
-        rows = MermaApprovalsRepository.list_pending(loc_ids)
+        rows = WasteApprovalsRepository.list_pending(loc_ids)
     rows = sorted(rows, key=lambda r: r.get('date') or datetime.min, reverse=True)
     items = [{
         'id': r['id'],
@@ -232,7 +232,7 @@ def _puede_gestionar_merma(user, waste):
         return True
     if waste.user_id == user.id:
         return True
-    locs = {loc.id for loc in MermaApprovalsRepository.get_user_locations(user.id)}
+    locs = {loc.id for loc in WasteApprovalsRepository.get_user_locations(user.id)}
     return waste.location_id in locs
 
 
@@ -243,23 +243,23 @@ def get_pending_wastes_for_view(user_id):
     sedes asignadas. Solo el Administrador puede corregir/cancelar mermas; los
     demás roles ven el listado en modo lectura.
     """
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user:
         return [], False
     is_admin = getattr(user, 'is_admin', False)
 
-    allowed = {loc.id for loc in MermaApprovalsRepository.get_user_locations(user_id)}
+    allowed = {loc.id for loc in WasteApprovalsRepository.get_user_locations(user_id)}
 
     if is_admin:
-        rows = MermaApprovalsRepository.list_pending(None)
+        rows = WasteApprovalsRepository.list_pending(None)
     else:
         if allowed:
-            rows = MermaApprovalsRepository.list_pending(list(allowed))
+            rows = WasteApprovalsRepository.list_pending(list(allowed))
         else:
             # Sin sedes: solo sus propias mermas pendientes.
-            rows = [r for r in MermaApprovalsRepository.list_pending(None) if r.get('created_by') == user.id]
+            rows = [r for r in WasteApprovalsRepository.list_pending(None) if r.get('created_by') == user.id]
 
-    counts = MermaApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
+    counts = WasteApprovalsRepository.get_detail_state_counts({r['id'] for r in rows})
     for r in rows:
         decididas, total = counts.get(r['id'], (0, 0))
         r['lineas_decididas'] = decididas
@@ -277,25 +277,25 @@ def get_pending_wastes_for_view(user_id):
 
 def get_waste_detail(waste_id, user_id):
     """Cabecera + líneas (con lote, vencimiento, cantidad y stock del lote)."""
-    row = MermaApprovalsRepository.get_waste_with_type(waste_id)
+    row = WasteApprovalsRepository.get_waste_with_type(waste_id)
     if not row:
         return None, 'La merma no existe.'
 
     waste = row[0]
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user:
         return None, 'Usuario no encontrado.'
     if not getattr(user, 'is_admin', False):
-        allowed = {loc.id for loc in MermaApprovalsRepository.get_user_locations(user_id)}
+        allowed = {loc.id for loc in WasteApprovalsRepository.get_user_locations(user_id)}
         if waste.location_id not in allowed:
             return None, 'No tiene permisos para ver mermas de esta sede.'
     elif waste.user_id == user.id:
         return None, 'No puede resolver una merma que usted mismo registró. Debe resolverla otro administrador.'
 
-    items = MermaApprovalsRepository.get_details_by_waste(waste_id)
-    prods = MermaApprovalsRepository.get_products_info({d.product_id for d in items})
+    items = WasteApprovalsRepository.get_details_by_waste(waste_id)
+    prods = WasteApprovalsRepository.get_products_info({d.product_id for d in items})
     resolved_ids = {d.resolved_by_id for d in items if d.resolved_by_id}
-    resolvers = MermaApprovalsRepository.get_users(resolved_ids)
+    resolvers = WasteApprovalsRepository.get_users(resolved_ids)
 
     lines = []
     for d in items:
@@ -354,7 +354,7 @@ def get_waste_detail(waste_id, user_id):
 
 
 def _only_admin(user_id):
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user or not getattr(user, 'is_admin', False):
         raise PermissionError('Solo el Administrador puede aprobar o rechazar mermas.')
     return user
@@ -380,7 +380,7 @@ def _q2(value):
 
 
 def _stock_disponible(location_id, product_id):
-    inv = MermaApprovalsRepository.get_inventory_item(location_id, product_id)
+    inv = WasteApprovalsRepository.get_inventory_item(location_id, product_id)
     if inv is None:
         return 0.0
     disponible = (
@@ -419,7 +419,7 @@ def _descontar_stock_lines(waste, details):
         )
 
     for d in details:
-        inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+        inv = WasteApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         if inv is None:
             raise ValueError(
                 f'No existe inventario para el insumo #{d.product_id} en la sede #{waste.location_id}.'
@@ -453,7 +453,7 @@ def _descontar_stock_lines(waste, details):
     # va en Decimal (no float) para que el saldo coincida al centavo con la
     # columna Numeric(10,2).
     for d in details:
-        inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+        inv = WasteApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         antes = _dec(inv.current_quantity)
         qty = _dec(d.quantity)
         despues = _q2(antes - qty)
@@ -475,7 +475,7 @@ def _descontar_stock_lines(waste, details):
 
 def _productos_name(ids):
     """Mapa {product_id: nombre} para los payloads de auditoría."""
-    prods = MermaApprovalsRepository.get_products_info(ids)
+    prods = WasteApprovalsRepository.get_products_info(ids)
     return {pid: info.get('name', f'#{pid}') for pid, info in prods.items()}
 
 
@@ -492,7 +492,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
     con el resumen. Cada batch escribe una auditoría con el detalle por línea.
     """
     user = _only_admin(user_id)
-    waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
+    waste = WasteApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
         return {'success': False, 'message': 'La merma no existe.'}
     if waste.status != 'PENDIENTE':
@@ -556,7 +556,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
     # Al RECHAZAR una línea pendiente se libera su reserva: el stock congelado
     # por esta merma vuelve a estar disponible (current_quantity no se descuenta).
     for d, _reason in rechazar:
-        inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+        inv = WasteApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
         if inv is None:
             continue
         inv.reserved_quantity = max(
@@ -565,9 +565,9 @@ def decidir_lineas(waste_id, user_id, decisiones):
         )
 
     for d in aprobar:
-        MermaApprovalsRepository.mark_line_resolved(d, user.id, 'aprobar')
+        WasteApprovalsRepository.mark_line_resolved(d, user.id, 'aprobar')
     for d, reason in rechazar:
-        MermaApprovalsRepository.mark_line_resolved(d, user.id, 'rechazar', reason)
+        WasteApprovalsRepository.mark_line_resolved(d, user.id, 'rechazar', reason)
 
     pendientes = [d for d in detalle.values() if (d.status or 'PENDIENTE') == 'PENDIENTE']
     finalizado = not pendientes
@@ -581,7 +581,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
             estado_final = 'RECHAZADO'
         else:
             estado_final = 'APROBADO_PARCIAL'
-        MermaApprovalsRepository.mark_resolved(waste, user.id, estado_final)
+        WasteApprovalsRepository.mark_resolved(waste, user.id, estado_final)
 
     # --- Auditoría del batch con detalle por línea ---
     nombres = _productos_name({d.product_id for d in aprobar} | {d.product_id for d, _reason in rechazar})
@@ -623,7 +623,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
         event = EV_DECISION
     severity = 'ALERTA' if rechazar else 'NORMAL'
 
-    MermaApprovalsRepository.create_audit(
+    WasteApprovalsRepository.create_audit(
         waste, user.id, event, severity,
         {
             'merma_id': waste.id,
@@ -678,7 +678,7 @@ def decidir_lineas(waste_id, user_id, decisiones):
 def approve_waste(waste_id, user_id):
     """Admin aprueba TODAS las líneas pendientes de una merma: descuenta stock."""
     user = _only_admin(user_id)
-    waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
+    waste = WasteApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
         return {'success': False, 'message': 'La merma no existe.'}
     if waste.status != 'PENDIENTE':
@@ -701,7 +701,7 @@ def approve_waste(waste_id, user_id):
 def reject_waste(waste_id, user_id, reason):
     """Admin rechaza TODAS las líneas pendientes de una merma: no toca stock."""
     user = _only_admin(user_id)
-    waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
+    waste = WasteApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
         return {'success': False, 'message': 'La merma no existe.'}
     if waste.status != 'PENDIENTE':
@@ -730,10 +730,10 @@ def cancel_waste(waste_id, user_id, reason):
     motivo y queda constancia en la Auditoría de Inventario. Si ya hay líneas
     decididas no se puede cancelar (parte del stock ya fue descontada).
     """
-    user = MermaApprovalsRepository.get_user_by_id(user_id)
+    user = WasteApprovalsRepository.get_user_by_id(user_id)
     if not user:
         return {'success': False, 'message': 'Usuario no encontrado.'}
-    waste = MermaApprovalsRepository.get_waste_by_id(waste_id)
+    waste = WasteApprovalsRepository.get_waste_by_id(waste_id)
     if not waste:
         return {'success': False, 'message': 'La merma no existe.'}
     if waste.status != 'PENDIENTE':
@@ -758,15 +758,15 @@ def cancel_waste(waste_id, user_id, reason):
         # Se libera la reserva congelada por las líneas pendientes: el stock
         # vuelve a estar disponible (current_quantity no se descuenta).
         for d in waste.details:
-            inv = MermaApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
+            inv = WasteApprovalsRepository.get_inventory_item(waste.location_id, d.product_id)
             if inv is None:
                 continue
             inv.reserved_quantity = max(
                 Decimal('0.00'),
                 _q2(_dec(inv.reserved_quantity) - _dec(d.quantity)),
             )
-        MermaApprovalsRepository.mark_cancelled(waste, user.id, reason)
-        MermaApprovalsRepository.create_audit(
+        WasteApprovalsRepository.mark_cancelled(waste, user.id, reason)
+        WasteApprovalsRepository.create_audit(
             waste, user.id, EV_CANCELAR, 'ALERTA',
             {
                 'merma_id': waste.id,
@@ -789,7 +789,7 @@ def _avisar_autor_final(waste, admin, decisiones_audit):
 
     La notificación resume la decisión por producto: aprobadas/rechazadas.
     """
-    autor = MermaApprovalsRepository.get_user_by_id(waste.user_id)
+    autor = WasteApprovalsRepository.get_user_by_id(waste.user_id)
     if not autor or autor.id == admin.id:
         return
     # Cuenta REAL de la merma completa, no solo del batch actual: en una decisión

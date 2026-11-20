@@ -26,7 +26,7 @@ def _coerce_positive_int(value):
     except (TypeError, ValueError):
         return value
 
-@register_waste_bp.route('/waste/merma/new', methods=['GET'])
+@register_waste_bp.route('/waste/waste/new', methods=['GET'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def nueva_merma():
@@ -214,7 +214,7 @@ def subir_foto():
         logger.exception("Error al subir la evidencia de la merma")
         return jsonify({'success': False, 'message': 'No se pudo subir la evidencia. Intenta de nuevo.'}), 502
 
-@register_waste_bp.route('/waste/merma/new', methods=['POST'])
+@register_waste_bp.route('/waste/waste/new', methods=['POST'])
 @login_required
 @require_roles(*OPERATIVE_ROLES)
 def crear_merma():

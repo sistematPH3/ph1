@@ -16,7 +16,7 @@ from app.models.security_model import User, user_locations
 from app.models.waste_model import Waste, WasteType, WasteDetail, AuditLog, AppParameter
 
 
-class MermaApprovalsRepository:
+class WasteApprovalsRepository:
     """Acceso a datos para la bandeja de aprobación de mermas pendientes."""
 
     # ------------------------------------------------------------------

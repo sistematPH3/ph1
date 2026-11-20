@@ -85,8 +85,8 @@ def create_app():
         app.register_blueprint(waste_approvals_bp)
 
         # MÓDULO WASTE: MIS MERMAS PENDIENTES (EDICIÓN/CANCELACIÓN DEL AUTOR)
-        from .waste.routes.merma_list_routes import merma_list_bp
-        app.register_blueprint(merma_list_bp)
+        from .waste.routes.waste_list_routes import waste_list_bp
+        app.register_blueprint(waste_list_bp)
         # ==========================================================
 
         # ==========================================================

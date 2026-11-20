@@ -960,13 +960,13 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
 
     # --- 8.7 Rutas HTTP: login, flujo e2e y bloqueo de rol --------------------
     def test_ruta_nueva_merma_requiere_login(self):
-        resp = self.app.test_client().get("/waste/merma/new", follow_redirects=False)
+        resp = self.app.test_client().get("/waste/waste/new", follow_redirects=False)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("/auth/login", resp.headers.get("Location", ""))
 
     def test_ruta_crear_merma_requiere_login(self):
         resp = self.app.test_client().post(
-            "/waste/merma/new",
+            "/waste/waste/new",
             json={"location_id": 1, "waste_type_id": 1, "items": [], "notes": "x"},
             follow_redirects=False)
         self.assertEqual(resp.status_code, 302)
@@ -977,7 +977,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        resp_get = client.get("/waste/merma/new")
+        resp_get = client.get("/waste/waste/new")
         self.assertEqual(resp_get.status_code, 200)
         self.assertIn("Registro de Merma", resp_get.get_data(as_text=True))
 
@@ -987,7 +987,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
                        "quantity": 5.0, "waste_type_id": env["waste_type"].id}],
             "notes": "Vencido",
         }
-        resp = client.post("/waste/merma/new", json=payload)
+        resp = client.post("/waste/waste/new", json=payload)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertTrue(data["success"])
@@ -1016,14 +1016,14 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
                 sess["last_waste_submit_time"] = 0
 
         reset_submit_lock()
-        r1 = client.post("/waste/merma/new", json=payload)
+        r1 = client.post("/waste/waste/new", json=payload)
         self.assertEqual(r1.status_code, 200)
         d1 = r1.get_json()
         self.assertTrue(d1["success"])
         self.assertFalse(d1.get("duplicate"))
 
         reset_submit_lock()
-        r2 = client.post("/waste/merma/new", json=payload)
+        r2 = client.post("/waste/waste/new", json=payload)
         self.assertEqual(r2.status_code, 200)
         d2 = r2.get_json()
         self.assertTrue(d2["success"])
@@ -1046,7 +1046,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         # Un request_id distinto SÍ crea una merma nueva (sin interferencias).
         payload2 = dict(payload, request_id="req-http-xyz")
         reset_submit_lock()
-        r3 = client.post("/waste/merma/new", json=payload2)
+        r3 = client.post("/waste/waste/new", json=payload2)
         self.assertEqual(r3.status_code, 200)
         d3 = r3.get_json()
         self.assertTrue(d3["success"])
@@ -1058,7 +1058,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        resp = client.post("/waste/merma/new", json={
+        resp = client.post("/waste/waste/new", json={
             "location_id": env["location_id"],
             "waste_type_id": env["waste_type"].id,
             "items": [{"product_id": env["product_id"], "lot_number": "L-001",
@@ -1086,7 +1086,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         with client.session_transaction() as sess:
             sess["_user_id"] = str(user_f.id)
         resp = client.post(
-            "/waste/merma/new",
+            "/waste/waste/new",
             json={"location_id": env["location_id"],
                   "waste_type_id": env["waste_type"].id,
                   "items": [{"product_id": env["product_id"], "lot_number": "L-001",
@@ -1177,7 +1177,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        resp = client.post("/waste/merma/new", json={
+        resp = client.post("/waste/waste/new", json={
             "location_id": env["location_id"],
             "items": [{"product_id": env["product_id"], "lot_number": "L-001",
                        "quantity": 5.0, "waste_type_id": env["waste_type"].id}],
@@ -1525,7 +1525,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        page = client.get("/waste/merma/new")
+        page = client.get("/waste/waste/new")
         self.assertEqual(page.status_code, 200)
         html = page.get_data(as_text=True)
         self.assertNotIn("expired-alert-wrapper", html)
@@ -1541,7 +1541,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        page = client.get("/waste/merma/new")
+        page = client.get("/waste/waste/new")
         self.assertEqual(page.status_code, 200)
         html = page.get_data(as_text=True)
         self.assertNotIn("expired-alert-wrapper", html)
@@ -1675,7 +1675,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         self.assertTrue(data["requiere_aprobacion"])
 
     # ------------------------------------------------------------------
-    # 8.11) DEEP-LINK: /waste/merma/new?type=VENCIDO (audio 9)
+    # 8.11) DEEP-LINK: /waste/waste/new?type=VENCIDO (audio 9)
     # ------------------------------------------------------------------
     def test_deep_link_type_vencido_no_bloquea_nada(self):
         env = self._seed_central_env(code="VENCIDO")
@@ -1683,7 +1683,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
         # El tipo ya no es parte de la cabecera: el ?type= es inocuo.
-        resp = client.get("/waste/merma/new?type=VENCIDO")
+        resp = client.get("/waste/waste/new?type=VENCIDO")
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("locked_type_code", resp.get_data(as_text=True))
 
@@ -1692,7 +1692,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        resp = client.get("/waste/merma/new?type=NOEXISTE")
+        resp = client.get("/waste/waste/new?type=NOEXISTE")
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("locked_type_code", resp.get_data(as_text=True))
 
@@ -1726,7 +1726,7 @@ requires_approval=code in ("TEMPERATURA", "ROBO_SOSPECHA"),
         client = self.app.test_client()
         with client.session_transaction() as sess:
             sess["_user_id"] = str(env["user_id"])
-        resp = client.get("/waste/merma/new")
+        resp = client.get("/waste/waste/new")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
         # NO debe aparecer el banner/alert de vencidos en el contenido principal

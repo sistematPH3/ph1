@@ -3,7 +3,7 @@
    -----------------------------------------------------------------
    1) Búsqueda instantánea sobre las filas de la tabla.
    2) Botón Cancelar: abre un modal de confirmación con motivo
-      obligatorio y llama a POST /api/waste/merma/<id>/cancel.
+      obligatorio y llama a POST /api/waste/waste/<id>/cancel.
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
         btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Cancelando...';
 
         try {
-            const res = await fetch("/api/waste/merma/" + wasteId + "/cancel", {
+            const res = await fetch("/api/waste/waste/" + wasteId + "/cancel", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ reason: reason })
