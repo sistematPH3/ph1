@@ -1103,7 +1103,9 @@ class AnalysisReportsTest(unittest.TestCase):
             [self.sede_a.id], date(2026, 9, 1), date(2026, 9, 30), 'USD',
             incluir_compras=False)
         self.assertEqual([c['concepto'] for c in cons['por_concepto']],
-                         ['Gastos de cocina', 'Mermas'])
+                         ['Gastos de cocina', 'Mermas y pérdidas de traslado'])
+        # Sin compras no hay distribución de la inversión.
+        self.assertEqual(cons['distribucion'], [])
         self.assertNotIn('Compras', [c['concepto'] for c in cons['por_concepto']])
         self.assertEqual(cons['por_categoria'], [])
         self.assertEqual(cons['por_moneda']['filas'], [])
@@ -1148,13 +1150,18 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(result['recibidos']['conteo'], 1)
         self.assertEqual(result['recibidos']['quantity'], _redondo('10.00'))
         self.assertEqual(result['recibidos']['cost'], _redondo('1000.00'))
-        self.assertEqual(result['enviados']['conteo'], 1)
-        self.assertEqual(result['enviados']['quantity'], _redondo('4.00'))
-        self.assertEqual(result['enviados']['cost'], _redondo('400.00'))
+        # La DEVOLUCION no es un traslado consolidado: no suma como enviado.
+        self.assertEqual(result['enviados']['conteo'], 0)
+        self.assertEqual(result['enviados']['cost'], _redondo('0.00'))
         self.assertEqual(result['internos']['conteo'], 0)
-        self.assertEqual(result['total']['conteo'], 2)
-        self.assertEqual(result['total']['cost'], _redondo('1400.00'))
-        self.assertEqual(len(result['movimientos']), 2)
+        self.assertEqual(result['total']['conteo'], 1)
+        self.assertEqual(result['total']['cost'], _redondo('1000.00'))
+        self.assertEqual(len(result['movimientos']), 1)
+        # La mercancía recibida por la sede sí queda valorizada.
+        self.assertEqual(result['recibido_por_sede'][0]['sede'],
+                         self.sede_a.name)
+        self.assertEqual(result['recibido_por_sede'][0]['monto'],
+                         _redondo('1000.00'))
 
     def test_traslado_recibido_mide_lo_que_llego_y_no_lo_despachado(self):
         compra = Purchase(
@@ -1177,6 +1184,17 @@ class AnalysisReportsTest(unittest.TestCase):
         db.session.add(MovementDetail(
             movement_id=mov.id, product_id=self.harina.id, lot_number='L-REC',
             quantity=Decimal('50.00'), received_quantity=Decimal('40.00')))
+        # Segundo traslado aún en camino: salió pero la sede no lo ha recibido.
+        camino = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                          destination_location_id=self.sede_a.id,
+                          date=datetime(2026, 9, 11), user_id=self.admin.id,
+                          status='EN_TRANSITO')
+        db.session.add(camino)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=camino.id, product_id=self.harina.id,
+            lot_number='L-REC', quantity=Decimal('30.00'),
+            received_quantity=None))
         db.session.commit()
 
         result = svc.obtener_traslados_direccional(
@@ -1187,8 +1205,32 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(result['total']['quantity'], _redondo('40.00'))
         # Lo despachado se conserva aparte para los KPIs de mercancía movida.
         self.assertEqual(result['total_despachado']['quantity'],
-                         _redondo('50.00'))
-        self.assertEqual(result['total_despachado']['cost'], _redondo('500.00'))
+                         _redondo('80.00'))
+        self.assertEqual(result['total_despachado']['cost'], _redondo('800.00'))
+        # Lo que sigue en camino no se cuenta como recibido.
+        self.assertEqual(result['recibido_total']['conteo'], 1)
+        self.assertEqual(result['recibido_total']['quantity'], _redondo('40.00'))
+        self.assertEqual(result['recibido_total']['cost'], _redondo('400.00'))
+        self.assertEqual(result['en_transito']['conteo'], 1)
+        self.assertEqual(result['en_transito']['quantity'], _redondo('30.00'))
+        self.assertEqual(result['en_transito']['cost'], _redondo('300.00'))
+
+        # Las tarjetas del consolidado deben cuadrar con la tabla por sede.
+        cons = svc.consolidado_financiero(
+            [self.central.id, self.sede_a.id], date(2026, 9, 1),
+            date(2026, 9, 30), 'USD')
+        tr = cons['traslados']
+        self.assertEqual(tr['conteo'], 1)
+        self.assertEqual(tr['quantity'], _redondo('40.00'))
+        self.assertEqual(tr['costo'], _redondo('400.00'))
+        self.assertEqual(sum(f['conteo'] for f in tr['recibido_por_sede']),
+                         tr['conteo'])
+        self.assertEqual(sum(f['quantity'] for f in tr['recibido_por_sede']),
+                         tr['quantity'])
+        self.assertEqual(sum(f['monto'] for f in tr['recibido_por_sede']),
+                         tr['costo'])
+        self.assertEqual(tr['en_transito']['conteo'], 1)
+        self.assertEqual(tr['en_transito']['quantity'], _redondo('30.00'))
 
     def test_traslado_interno_mide_lo_recibido_y_enviado_lo_despachado(self):
         compra = Purchase(
@@ -1558,17 +1600,34 @@ class AnalysisReportsTest(unittest.TestCase):
         cons = reporte['detail']['consolidado']
         conceptos = [c['concepto'] for c in cons['por_concepto']]
         self.assertEqual(conceptos,
-                         ['Compras', 'Gastos de cocina', 'Mermas'])
-        # Suma limpia: 1000 (compras) + 15 (mermas) = 1015 USD exactos.
+                         ['Compras', 'Gastos de cocina',
+                          'Mermas y pérdidas de traslado'])
+        # La inversión real son las compras (1000); la merma de 15 es una salida
+        # de esa misma mercancía y NO se vuelve a sumar (sin doble conteo).
         self.assertEqual(cons['total_operativo'], _redondo('15.00'))
-        self.assertEqual(cons['total_registrado'], _redondo('1015.00'))
-        self.assertEqual(reporte['current']['amount_usd'], _redondo('1015.00'))
+        self.assertEqual(cons['total_registrado'], _redondo('1000.00'))
+        self.assertEqual(reporte['current']['amount_usd'], _redondo('1000.00'))
+        # Dona: destino de la mercancía comprada en porcentajes que suman 100.
+        distribucion = {f['clave']: f for f in cons['distribucion']}
+        self.assertEqual(distribucion['mermas']['pct'], _redondo('1.50'))
+        self.assertEqual(distribucion['disponible']['pct'], _redondo('98.50'))
+        self.assertEqual(sum(f['pct'] for f in cons['distribucion']),
+                         _redondo('100.00'))
         # Los traslados viven en su propio bloque informativo.
         self.assertIn('traslados', cons)
         self.assertNotIn('resultado', cons)
+        # "Por sede" es solo gasto operativo: las compras centralizadas no se
+        # reparten entre sucursales.
         sedes = [s['sede'] for s in cons['por_sede']]
-        self.assertIn('Compras Central', sedes)
+        self.assertNotIn('Compras Central', sedes)
         self.assertIn('Sede La Candelaria', sedes)
+        fila_sede = next(s for s in cons['por_sede']
+                         if s['sede'] == 'Sede La Candelaria')
+        self.assertEqual(fila_sede['mermas'], _redondo('15.00'))
+        self.assertEqual(fila_sede['monto'], _redondo('15.00'))
+        # Los traslados consolidados y las devoluciones viven en su bloque.
+        self.assertIn('recibido_por_sede', cons['traslados'])
+        self.assertIn('devoluciones', cons['traslados'])
         categorias = [c['category'] for c in cons['por_categoria']]
         self.assertIn('Sin categoría', categorias)
 
@@ -1580,8 +1639,9 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
         self.assertIn('Consolidado financiero', html)
-        self.assertIn('Total registrado', html)
-        self.assertIn('Traslados del período', html)
+        self.assertIn('Inversión real en compras', html)
+        self.assertIn('Traslados consolidados por sede', html)
+        self.assertNotIn('control logístico', html)
 
     # ---------------------------------------------------- gráficos --------
     def test_evolucion_alinea_periodos_y_montos_del_cajon(self):

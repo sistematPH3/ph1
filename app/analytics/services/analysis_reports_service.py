@@ -3,6 +3,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.analytics.repositories.analysis_reports_repository import (
+    ESTADOS_TRASLADO_EN_TRANSITO,
     fechas_con_registros,
     hay_snapshots_metrico,
     listar_periodos_disponibles,
@@ -10,9 +11,11 @@ from app.analytics.repositories.analysis_reports_repository import (
     obtener_compras_por_moneda,
     obtener_compras_por_proveedor,
     obtener_consumo_valorizado,
+    obtener_devoluciones_central,
     obtener_gasto_por_categoria,
     obtener_mermas_detalle,
     obtener_mermas_resumen,
+    obtener_mermas_top_producto,
     obtener_nombres_sedes,
     obtener_recibido_por_insumo,
     obtener_resumen_consumo,
@@ -365,14 +368,20 @@ def _etiqueta_periodo(period_type, inicio, fin):
     return str(inicio.year)
 
 
-def _sumar_rango(location_ids, metric, period_type, desde, hasta):
+def _sumar_rango(location_ids, metric, period_type, desde, hasta,
+                 usar_snapshots=True):
     """Totales del rango. Si el cajón (statistics_snapshots) tiene resúmenes
     para la métrica los suma; si está vacío (en la práctica nadie lo llena)
     lee de las tablas REALES: compras, consumo de cocina, mermas aprobadas y
     traslados valorizados. Las columnas que el cajón trae en 0 (snapshots
-    viejos sin tasa EUR/Bs) se completan con la valoración real."""
+    viejos sin tasa EUR/Bs) se completan con la valoración real.
+
+    Con `usar_snapshots=False` (rango desde/hasta explícito) se lee SIEMPRE de
+    las tablas reales: un snapshot es el resumen de un período completo y
+    sumarlo para un rango parcial mostraría montos fuera del intervalo."""
     metric = (metric or 'PURCHASES').upper()
-    if not hay_snapshots_metrico(location_ids, metric, period_type):
+    if not usar_snapshots or not hay_snapshots_metrico(location_ids, metric,
+                                                       period_type):
         return obtener_totales_reales(location_ids, metric, desde, hasta)
 
     totales = {
@@ -419,8 +428,9 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta):
 def _consolidado_por_periodo(location_ids, period_type, desde, hasta,
                              moneda='USD', incluir_compras=True):
     """Consolidado financiero del rango con datos REALES, convertido a la moneda
-    seleccionada del reporte (USD→Bs/EUR con la tasa BCV del período). El monto
-    acumulado es la suma limpia de Compras + Gastos de cocina + Mermas."""
+    seleccionada del reporte. El monto de la serie es la INVERSIÓN REAL en
+    compras: los gastos de cocina, mermas y pérdidas de traslado son salidas de
+    esa misma mercancía y sumarlos aquí duplicaría el egreso."""
     consolidado = consolidado_financiero(location_ids, desde, hasta, moneda,
                                           incluir_compras=incluir_compras)
     monto = consolidado['total_registrado']
@@ -431,6 +441,28 @@ def _consolidado_por_periodo(location_ids, period_type, desde, hasta,
         'quantity': Decimal('0.00'),
         'record_count': 0,
     }
+
+
+def _operativo_por_sede(loc_id, inicio, fin, moneda='USD'):
+    """Gasto operativo absorbido por una sede: cocina + mermas + pérdidas de
+    traslado atribuidas a ella (la que despachó). Las compras NO se reparten:
+    son centralizadas, así que el ranking compara solo costo operativo."""
+    desde_dt = (inicio if isinstance(inicio, datetime)
+                else datetime.combine(inicio, time.min))
+    hasta_dt = (fin if isinstance(fin, datetime)
+                else datetime.combine(fin, time.max))
+    mermas = obtener_mermas_resumen([loc_id], desde_dt, hasta_dt)
+    consumo = obtener_consumo_valorizado([loc_id], desde_dt, hasta_dt)
+    direccional = obtener_traslados_direccional([loc_id], desde_dt, hasta_dt,
+                                                moneda)
+
+    def convertir(buckets):
+        monto = _convertir_buckets(buckets, moneda, hasta_dt)
+        return _redondear(monto) if monto is not None else Decimal('0.00')
+
+    return _redondear(
+        convertir(mermas['total']) + convertir(consumo['total'])
+        + direccional['perdidas_por_sede'].get(loc_id, Decimal('0.00')))
 
 
 def _ancla_inicial(location_ids, metric, period_type, referencia):
@@ -503,11 +535,33 @@ def queda_reporte_usuario_autorizado(user_id, location_id=None):
     return efectivas, None
 
 
+def _limites_rango(desde, hasta, location_ids, metric):
+    """Límites efectivos cuando se usa al menos un extremo del rango libre.
+
+    Si solo llega `desde` (o solo `hasta`), el extremo faltante se completa con
+    la primera/última fecha CON REGISTROS de la métrica. Antes un filtro de un
+    solo lado se ignoraba por completo y el reporte volvía al mes cerrado.
+    Devuelve (inicio, fin) o None si no hay ningún extremo."""
+    if not (desde or hasta):
+        return None
+    if desde and hasta:
+        return (desde, hasta) if desde <= hasta else (hasta, desde)
+    fechas = fechas_con_registros(location_ids, metric)
+    inicio = desde or (fechas[0] if fechas else (hasta or date.today()))
+    fin = hasta or (fechas[-1] if fechas else (desde or date.today()))
+    if fin < inicio:
+        inicio, fin = fin, inicio
+    return inicio, fin
+
+
 def _marco_desde_filtros(filtros, location_ids, ref_metric):
     """Marco temporal del reporte. Con desde/hasta definidos usa el rango libre
-    exacto; sin ellos deriva el período del tipo seleccionado (ancla del cajón)."""
-    if filtros.desde and filtros.hasta:
-        inicio, fin = filtros.desde, filtros.hasta
+    exacto (también si solo viene un extremo); sin ellos deriva el período del
+    tipo seleccionado (ancla del cajón)."""
+    limites = _limites_rango(filtros.desde, filtros.hasta, location_ids,
+                             ref_metric)
+    if limites:
+        inicio, fin = limites
         duracion = (fin - inicio).days + 1
         previo_inicio = inicio - timedelta(days=duracion)
         previo_fin = inicio - timedelta(days=1)
@@ -560,6 +614,10 @@ def construir_reporte(filtros, user_id):
     inicio, fin = marco['period_start'], marco['period_end']
     previo_inicio, previo_fin = marco['previous_start'], marco['previous_end']
 
+    # Con un rango libre (desde/hasta) el cajón de resúmenes no sirve: guarda
+    # períodos completos. Se lee siempre de las tablas reales para no mostrar
+    # acumulados fuera del intervalo elegido.
+    usar_snapshots = not (filtros.desde or filtros.hasta)
     if metric == 'CONSOLIDATED':
         actual = _consolidado_por_periodo(efectivas, period_type, inicio, fin,
                                           moneda, incluir_compras=incluir_compras)
@@ -567,9 +625,11 @@ def construir_reporte(filtros, user_id):
                                             previo_inicio, previo_fin, moneda,
                                             incluir_compras=incluir_compras)
     else:
-        actual = _sumar_rango(efectivas, metric, period_type, inicio, fin)
+        actual = _sumar_rango(efectivas, metric, period_type, inicio, fin,
+                              usar_snapshots=usar_snapshots)
         anterior = _sumar_rango(efectivas, metric, period_type,
-                                previo_inicio, previo_fin)
+                                previo_inicio, previo_fin,
+                                usar_snapshots=usar_snapshots)
     comparativo = calcular_comparativo(actual, anterior, moneda)
 
     detalle = _detalle_metric(efectivas, metric, period_type,
@@ -588,6 +648,13 @@ def construir_reporte(filtros, user_id):
             'metric': metric,
             'period_type': period_type,
             'moneda': moneda,
+        },
+        # Rango efectivo del reporte: la ruta lo usa para que los gráficos
+        # apliquen exactamente el mismo intervalo (también con un solo extremo).
+        'range': {
+            'desde': inicio,
+            'hasta': fin,
+            'explicito': bool(filtros.desde or filtros.hasta),
         },
         'period': {
             'start': inicio,
@@ -625,6 +692,33 @@ def _inicio_anterior(period_type, inicio):
     return _add_months(inicio, -1)
 
 
+def _top_productos(por_producto, moneda, fecha, limite=5):
+    """Ordena por producto el impacto monetario (convertido a la moneda del
+    reporte con la tasa vigente al cierre del rango) y devuelve el principal
+    junto al ranking corto. `por_producto` trae quantity + buckets por moneda.
+    """
+    filas = []
+    for fila in por_producto or []:
+        monto = _convertir_buckets(fila.get('buckets') or {}, moneda, fecha)
+        filas.append({
+            'product_id': fila.get('product_id'),
+            'product_name': fila.get('product_name'),
+            'quantity': _redondear(fila.get('quantity')),
+            'monto': _redondear(monto or Decimal('0.00')),
+        })
+    filas.sort(key=lambda f: (-float(f['monto']), -float(f['quantity']),
+                              f['product_name'] or ''))
+    total = sum((f['monto'] for f in filas), Decimal('0.00'))
+    for fila in filas:
+        fila['pct'] = (_redondear((fila['monto'] / total) * 100)
+                       if total else Decimal('0.00'))
+    return {
+        'moneda': moneda,
+        'principal': filas[0] if filas else None,
+        'filas': filas[:limite],
+    }
+
+
 def _detalle_metric(location_ids, metric, period_type, inicio, fin,
                     moneda='USD', incluir_compras=True):
     if metric == 'PURCHASES':
@@ -635,15 +729,25 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
                        'BS': f.get('total_bs', Decimal('0.00')),
                        'EUR': f.get('total_eur', Decimal('0.00'))}
             buckets_filas.append(buckets)
-            f['monto'] = _monto_en_moneda(buckets, moneda, fin)
+            # Monto ya valorizado con la tasa del día de cada compra: antes se
+            # reconvertía el Bs con la tasa de cierre (109,83 en vez de 109,95).
+            f['monto'] = f['equivalente'].get(moneda, Decimal('0.00'))
             f['moneda'] = moneda
         return {'por_proveedor': filas,
                 'monedas_sin_tasa': _monedas_sin_tasa(buckets_filas, moneda,
                                                       fin)}
     if metric == 'KITCHEN_CONSUMPTION':
-        return {'registros': obtener_resumen_consumo(location_ids, inicio, fin)}
+        consumo = obtener_consumo_valorizado(location_ids, inicio, fin)
+        return {'registros': obtener_resumen_consumo(location_ids, inicio, fin),
+                'top_producto': _top_productos(consumo['por_producto'],
+                                               moneda, fin),
+                'por_sede': consumo['por_sede']}
     if metric == 'WASTE':
         registros = obtener_mermas_detalle(location_ids, inicio, fin)
+        resumen_mermas = obtener_mermas_resumen(location_ids, inicio, fin)
+        top_producto = _top_productos(
+            obtener_mermas_top_producto(location_ids, inicio, fin),
+            moneda, fin)
         buckets_filas = []
         for r in registros:
             r['cost_original'] = r['cost']
@@ -655,6 +759,8 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
             r['cost'] = _redondear(convertido) if convertido is not None else Decimal('0.00')
             r['currency'] = moneda
         return {'mermas': registros,
+                'top_producto': top_producto,
+                'por_sede': resumen_mermas['por_sede'],
                 'monedas_sin_tasa': _monedas_sin_tasa(buckets_filas, moneda,
                                                       fin)}
     if metric == 'TRANSFERS':
@@ -673,6 +779,13 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
         resumen['extravios_valorizados'] = True
         resumen['direccional'] = direccional
         resumen['movimientos'] = direccional['movimientos']
+        resumen['perdidas_detalle'] = direccional['perdidas_detalle']
+        resumen['perdidas_conteo'] = direccional['perdidas_conteo']
+        # La cantidad de extravíos debe salir de la MISMA fuente que la tabla de
+        # detalle (misma exclusión de devoluciones/anulados y de pérdidas en
+        # tránsito). Antes el resumen contaba también devoluciones y arrojaba
+        # una cifra mayor que la suma de las líneas mostradas.
+        resumen['extravios_quantity'] = direccional['extravios_quantity']
         recibido = obtener_recibido_por_insumo(location_ids, inicio, fin)
         resumen['recibido_por_insumo'] = recibido
         if SEDE_CENTRAL_ID not in location_ids:
@@ -742,7 +855,19 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
     if metric == 'CONSOLIDATED':
         consolidado = consolidado_financiero(location_ids, inicio, fin, moneda,
                                              incluir_compras=incluir_compras)
+        # La vista consolidada también reporta pérdidas de traslado, así que
+        # debe llevar el MISMO detalle por producto/lote que la vista de
+        # traslados. Antes solo se empaquetaba en TRANSFERS y la tabla nunca
+        # se pintaba en el reporte consolidado.
+        orientacion = _orientacion_efectiva(location_ids, incluir_compras)
+        direccional = obtener_traslados_direccional(location_ids, inicio, fin,
+                                                    moneda, orientacion)
         return {'consolidado': consolidado,
+                'moneda': moneda,
+                'perdidas_valorizadas': direccional['perdidas'],
+                'perdidas_detalle': direccional['perdidas_detalle'],
+                'perdidas_conteo': direccional['perdidas_conteo'],
+                'extravios_quantity': direccional['extravios_quantity'],
                 'monedas_sin_tasa': _monedas_sin_tasa(
                     [f['buckets'] for f in consolidado['por_concepto']],
                     moneda, fin)}
@@ -846,6 +971,101 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
 
     perdidas = (_convertir_buckets(datos['perdidas'], moneda, hasta_dt)
                 or Decimal('0.00'))
+
+    # Detalle de los traslados PERDIDOS: qué producto y cuánta cantidad no
+    # llegó, con su valorización en la moneda del reporte. El conteo cuenta
+    # traslados distintos (un traslado puede perder varios productos).
+    perdidas_detalle = [{
+        'movement_id': fila['movement_id'],
+        'date': fila['date'],
+        'type': fila['type'],
+        'status': fila['status'],
+        'origin_name': fila['origin_name'],
+        'destination_name': fila['destination_name'],
+        'product_id': fila['product_id'],
+        'product_name': fila['product_name'],
+        'lot_number': fila['lot_number'],
+        'quantity': fila['quantity'],
+        'cost': convertir(fila['buckets']),
+    } for fila in datos.get('perdidas_detalle', [])]
+    perdidas_conteo = len({fila['movement_id'] for fila in perdidas_detalle})
+
+    # Pérdidas (extravíos) atribuidas a la sede que DESPACHÓ: es la que asumió
+    # el costo de la mercancía que salió y no llegó completa.
+    perdidas_por_sede = {}
+    for f in datos['filas']:
+        if not any(f['perdidas'].values()):
+            continue
+        monto_sede = (_convertir_buckets(f['perdidas'], moneda, hasta_dt)
+                      or Decimal('0.00'))
+        perdidas_por_sede[f['origin_id']] = _redondear(
+            perdidas_por_sede.get(f['origin_id'], Decimal('0.00'))
+            + monto_sede)
+
+    # Totales de lo REALMENTE RECIBIDO por las sedes de destino visibles. Es
+    # la misma base que alimenta 'recibido_por_sede', así que las tarjetas de
+    # control logístico y la tabla por sede coinciden al céntimo. Lo que aún
+    # está en camino no se suma aquí: se informa aparte como 'en_transito'.
+    ids = set(location_ids or [])
+    recibido_total = {'conteo': 0, 'quantity': Decimal('0.00'),
+                      'buckets': _bucket_vacio()}
+    en_transito = {'conteo': 0, 'quantity': Decimal('0.00'),
+                   'buckets': _bucket_vacio()}
+    sin_recepcion = {'conteo': 0, 'quantity': Decimal('0.00'),
+                     'buckets': _bucket_vacio()}
+    for f in datos['filas']:
+        destino = f['destination_id']
+        if destino not in ids or destino == SEDE_CENTRAL_ID:
+            continue
+        if f['received_quantity'] > 0:
+            ag, cantidad, buckets = (recibido_total,
+                                     f['received_quantity'],
+                                     f['buckets_recibido'])
+        else:
+            ag = (en_transito
+                  if f['status'] in ESTADOS_TRASLADO_EN_TRANSITO
+                  else sin_recepcion)
+            cantidad = f['despachado']
+            buckets = f['buckets_despachado']
+        ag['conteo'] += 1
+        ag['quantity'] += cantidad
+        for m in MONEDAS:
+            ag['buckets'][m] += buckets.get(m, Decimal('0.00'))
+
+    def _resumen_flujo(ag):
+        return {'conteo': ag['conteo'],
+                'quantity': _redondear(ag['quantity']),
+                'cost': convertir(ag['buckets'])}
+
+    recibido_total = _resumen_flujo(recibido_total)
+    en_transito = _resumen_flujo(en_transito)
+    sin_recepcion = _resumen_flujo(sin_recepcion)
+
+    # Mercancía realmente recibida por cada sede de destino (sin la Central,
+    # que no es una sucursal receptora). Solo traslados consolidados.
+    recibido_por_sede = {}
+    for f in datos['filas']:
+        destino = f['destination_id']
+        if destino not in ids or destino == SEDE_CENTRAL_ID:
+            continue
+        if not f['received_quantity']:
+            continue
+        ag = recibido_por_sede.setdefault(destino, {
+            'sede': f['destination_name'], 'conteo': 0,
+            'quantity': Decimal('0.00'), 'buckets': _bucket_vacio()})
+        ag['conteo'] += 1
+        ag['quantity'] += f['received_quantity']
+        for m in MONEDAS:
+            ag['buckets'][m] += f['buckets_recibido'].get(m, Decimal('0.00'))
+    recibido = []
+    for ag in recibido_por_sede.values():
+        recibido.append({
+            'sede': ag['sede'], 'conteo': ag['conteo'],
+            'quantity': _redondear(ag['quantity']),
+            'monto': convertir(ag['buckets']),
+        })
+    recibido.sort(key=lambda r: -float(r['monto']))
+
     return {
         'moneda': moneda,
         'enviados': direccional['enviados'],
@@ -855,6 +1075,13 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
         'total_despachado': total_despachado,
         'movimientos': movimientos,
         'perdidas': _redondear(perdidas),
+        'perdidas_detalle': perdidas_detalle,
+        'perdidas_conteo': perdidas_conteo,
+        'perdidas_por_sede': perdidas_por_sede,
+        'recibido_total': recibido_total,
+        'en_transito': en_transito,
+        'sin_recepcion': sin_recepcion,
+        'recibido_por_sede': recibido,
         'extravios_quantity': datos['extravios_quantity'],
     }
 
@@ -865,11 +1092,22 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
     (por defecto USD). Presenta cada rubro por separado y sin restas
     residuales:
       - por_concepto: Compras (solo moneda nativa de pago), Gastos de cocina y
-        Mermas, todos en magnitud positiva.
-      - total_operativo: suma limpia de Gastos de cocina + Mermas.
-      - total_registrado: suma limpia de Compras + total_operativo.
-      - traslados: bloque informativo independiente (conteo, cantidad movida y
-        costo a valor de inventario). NO entra en ninguna suma ni resta.
+        Mermas y pérdidas de traslado, todos en magnitud positiva.
+      - por_sede: gasto OPERATIVO absorbido por cada sede (cocina + mermas +
+        pérdidas de traslado). Excluye compras: son centralizadas.
+      - traslados.recibido_por_sede / traslados.devoluciones: mercancía que
+        llegó a cada sede por traslados consolidados y devoluciones a la
+        Central (los retornos no cuentan como traslados).
+      - total_operativo: Gastos de cocina + Mermas y pérdidas de traslado.
+      - total_registrado: INVERSIÓN REAL en compras. Cocina y pérdidas no se
+        suman: son porciones de la misma mercancía ya comprada (doble conteo).
+      - distribucion: destino de la mercancía comprada en % (disponible,
+        cocina, mermas y pérdidas de traslado).
+      - traslados: control logístico de lo REALMENTE RECIBIDO por las sedes de
+        destino (conteo, cantidad y costo a valor de inventario), de modo que
+        las tarjetas coinciden con la tabla por sede. Lo que sigue en camino
+        viaja aparte en 'en_transito' y no suma; sus pérdidas sí se agrupan con
+        las mermas.
     Las compras se valoran con la tasa del día de cada compra (el BS registrado
     en price_bs); consumo/mermas con la última tasa BCV del período. Si
     incluir_compras es False (sedes que no gestionan la Central) las compras se
@@ -906,17 +1144,67 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
         cat = linea['category']
         por_categoria.setdefault(cat, _bucket_vacio())
         for m in MONEDAS:
-            # El equivalente contable conserva la valoración histórica de la
-            # tabla por categoría; la columna Bs del consolidado usa 'buckets'.
-            por_categoria[cat][m] += linea['buckets_equivalentes'].get(
+            # Equivalente valorizado con la tasa del día de cada compra: así la
+            # suma de las categorías coincide al céntimo con 'Compras' y no se
+            # reconvierte el Bs registrado con la tasa de cierre.
+            por_categoria[cat][m] += linea['equivalente'].get(
                 m, Decimal('0.00'))
     compras_monto = (_compras_en_moneda(desde_dt, hasta_dt, moneda)
                      if incluir_compras else Decimal('0.00'))
 
     total_consumo = convertir(consumo['total'])
     total_mermas = convertir(mermas['total'])
-    total_operativo = _redondear(total_consumo + total_mermas)
-    total_registrado = _redondear(compras_monto + total_operativo)
+
+    # Traslados: se mide la mercancía despachada (volumen) y su valorización a
+    # costo. Las PÉRDIDAS de traslado (extravíos) ya no quedan fuera del
+    # análisis: se agrupan con las mermas como pérdida operativa de mercancía.
+    direccional = obtener_traslados_direccional(
+        location_ids, desde_dt, hasta_dt, moneda,
+        orientacion_id=_orientacion_efectiva(location_ids, incluir_compras))
+    # Las tarjetas miden lo RECIBIDO (misma base que la tabla por sede); lo
+    # despachado y aún en camino se informa aparte, sin sumarse al costo.
+    recibido = direccional['recibido_total']
+    total_perdidas_traslado = _redondear(direccional['perdidas'])
+    # Devoluciones al Almacén Central: no cuentan como traslados de
+    # abastecimiento, pero sí se informan con su monto (mercancía devuelta).
+    devoluciones_datos = obtener_devoluciones_central(location_ids, desde_dt,
+                                                      hasta_dt)
+    devoluciones_por_sede = [
+        {'sede': sede,
+         'conteo': ag['conteo'],
+         'quantity': _redondear(ag['quantity']),
+         'monto': convertir(ag['buckets'])}
+        for sede, ag in devoluciones_datos['por_sede'].items()
+    ]
+    devoluciones_por_sede.sort(key=lambda f: -float(f['monto']))
+    traslados = {
+        'moneda': moneda,
+        'conteo': recibido['conteo'],
+        'quantity': _redondear(recibido['quantity']),
+        'costo': _redondear(recibido['cost']),
+        'en_transito': direccional['en_transito'],
+        'sin_recepcion': direccional['sin_recepcion'],
+        'recibido_por_sede': direccional['recibido_por_sede'],
+        'devoluciones': {
+            'conteo': devoluciones_datos['conteo'],
+            'quantity': _redondear(devoluciones_datos['quantity']),
+            'monto': convertir(devoluciones_datos['buckets']),
+            'por_sede': devoluciones_por_sede,
+        },
+    }
+
+    total_mermas_perdidas = _redondear(total_mermas + total_perdidas_traslado)
+    total_operativo = _redondear(total_consumo + total_mermas_perdidas)
+    # La inversión REAL es la compra a proveedores. Cocina, mermas y pérdidas
+    # salen de esa misma mercancía: sumarlas sería doble conteo (231,85 → 209,95).
+    total_registrado = (compras_monto if incluir_compras else total_operativo)
+
+    buckets_mermas_perdidas = {
+        m: _redondear(mermas['total'].get(m, Decimal('0.00')))
+        for m in MONEDAS}
+    # Las pérdidas de traslado ya vienen convertidas a la moneda del reporte.
+    buckets_mermas_perdidas[moneda] = _redondear(
+        buckets_mermas_perdidas[moneda] + total_perdidas_traslado)
 
     por_concepto = []
     if incluir_compras:
@@ -928,44 +1216,77 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
          'monto': total_consumo,
          'buckets': {m: _redondear(consumo['total'].get(m, Decimal('0.00')))
                      for m in MONEDAS}},
-        {'concepto': 'Mermas', 'tipo': 'operativo',
-         'monto': total_mermas,
-         'buckets': {m: _redondear(mermas['total'].get(m, Decimal('0.00')))
-                     for m in MONEDAS}},
+        {'concepto': 'Mermas y pérdidas de traslado', 'tipo': 'operativo',
+         'monto': total_mermas_perdidas,
+         'buckets': buckets_mermas_perdidas,
+         'mermas': total_mermas,
+         'perdidas_traslado': total_perdidas_traslado},
     ])
 
-    # Traslados: bloque puramente informativo. Se mide la mercancía despachada
-    # (volumen) y su valorización a costo. No se suma ni se resta en el
-    # consolidado; las pérdidas se muestran aquí como dato de control.
-    direccional = obtener_traslados_direccional(
-        location_ids, desde_dt, hasta_dt, moneda,
-        orientacion_id=_orientacion_efectiva(location_ids, incluir_compras))
-    despachado = direccional['total_despachado']
-    traslados = {
-        'moneda': moneda,
-        'conteo': despachado['conteo'],
-        'quantity': _redondear(despachado['quantity']),
-        'costo': _redondear(despachado['cost']),
-        'perdidas_costo': _redondear(direccional['perdidas']),
-        'perdidas_quantity': _redondear(direccional['extravios_quantity']),
-    }
+    # Dona "Distribución del período": en qué se fue la mercancía COMPRADA,
+    # expresada en porcentaje. No repite la evolución lineal (montos por mes).
+    distribucion = []
+    if incluir_compras and compras_monto > 0:
+        componentes = total_consumo + total_mermas + total_perdidas_traslado
+        base = (compras_monto if compras_monto >= componentes
+                else componentes)
+        disponible = _redondear(
+            max(compras_monto - componentes, Decimal('0.00')))
+
+        def pct(parte):
+            return _redondear((parte / base) * 100) if base else Decimal('0.00')
+
+        distribucion = [
+            {'clave': 'disponible', 'label': 'Disponible / comercializado',
+             'monto': disponible, 'pct': pct(disponible)},
+            {'clave': 'cocina', 'label': 'Consumo de cocina',
+             'monto': total_consumo, 'pct': pct(total_consumo)},
+            {'clave': 'mermas', 'label': 'Mermas',
+             'monto': total_mermas, 'pct': pct(total_mermas)},
+            {'clave': 'perdidas_traslado', 'label': 'Pérdidas de traslado',
+             'monto': total_perdidas_traslado,
+             'pct': pct(total_perdidas_traslado)},
+        ]
+        distribucion = [f for f in distribucion if f['monto'] > 0]
+        if distribucion:
+            # Cierre contable: el redondeo a 2 decimales debe sumar 100,00 %.
+            mayor = max(distribucion, key=lambda f: f['pct'])
+            sobrante = Decimal('100.00') - sum(f['pct'] for f in distribucion)
+            mayor['pct'] = _redondear(mayor['pct'] + sobrante)
 
     por_categoria_filas = [
-        {'category': cat, 'monto': _monto_en_moneda(b, moneda, hasta_dt)}
+        {'category': cat, 'monto': _redondear(b.get(moneda, Decimal('0.00')))}
         for cat, b in por_categoria.items()
     ]
     por_categoria_filas.sort(key=lambda f: -float(f['monto']))
 
+    # "Por sede" es ESTRICTAMENTE gasto operativo absorbido por cada sede:
+    # cocina + mermas + pérdidas de traslado. Las compras son centralizadas y
+    # no se reparten entre sucursales (antes se sumaba "Compras Central").
+    nombres_sedes = obtener_nombres_sedes(location_ids)
     por_sede_map = {}
-    for fuente in (mermas['por_sede'], consumo['por_sede']):
-        for sede, valores in fuente.items():
-            por_sede_map.setdefault(sede, _bucket_vacio())
-            for m in MONEDAS:
-                por_sede_map[sede][m] += valores.get(m, Decimal('0.00'))
-    por_sede = [{'sede': sede, 'monto': convertir(val)}
-                for sede, val in por_sede_map.items()]
-    if incluir_compras and compras_monto:
-        por_sede.append({'sede': 'Compras Central', 'monto': compras_monto})
+
+    def _fila_sede(nombre):
+        return por_sede_map.setdefault(nombre, {
+            'sede': nombre, 'mermas': Decimal('0.00'),
+            'cocina': Decimal('0.00'), 'perdidas': Decimal('0.00')})
+
+    for sede, valores in mermas['por_sede'].items():
+        _fila_sede(sede)['mermas'] += convertir(valores)
+    for sede, valores in consumo['por_sede'].items():
+        _fila_sede(sede)['cocina'] += convertir(valores)
+    for loc_id, monto in direccional['perdidas_por_sede'].items():
+        _fila_sede(nombres_sedes.get(loc_id, f'Sede #{loc_id}'))['perdidas'] += monto
+
+    por_sede = []
+    for fila in por_sede_map.values():
+        fila['monto'] = _redondear(fila['mermas'] + fila['cocina']
+                                   + fila['perdidas'])
+        fila['mermas'] = _redondear(fila['mermas'])
+        fila['cocina'] = _redondear(fila['cocina'])
+        fila['perdidas'] = _redondear(fila['perdidas'])
+        if fila['monto'] > 0:
+            por_sede.append(fila)
     por_sede.sort(key=lambda f: -float(f['monto']))
 
     return {
@@ -980,6 +1301,11 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
         'total_compras': _redondear(compras_monto),
         'total_operativo': total_operativo,
         'total_registrado': total_registrado,
+        'total_etiqueta': ('Inversión real en compras' if incluir_compras
+                           else 'Pérdidas operativas del período'),
+        'mermas': total_mermas,
+        'perdidas_traslado': total_perdidas_traslado,
+        'distribucion': distribucion,
         'traslados': traslados,
     }
 
@@ -1030,7 +1356,8 @@ def _valor_con_respaldo(location_ids, metric, period_type, inicio, fin,
 
 
 def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
-                             moneda='USD', incluir_compras=True):
+                             moneda='USD', incluir_compras=True,
+                             usar_snapshots=True):
     """Un renglón por sede para el ranking y la comparativa lateral.
 
     ``total_base`` se expresa en la moneda del reporte: los montos reales
@@ -1050,19 +1377,21 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
     compras_base = None
     for loc_id in location_ids:
         if metric == 'CONSOLIDATED':
-            totales = _consolidado_por_periodo([loc_id], period_type,
-                                               inicio, fin, moneda,
-                                               incluir_compras=incluir_compras)
+            # Ranking consolidado = gasto operativo por sede, sin compras
+            # (las compras son una sola inversión central, no de la sede).
+            total_sede = _operativo_por_sede(loc_id, inicio, fin, moneda)
+            totales = {'amount_usd': total_sede, 'amount_bs': total_sede,
+                       'amount_eur': total_sede, 'quantity': Decimal('0.00'),
+                       'record_count': 0}
         else:
             totales = _sumar_rango([loc_id], metric, period_type,
-                                   inicio, fin)
-        snap = obtener_snapshot(loc_id, metric, period_type, inicio)
-        if snap is None:
-            snap = obtener_snapshot(loc_id, 'PURCHASES', period_type, inicio)
+                                   inicio, fin,
+                                   usar_snapshots=usar_snapshots)
         if metric == 'CONSOLIDATED':
             # El consolidado ya viene expresado en la moneda del reporte.
             total_base = totales['amount_usd']
-        elif hay_snapshots_metrico([loc_id], metric, period_type):
+        elif usar_snapshots and hay_snapshots_metrico([loc_id], metric,
+                                                       period_type):
             # Los snapshots traen las tres valoraciones: se elige la pedida y,
             # si quedó en 0, se recalcula desde las tablas reales.
             total_base = _valor_con_respaldo(
@@ -1095,9 +1424,11 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
                     moneda='USD', incluir_compras=True, desde=None, hasta=None):
     """Ranking de sedes para una métrica, ordenado por monto en la moneda base
     (mayor primero) con su comparativa contra el período anterior."""
-    if desde and hasta:
-        inicio, fin = desde, hasta
-        duracion = (hasta - desde).days + 1
+    metric = (metric or 'PURCHASES').upper()
+    limites = _limites_rango(desde, hasta, location_ids, metric)
+    if limites:
+        inicio, fin = limites
+        duracion = (fin - inicio).days + 1
         previo_inicio, previo_fin = (inicio - timedelta(days=duracion),
                                      inicio - timedelta(days=1))
     else:
@@ -1107,11 +1438,12 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
         previo_inicio, previo_fin = (marco['previous_start'],
                                      marco['previous_end'])
 
-    metric = (metric or 'PURCHASES').upper()
     moneda = (moneda or 'USD').upper()
+    usar_snapshots = limites is None
     renglones = obtener_metrica_por_sede(location_ids, metric, period_type.upper(),
                                          inicio, fin, moneda,
-                                         incluir_compras=incluir_compras)
+                                         incluir_compras=incluir_compras,
+                                         usar_snapshots=usar_snapshots)
     previo_desde = (previo_inicio if isinstance(previo_inicio, datetime)
                     else datetime.combine(previo_inicio, time.min))
     previo_hasta = (previo_fin if isinstance(previo_fin, datetime)
@@ -1119,15 +1451,15 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
     for renglon in renglones:
         loc_id = renglon['location_id']
         if metric == 'CONSOLIDATED':
-            previo = _consolidado_por_periodo(
-                [loc_id], period_type.upper(), previo_inicio, previo_fin,
-                moneda, incluir_compras=incluir_compras)
-            anterior_m = previo['amount_usd']
+            anterior_m = _operativo_por_sede(loc_id, previo_inicio,
+                                             previo_fin, moneda)
         else:
             previo = _sumar_rango([loc_id], metric,
                                   period_type.upper(), previo_inicio,
-                                  previo_fin)
-            if hay_snapshots_metrico([loc_id], metric, period_type):
+                                  previo_fin,
+                                  usar_snapshots=usar_snapshots)
+            if usar_snapshots and hay_snapshots_metrico([loc_id], metric,
+                                                        period_type):
                 anterior_m = _valor_con_respaldo(
                     [loc_id], metric, period_type.upper(), previo_inicio,
                     previo_fin, moneda, previo)
@@ -1148,18 +1480,62 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
     return renglones
 
 
+def _segmentos_rango(desde, hasta):
+    """Divide un rango libre en puntos de gráfico SIN salirse de él: un punto
+    por día hasta 31 días; si es mayor, un único punto con el total del rango.
+    Devuelve [(inicio, fin, etiqueta)]."""
+    dias = (hasta - desde).days + 1
+    if dias <= 31:
+        return [(desde + timedelta(days=i), desde + timedelta(days=i),
+                 (desde + timedelta(days=i)).strftime('%d/%m/%Y'))
+                for i in range(dias)]
+    return [(desde, hasta,
+             'Del ' + desde.strftime('%d/%m/%Y') + ' al '
+             + hasta.strftime('%d/%m/%Y'))]
+
+
+def _valor_evolucion(location_ids, metric, inicio, fin, moneda,
+                      incluir_compras):
+    """Valor de un tramo para el gráfico de evolución, leyendo SIEMPRE de las
+    tablas reales (sin snapshots): un tramo puede ser un día suelto."""
+    if metric == 'CONSOLIDATED':
+        totales = _consolidado_por_periodo(location_ids, 'MONTHLY', inicio, fin,
+                                           moneda,
+                                           incluir_compras=incluir_compras)
+    else:
+        totales = _sumar_rango(location_ids, metric, 'MONTHLY', inicio, fin,
+                               usar_snapshots=False)
+    if metric == 'TRANSFERS':
+        valor = Decimal(str(totales['record_count']))
+    elif metric == 'CONSOLIDATED':
+        valor = totales.get(f'amount_{moneda.lower()}', Decimal('0.00'))
+    else:
+        valor = _valor_con_respaldo(location_ids, metric, 'MONTHLY', inicio,
+                                    fin, moneda, totales)
+    return _redondear(valor)
+
+
 def obtener_evolucion(location_ids, metric, period_type='MONTHLY',
                       period_start=None, moneda='USD', limite=6,
-                      incluir_compras=True):
-    """Serie temporal de los N períodos históricos (hasta e incluyendo el ancla)
-    para el gráfico de evolución. Lee del cajón, igual que los KPIs, pero si un
-    período trae 0 en la moneda pedida se recalcula con los datos reales. Los
-    traslados se grafican por cantidad de registros; lo demás por monto en la
-    moneda base del reporte."""
+                      incluir_compras=True, desde=None, hasta=None):
+    """Serie temporal para el gráfico de evolución.
+
+    Con `desde`/`hasta` explícitos se grafica EXACTAMENTE ese rango (un punto
+    por día, o el total si abarca más de 31 días) leyendo de las tablas
+    reales: antes se graficaba siempre el período completo, de modo que cambiar
+    el filtro no alteraba el gráfico. Sin rango se mantiene la serie de N
+    períodos históricos del ancla."""
     metric = (metric or 'PURCHASES').upper()
     period_type = (period_type or 'MONTHLY').upper()
     moneda = (moneda or 'USD').upper()
     ref_metric = 'PURCHASES' if metric == 'CONSOLIDATED' else metric
+
+    if desde and hasta:
+        return [{
+            'label': etiqueta,
+            'value': _valor_evolucion(location_ids, metric, inicio, fin,
+                                      moneda, incluir_compras),
+        } for inicio, fin, etiqueta in _segmentos_rango(desde, hasta)]
 
     ancla = _ancla_inicial(location_ids, ref_metric, period_type, period_start)
     disponibles = listar_periodos_disponibles(
@@ -1245,26 +1621,34 @@ def _serie_detalle(reporte, moneda):
 
     if metric == 'CONSOLIDATED':
         consolidado = detalle.get('consolidado') or {}
-        filas = consolidado.get('por_concepto') or []
+        filas = consolidado.get('distribucion') or []
         if not filas:
             return None
         return {
-            'titulo': 'Consolidado del período',
+            'titulo': 'Distribución del período — destino de la mercancía',
             'tipo': 'doughnut',
-            'labels': [f['concepto'] for f in filas],
-            'values': [float(f['monto']) for f in filas],
-            'unidad': consolidado.get('moneda', moneda),
+            'labels': [f['label'] for f in filas],
+            # La dona muestra PORCENTAJES del destino de la compra, no montos
+            # repetidos de la evolución lineal.
+            'values': [float(f['pct']) for f in filas],
+            'unidad': '%',
+            'porcentaje': True,
+            'detalle_montos': [{'label': f['label'],
+                                'monto': float(f['monto'])}
+                               for f in filas],
+            'moneda_montos': consolidado.get('moneda', moneda),
         }
 
     return None
 
 
-def _serie_ranking(ranking, moneda):
+def _serie_ranking(ranking, moneda, metric='PURCHASES'):
     if not ranking:
         return None
     filas = sorted(ranking, key=lambda r: -float(r['total_base']))
     return {
-        'titulo': 'Ranking entre sedes', 'tipo': 'ranking',
+        'titulo': ('Gastos operativos por sede' if metric == 'CONSOLIDATED'
+                   else 'Ranking entre sedes'), 'tipo': 'ranking',
         'labels': [r['location_name'] for r in filas],
         'values': [float(r['total_base']) for r in filas],
         'unidad': (moneda or 'USD').upper(),
@@ -1282,13 +1666,27 @@ def _retroceder_periodo(period_type, inicio, cantidad):
     return _add_months(inicio, -cantidad)
 
 
+def _gasto_por_categoria_rango(inicio, fin, moneda):
+    """Categorías contables compradas dentro del tramo [inicio, fin], sin
+    incluir nada fuera de él."""
+    por_cat = {}
+    for fila in obtener_gasto_por_categoria(inicio, fin):
+        # Monto ya valorizado con la tasa del día de cada compra.
+        por_cat[fila['category']] = fila['equivalente'].get(
+            moneda, Decimal('0.00'))
+    return por_cat
+
+
 def obtener_gasto_categorias(period_type='MONTHLY', period_start=None,
-                             moneda='USD', meses=6):
+                             moneda='USD', meses=6, desde=None, hasta=None):
     """Serie comparada de meses con el dinero REAL gastado POR CATEGORÍA
     contable (cantidad × precio de purchase_details). Las compras se muestran
     con el valor registrado en la moneda del reporte: el BS es el price_bs que
     se grabó con la tasa del día de cada compra. Devuelve etiquetas de períodos
-    y N series apiladas (top categorías + 'Otros')."""
+    y N series apiladas (top categorías + 'Otros').
+
+    Con `desde`/`hasta` explícitos se calcula UNA sola columna con lo comprado
+    dentro del rango (antes siempre se traían los últimos 6 meses)."""
     period_type = (period_type or 'MONTHLY').upper()
     moneda = (moneda or 'USD').upper()
     if moneda not in MONEDAS:
@@ -1297,19 +1695,20 @@ def obtener_gasto_categorias(period_type='MONTHLY', period_start=None,
                              period_start or date.today())['period_start']
 
     columnas = []
-    for i in range(meses - 1, -1, -1):
-        inicio = _retroceder_periodo(period_type, ancla, i)
-        fin = _fin_desde_inicio(period_type, inicio)
-        fin_dt = datetime.combine(fin, time.max)
-        por_cat = {}
-        for fila in obtener_gasto_por_categoria(inicio, fin):
-            buckets = {'USD': fila['total_usd'], 'BS': fila['total_bs'],
-                       'EUR': fila['total_eur']}
-            por_cat[fila['category']] = _monto_en_moneda(buckets, moneda, fin_dt)
+    if desde and hasta:
         columnas.append({
-            'label': _etiqueta_periodo(period_type, inicio, fin),
-            'por_cat': por_cat,
+            'label': ('Del ' + desde.strftime('%d/%m/%Y') + ' al '
+                      + hasta.strftime('%d/%m/%Y')),
+            'por_cat': _gasto_por_categoria_rango(desde, hasta, moneda),
         })
+    else:
+        for i in range(meses - 1, -1, -1):
+            inicio = _retroceder_periodo(period_type, ancla, i)
+            fin = _fin_desde_inicio(period_type, inicio)
+            columnas.append({
+                'label': _etiqueta_periodo(period_type, inicio, fin),
+                'por_cat': _gasto_por_categoria_rango(inicio, fin, moneda),
+            })
 
     totales_cat = {}
     for col in columnas:
@@ -1344,11 +1743,12 @@ def obtener_gasto_categorias(period_type='MONTHLY', period_start=None,
 
 
 def obtener_evolucion_gasto(period_type='MONTHLY', period_start=None,
-                            moneda='USD', meses=6):
+                            moneda='USD', meses=6, desde=None, hasta=None):
     """Evolución REAL del dinero gastado (compras exactas) por período, desde
     purchase_details. Las compras se muestran con el valor registrado en la
     moneda del reporte (el BS es el price_bs de cada compra, grabado con la
-    tasa del día de compra)."""
+    tasa del día de compra). Con `desde`/`hasta` explícitos grafica solo ese
+    rango (un punto por día o el total), sin meses fuera del filtro."""
     period_type = (period_type or 'MONTHLY').upper()
     moneda = (moneda or 'USD').upper()
     if moneda not in MONEDAS:
@@ -1356,16 +1756,25 @@ def obtener_evolucion_gasto(period_type='MONTHLY', period_start=None,
     ancla = calcular_periodo(period_type,
                              period_start or date.today())['period_start']
 
+    if desde and hasta:
+        puntos = []
+        for inicio, fin, etiqueta in _segmentos_rango(desde, hasta):
+            total = sum((fila['equivalente'].get(moneda, Decimal('0.00'))
+                         for fila in obtener_gasto_por_categoria(inicio, fin)),
+                        Decimal('0.00'))
+            puntos.append({'label': etiqueta, 'value': _redondear(total)})
+        return puntos
+
     puntos = []
     for i in range(meses - 1, -1, -1):
         inicio = _retroceder_periodo(period_type, ancla, i)
         fin = _fin_desde_inicio(period_type, inicio)
-        fin_dt = datetime.combine(fin, time.max)
         total = Decimal('0.00')
         for fila in obtener_gasto_por_categoria(inicio, fin):
-            buckets = {'USD': fila['total_usd'], 'BS': fila['total_bs'],
-                       'EUR': fila['total_eur']}
-            total += _monto_en_moneda(buckets, moneda, fin_dt)
+            # Monto ya valorizado con la tasa del día de cada compra: la serie
+            # coincide con el KPI de compras (antes se reconvertía el Bs con la
+            # tasa de cierre y la suma daba 210,71 en vez de 209,95).
+            total += fila['equivalente'].get(moneda, Decimal('0.00'))
         puntos.append({
             'label': _etiqueta_periodo(period_type, inicio, fin),
             'value': _redondear(total),
@@ -1373,26 +1782,36 @@ def obtener_evolucion_gasto(period_type='MONTHLY', period_start=None,
     return puntos
 
 
-def construir_graficos(reporte, ranking, moneda='USD', incluir_compras=True):
+def construir_graficos(reporte, ranking, moneda='USD', incluir_compras=True,
+                       desde=None, hasta=None):
     """Datos serializables (números sueltos) para los gráficos Chart.js de la
     pantalla: evolución temporal, desglose del reporte, gasto por categoría
     contable y ranking entre sedes. El dinero (compras/consolidado) sale de las
     tablas reales tal cual está en el sistema; el resto del cajón de
-    resúmenes. Si incluir_compras es False las series de compras se omiten."""
+    resúmenes. Si incluir_compras es False las series de compras se omiten.
+
+    Con `desde`/`hasta` explícitos TODOS los gráficos respetan ese rango: antes
+    la evolución y las categorías mostraban siempre el período/meses completos.
+    """
     metric = reporte['filters']['metric']
-    if metric in ('PURCHASES', 'CONSOLIDATED') and incluir_compras:
+    if metric == 'PURCHASES' and incluir_compras:
+        # Solo compras: dinero gastado compra por compra (tasa del día).
         evolucion = obtener_evolucion_gasto(
             reporte['filters']['period_type'],
             reporte['period']['start'],
-            moneda)
+            moneda, desde=desde, hasta=hasta)
     else:
+        # CONSOLIDATED: inversión real del período = compras a proveedores,
+        # compra por compra con la tasa del día. Cocina y mermas no se suman
+        # (son salidas de esa misma mercancía).
         evolucion = obtener_evolucion(
             reporte['filters']['location_ids'],
             metric,
             reporte['filters']['period_type'],
             reporte['period']['start'],
             moneda,
-            incluir_compras=incluir_compras)
+            incluir_compras=incluir_compras,
+            desde=desde, hasta=hasta)
     return {
         'metric': metric,
         'moneda': (moneda or 'USD').upper(),
@@ -1401,9 +1820,9 @@ def construir_graficos(reporte, ranking, moneda='USD', incluir_compras=True):
         'gasto': (obtener_gasto_categorias(
             reporte['filters']['period_type'],
             reporte['period']['start'],
-            moneda) if incluir_compras
+            moneda, desde=desde, hasta=hasta) if incluir_compras
             else {'labels': [], 'series': [], 'totales': []}),
-        'ranking': _serie_ranking(ranking, moneda),
+        'ranking': _serie_ranking(ranking, moneda, metric),
     }
 
 
@@ -1411,8 +1830,8 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
                  moneda='USD', incluir_compras=True, desde=None, hasta=None):
     """KPIs del período con dinero REAL de las tablas del sistema (purchase_details,
     auditoría de consumo, mermas aprobadas y extravíos valorizados): Compras,
-    Gastos de cocina, Mermas y Traslados, cada uno con su variación contra el
-    período anterior. Las compras se valoran con la tasa del día de cada compra
+    Gastos de cocina, Mermas y pérdidas (mermas + pérdidas de traslado) y
+    Traslados, cada uno con su variación contra el período anterior. Las compras se valoran con la tasa del día de cada compra
     (price_bs registrado); lo demás con la última tasa BCV del rango. No se
     calcula un 'costo operativo' residual: cada rubro se presenta transparente
     y los traslados son un indicador logístico independiente. Con
@@ -1421,9 +1840,10 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
     moneda = (moneda or 'USD').upper()
     if moneda not in MONEDAS:
         moneda = 'USD'
-    if desde and hasta:
-        inicio, fin = desde, hasta
-        duracion = (hasta - desde).days + 1
+    limites = _limites_rango(desde, hasta, location_ids, 'CONSOLIDATED')
+    if limites:
+        inicio, fin = limites
+        duracion = (fin - inicio).days + 1
         previo_inicio, previo_fin = (inicio - timedelta(days=duracion),
                                      inicio - timedelta(days=1))
         marco = {'previous_start': previo_inicio, 'previous_end': previo_fin,
@@ -1454,12 +1874,16 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
             total = _convertir_buckets(buckets, moneda, hasta_dt)
             return _redondear(total) if total is not None else Decimal('0.00')
 
+        perdidas = convertir(datos['perdidas'])
         return {
             'compras': (_compras_en_moneda(desde_dt, hasta_dt, moneda)
                         if incluir_compras else Decimal('0.00')),
             'consumo': convertir(consumo['total']),
-            'mermas': convertir(mermas['total']),
-            'perdidas': convertir(datos['perdidas']),
+            'mermas_solo': convertir(mermas['total']),
+            'perdidas': perdidas,
+            # Las pérdidas de traslado son pérdida operativa de mercancía:
+            # se analizan junto a las mermas, no como un rubro ajeno.
+            'mermas': _redondear(convertir(mermas['total']) + perdidas),
             'direccional': _agrupar_direccional(datos['filas'], moneda,
                                                 hasta_dt),
         }
@@ -1494,7 +1918,9 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
         'consumo_cocina': {'label': 'Gastos de cocina',
                            'metric': 'KITCHEN_CONSUMPTION',
                            **estado('consumo')},
-        'mermas': {'label': 'Mermas', 'metric': 'WASTE',
+        'mermas': {'label': 'Mermas y pérdidas', 'metric': 'WASTE',
+                   'mermas_solo': _redondear(actual['mermas_solo']),
+                   'perdidas_traslado': _redondear(actual['perdidas']),
                    **estado('mermas')},
         'traslados': {'label': ('Traslados enviados'
                                 if clave_flujo == 'enviados'

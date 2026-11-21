@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func
@@ -11,7 +11,7 @@ from app.models.statistics_model import StatisticsSnapshot
 from app.models.logistics_model import (ExchangeRateHistory, Location, Purchase,
                                          PurchaseDetail, Movement, MovementDetail)
 from app.models.inventory_model import Product
-from app.models.waste_model import AuditLog, Waste, WasteType
+from app.models.waste_model import AuditLog, Waste, WasteDetail, WasteType
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,12 @@ ESTADOS_TRASLADO_ANULADOS = (
 # Un movimiento EN_TRANSITO ya salió de origen (cuenta como enviado) pero aún
 # no ha llegado a destino (no cuenta como recibido ni interno).
 ESTADOS_TRASLADO_EN_TRANSITO = ('EN_TRANSITO',)
+# Devoluciones: NO son traslados de abastecimiento. Los traslados que cuentan
+# para las estadísticas son solo los consolidados (despachos); los retornos
+# se informan aparte como devoluciones al Almacén Central.
+TIPOS_TRASLADO_DEVOLUCION = ('DEVOLUCION', 'RETORNO_EMERGENCIA')
+ESTADOS_TRASLADO_DEVUELTOS = ('DEVUELTO', 'DEVUELTA', 'DEVOLUCION',
+                              'RETORNO_EMERGENCIA')
 
 
 def obtener_sedes_permitidas(user_id):
@@ -116,6 +122,17 @@ def listar_periodos_disponibles(location_ids, metric, period_type, limite=24):
     return sorted(inicios, reverse=True)[:max(1, limite)]
 
 
+def _rango_datetime(desde, hasta):
+    """Normaliza el rango a datetimes que cubren los días COMPLETOS: `desde` a
+    las 00:00:00 y `hasta` a las 23:59:59.999999. Sin esto, una fecha `hasta`
+    (00:00) dejaba fuera los registros del propio día que ocurrieron más tarde."""
+    desde_dt = (desde if isinstance(desde, datetime)
+                else datetime.combine(desde, time.min))
+    hasta_dt = (hasta if isinstance(hasta, datetime)
+                else datetime.combine(hasta, time.max))
+    return desde_dt, hasta_dt
+
+
 def _totales_vacios():
     return {
         'amount_usd': Decimal('0.00'),
@@ -135,8 +152,7 @@ def obtener_totales_reales(location_ids, metric, desde, hasta):
         return _totales_vacios()
     metric = (metric or 'PURCHASES').upper()
     totales = _totales_vacios()
-    desde = desde if hasattr(desde, 'date') else desde
-    hasta = hasta if hasattr(hasta, 'date') else hasta
+    desde, hasta = _rango_datetime(desde, hasta)
 
     if metric in ('PURCHASES', 'CONSOLIDATED'):
         for fila in obtener_compras_por_moneda(desde, hasta):
@@ -263,7 +279,11 @@ def obtener_compras_por_proveedor(desde, hasta):
     """Detalle de compras del rango agrupado por proveedor y mes (no son por sede:
     las compras entran a la sede central). Monto en la moneda original de la
     compra (total_usd/total_eur) y el BS registrado con la tasa del día de la
-    compra (total_bs), ambos desde la cabecera de la factura."""
+    compra (total_bs), ambos desde la cabecera de la factura.
+
+    'equivalente' trae el monto valorizado en las tres monedas con la TASA DEL
+    DÍA de cada compra (no con la tasa de cierre del período), para que el
+    detalle por proveedor cuadre al céntimo con el KPI de compras."""
     compras = Purchase.query.filter(
         Purchase.purchase_date >= desde,
         Purchase.purchase_date <= hasta,
@@ -282,17 +302,47 @@ def obtener_compras_por_proveedor(desde, hasta):
             'total_usd': Decimal('0.00'),
             'total_bs': Decimal('0.00'),
             'total_eur': Decimal('0.00'),
+            'equivalente': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
+                            'EUR': Decimal('0.00')},
         })
         moneda = (compra.currency or 'USD').upper()
+        bucket = ('BS' if moneda in ('BS', 'VES', 'BS.', 'BSS')
+                  else ('EUR' if moneda == 'EUR' else 'USD'))
         total_real = _total_real_compra(compra)
-        fila['total_bs'] += _total_bs_compra(compra, moneda, total_real)
-        if moneda == 'EUR':
-            fila['total_eur'] += total_real
-        elif moneda not in ('BS', 'VES', 'BS.', 'BSS'):
-            fila['total_usd'] += total_real
+        total_bs_real = _total_bs_compra(compra, moneda, total_real)
+        fila['total_bs'] += total_bs_real
+        if bucket != 'BS':
+            fila['total_' + bucket.lower()] += total_real
+
+        # Equivalente con la tasa del día de la compra (misma base que
+        # _compras_en_moneda); antes se reconvertía con la tasa de cierre.
+        fila['equivalente'][bucket] += total_real
+        if bucket != 'BS':
+            fila['equivalente']['BS'] += total_bs_real
+        if bucket == 'USD':
+            tasa_eur = obtener_tasa_historica('EUR', compra.purchase_date)
+            if tasa_eur:
+                fila['equivalente']['EUR'] += total_bs_real / tasa_eur
+        elif bucket == 'EUR':
+            tasa_usd = obtener_tasa_historica('USD', compra.purchase_date)
+            if tasa_usd:
+                fila['equivalente']['USD'] += total_bs_real / tasa_usd
+        else:
+            tasa_usd = (Decimal(str(compra.exchange_rate or 0))
+                        or obtener_tasa_historica('USD',
+                                                  compra.purchase_date))
+            tasa_eur = obtener_tasa_historica('EUR', compra.purchase_date)
+            if tasa_usd:
+                fila['equivalente']['USD'] += total_real / tasa_usd
+            if tasa_eur:
+                fila['equivalente']['EUR'] += total_real / tasa_eur
         fila['purchase_count'] += 1
 
     filas = list(filas.values())
+    for fila in filas:
+        for clave_moneda in ('USD', 'BS', 'EUR'):
+            fila['equivalente'][clave_moneda] = (
+                fila['equivalente'][clave_moneda].quantize(Decimal('0.01')))
     filas.sort(key=lambda f: (-float(f['total_usd']) - float(f['total_bs']) - float(f['total_eur']),
                               f['month']))
     return filas
@@ -332,6 +382,56 @@ def obtener_mermas_detalle(location_ids, desde, hasta):
         'cost': Decimal(str(costo or 0)).quantize(Decimal('0.01')),
         'currency': (moneda or 'USD').upper(),
     } for fid, fecha, sede, tipo, notas, cantidad, costo, moneda in filas_brutas]
+
+
+def obtener_mermas_top_producto(location_ids, desde, hasta):
+    """Mermas APROBADAS del rango agrupadas por PRODUCTO: cantidad mermada y su
+    costo por moneda (buckets disjuntos), para identificar el producto de mayor
+    impacto. Se toman las líneas (waste_details) de las cabeceras aprobadas, de
+    modo que el detalle suma lo mismo que la cabecera del ticket."""
+    if not location_ids:
+        return []
+    desde, hasta = _rango_datetime(desde, hasta)
+    filas = db.session.query(
+        WasteDetail.product_id,
+        Product.name.label('producto'),
+        Waste.currency,
+        func.coalesce(func.sum(WasteDetail.quantity), 0),
+        func.coalesce(func.sum(WasteDetail.subtotal_cost), 0),
+    ).join(Waste, Waste.id == WasteDetail.waste_id).outerjoin(
+        Product, Product.id == WasteDetail.product_id
+    ).filter(
+        Waste.location_id.in_(location_ids),
+        Waste.status == 'APROBADO',
+        Waste.cancelled_at.is_(None),
+        Waste.date >= desde,
+        Waste.date <= hasta,
+    ).group_by(WasteDetail.product_id, Product.name, Waste.currency).all()
+
+    agrupado = {}
+    for product_id, nombre, moneda, cantidad, costo in filas:
+        clave = product_id if product_id is not None else -1
+        fila = agrupado.setdefault(clave, {
+            'product_id': product_id,
+            'product_name': nombre or 'Producto #{0}'.format(product_id),
+            'quantity': Decimal('0.00'),
+            'buckets': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
+                        'EUR': Decimal('0.00')},
+        })
+        moneda = (moneda or 'USD').upper()
+        if moneda in ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES'):
+            moneda = 'BS'
+        if moneda not in fila['buckets']:
+            fila['buckets'][moneda] = Decimal('0.00')
+        fila['quantity'] += Decimal(str(cantidad or 0))
+        fila['buckets'][moneda] += Decimal(str(costo or 0))
+
+    for fila in agrupado.values():
+        fila['quantity'] = fila['quantity'].quantize(Decimal('0.01'))
+        for clave in fila['buckets']:
+            fila['buckets'][clave] = fila['buckets'][clave].quantize(
+                Decimal('0.01'))
+    return list(agrupado.values())
 
 
 def obtener_mermas_resumen(location_ids, desde, hasta):
@@ -452,18 +552,22 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
       - internos:  se mueven entre sus sedes.
     Si se pasa orientacion_id (p. ej. la Central para quien la gestiona) la
     dirección se calcula desde esa sede: se narra lo que ella envía/recibe.
-    La cantidad y el costo se miden según la dirección: quien envía reporta lo
+    La    La cantidad y el costo se miden según la dirección: quien envía reporta lo
     despachado; quien recibe (o un traslado interno, donde el usuario es origen
     y destino) reporta lo realmente llegado (received_quantity; sin recepción
-    registrada no hay mercancía llegada).
-    Devuelve {'filas': [...]} con un dict por movimiento (id, date, type,
+    registrada no hay mercancía llegada). Las devoluciones/retornos se excluyen:
+    no son traslados de abastecimiento (se informan con
+    obtener_devoluciones_central).    Devuelve {'filas': [...]} con un dict por movimiento (id, date, type,
     status, direccion, origin_id, origin_name, destination_id,
     destination_name, quantity, despachado, missing_quantity, buckets,
     buckets_despachado, perdidas) y además 'perdidas' (extravíos
-    missing_quantity valorizados bucket a bucket) y 'extravios_quantity'."""
+    missing_quantity valorizados bucket a bucket), 'extravios_quantity' y
+    'perdidas_detalle' (una fila por producto perdido: qué se perdió y cuánto).
+"""
     vacio = {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')}
     base = {'filas': [], 'perdidas': dict(vacio),
-            'extravios_quantity': Decimal('0.00')}
+            'extravios_quantity': Decimal('0.00'),
+            'perdidas_detalle': []}
     if not location_ids:
         return base
 
@@ -480,14 +584,19 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
     movimientos = Movement.query.filter(
         Movement.date >= desde,
         Movement.date <= hasta,
+        # Solo traslados consolidados: las devoluciones/retornos se informan
+        # aparte (devoluciones al Almacén Central) y no inflan lo trasladado.
+        Movement.type.notin_(TIPOS_TRASLADO_DEVOLUCION),
         db.or_(Movement.status.is_(None),
-               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS)),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS
+                                      + ESTADOS_TRASLADO_DEVUELTOS)),
         db.or_(Movement.origin_location_id.in_(ids),
                Movement.destination_location_id.in_(ids)),
     ).order_by(Movement.date.asc(), Movement.id.asc()).all()
 
     perdidas = dict(vacio)
     extravios = Decimal('0.00')
+    perdidas_detalle = []
     filas = []
     for mov in movimientos:
         origen, destino = mov.origin_location_id, mov.destination_location_id
@@ -546,6 +655,26 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
                 if moneda not in perdidas_mov:
                     perdidas_mov[moneda] = Decimal('0.00')
                 perdidas_mov[moneda] += falta * precio
+                producto = db.session.get(Product, detalle.product_id)
+                perdidas_detalle.append({
+                    'detail_id': detalle.id,
+                    'movement_id': mov.id,
+                    'date': mov.date,
+                    'type': (mov.type or 'OTROS').upper(),
+                    'status': estado,
+                    'origin_id': origen,
+                    'origin_name': nombre_sede(origen),
+                    'destination_id': destino,
+                    'destination_name': nombre_sede(destino),
+                    'product_id': detalle.product_id,
+                    'product_name': (producto.name if producto is not None
+                                     else 'Insumo #{0}'.format(
+                                         detalle.product_id)),
+                    'lot_number': detalle.lot_number,
+                    'quantity': falta.quantize(Decimal('0.01')),
+                    'buckets': {moneda: (falta * precio).quantize(
+                        Decimal('0.01'))},
+                })
 
         for moneda in ('USD', 'BS', 'EUR'):
             buckets[moneda] = buckets.get(moneda, Decimal('0.00')).quantize(
@@ -580,13 +709,129 @@ def obtener_traslados_valorizados(location_ids, desde, hasta,
             'perdidas': dict(perdidas_mov),
         })
 
+    # Pérdidas ocurridas en DEVOLUCIONES/RETORNOS: el movimiento no suma al
+    # volumen de traslados de abastecimiento, pero la mercancía perdida SÍ es
+    # una pérdida real y debe aparecer en el detalle (antes el resumen la
+    # contaba y la tabla la omitía). Se excluyen los movimientos anulados.
+    devoluciones = Movement.query.filter(
+        Movement.date >= desde,
+        Movement.date <= hasta,
+        Movement.type.in_(TIPOS_TRASLADO_DEVOLUCION),
+        db.or_(Movement.status.is_(None),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS)),
+        db.or_(Movement.origin_location_id.in_(ids),
+               Movement.destination_location_id.in_(ids)),
+    ).order_by(Movement.date.asc(), Movement.id.asc()).all()
+    for mov in devoluciones:
+        for detalle in mov.details:
+            if not detalle.missing_quantity:
+                continue
+            falta = Decimal(str(detalle.missing_quantity))
+            precio, moneda = _ultimo_costo_compra(detalle.product_id,
+                                                  detalle.lot_number)
+            if moneda not in perdidas:
+                perdidas[moneda] = Decimal('0.00')
+            perdidas[moneda] += falta * precio
+            extravios += falta
+            producto = db.session.get(Product, detalle.product_id)
+            perdidas_detalle.append({
+                'detail_id': detalle.id,
+                'movement_id': mov.id,
+                'date': mov.date,
+                'type': (mov.type or 'OTROS').upper(),
+                'status': (mov.status or 'OTROS').upper(),
+                'origin_id': mov.origin_location_id,
+                'origin_name': nombre_sede(mov.origin_location_id),
+                'destination_id': mov.destination_location_id,
+                'destination_name': nombre_sede(mov.destination_location_id),
+                'product_id': detalle.product_id,
+                'product_name': (producto.name if producto is not None
+                                 else 'Insumo #{0}'.format(detalle.product_id)),
+                'lot_number': detalle.lot_number,
+                'quantity': falta.quantize(Decimal('0.01')),
+                'buckets': {moneda: (falta * precio).quantize(
+                    Decimal('0.01'))},
+            })
+
     for moneda in ('USD', 'BS', 'EUR'):
         perdidas[moneda] = perdidas[moneda].quantize(Decimal('0.01'))
     return {
         'filas': filas,
         'perdidas': perdidas,
         'extravios_quantity': extravios.quantize(Decimal('0.01')),
+        'perdidas_detalle': perdidas_detalle,
     }
+
+
+def obtener_devoluciones_central(location_ids, desde, hasta, central_id=1):
+    """Devoluciones del período que llegaron (o van) al Almacén Central.
+
+    No se mezclan con los traslados consolidados: aquí se valoriza la
+    mercancía devuelta por cada sede. Se usa la cantidad recepcionada si ya
+    fue procesada; si el retorno sigue en tránsito se valoriza lo despachado
+    (la mercancía ya salió de la sede). Los movimientos anulados se omiten.
+    Devuelve {'conteo', 'quantity', 'buckets', 'por_sede': {nombre: {...}}}.
+    """
+    vacio = {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
+             'EUR': Decimal('0.00')}
+    base = {'conteo': 0, 'quantity': Decimal('0.00'),
+            'buckets': dict(vacio), 'por_sede': {}}
+    if not location_ids:
+        return base
+
+    ids = set(location_ids)
+    nombres = dict(db.session.query(Location.id, Location.name).filter(
+        Location.id.in_(ids)).all())
+
+    def nombre_sede(loc_id):
+        if loc_id in nombres:
+            return nombres[loc_id]
+        loc = db.session.get(Location, loc_id)
+        return loc.name if loc is not None else 'Sede #{0}'.format(loc_id)
+
+    movimientos = Movement.query.filter(
+        Movement.date >= desde,
+        Movement.date <= hasta,
+        Movement.type.in_(TIPOS_TRASLADO_DEVOLUCION),
+        Movement.destination_location_id == central_id,
+        Movement.origin_location_id.in_(ids),
+        db.or_(Movement.status.is_(None),
+               Movement.status.notin_(ESTADOS_TRASLADO_ANULADOS)),
+    ).order_by(Movement.date.asc(), Movement.id.asc()).all()
+
+    for mov in movimientos:
+        sede = nombre_sede(mov.origin_location_id)
+        ag = base['por_sede'].setdefault(sede, {
+            'conteo': 0, 'quantity': Decimal('0.00'),
+            'buckets': dict(vacio)})
+        base['conteo'] += 1
+        ag['conteo'] += 1
+        for detalle in mov.details:
+            if detalle.received_quantity is not None:
+                efectiva = Decimal(str(detalle.received_quantity))
+            else:
+                efectiva = Decimal(str(detalle.quantity or 0))
+            base['quantity'] += efectiva
+            ag['quantity'] += efectiva
+            precio, moneda = _ultimo_costo_compra(detalle.product_id,
+                                                  detalle.lot_number)
+            if moneda not in base['buckets']:
+                base['buckets'][moneda] = Decimal('0.00')
+            if moneda not in ag['buckets']:
+                ag['buckets'][moneda] = Decimal('0.00')
+            base['buckets'][moneda] += efectiva * precio
+            ag['buckets'][moneda] += efectiva * precio
+
+    for moneda in ('USD', 'BS', 'EUR'):
+        base['buckets'][moneda] = base['buckets'][moneda].quantize(
+            Decimal('0.01'))
+        for ag in base['por_sede'].values():
+            ag['buckets'][moneda] = ag['buckets'][moneda].quantize(
+                Decimal('0.01'))
+    for ag in base['por_sede'].values():
+        ag['quantity'] = ag['quantity'].quantize(Decimal('0.01'))
+    base['quantity'] = base['quantity'].quantize(Decimal('0.01'))
+    return base
 
 
 def obtener_recibido_por_insumo(location_ids, desde, hasta):
@@ -700,49 +945,28 @@ def obtener_resumen_consumo(location_ids, desde, hasta):
 
 
 def obtener_gasto_por_categoria(desde, hasta, moneda='USD', conversor=None):
-    """Gasto REAL por categoría contable, directamente desde purchase_details
-    (cantidad × precio). Montos exactos en la moneda original de cada compra:
-    bucket a bucket (USD/BS/EUR), sin conversión. El BS de cada detalle es el
-    price_bs registrado (tasa del día de la compra)."""
-    compras = Purchase.query.filter(
-        Purchase.purchase_date >= desde,
-        Purchase.purchase_date <= hasta,
-        func.upper(Purchase.status).in_(['COMPLETED', 'COMPLETADO']),
-    ).all()
+    """Gasto REAL por categoría contable desde las compras del rango.
 
-    filas = {}
-    for compra in compras:
-        mes = compra.purchase_date.strftime('%Y-%m')
-        moneda_orig = (compra.currency or 'USD').upper()
-        for detalle in compra.details:
-            producto = db.session.get(Product, detalle.product_id)
-            categoria = 'Sin categoría'
-            if producto is not None and producto.product_type is not None:
-                macro = producto.product_type.category
-                categoria = macro.name if macro is not None else 'Sin categoría'
-            fila = filas.setdefault((mes, categoria), {
-                'month': mes, 'category': categoria,
-                'total_usd': Decimal('0.00'),
-                'total_bs': Decimal('0.00'),
-                'total_eur': Decimal('0.00'),
-            })
-            cantidad = Decimal(str(detalle.quantity or 0))
-            if moneda_orig in ('BS', 'VES', 'BS.', 'BSS'):
-                monto = cantidad * Decimal(str(detalle.price_bs or 0))
-                fila['total_bs'] += monto
-            elif moneda_orig == 'EUR':
-                monto = cantidad * Decimal(str(detalle.foreign_price or 0))
-                fila['total_eur'] += monto
-                fila['total_bs'] += cantidad * Decimal(str(detalle.price_bs or 0))
-            else:
-                monto = cantidad * Decimal(str(detalle.foreign_price or 0))
-                fila['total_usd'] += monto
-                fila['total_bs'] += cantidad * Decimal(str(detalle.price_bs or 0))
-
-    filas = list(filas.values())
-    for fila in filas:
-        for clave in ('total_usd', 'total_bs', 'total_eur'):
-            fila[clave] = fila[clave].quantize(Decimal('0.01'))
+    Cada fila sale de la CABECERA de la compra (importe exacto de la factura)
+    repartido entre sus categorías y valorizado con la TASA DEL DÍA de compra,
+    igual que el KPI de compras. Antes se reconstruía con cantidad × precio
+    unitario: el precio redondeado a 2 decimales convertía 100,00 EUR en
+    100,80 EUR / 101.715,20 Bs, y el servicio reconvertía ese Bs con la tasa de
+    cierre del período (110,71 USD en vez de 109,95 USD).
+    """
+    filas = []
+    for linea in obtener_compras_consolidado(desde, hasta):
+        buckets = linea['buckets_equivalentes']
+        filas.append({
+            'month': linea['month'],
+            'category': linea['category'],
+            'total_usd': buckets['USD'],
+            'total_bs': buckets['BS'],
+            'total_eur': buckets['EUR'],
+            # Monto del tramo en la moneda pedida, valorizado con la tasa del
+            # día de cada compra (sin reconversiones posteriores).
+            'equivalente': dict(linea['equivalente']),
+        })
     filas.sort(key=lambda f: (-float(f['total_usd']), f['month']))
     return filas
 
@@ -774,9 +998,19 @@ def obtener_tasa_historica(moneda, fecha):
         return None
 
 
+def _moneda_costo(moneda):
+    """Homologa la moneda del precio a USD/BS/EUR. Las compras viejas guardan
+    los bolívares como 'VES'/'BSS'/'BS.'; si el bucket conservara ese código,
+    la valorización (que solo suma USD/BS/EUR) descartaría la pérdida."""
+    codigo = (moneda or 'USD').upper()
+    if codigo in ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES'):
+        return 'BS'
+    return codigo
+
+
 def _ultimo_costo_compra(product_id, lot_number=None):
     """Último costo de compra (foreign_price) del lote exacto; a falta de este,
-    del producto. Retorna (precio Decimal, moneda)."""
+    del producto. Retorna (precio Decimal, moneda normalizada)."""
     def consulta(lote):
         q = db.session.query(
             PurchaseDetail.foreign_price, Purchase.currency
@@ -793,21 +1027,24 @@ def _ultimo_costo_compra(product_id, lot_number=None):
         fila = consulta(None)
     if fila is None or fila[0] is None:
         return Decimal('0.00'), 'USD'
-    return Decimal(str(fila[0])), (fila[1] or 'USD').upper()
+    return Decimal(str(fila[0])), _moneda_costo(fila[1])
 
 
 def obtener_consumo_valorizado(location_ids, desde, hasta):
     """Gasto REAL de cocina del rango: cantidad consumida por la auditoría
     (GASTO_COCINA/CONSUMO_COCINA) × último costo de compra, bucket a bucket por
-    la moneda del precio. Sin tasas ni conversión."""
+    la moneda del precio. Sin tasas ni conversión. Además devuelve
+    'por_producto': la misma valorización agrupada por insumo, para conocer el
+    producto que encabeza el consumo."""
     vacio = {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')}
     if not location_ids:
-        return {'total': dict(vacio), 'por_sede': {}}
+        return {'total': dict(vacio), 'por_sede': {}, 'por_producto': []}
 
     nombres = dict(db.session.query(Location.id, Location.name).filter(
         Location.id.in_(location_ids)).all())
     total = dict(vacio)
     por_sede = {}
+    por_producto = {}
 
     registros = db.session.query(AuditLog.location_id, AuditLog.changed_data).filter(
         AuditLog.location_id.in_(location_ids),
@@ -869,12 +1106,32 @@ def obtener_consumo_valorizado(location_ids, desde, hasta):
             por_sede[sede][moneda] = Decimal('0.00')
         por_sede[sede][moneda] += monto
 
+        producto = db.session.get(Product, p_id)
+        fila_prod = por_producto.setdefault(p_id, {
+            'product_id': p_id,
+            'product_name': (producto.name if producto is not None
+                             else 'Insumo #{0}'.format(p_id)),
+            'quantity': Decimal('0.00'),
+            'buckets': dict(vacio),
+        })
+        fila_prod['quantity'] += cantidad
+        if moneda not in fila_prod['buckets']:
+            fila_prod['buckets'][moneda] = Decimal('0.00')
+        fila_prod['buckets'][moneda] += monto
+
     for clave in ('USD', 'BS', 'EUR'):
         total[clave] = total[clave].quantize(Decimal('0.01'))
     for sede in por_sede:
         for clave in ('USD', 'BS', 'EUR'):
             por_sede[sede][clave] = por_sede[sede][clave].quantize(Decimal('0.01'))
-    return {'total': total, 'por_sede': por_sede}
+    lista_productos = list(por_producto.values())
+    for fila in lista_productos:
+        fila['quantity'] = fila['quantity'].quantize(Decimal('0.01'))
+        for clave in fila['buckets']:
+            fila['buckets'][clave] = fila['buckets'][clave].quantize(
+                Decimal('0.01'))
+    return {'total': total, 'por_sede': por_sede,
+            'por_producto': lista_productos}
 
 
 def _total_real_compra(compra):
@@ -931,6 +1188,8 @@ def obtener_compras_consolidado(desde, hasta):
         'buckets': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')},
         'buckets_equivalentes': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
                                  'EUR': Decimal('0.00')},
+        'equivalente': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
+                        'EUR': Decimal('0.00')},
         'category': 'Sin categoría', 'month': '',
     }
     agrupadas = {}
@@ -981,6 +1240,7 @@ def obtener_compras_consolidado(desde, hasta):
                     'buckets': dict(linea_vacia['buckets']),
                     'buckets_equivalentes': dict(
                         linea_vacia['buckets_equivalentes']),
+                    'equivalente': dict(linea_vacia['equivalente']),
                 }
             if suma_lineas:
                 proporcion = linea['monto'] / suma_lineas
@@ -1009,12 +1269,39 @@ def obtener_compras_consolidado(desde, hasta):
             if bucket != 'BS':
                 agrupadas[clave]['buckets_equivalentes']['BS'] += parte_bs
 
+            # Equivalente en las TRES monedas con la tasa del día de la compra
+            # (la misma base del KPI de compras). Reconversiones con la tasa de
+            # cierre inflaban las compras en divisa (110,71 en vez de 109,95).
+            fila = agrupadas[clave]
+            fila['equivalente'][bucket] += parte
+            if bucket != 'BS':
+                fila['equivalente']['BS'] += parte_bs
+            if bucket == 'USD':
+                tasa_eur = obtener_tasa_historica('EUR', compra.purchase_date)
+                if tasa_eur:
+                    fila['equivalente']['EUR'] += parte_bs / tasa_eur
+            elif bucket == 'EUR':
+                tasa_usd = obtener_tasa_historica('USD', compra.purchase_date)
+                if tasa_usd:
+                    fila['equivalente']['USD'] += parte_bs / tasa_usd
+            else:
+                tasa_usd = (Decimal(str(compra.exchange_rate or 0))
+                            or obtener_tasa_historica('USD',
+                                                      compra.purchase_date))
+                tasa_eur = obtener_tasa_historica('EUR', compra.purchase_date)
+                if tasa_usd:
+                    fila['equivalente']['USD'] += parte / tasa_usd
+                if tasa_eur:
+                    fila['equivalente']['EUR'] += parte / tasa_eur
+
     for fila in agrupadas.values():
         for clave in ('USD', 'BS', 'EUR'):
             fila['buckets'][clave] = fila['buckets'][clave].quantize(
                 Decimal('0.01'))
             fila['buckets_equivalentes'][clave] = (
                 fila['buckets_equivalentes'][clave].quantize(Decimal('0.01')))
+            fila['equivalente'][clave] = fila['equivalente'][clave].quantize(
+                Decimal('0.01'))
     return list(agrupadas.values())
 
 

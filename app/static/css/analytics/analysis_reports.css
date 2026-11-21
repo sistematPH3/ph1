@@ -15,6 +15,7 @@ body {
 /* ---------- Tarjeta principal ---------- */
 .reports-card {
     background: #ffffff;
+    width: 100%;
     border-radius: 24px;
     padding: 2rem 2.25rem;
     box-shadow: 0 12px 40px rgba(22, 48, 95, 0.08), 0 2px 6px rgba(22, 48, 95, 0.04);
@@ -259,6 +260,7 @@ body {
 /* ---------- Paneles de gráficos y tablas ---------- */
 .reports-panel {
     background: #ffffff;
+    min-width: 0;
     border: 1px solid #e8edf6;
     border-top: 3px solid #af1515;
     border-radius: 18px;
@@ -310,6 +312,19 @@ body {
 }
 
 /* ---------- Tablas ---------- */
+/* Las tablas anchas se desplazan dentro de su panel, nunca empujan ni
+   recortan la columna del grid que las contiene. */
+.reports-panel .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+}
+
+.reports-panel .table-responsive > .table {
+    margin-bottom: 0;
+}
+
 .reports-table {
     font-size: 0.9rem;
     margin-bottom: 0;

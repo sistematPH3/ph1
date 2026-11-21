@@ -44,6 +44,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from app import create_app, db
 from app.models import (Location, Product, Purchase, PurchaseDetail, Role,
                         StatisticsSnapshot, Supplier, User)
+from app.models.logistics_model import Movement, MovementDetail
 from app.models.waste_model import Waste, WasteType
 from app.models.statistics_model import SnapshotMetric, SnapshotPeriodType
 from app.analytics.services import analysis_reports_service as svc
@@ -94,6 +95,8 @@ class ExportReportsTest(unittest.TestCase):
             record_count=4, calculated_by_user_id=self.admin.id))
         proveedor = Supplier(name="Provee Real", tax_id="J-123")
         harina = Product(name="Harina Real", sku="H-EXP", unit_of_measure="KG")
+        self.proveedor = proveedor
+        self.harina = harina
         db.session.add_all([proveedor, harina])
         db.session.flush()
         compra = Purchase(supplier_id=proveedor.id,
@@ -202,29 +205,118 @@ class ExportReportsTest(unittest.TestCase):
         tabla_concepto = next(t for t in tablas
                               if t[0].startswith('Consolidado financiero ('))
         tabla_sede = next(t for t in tablas
-                          if t[0] == 'Consolidado financiero por sede')
+                          if t[0] == 'Gasto operativo por sede (sin compras)')
         tabla_traslados = next(t for t in tablas
                                if t[0].startswith('Traslados del período'))
+        tabla_recibido = next(t for t in tablas
+                              if t[0].startswith('Traslados consolidados'))
         tabla_moneda = next(t for t in tablas
                             if t[0].startswith('Compras por moneda'))
         _, _, filas_concepto = tabla_concepto
         _, _, filas_sede = tabla_sede
         nombres_concepto = [fila[0] for fila in filas_concepto]
-        self.assertIn('Mermas', nombres_concepto)
-        self.assertEqual(nombres_concepto[-1],
-                         'Total registrado (compras + operativo)')
-        self.assertIn('1.015,00', filas_concepto[-1])
+        self.assertIn('Mermas y pérdidas de traslado', nombres_concepto)
+        self.assertEqual(nombres_concepto[-1], 'Inversión real en compras')
+        self.assertIn('1.000,00', filas_concepto[-1])
         self.assertEqual(tabla_traslados[0],
                          'Traslados del período (informativo, no suma al consolidado)')
         nombres_sede = [fila[0] for fila in filas_sede]
         self.assertIn('Sede La Candelaria', nombres_sede)
-        self.assertIn('Compras Central', nombres_sede)
+        self.assertNotIn('Compras Central', nombres_sede)
+        self.assertIn('Devoluciones al Almacén Central',
+                      [fila[0] for fila in tabla_recibido[2]])
         titulo_moneda, columnas_moneda, filas_moneda = tabla_moneda
         self.assertEqual(titulo_moneda,
                          'Compras por moneda (en qué moneda se compra más)')
         self.assertIn('% del total', columnas_moneda)
         self.assertEqual([fila[0] for fila in filas_moneda], ['USD'])
         self.assertEqual(filas_moneda[0][1], '1.000,00')  # registrado en su moneda
+
+    def test_export_compras_incluye_categorias_y_monedas(self):
+        datos = self._datos_exportacion(location_id=self.central.id)
+        titulos = [tabla[0] for tabla in datos['detalle_tablas']]
+        self.assertIn('Compras por proveedor', titulos)
+        self.assertIn('Compras por categoría contable', titulos)
+        self.assertIn('Compras por moneda (en qué moneda se compra más)',
+                      titulos)
+
+    def test_export_traslados_incluye_perdidas_detalladas(self):
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede.id,
+                       date=datetime(2026, 9, 15, 10), user_id=self.admin.id,
+                       status='CERRADO_CON_PERDIDA')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id,
+            lot_number='LOTE-EXP-77', quantity=Decimal('4.00'),
+            received_quantity=Decimal('1.00'), missing_quantity=Decimal('3.00')))
+        db.session.commit()
+        filtros = svc.ReportFilters(location_id=self.central.id,
+                                    metric='TRANSFERS',
+                                    period_type='MONTHLY',
+                                    period_start=date(2026, 9, 1),
+                                    moneda='USD')
+        datos = export_service.construir_exportacion(filtros, self.admin.id)
+        tabla = next(t for t in datos['detalle_tablas']
+                     if t[0] == 'Traslados perdidos — Detalle de mercancía')
+        _, columnas, filas = tabla
+        self.assertIn('Lote', columnas)
+        self.assertEqual(filas[0][2], 'Harina Real')
+        self.assertEqual(filas[0][3], 'LOTE-EXP-77')
+        self.assertEqual(filas[0][4], '3')
+        self.assertEqual(filas[-1][0], 'Total perdido')
+
+    def test_export_consolidado_incluye_ranking_y_perdidas(self):
+        mov = Movement(type='DESPACHO', origin_location_id=self.central.id,
+                       destination_location_id=self.sede.id,
+                       date=datetime(2026, 9, 16, 10), user_id=self.admin.id,
+                       status='CERRADO_CON_PERDIDA')
+        db.session.add(mov)
+        db.session.flush()
+        db.session.add(MovementDetail(
+            movement_id=mov.id, product_id=self.harina.id,
+            lot_number='LOTE-CONS-01', quantity=Decimal('2.00'),
+            received_quantity=Decimal('0.00'), missing_quantity=Decimal('2.00')))
+        db.session.commit()
+        filtros = svc.ReportFilters(location_id=None,
+                                    metric='CONSOLIDATED',
+                                    period_type='MONTHLY',
+                                    period_start=date(2026, 9, 1),
+                                    moneda='USD')
+        datos = export_service.construir_exportacion(filtros, self.admin.id)
+        titulos = [tabla[0] for tabla in datos['detalle_tablas']]
+        self.assertIn('Ranking operativo por sede (sin compras)', titulos)
+        self.assertIn('Traslados perdidos — Detalle de mercancía', titulos)
+        tabla = next(t for t in datos['detalle_tablas']
+                     if t[0] == 'Traslados perdidos — Detalle de mercancía')
+        self.assertIn('LOTE-CONS-01', [fila[3] for fila in tabla[2]])
+
+    def test_export_respeta_rango_desde_hasta(self):
+        compra = Purchase(supplier_id=self.proveedor.id,
+                          purchase_date=datetime(2026, 10, 5),
+                          total_amount=Decimal('500.00'), currency='USD',
+                          invoice_url='https://img/exp2.png',
+                          status='COMPLETADO', user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id,
+            lot_number='L-OCT', quantity=Decimal('5.00'),
+            foreign_price=Decimal('100.00'), price_bs=Decimal('40734.54')))
+        db.session.commit()
+        filtros = svc.ReportFilters(location_id=self.central.id,
+                                    metric='PURCHASES',
+                                    period_type='MONTHLY',
+                                    moneda='USD', desde=date(2026, 10, 1),
+                                    hasta=date(2026, 10, 31))
+        datos = export_service.construir_exportacion(filtros, self.admin.id)
+        self.assertEqual(datos['header']['rango'],
+                         '01/10/2026 al 31/10/2026')
+        self.assertEqual(datos['kpis']['kpis']['compras']['actual'],
+                         Decimal('500.00'))
+        tabla = datos['detalle_tablas'][0]
+        self.assertEqual(tabla[2][0][3], '500,00')
 
     def test_pdf_genera_bytes_validos(self):
         datos = self._datos_exportacion(moneda='BS')

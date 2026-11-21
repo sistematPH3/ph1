@@ -169,8 +169,15 @@ def reports_page():
                                                 validado['data']['period_type'])
     fechas_disponibles = report_svc.obtener_fechas_disponibles(
         sede_ids, validado['data']['metric'], validado['data']['period_type'])
+    # Los gráficos reciben el rango EFECTIVO del reporte (también cuando el
+    # usuario dejó un solo extremo del filtro): antes mostraban siempre el mes.
+    rango = reporte.get('range') or {}
+    rango_graficos = ({'desde': rango.get('desde'),
+                       'hasta': rango.get('hasta')}
+                      if rango.get('explicito') else {})
     graficos = _a_json(report_svc.construir_graficos(
-        reporte, ranking, moneda, incluir_compras=incluir_compras))
+        reporte, ranking, moneda, incluir_compras=incluir_compras,
+        **rango_graficos))
     from app.analytics.repositories.analysis_reports_repository import (
         obtener_sedes_opciones,
     )

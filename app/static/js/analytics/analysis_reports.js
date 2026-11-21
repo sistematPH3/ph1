@@ -144,6 +144,17 @@
                 label: function (ctx) {
                     var v = ctx.parsed.y || ctx.parsed || 0;
                     if (esConteo) return ' ' + Number(v).toLocaleString('es-VE') + ' movimientos';
+                    if (moneda === '%') {
+                        var pctTxt = Number(v).toLocaleString('es-VE', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                        var det = ctx.chart.config._detalleMontos;
+                        var monto = det && det[ctx.dataIndex]
+                            ? ' · ' + textoMonto(det[ctx.dataIndex], ctx.chart.config._monedaMontos)
+                            : '';
+                        return ' ' + pctTxt + ' %' + monto;
+                    }
                     if (ctx.dataset.type === 'doughnut' || ctx.chart.config.type === 'doughnut') {
                         return ' ' + textoMonto(ctx.parsed, moneda);
                     }
@@ -228,7 +239,9 @@
         // 2) Desglose del reporte (barras o torta)
         if (g.detalle) {
             var d = g.detalle;
-            var monedaDetalle = d.unidad === 'mezcla' ? 'mezcla' : moneda;
+            var monedaDetalle = d.unidad === 'mezcla'
+                ? 'mezcla'
+                : (d.unidad === '%' ? '%' : moneda);
             var colores = d.labels.map(function (_, i) {
                 return PALETA[i % PALETA.length];
             });
@@ -245,7 +258,7 @@
                 datasetDet.borderRadius = 6;
                 datasetDet.maxBarThickness = 46;
             }
-            crearGrafico('chartDetalle', {
+            var configDet = {
                 type: d.tipo === 'doughnut' ? 'doughnut' : 'bar',
                 data: { labels: d.labels, datasets: [datasetDet] },
                 options: {
@@ -277,7 +290,15 @@
                             }
                         }
                 }
-            });
+            };
+            if (d.porcentaje) {
+                // Los arcos usan el %; el tooltip muestra además el monto real.
+                configDet._detalleMontos = (d.detalle_montos || []).map(function (f) {
+                    return f.monto;
+                });
+                configDet._monedaMontos = d.moneda_montos || moneda;
+            }
+            crearGrafico('chartDetalle', configDet);
         }
 
         // 4) Compras por categoría contable (barras apiladas por mes)

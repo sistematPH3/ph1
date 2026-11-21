@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/analysis_reports.css') }}?v=17">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics/analysis_reports.css') }}?v=18">
 {% endblock %}
 
 {% block content %}
@@ -25,6 +25,82 @@
     {% endif %}
 
     {% if reporte %}
+    {% macro top_producto_bloque(top, titulo) %}
+    {% if top and top.principal %}
+    <div class="reports-inner-title">
+        <i class="bi bi-box-seam me-2"></i>{{ titulo }}
+    </div>
+    <div class="ranking-list mb-3">
+        {% for fila in top.filas %}
+        <div class="ranking-item">
+            <div class="ranking-pos">{{ loop.index }}</div>
+            <div class="flex-grow-1">
+                <div class="fw-semibold">{{ fila.product_name }}</div>
+                <div class="text-muted small">
+                    {{ fila.quantity | ph_qty }} unidades ·
+                    {{ fila.pct | ph_amount(2) }}% del costo
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold">{{ fila.monto | ph_amount(2) }}</div>
+                <div class="text-muted small">{{ top.moneda }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endmacro %}
+    {% macro perdidas_detalle_bloque(detalle, conteo, extravios, valorizadas, moneda) %}
+    <h6 class="reports-panel-subtitle mt-4">
+        <i class="bi bi-exclamation-octagon me-2"></i>Traslados perdidos — Detalle de mercancía
+        {% if detalle %}
+        <span class="reports-panel-note">
+            {{ conteo }} traslado(s) con pérdida ·
+            {{ extravios | ph_qty }} unidades ·
+            impacto {{ valorizadas | ph_amount(2) }} {{ moneda }}
+        </span>
+        {% endif %}
+    </h6>
+    {% if detalle %}
+    <div class="table-responsive">
+        <table class="table align-middle reports-table table-sm">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Origen → Destino</th>
+                    <th>Producto</th>
+                    <th>Lote</th>
+                    <th class="text-end">Cant. perdida</th>
+                    <th class="text-end">Costo ({{ moneda }})</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in detalle %}
+                <tr>
+                    <td>{{ fila.date.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ fila.origin_name }} → {{ fila.destination_name }}</td>
+                    <td>{{ fila.product_name }}</td>
+                    <td>{{ fila.lot_number or '—' }}</td>
+                    <td class="text-end fw-semibold text-danger">{{ fila.quantity | ph_qty }}</td>
+                    <td class="text-end fw-semibold">{{ fila.cost | ph_amount(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="reports-total-row">
+                    <td colspan="4" class="fw-semibold">Total perdido</td>
+                    <td class="text-end fw-semibold">{{ extravios | ph_qty }}</td>
+                    <td class="text-end fw-semibold">{{ valorizadas | ph_amount(2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">
+        <i class="bi bi-check-circle text-success me-1"></i>Sin traslados perdidos registrados en el período.
+    </p>
+    {% endif %}
+    {% endmacro %}
     <div class="ph-card reports-card">
         <!-- Cabecera -->
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -216,6 +292,8 @@
                         <i class="bi bi-pie-chart me-2"></i>{{ graficos.detalle.titulo }}
                         {% if graficos.detalle.tipo == 'bar' %}
                         <span class="reports-panel-note">monto ({{ graficos.detalle.unidad or graficos.moneda }})</span>
+                        {% elif graficos.detalle.porcentaje %}
+                        <span class="reports-panel-note">% del destino de la mercancía comprada</span>
                         {% endif %}
                     </h4>
                     <div class="chart-box"><canvas id="chartDetalle"></canvas></div>
@@ -244,19 +322,22 @@
             <div class="col-12">
                 <div class="reports-panel">
                     <h4 class="reports-panel-title">
-                        <i class="bi bi-calculator-fill me-2"></i>Consolidado financiero — cuánto se gastó, en qué y dónde
-                        <span class="reports-panel-note">{% if ver_compras %}compras con la tasa del día de cada compra; {% endif %}gastos de cocina y mermas con la última tasa BCV del período</span>
+                        <i class="bi bi-calculator-fill me-2"></i>Consolidado financiero — cuánto se invirtió y a dónde fue
+                        <span class="reports-panel-note">{% if ver_compras %}compras con la tasa del día de cada compra; {% endif %}cocina, mermas y pérdidas de traslado valorizadas a costo</span>
                     </h4>
                     <p class="text-muted small mb-3">
                         Cada rubro se muestra por separado, en valores positivos y sin restas residuales.
                         {% if ver_compras %}
                         Las compras se agrupan solo por su moneda nativa de pago y su entrega entra a la
-                        <strong>Central</strong>.
+                        <strong>Central</strong>. La <strong>inversión real</strong> es la compra a proveedores:
+                        los gastos de cocina, las mermas y las pérdidas de traslado son porciones de esa misma
+                        mercancía, por lo que <strong>no</strong> se vuelven a sumar (evita el doble conteo).
                         {% else %}
-                        Las compras son exclusivas de la sede <strong>Central</strong> y no aplican aquí.
+                        Las compras son exclusivas de la sede <strong>Central</strong> y no aplican aquí; se
+                        muestran las pérdidas operativas de la mercancía.
                         {% endif %}
-                        Los traslados se informan en un bloque aparte y <strong>no</strong> forman parte de
-                        ninguna suma ni resta del consolidado.
+                        Las pérdidas de traslado (extravíos) se agrupan con las mermas; el bloque logístico
+                        siguiente queda como control informativo.
                     </p>
                     <div class="row g-4">
                         <div class="col-12 col-lg-6">
@@ -275,7 +356,15 @@
                                     <tbody>
                                         {% for fila in cons.por_concepto %}
                                         <tr>
-                                            <td>{{ fila.concepto }}</td>
+                                            <td>
+                                                {{ fila.concepto }}
+                                                {% if fila.perdidas_traslado is defined and fila.perdidas_traslado %}
+                                                <div class="text-muted small">
+                                                    Mermas {{ fila.mermas | ph_amount(2) }} +
+                                                    pérdidas de traslado {{ fila.perdidas_traslado | ph_amount(2) }}
+                                                </div>
+                                                {% endif %}
+                                            </td>
                                             <td class="text-end">{{ fila.buckets.USD | ph_amount }}</td>
                                             <td class="text-end">{{ fila.buckets.BS | ph_amount }}</td>
                                             <td class="text-end">{{ fila.buckets.EUR | ph_amount }}</td>
@@ -285,12 +374,19 @@
                                         <tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos reales en el período.</td></tr>
                                         {% endfor %}
                                         <tr class="table-light fw-semibold">
-                                            <td colspan="4">Total gasto operativo (cocina + mermas)</td>
+                                            <td colspan="4">Pérdidas operativas (cocina + mermas y pérdidas de traslado)</td>
                                             <td class="text-end">{{ cons.total_operativo | ph_amount(0 if cons.total_operativo == cons.total_operativo|int else 2) }}</td>
                                         </tr>
                                         <tr class="fw-bold">
-                                            <td colspan="4">Total registrado (compras + operativo)</td>
+                                            <td colspan="4">{{ cons.total_etiqueta }}</td>
                                             <td class="text-end">{{ cons.total_registrado | ph_amount(0 if cons.total_registrado == cons.total_registrado|int else 2) }}</td>
+                                        </tr>
+                                        <tr class="table-light">
+                                            <td colspan="4" class="small text-muted">
+                                                La cocina y las pérdidas no se suman a la inversión: son salidas de la
+                                                misma mercancía ya comprada (sin doble conteo).
+                                            </td>
+                                            <td></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -322,69 +418,103 @@
                         </div>
                         {% endif %}
                         <div class="col-12">
-                            <h6 class="reports-panel-subtitle">Traslados del período — control logístico (informativo)</h6>
+                            <h6 class="reports-panel-subtitle">Traslados consolidados por sede — mercancía recibida</h6>
                             <p class="text-muted small mb-2">
-                                Volumen movilizado y valorización a costo de inventario. Este bloque es solo
-                                informativo: no se suma ni se resta en el consolidado financiero.
+                                Cantidad y monto real que llegó a cada sede por traslados consolidados.
+                                Las devoluciones al Almacén Central se informan aparte y no cuentan como
+                                traslado. Los traslados que aún están en camino se detallan al pie y no
+                                se suman hasta que la sede los reciba.
                             </p>
-                            <div class="row g-3">
-                                <div class="col-6 col-lg-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Traslados</div>
-                                        <div class="fw-bold fs-5">{{ cons.traslados.conteo }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-lg-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Cantidad movilizada</div>
-                                        <div class="fw-bold fs-5">{{ cons.traslados.quantity | ph_qty }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-lg-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Costo a valor de inventario ({{ cons.moneda }})</div>
-                                        <div class="fw-bold fs-5">{{ cons.traslados.costo | ph_amount(0 if cons.traslados.costo == cons.traslados.costo|int else 2) }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-lg-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Pérdidas en traslados ({{ cons.moneda }})</div>
-                                        <div class="fw-bold fs-5">{{ cons.traslados.perdidas_costo | ph_amount(0 if cons.traslados.perdidas_costo == cons.traslados.perdidas_costo|int else 2) }}</div>
-                                        <div class="text-muted small">{{ cons.traslados.perdidas_quantity | ph_qty }} uds.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <h6 class="reports-panel-subtitle">Por sede</h6>
                             <div class="table-responsive">
                                 <table class="table align-middle reports-table">
                                     <thead>
                                         <tr>
                                             <th>Sede</th>
+                                            <th class="text-end">Traslados</th>
+                                            <th class="text-end">Cantidad recibida</th>
                                             <th class="text-end">Monto ({{ cons.moneda }})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for fila in cons.traslados.recibido_por_sede %}
+                                        <tr>
+                                            <td>{{ fila.sede }}</td>
+                                            <td class="text-end">{{ fila.conteo }}</td>
+                                            <td class="text-end">{{ fila.quantity | ph_qty }}</td>
+                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="4" class="text-center text-muted py-3">Sin traslados consolidados recibidos en el período.</td></tr>
+                                        {% endfor %}
+                                        <tr class="table-light fw-semibold">
+                                            <td>Devoluciones al Almacén Central</td>
+                                            <td class="text-end">{{ cons.traslados.devoluciones.conteo }}</td>
+                                            <td class="text-end">{{ cons.traslados.devoluciones.quantity | ph_qty }}</td>
+                                            <td class="text-end">{{ cons.traslados.devoluciones.monto | ph_amount(0 if cons.traslados.devoluciones.monto == cons.traslados.devoluciones.monto|int else 2) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% set transito = cons.traslados.en_transito %}
+                            {% set sin_recibir = cons.traslados.sin_recepcion %}
+                            {% if transito.conteo or sin_recibir.conteo %}
+                            <p class="text-muted small mt-2 mb-0">
+                                <strong>Pendientes de recibir:</strong>
+                                {% if transito.conteo %}{{ transito.conteo }} traslado(s) en camino
+                                ({{ transito.quantity | ph_qty }} uds · {{ transito.cost | ph_amount(0 if transito.cost == transito.cost|int else 2) }} {{ cons.moneda }}){% endif %}{% if transito.conteo and sin_recibir.conteo %}; {% endif %}{% if sin_recibir.conteo %}{{ sin_recibir.conteo }} traslado(s) sin recepción registrada
+                                ({{ sin_recibir.quantity | ph_qty }} uds · {{ sin_recibir.cost | ph_amount(0 if sin_recibir.cost == sin_recibir.cost|int else 2) }} {{ cons.moneda }}){% endif %}.
+                                No se incluyen en la tabla hasta que la sede los reciba.
+                            </p>
+                            {% endif %}
+                        </div>
+                        <div class="col-12">
+                            <h6 class="reports-panel-subtitle">Gasto operativo por sede</h6>
+                            <p class="text-muted small mb-2">
+                                Costo absorbido por cada sede: mermas, gastos de cocina y pérdidas de
+                                traslado (atribuidas a la sede que despachó). Las compras son
+                                centralizadas y no se reparten entre sucursales.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table align-middle reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sede</th>
+                                            <th class="text-end">Mermas</th>
+                                            <th class="text-end">Cocina</th>
+                                            <th class="text-end">Pérdidas de traslado</th>
+                                            <th class="text-end">Total ({{ cons.moneda }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for fila in cons.por_sede %}
                                         <tr>
                                             <td>{{ fila.sede }}</td>
-                                            <td class="text-end">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
+                                            <td class="text-end">{{ fila.mermas | ph_amount(0 if fila.mermas == fila.mermas|int else 2) }}</td>
+                                            <td class="text-end">{{ fila.cocina | ph_amount(0 if fila.cocina == fila.cocina|int else 2) }}</td>
+                                            <td class="text-end">{{ fila.perdidas | ph_amount(0 if fila.perdidas == fila.perdidas|int else 2) }}</td>
+                                            <td class="text-end fw-semibold">{{ fila.monto | ph_amount(0 if fila.monto == fila.monto|int else 2) }}</td>
                                         </tr>
                                         {% else %}
-                                        <tr><td colspan="2" class="text-center text-muted py-4">Sin movimientos por sede en el período.</td></tr>
+                                        <tr><td colspan="5" class="text-center text-muted py-4">Sin gasto operativo por sede en el período.</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+                        <div class="col-12">
+                            {{ perdidas_detalle_bloque(reporte.detail.perdidas_detalle,
+                                                       reporte.detail.perdidas_conteo,
+                                                       reporte.detail.extravios_quantity,
+                                                       reporte.detail.perdidas_valorizadas,
+                                                       cons.moneda) }}
+                        </div>
                         {% if ver_compras %}
                         <div class="col-12">
                             <h6 class="reports-panel-subtitle">Compras por moneda — en qué moneda se compró más</h6>
                             <p class="text-muted small mb-2">
-                                Cada compra se registró en su propia moneda; el equivalente usa la tasa
-                                del día de cada compra (la que el sistema guardó al registrarla en
-                                <code>price_bs</code>). La moneda $ es dólar (USD), Bs es bolívar y EUR es euro.
+                                Cada compra se registró en su propia moneda y el equivalente usa la tasa
+                                de cambio del día en que se hizo cada compra.
+                                La moneda $ es dólar (USD), Bs es bolívar y EUR es euro.
                             </p>
                             <div class="table-responsive">
                                 <table class="table align-middle reports-table">
@@ -457,7 +587,56 @@
                         </table>
                     </div>
                 </div>
+            </div>
 
+            <!-- Ranking entre sedes -->
+            <div class="col-12 col-xl-5">
+                <div class="reports-panel">
+                    <h4 class="reports-panel-title">
+                        <i class="bi bi-trophy me-2"></i>
+                        {% if filtros.metric == 'CONSOLIDATED' %}Gastos operativos por sede{% else %}Ranking entre sedes{% endif %}
+                    </h4>
+                    {% if filtros.metric == 'CONSOLIDATED' %}
+                    <p class="text-muted small mb-2">
+                        Solo mermas, gastos de cocina y pérdidas de traslado. Las compras son
+                        centralizadas y no se reparten entre las sedes.
+                    </p>
+                    {% endif %}
+                    {% if ranking %}
+                    <div class="ranking-list">
+                        {% for renglon in ranking %}
+                        <div class="ranking-item">
+                            <div class="ranking-pos">{{ loop.index }}</div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ renglon.location_name }}</div>
+                                <div class="text-muted small">
+                                    Ant. {{ renglon.anterior | ph_amount }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">{{ renglon.total_base | ph_amount }}</div>
+                                <div class="small trend-{{ 'up' if renglon.pct and renglon.pct > 0 else ('down' if renglon.pct and renglon.pct < 0 else 'flat') }}">
+                                    {% if renglon.pct is not none %}
+                                    {{ '+' if renglon.pct > 0 else '' }}{{ renglon.pct | ph_amount }}%
+                                    {% else %}—{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small py-3">Aún no hay resúmenes en el cajón para este período.</p>
+                    {% endif %}
+                    {% if graficos and graficos.ranking %}
+                    <div class="chart-box chart-box-ranking mt-3">
+                        <canvas id="chartRanking"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Detalle a ancho completo: sus tablas necesitan toda la fila -->
+            <div class="col-12">
                 <div class="reports-panel">
                     <h4 class="reports-panel-title">
                         <i class="bi bi-table me-2"></i>Detalle del reporte
@@ -492,6 +671,8 @@
                     <p class="text-muted small mb-1">
                         <i class="bi bi-fire me-1"></i>Registros de consumo de cocina del período.
                     </p>
+                    {{ top_producto_bloque(reporte.detail.top_producto,
+                                           'Producto con mayor consumo en cocina') }}
                     <div class="d-flex align-items-center gap-3 py-2">
                         <span class="fs-4 fw-bold">{{ reporte.detail.registros }}</span>
                         <span class="text-muted small">registros registrados (valorización por último precio según el contrato de costo).</span>
@@ -502,6 +683,8 @@
                         <i class="bi bi-trash3 me-1"></i>Cada merma aprobada real del período, con su costo convertido a {{ filtros.moneda }}
                         (la merma se registró con su propio costo; al cambiar la moneda se convierte con la tasa BCV).
                     </p>
+                    {{ top_producto_bloque(reporte.detail.top_producto,
+                                           'Producto con mayor impacto en mermas') }}
                     <div class="table-responsive">
                         <table class="table align-middle reports-table">
                             <thead>
@@ -555,6 +738,12 @@
                             </tbody>
                         </table>
                     </div>
+
+                    {{ perdidas_detalle_bloque(reporte.detail.perdidas_detalle,
+                                               reporte.detail.perdidas_conteo,
+                                               reporte.detail.extravios_quantity,
+                                               reporte.detail.perdidas_valorizadas,
+                                               reporte.detail.direccional.moneda) }}
 
                     {% if reporte.detail.recibido_por_insumo %}
                     <h6 class="reports-panel-subtitle mt-4">
@@ -712,48 +901,9 @@
                             <div class="text-muted small">{{ cons.moneda }}</div>
                             <div class="fs-5 fw-bold">{{ cons.total_registrado | ph_amount(0 if cons.total_registrado == cons.total_registrado|int else 2) }}</div>
                         </div>
-                        <div class="text-muted small ms-1">= total registrado (en la moneda seleccionada, tasa BCV): {% if ver_compras %}compras + {% endif %}gastos de cocina + mermas. Los traslados se informan aparte.</div>
+                        <div class="text-muted small ms-1">= {{ cons.total_etiqueta }} ({{ cons.moneda }}, tasa BCV){% if ver_compras %}. Compras reales sin sumar cocina, mermas ni pérdidas de traslado (evita doble conteo).{% endif %}</div>
                     </div>
                     {% endif %}
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Ranking entre sedes -->
-            <div class="col-12 col-xl-5">
-                <div class="reports-panel">
-                    <h4 class="reports-panel-title">
-                        <i class="bi bi-trophy me-2"></i>Ranking entre sedes
-                    </h4>
-                    {% if ranking %}
-                    <div class="ranking-list">
-                        {% for renglon in ranking %}
-                        <div class="ranking-item">
-                            <div class="ranking-pos">{{ loop.index }}</div>
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold">{{ renglon.location_name }}</div>
-                                <div class="text-muted small">
-                                    Ant. {{ renglon.anterior | ph_amount }}
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold">{{ renglon.total_base | ph_amount }}</div>
-                                <div class="small trend-{{ 'up' if renglon.pct and renglon.pct > 0 else ('down' if renglon.pct and renglon.pct < 0 else 'flat') }}">
-                                    {% if renglon.pct is not none %}
-                                    {{ '+' if renglon.pct > 0 else '' }}{{ renglon.pct | ph_amount }}%
-                                    {% else %}—{% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-muted small py-3">Aún no hay resúmenes en el cajón para este período.</p>
-                    {% endif %}
-                    {% if graficos and graficos.ranking %}
-                    <div class="chart-box chart-box-ranking mt-3">
-                        <canvas id="chartRanking"></canvas>
-                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -769,5 +919,5 @@
     window.REPORT_FILTERS = {{ filtros | tojson }};
     window.RECORTES = {{ graficos | tojson }};
 </script>
-<script src="{{ url_for('static', filename='js/analytics/analysis_reports.js') }}?v=10"></script>
+<script src="{{ url_for('static', filename='js/analytics/analysis_reports.js') }}?v=11"></script>
 {% endblock %}
