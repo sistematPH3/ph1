@@ -186,6 +186,11 @@
                         {% else %}—{% endif %}
                         <span class="trend-note">vs {{ kpis.period.previous_label }}</span>
                     </div>
+                    {% if kpi.quantity is defined and kpi.quantity %}
+                    <div class="text-muted small mt-1">
+                        {{ kpi.quantity | ph_qty }} uds. movidas · {{ kpi.conteo }} traslados
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -240,17 +245,18 @@
                 <div class="reports-panel">
                     <h4 class="reports-panel-title">
                         <i class="bi bi-calculator-fill me-2"></i>Consolidado financiero — cuánto se gastó, en qué y dónde
-                        <span class="reports-panel-note">{% if ver_compras %}compras con la tasa del día de cada compra; {% endif %}consumo/mermas/pérdidas con la última tasa BCV del período</span>
+                        <span class="reports-panel-note">{% if ver_compras %}compras con la tasa del día de cada compra; {% endif %}gastos de cocina y mermas con la última tasa BCV del período</span>
                     </h4>
                     <p class="text-muted small mb-3">
+                        Cada rubro se muestra por separado, en valores positivos y sin restas residuales.
                         {% if ver_compras %}
-                        Compras − consumo de cocina − mermas − pérdidas en traslado.
-                        Las compras no tienen sede: su entrega entra a la <strong>Central</strong>.
+                        Las compras se agrupan solo por su moneda nativa de pago y su entrega entra a la
+                        <strong>Central</strong>.
                         {% else %}
-                        El costo operativo de estas sedes se mide por el flujo de traslados:
-                        −(consumo de cocina + mermas + pérdidas en traslado). Las compras son
-                        exclusivas de la sede <strong>Central</strong> y no aplican aquí.
+                        Las compras son exclusivas de la sede <strong>Central</strong> y no aplican aquí.
                         {% endif %}
+                        Los traslados se informan en un bloque aparte y <strong>no</strong> forman parte de
+                        ninguna suma ni resta del consolidado.
                     </p>
                     <div class="row g-4">
                         <div class="col-12 col-lg-6">
@@ -278,9 +284,13 @@
                                         {% else %}
                                         <tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos reales en el período.</td></tr>
                                         {% endfor %}
+                                        <tr class="table-light fw-semibold">
+                                            <td colspan="4">Total gasto operativo (cocina + mermas)</td>
+                                            <td class="text-end">{{ cons.total_operativo | ph_amount(0 if cons.total_operativo == cons.total_operativo|int else 2) }}</td>
+                                        </tr>
                                         <tr class="fw-bold">
-                                            <td colspan="4">Resultado del período</td>
-                                            <td class="text-end">{{ cons.resultado | ph_amount(0 if cons.resultado == cons.resultado|int else 2) }}</td>
+                                            <td colspan="4">Total registrado (compras + operativo)</td>
+                                            <td class="text-end">{{ cons.total_registrado | ph_amount(0 if cons.total_registrado == cons.total_registrado|int else 2) }}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -311,6 +321,40 @@
                             </div>
                         </div>
                         {% endif %}
+                        <div class="col-12">
+                            <h6 class="reports-panel-subtitle">Traslados del período — control logístico (informativo)</h6>
+                            <p class="text-muted small mb-2">
+                                Volumen movilizado y valorización a costo de inventario. Este bloque es solo
+                                informativo: no se suma ni se resta en el consolidado financiero.
+                            </p>
+                            <div class="row g-3">
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Traslados</div>
+                                        <div class="fw-bold fs-5">{{ cons.traslados.conteo }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Cantidad movilizada</div>
+                                        <div class="fw-bold fs-5">{{ cons.traslados.quantity | ph_qty }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Costo a valor de inventario ({{ cons.moneda }})</div>
+                                        <div class="fw-bold fs-5">{{ cons.traslados.costo | ph_amount(0 if cons.traslados.costo == cons.traslados.costo|int else 2) }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pérdidas en traslados ({{ cons.moneda }})</div>
+                                        <div class="fw-bold fs-5">{{ cons.traslados.perdidas_costo | ph_amount(0 if cons.traslados.perdidas_costo == cons.traslados.perdidas_costo|int else 2) }}</div>
+                                        <div class="text-muted small">{{ cons.traslados.perdidas_quantity | ph_qty }} uds.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-12">
                             <h6 class="reports-panel-subtitle">Por sede</h6>
                             <div class="table-responsive">
@@ -666,9 +710,9 @@
                     <div class="d-flex align-items-center gap-3 py-2">
                         <div>
                             <div class="text-muted small">{{ cons.moneda }}</div>
-                            <div class="fs-5 fw-bold">{{ cons.resultado | ph_amount(0 if cons.resultado == cons.resultado|int else 2) }}</div>
+                            <div class="fs-5 fw-bold">{{ cons.total_registrado | ph_amount(0 if cons.total_registrado == cons.total_registrado|int else 2) }}</div>
                         </div>
-                        <div class="text-muted small ms-1">= resultado del período (en la moneda seleccionada, tasa BCV) — {% if ver_compras %}compras {% endif %}− consumo − mermas − pérdidas en traslados</div>
+                        <div class="text-muted small ms-1">= total registrado (en la moneda seleccionada, tasa BCV): {% if ver_compras %}compras + {% endif %}gastos de cocina + mermas. Los traslados se informan aparte.</div>
                     </div>
                     {% endif %}
                     {% endif %}

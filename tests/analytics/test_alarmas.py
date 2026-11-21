@@ -153,6 +153,42 @@ class AlarmasTest(unittest.TestCase):
         self.assertEqual(filtradas[0]["variacion_pct"], Decimal("200.00"))
         self.assertEqual(filtradas[0]["location_name"], "Sede A")
 
+    def test_ventana_genera_historicos_y_dispara_alarma(self):
+        """El dashboard solo generaba el período actual; sin los 3 anteriores
+        jamás había comparación. La ventana de alarmas debe reconstruirlos."""
+        from datetime import time
+
+        from app.analytics.services.snapshots_service import (
+            asegurar_ventana_alarmas, evaluar_alarmas, periodos_historia,
+        )
+        from app.models import Purchase
+
+        ventana = periodos_historia(SnapshotPeriodType.MONTHLY, limite=4)
+        for indice, (inicio, _fin) in enumerate(ventana):
+            db.session.add(Purchase(
+                purchase_date=datetime.combine(inicio, time(12, 0)),
+                total_amount=(Decimal("300.00") if indice == 3
+                              else Decimal("100.00")),
+                currency="USD", exchange_rate=Decimal("0.00"),
+                invoice_url="http://x", user_id=self.user.id,
+                status="COMPLETED",
+            ))
+        db.session.flush()
+
+        resultado = asegurar_ventana_alarmas(
+            SnapshotPeriodType.MONTHLY, user_id=self.user.id)
+        self.assertTrue(resultado["success"])
+        self.assertEqual(resultado["generados"], 4)
+
+        alertas = evaluar_alarmas(SnapshotPeriodType.MONTHLY)
+        filtradas = [a for a in alertas
+                     if a["metric"] == SnapshotMetric.PURCHASES
+                     and a["location_id"] == self.loc.id]
+        self.assertEqual(len(filtradas), 1)
+        self.assertEqual(filtradas[0]["valor_usd"], Decimal("300.00"))
+        self.assertEqual(filtradas[0]["promedio_usd"], Decimal("100.00"))
+        self.assertEqual(filtradas[0]["variacion_pct"], Decimal("200.00"))
+
     def test_valor_bajo_no_alarma(self):
         ventana = self._ventana()
         actual = ventana[-1]
@@ -206,6 +242,26 @@ class AlarmasTest(unittest.TestCase):
         from app.models import Notification
         self.assertEqual(
             Notification.query.filter_by(type="ALERTA_ESTADISTICA").count(), 0)
+
+    def test_panel_visual_muestra_la_alerta(self):
+        from flask import render_template
+
+        alerta = {
+            'metric': SnapshotMetric.WASTE, 'metric_label': 'Mermas',
+            'location_id': self.loc.id, 'location_name': self.loc.name,
+            'valor_usd': Decimal('300.00'),
+            'promedio_usd': Decimal('100.00'),
+            'variacion_pct': Decimal('200.00'),
+        }
+        with self.app.test_request_context('/'):
+            html = render_template('alerts/_statistics_alerts.html',
+                                   alertas_estadisticas=[alerta])
+            vacio = render_template('alerts/_statistics_alerts.html',
+                                    alertas_estadisticas=[])
+        self.assertIn('Alertas de Irregularidad', html)
+        self.assertIn('Mermas', html)
+        self.assertIn('+200.00%', html)
+        self.assertNotIn('Alertas de Irregularidad', vacio)
 
     def test_obtener_pendientes(self):
         db.session.add(Waste(

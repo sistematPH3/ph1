@@ -93,7 +93,7 @@
         KITCHEN_CONSUMPTION: 'Gastos de cocina',
         WASTE: 'Mermas',
         TRANSFERS: 'Traslados',
-        CONSOLIDATED: 'Costo operativo'
+        CONSOLIDATED: 'Consolidado financiero'
     };
     var PALETA = ['#C8102E', '#F5B301', '#1F3864', '#1A7F4B', '#8D4BB8',
                   '#2E75B6', '#C9803B', '#5A6B8C'];

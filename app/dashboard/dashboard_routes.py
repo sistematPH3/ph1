@@ -24,8 +24,7 @@ from app.analytics.services.snapshots_service import (
     obtener_costo_operativo,
     obtener_mermas_por_tipo,
     obtener_pendientes,
-    generar_snapshots,
-    faltan_snapshots,
+    asegurar_ventana_alarmas,
     obtener_flujo_traslados,
 )
 from app.models import Location
@@ -64,15 +63,13 @@ def _contexto_estadisticas(period_type, moneda='USD', location_ids=None):
     return alertas_estadisticas, datos_grafico
 
 def _asegurar_snapshots(period_type, user_id=None, location_ids=None):
-    """Regeneración perezosa: si falta el snapshot del período vigente se
-    calcula SOLO ese período antes de renderizar. Un fallo aquí no debe tumbar el panel."""
+    """Regeneración perezosa de la ventana de alarmas (actual + 3 anteriores).
+
+    Sin los 3 períodos previos la evaluación no puede comparar y el panel de
+    irregularidades queda vacío. Un fallo aquí no debe tumbar el panel.
+    """
     try:
-        if faltan_snapshots(period_type, location_ids=location_ids):
-            from app.analytics.services.snapshots_service import (
-                calcular_periodo, generar_snapshot_periodo,
-            )
-            inicio, fin = calcular_periodo(period_type)
-            generar_snapshot_periodo(period_type, inicio, fin, user_id=user_id)
+        asegurar_ventana_alarmas(period_type, user_id=user_id)
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(

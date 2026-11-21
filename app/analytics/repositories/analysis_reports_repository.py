@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func
 
@@ -262,8 +262,8 @@ def hay_snapshots_en_rango(location_ids, metric, period_type, period_start, peri
 def obtener_compras_por_proveedor(desde, hasta):
     """Detalle de compras del rango agrupado por proveedor y mes (no son por sede:
     las compras entran a la sede central). Monto en la moneda original de la
-    compra (total_usd/total_eur) y el BS registrado en price_bs con la tasa del
-    día de la compra (total_bs)."""
+    compra (total_usd/total_eur) y el BS registrado con la tasa del día de la
+    compra (total_bs), ambos desde la cabecera de la factura."""
     compras = Purchase.query.filter(
         Purchase.purchase_date >= desde,
         Purchase.purchase_date <= hasta,
@@ -283,19 +283,13 @@ def obtener_compras_por_proveedor(desde, hasta):
             'total_bs': Decimal('0.00'),
             'total_eur': Decimal('0.00'),
         })
-        bs_registrado = Decimal('0.00')
-        for detalle in compra.details:
-            bs_registrado += (Decimal(str(detalle.quantity or 0))
-                              * Decimal(str(detalle.price_bs or 0)))
         moneda = (compra.currency or 'USD').upper()
-        if moneda in ('BS', 'VES', 'BS.', 'BSS'):
-            fila['total_bs'] += bs_registrado
-        elif moneda == 'EUR':
-            fila['total_eur'] += Decimal(str(compra.total_amount or 0))
-            fila['total_bs'] += bs_registrado
-        else:
-            fila['total_usd'] += Decimal(str(compra.total_amount or 0))
-            fila['total_bs'] += bs_registrado
+        total_real = _total_real_compra(compra)
+        fila['total_bs'] += _total_bs_compra(compra, moneda, total_real)
+        if moneda == 'EUR':
+            fila['total_eur'] += total_real
+        elif moneda not in ('BS', 'VES', 'BS.', 'BSS'):
+            fila['total_usd'] += total_real
         fila['purchase_count'] += 1
 
     filas = list(filas.values())
@@ -845,16 +839,19 @@ def obtener_consumo_valorizado(location_ids, desde, hasta):
             l_num = None
         # Cantidad efectiva: si el gasto fue editado/anulado/reactivado, el
         # movimiento compensatorio deja 'edited_quantity' en el log original.
-        # Se usa esa magnitud (con signo de egreso) para reflejar el gasto REAL
-        # corregido y no la cantidad original ya reemplazada.
+        # Se usa esa magnitud para reflejar el gasto REAL corregido. El signo
+        # negativo es solo la convención del kardex (register_consumption
+        # guarda -abs(...)); el reporte necesita la MAGNITUD positiva para que
+        # el consolidado no invierta la resta de egresos.
         if c_data.get('edited_quantity') is not None:
             try:
-                cantidad = -abs(Decimal(str(c_data.get('edited_quantity'))))
+                cantidad = abs(Decimal(str(c_data.get('edited_quantity'))))
             except (TypeError, ValueError):
                 cantidad = Decimal('0.00')
         else:
             try:
-                cantidad = Decimal(str(c_data.get('quantity_changed', 0.0) or 0.0))
+                cantidad = abs(Decimal(str(
+                    c_data.get('quantity_changed', 0.0) or 0.0)))
             except (TypeError, ValueError):
                 cantidad = Decimal('0.00')
         if p_id is None or not cantidad:
@@ -880,11 +877,60 @@ def obtener_consumo_valorizado(location_ids, desde, hasta):
     return {'total': total, 'por_sede': por_sede}
 
 
+def _total_real_compra(compra):
+    """Importe realmente pagado en la moneda de la compra.
+
+    La cabecera (Purchase.total_amount) guarda el total exacto de la factura.
+    NO se reconstruye con cantidad × precio unitario: el detalle solo conserva
+    dos decimales por unidad (p. ej. 100,00 / 160 = 0,625 → 0,63), y volver a
+    multiplicar arrastra una desviación de 0,80 EUR en esa factura."""
+    total = Decimal(str(compra.total_amount or 0))
+    if total:
+        return total
+    # Respaldo solo para registros antiguos sin total de cabecera.
+    total = Decimal('0.00')
+    moneda = (compra.currency or 'USD').upper()
+    for detalle in compra.details:
+        cantidad = Decimal(str(detalle.quantity or 0))
+        if moneda in ('BS', 'VES', 'BS.', 'BSS'):
+            total += cantidad * Decimal(str(detalle.price_bs or 0))
+        else:
+            total += cantidad * Decimal(str(detalle.foreign_price or 0))
+    return total
+
+
+def _total_bs_compra(compra, moneda, total_real):
+    """Bolívares realmente registrados por la compra.
+
+    En compras en Bs el total de cabecera ya está en bolívares. En compras en
+    divisa se usa la tasa guardada ese día (Bs por unidad de la divisa), no la
+    suma de price_bs de cada línea: price_bs también nace del precio unitario
+    redondeado y reproduce la misma desviación (101.715,20 vs 100.907,17)."""
+    if moneda in ('BS', 'VES', 'BS.', 'BSS'):
+        return total_real
+    tasa = Decimal(str(compra.exchange_rate or 0))
+    if tasa:
+        return (total_real * tasa).quantize(Decimal('0.01'),
+                                            rounding=ROUND_HALF_UP)
+    total = Decimal('0.00')
+    for detalle in compra.details:
+        total += (Decimal(str(detalle.quantity or 0))
+                  * Decimal(str(detalle.price_bs or 0)))
+    return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def obtener_compras_consolidado(desde, hasta):
-    """Líneas REALES de compras del rango (cantidad × precio, categoría contable y
-    moneda original). El gasto por compra pertenece a la sede Central."""
+    """Líneas REALES de compras del rango (importe pagado, categoría contable y
+    moneda original). 'buckets' contiene SOLO la moneda nativa de pago;
+    'buckets_equivalentes' conserva la valoración contable en las tres monedas
+    (incluido el Bs registrado con la tasa del día). El importe de cada compra
+    sale de la cabecera (total_amount) y se reparte entre categorías según el
+    peso de cada línea, para no reintroducir el redondeo unitario. El gasto por
+    compra pertenece a la sede Central."""
     linea_vacia = {
         'buckets': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')},
+        'buckets_equivalentes': {'USD': Decimal('0.00'), 'BS': Decimal('0.00'),
+                                 'EUR': Decimal('0.00')},
         'category': 'Sin categoría', 'month': '',
     }
     agrupadas = {}
@@ -896,47 +942,89 @@ def obtener_compras_consolidado(desde, hasta):
     for compra in compras:
         moneda_orig = (compra.currency or 'USD').upper()
         mes = compra.purchase_date.strftime('%Y-%m')
+        total_real = _total_real_compra(compra)
+        total_bs_real = _total_bs_compra(compra, moneda_orig, total_real)
+        if moneda_orig in ('BS', 'VES', 'BS.', 'BSS'):
+            bucket = 'BS'
+        elif moneda_orig == 'EUR':
+            bucket = 'EUR'
+        else:
+            bucket = 'USD'
+
+        lineas = []
         for detalle in compra.details:
             producto = db.session.get(Product, detalle.product_id)
             categoria = 'Sin categoría'
             if producto is not None and producto.product_type is not None:
                 macro = producto.product_type.category
                 categoria = macro.name if macro is not None else 'Sin categoría'
-            clave = (mes, categoria)
+            cantidad = Decimal(str(detalle.quantity or 0))
+            if bucket == 'BS':
+                monto = cantidad * Decimal(str(detalle.price_bs or 0))
+            else:
+                monto = cantidad * Decimal(str(detalle.foreign_price or 0))
+            lineas.append({'clave': (mes, categoria), 'monto': monto})
+        if not lineas:
+            continue
+
+        # El total real de la cabecera se reparte entre las categorías según el
+        # peso de cada línea. El último tramo absorbe el residuo de redondeo
+        # para que la suma de las filas coincida EXACTA con la factura.
+        suma_lineas = sum((linea['monto'] for linea in lineas), Decimal('0.00'))
+        acum_nativa = Decimal('0.00')
+        acum_bs = Decimal('0.00')
+        for indice, linea in enumerate(lineas):
+            clave = linea['clave']
             if clave not in agrupadas:
                 agrupadas[clave] = {
-                    'month': mes, 'category': categoria,
+                    'month': mes, 'category': clave[1],
                     'buckets': dict(linea_vacia['buckets']),
+                    'buckets_equivalentes': dict(
+                        linea_vacia['buckets_equivalentes']),
                 }
-            cantidad = Decimal(str(detalle.quantity or 0))
-            if moneda_orig in ('BS', 'VES', 'BS.', 'BSS'):
-                bucket = 'BS'
-                monto = cantidad * Decimal(str(detalle.price_bs or 0))
-            elif moneda_orig == 'EUR':
-                bucket = 'EUR'
-                monto = cantidad * Decimal(str(detalle.foreign_price or 0))
+            if suma_lineas:
+                proporcion = linea['monto'] / suma_lineas
+                if indice == len(lineas) - 1:
+                    parte = total_real - acum_nativa
+                    parte_bs = total_bs_real - acum_bs
+                else:
+                    parte = (total_real * proporcion).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    parte_bs = (total_bs_real * proporcion).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP)
             else:
-                bucket = 'USD'
-                monto = cantidad * Decimal(str(detalle.foreign_price or 0))
-            agrupadas[clave]['buckets'][bucket] += monto
+                # Líneas sin valorizar: todo el importe a la primera categoría.
+                parte = total_real if indice == 0 else Decimal('0.00')
+                parte_bs = total_bs_real if indice == 0 else Decimal('0.00')
+            acum_nativa += parte
+            acum_bs += parte_bs
+
+            # Moneda NATIVA: solo la divisa en que se pagó la compra.
+            agrupadas[clave]['buckets'][bucket] += parte
+
+            # Equivalente contable en las tres monedas. El Bs sale de la tasa
+            # del día de la compra (total_amount × exchange_rate), no de sumar
+            # price_bs unitarios ya redondeados.
+            agrupadas[clave]['buckets_equivalentes'][bucket] += parte
             if bucket != 'BS':
-                # El BS registrado en price_bs se grabó con la tasa del día de la
-                # compra (Purchase.exchange_rate), no con la del cierre del período.
-                agrupadas[clave]['buckets']['BS'] += (
-                    cantidad * Decimal(str(detalle.price_bs or 0)))
+                agrupadas[clave]['buckets_equivalentes']['BS'] += parte_bs
 
     for fila in agrupadas.values():
         for clave in ('USD', 'BS', 'EUR'):
-            fila['buckets'][clave] = fila['buckets'][clave].quantize(Decimal('0.01'))
+            fila['buckets'][clave] = fila['buckets'][clave].quantize(
+                Decimal('0.01'))
+            fila['buckets_equivalentes'][clave] = (
+                fila['buckets_equivalentes'][clave].quantize(Decimal('0.01')))
     return list(agrupadas.values())
 
 
 def obtener_compras_por_moneda(desde, hasta):
     """Una fila por compra completada del rango con su moneda, la tasa del día
     que el sistema guardó al registrarla (Purchase.exchange_rate; si no está
-    guardada se usa la última tasa BCV del día de la compra) y los totales por
-    moneda con el VALOR REGISTRADO: el BS de cada detalle es cantidad × price_bs
-    (grabado con esa tasa del día de la compra)."""
+    guardada se usa la última tasa BCV del día de la compra) y los totales en
+    su moneda NATIVA tomados de la cabecera (Purchase.total_amount). El Bs sale
+    de total_amount × exchange_rate, no de sumar price_bs unitarios ya
+    redondeados, para que la factura y el reporte coincidan al céntimo."""
     compras = Purchase.query.filter(
         Purchase.purchase_date >= desde,
         Purchase.purchase_date <= hasta,
@@ -949,16 +1037,13 @@ def obtener_compras_por_moneda(desde, hasta):
         if not tasa:
             # La tasa BCV se archiva como 'BS' aunque la compra diga 'VES'.
             tasa = obtener_tasa_historica(moneda, compra.purchase_date) or Decimal('0.00')
+        total_real = _total_real_compra(compra)
         total_usd = total_bs = total_eur = Decimal('0.00')
-        for detalle in compra.details:
-            cantidad = Decimal(str(detalle.quantity or 0))
-            total_bs += cantidad * Decimal(str(detalle.price_bs or 0))
-            if moneda == 'EUR':
-                total_eur += cantidad * Decimal(str(detalle.foreign_price or 0))
-            elif moneda in ('BS', 'VES', 'BS.', 'BSS'):
-                pass
-            else:
-                total_usd += cantidad * Decimal(str(detalle.foreign_price or 0))
+        total_bs = _total_bs_compra(compra, moneda, total_real)
+        if moneda == 'EUR':
+            total_eur = total_real
+        elif moneda not in ('BS', 'VES', 'BS.', 'BSS'):
+            total_usd = total_real
         filas.append({
             'currency': moneda,
             'purchase_date': compra.purchase_date,

@@ -198,13 +198,24 @@ class ExportReportsTest(unittest.TestCase):
                                     period_start=date(2026, 9, 1),
                                     moneda='USD')
         datos = export_service.construir_exportacion(filtros, self.admin.id)
-        tabla_concepto, tabla_sede, tabla_moneda = datos['detalle_tablas']
+        tablas = datos['detalle_tablas']
+        tabla_concepto = next(t for t in tablas
+                              if t[0].startswith('Consolidado financiero ('))
+        tabla_sede = next(t for t in tablas
+                          if t[0] == 'Consolidado financiero por sede')
+        tabla_traslados = next(t for t in tablas
+                               if t[0].startswith('Traslados del período'))
+        tabla_moneda = next(t for t in tablas
+                            if t[0].startswith('Compras por moneda'))
         _, _, filas_concepto = tabla_concepto
         _, _, filas_sede = tabla_sede
         nombres_concepto = [fila[0] for fila in filas_concepto]
         self.assertIn('Mermas', nombres_concepto)
-        self.assertEqual(nombres_concepto[-1], 'Resultado del período')
-        self.assertEqual(filas_concepto[-1][1], '985,00')
+        self.assertEqual(nombres_concepto[-1],
+                         'Total registrado (compras + operativo)')
+        self.assertIn('1.015,00', filas_concepto[-1])
+        self.assertEqual(tabla_traslados[0],
+                         'Traslados del período (informativo, no suma al consolidado)')
         nombres_sede = [fila[0] for fila in filas_sede]
         self.assertIn('Sede La Candelaria', nombres_sede)
         self.assertIn('Compras Central', nombres_sede)

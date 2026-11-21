@@ -30,7 +30,7 @@ MONEDAS = {
     'BS': 'Bolívares (Bs)',
     'EUR': 'Euros (EUR)',
 }
-KPIS_ORDEN = ('compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo')
+KPIS_ORDEN = ('compras', 'consumo_cocina', 'mermas', 'traslados')
 
 # Throttle en memoria de la consulta automática al BCV (por proceso).
 _ULTIMA_CONSULTA_TASAS = {'momento': None}

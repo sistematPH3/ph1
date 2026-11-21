@@ -138,32 +138,36 @@ def _agregar(filas, valor_usd_bs_eur):
 
 
 def _agregar_compras(filas, cache):
+    """Valoriza CADA FACTURA desde su cabecera (no desde el precio unitario).
+
+    `total_foreign` ya es el importe exacto de la factura y `total_bs` su
+    equivalente con la tasa guardada al registrarla. Así la alarma compara el
+    mismo dinero que muestra Gestión de Compras, sin el desvío de redondeo del
+    detalle (160 × 0,63 = 100,80 frente a una cabecera de 100,00).
+    """
     def valor(fila):
-        qty = fila['quantity']
+        total = fila['total_foreign']
         moneda = fila['currency']
+        tasas = _tasas_en(fila['date'], cache=cache)
+        rate_usd = tasas.get('USD')
+        rate_eur = tasas.get('EUR')
         if moneda == 'EUR':
-            tasas = _tasas_en(fila['date'], cache=cache)
-            rate_usd = tasas.get('USD')
-            rate_eur = tasas.get('EUR')
-            usd = _redondear(fila['unit_foreign'] * qty * rate_eur / rate_usd) if rate_usd and rate_eur else Decimal('0.00')
-            eur = _redondear(fila['unit_foreign'] * qty)
+            eur = total
+            bs = fila['total_bs']
+            usd = (_redondear(total * fila['exchange_rate'] / rate_usd)
+                   if rate_usd and fila.get('exchange_rate')
+                   else Decimal('0.00'))
         elif moneda == 'BS':
-            tasas = _tasas_en(fila['date'], cache=cache)
-            rate_usd = tasas.get('USD')
-            usd = _redondear(fila['price_bs'] * qty / rate_usd) if fila['price_bs'] and rate_usd else Decimal('0.00')
-            rate_eur = tasas.get('EUR')
-            eur = (_redondear(usd * rate_usd / rate_eur) if usd and rate_eur and rate_usd else Decimal('0.00'))
+            bs = total
+            usd = (_redondear(total / rate_usd) if rate_usd
+                   else Decimal('0.00'))
+            eur = (_redondear(usd * rate_usd / rate_eur)
+                   if usd and rate_eur and rate_usd else Decimal('0.00'))
         else:
-            usd = _redondear(fila['unit_foreign'] * qty)
-            tasas = _tasas_en(fila['date'], cache=cache)
-            rate_usd = tasas.get('USD')
-            rate_eur = tasas.get('EUR')
-            eur = (_redondear(usd * rate_usd / rate_eur) if rate_eur and rate_usd else Decimal('0.00'))
-        bs = _redondear(fila['price_bs'] * qty) if fila['price_bs'] else Decimal('0.00')
-        if not bs and usd:
-            tasas = _tasas_en(fila['date'], cache=cache)
-            rate_usd = tasas.get('USD')
-            bs = _redondear(usd * rate_usd) if rate_usd else Decimal('0.00')
+            usd = total
+            bs = fila['total_bs']
+            eur = (_redondear(usd * rate_usd / rate_eur)
+                   if rate_eur and rate_usd else Decimal('0.00'))
         return usd, bs, eur
     return _agregar(filas, valor)
 
@@ -178,7 +182,11 @@ def _agregar_consumo(filas, cache):
 
 def _agregar_mermas(filas, cache):
     def valor(fila):
-        usd = _redondear(fila['unit_cost_usd'] * fila['quantity'])
+        # El importe exacto de la línea ya está en subtotal_cost; recalcular
+        # unitario × cantidad reintroduce redondeos distintos al total.
+        usd = fila.get('subtotal_cost')
+        if not usd:
+            usd = _redondear(fila['unit_cost_usd'] * fila['quantity'])
         tasas = _tasas_en(fila['date'], cache=cache)
         rate_usd = tasas.get('USD')
         rate_eur = tasas.get('EUR')
@@ -289,6 +297,43 @@ def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, locatio
     if location_ids:
         query = query.filter(StatisticsSnapshot.location_id.in_(location_ids))
     return query.first() is None
+
+
+def asegurar_ventana_alarmas(period_type=SnapshotPeriodType.MONTHLY,
+                            corte=None, user_id=None):
+    """Garantiza los snapshots que necesita la evaluación de alarmas.
+
+    La alarma compara el período actual contra los 3 anteriores. El dashboard
+    solo generaba el período vigente, así que en una base nueva (o tras el
+    primer despliegue) nunca había historia contra la cual comparar y el panel
+    de irregularidades quedaba siempre vacío.
+
+    - Si faltan el período actual o todos los antecedentes, reconstruye los
+      períodos faltantes de la ventana de 4.
+    - Si ya hay actual + al menos un antecedente, no vuelve a recalcular.
+    - Si un período realmente no tiene actividad, no genera fila; se reintenta
+      en la siguiente carga, pero solo mientras no exista ningún antecedente.
+    """
+    if period_type not in PERIOD_TYPES:
+        period_type = SnapshotPeriodType.MONTHLY
+    ventana = periodos_historia(period_type, limite=4, corte=corte)
+    inicios = [p[0] for p in ventana]
+    existentes = {
+        s.period_start for s in StatisticsSnapshot.query.filter(
+            StatisticsSnapshot.period_type == period_type,
+            StatisticsSnapshot.period_start.in_(inicios),
+        ).all()
+    }
+    actual = ventana[-1][0]
+    hay_antecedente = any(p[0] in existentes for p in ventana[:-1])
+    if actual in existentes and hay_antecedente:
+        return {'success': True, 'generados': 0}
+    faltantes = [p for p in ventana if p[0] not in existentes]
+    if not faltantes:
+        return {'success': True, 'generados': 0}
+    resultado = _generar_snapshots_ventana(faltantes, period_type, user_id)
+    resultado['generados'] = len(faltantes)
+    return resultado
 
 
 def leer_configuracion():

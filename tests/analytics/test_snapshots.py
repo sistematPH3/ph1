@@ -202,7 +202,8 @@ class SnapshotsTest(unittest.TestCase):
         ).first()
         self.assertIsNotNone(snap)
         self.assertEqual(snap.amount_usd, Decimal("100.00"))
-        self.assertEqual(snap.amount_bs, Decimal("365.00"))
+        # 100 USD × 36,50 Bs/USD (tasa de la cabecera) = 3.650,00 Bs.
+        self.assertEqual(snap.amount_bs, Decimal("3650.00"))
         self.assertEqual(snap.quantity, Decimal("10.00"))
         self.assertEqual(snap.record_count, 1)
 
@@ -224,6 +225,41 @@ class SnapshotsTest(unittest.TestCase):
         # 100 USD * 36,50 / 38,00 = 96,05 EUR (antes quedaba 0,00 o invertido).
         self.assertEqual(snap.amount_usd, Decimal("100.00"))
         self.assertEqual(snap.amount_eur, Decimal("96.05"))
+
+    def test_compras_eur_usan_el_total_de_cabecera(self):
+        # Factura real: 160 unidades por 100,00 EUR. El detalle guarda 0,63 por
+        # unidad (0,625 redondeado), que multiplicado daría 100,80 EUR.
+        self._tasa("USD", Decimal("917.7751"))
+        self._tasa("EUR", Decimal("1009.0717"))
+        p = Purchase(
+            purchase_date=datetime.now(timezone.utc),
+            total_amount=Decimal("100.00"), currency="EUR",
+            exchange_rate=Decimal("1009.0717"),
+            invoice_url="http://x", user_id=self.user.id, status="COMPLETED",
+        )
+        db.session.add(p)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=p.id, product_id=self.product.id,
+            lot_number="LOT-EUR", quantity=Decimal("160.00"),
+            foreign_price=Decimal("0.63"), price_bs=Decimal("635.72"),
+        ))
+        db.session.flush()
+
+        from app.analytics.services.snapshots_service import generar_snapshots
+        resultado = generar_snapshots(SnapshotPeriodType.MONTHLY, user_id=self.user.id)
+        self.assertTrue(resultado["success"])
+        inicio, _ = _periodo_actual()
+        snap = StatisticsSnapshot.query.filter_by(
+            location_id=self.loc_a.id,
+            metric=SnapshotMetric.PURCHASES,
+            period_type=SnapshotPeriodType.MONTHLY,
+            period_start=inicio,
+        ).first()
+        self.assertIsNotNone(snap)
+        self.assertEqual(snap.amount_eur, Decimal("100.00"))
+        self.assertEqual(snap.amount_bs, Decimal("100907.17"))
+        self.assertEqual(snap.amount_usd, Decimal("109.95"))
 
     def test_genera_snapshots_mermas_excluye_canceladas(self):
         self._merma("APROBADO", 5)

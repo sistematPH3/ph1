@@ -130,9 +130,9 @@
     </div>
     <div class="fin-kpi-grid">
         {% if kpis_mes %}
-        {% set claves_fin = (['compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo']
+        {% set claves_fin = (['compras', 'consumo_cocina', 'mermas', 'traslados']
                              if ver_compras
-                             else ['consumo_cocina', 'mermas', 'traslados', 'costo_operativo']) %}
+                             else ['consumo_cocina', 'mermas', 'traslados']) %}
         {% for clave in claves_fin %}
         {% set kpi = kpis_mes.kpis[clave] %}
         <div class="fin-kpi-card fin-kpi--{{ fin_tonos[clave] }}">
@@ -166,9 +166,9 @@
 
 <!-- Mini estadísticas: dos pantallas lado a lado -->
 {% if kpis_mes %}
-{% set claves_g = (['compras', 'consumo_cocina', 'mermas', 'traslados', 'costo_operativo']
+{% set claves_g = (['compras', 'consumo_cocina', 'mermas', 'traslados']
                    if ver_compras
-                   else ['consumo_cocina', 'mermas', 'traslados', 'costo_operativo']) %}
+                   else ['consumo_cocina', 'mermas', 'traslados']) %}
 {% set comp = kpis_mes.kpis['compras'] if ver_compras else kpis_mes.kpis['traslados'] %}
 {% set panel_titulo = 'Compras del mes' if ver_compras else 'Traslados del mes' %}
 {% set panel_marca = 'COMPRAS' if ver_compras else 'TRASLADOS' %}

@@ -419,11 +419,11 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta):
 def _consolidado_por_periodo(location_ids, period_type, desde, hasta,
                              moneda='USD', incluir_compras=True):
     """Consolidado financiero del rango con datos REALES, convertido a la moneda
-    seleccionada del reporte (USD→Bs/EUR con la tasa BCV del período):
-    Compras − Consumo de cocina − Mermas − Pérdidas en traslado."""
+    seleccionada del reporte (USD→Bs/EUR con la tasa BCV del período). El monto
+    acumulado es la suma limpia de Compras + Gastos de cocina + Mermas."""
     consolidado = consolidado_financiero(location_ids, desde, hasta, moneda,
                                           incluir_compras=incluir_compras)
-    monto = consolidado['resultado']
+    monto = consolidado['total_registrado']
     return {
         'amount_usd': monto,
         'amount_bs': monto,
@@ -749,28 +749,6 @@ def _detalle_metric(location_ids, metric, period_type, inicio, fin,
     return {}
 
 
-def _detalles_extravio(location_ids, desde, hasta):
-    """Detalle de extravíos del rango valorizados a costo (último costo de
-    compra por producto/lote). Incluye la sede de origen del movimiento para el
-    desglose 'por sede'. El costo se expresa en USD (luego se convierte a la
-    moneda del reporte en quien lo consume)."""
-    datos = obtener_traslados_valorizados(location_ids, desde, hasta)
-    filas = []
-    for f in datos['filas']:
-        if not f['missing_quantity']:
-            continue
-        costo = _convertir_buckets(f['perdidas'], 'USD', hasta)
-        filas.append({
-            'product_id': None,
-            'quantity': f['missing_quantity'],
-            'costo': _redondear(costo) if costo is not None else Decimal('0.00'),
-            'buckets': dict(f['perdidas']),
-            'location_id': f['origin_id'] or f['destination_id'],
-            'location_name': f['origin_name'] or f['destination_name'],
-        })
-    return filas
-
-
 def _cubo_direccion_vacio():
     return {'conteo': 0, 'quantity': Decimal('0.00'),
             'buckets': _bucket_vacio(), 'cost': Decimal('0.00')}
@@ -884,13 +862,18 @@ def obtener_traslados_direccional(location_ids, desde, hasta, moneda='USD',
 def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
                            incluir_compras=True):
     """Gasto REAL del rango convertido a la moneda seleccionada del reporte
-    (por defecto USD): por concepto (compras, consumo, mermas, pérdidas en
-    traslados), por categoría contable, por sede y 'por moneda' (en qué moneda
-    se compró más). Las compras se valoran con la tasa del día de cada compra
-    (el BS registrado en price_bs); consumo/mermas/pérdidas con la última tasa
-    BCV del período. Si incluir_compras es False (sedes que no gestionan la
-    Central) las compras se eliminan por completo y el resultado pasa a medirse
-    por el flujo de traslados: −(Consumo + Mermas + Pérdidas en traslados)."""
+    (por defecto USD). Presenta cada rubro por separado y sin restas
+    residuales:
+      - por_concepto: Compras (solo moneda nativa de pago), Gastos de cocina y
+        Mermas, todos en magnitud positiva.
+      - total_operativo: suma limpia de Gastos de cocina + Mermas.
+      - total_registrado: suma limpia de Compras + total_operativo.
+      - traslados: bloque informativo independiente (conteo, cantidad movida y
+        costo a valor de inventario). NO entra en ninguna suma ni resta.
+    Las compras se valoran con la tasa del día de cada compra (el BS registrado
+    en price_bs); consumo/mermas con la última tasa BCV del período. Si
+    incluir_compras es False (sedes que no gestionan la Central) las compras se
+    omiten por completo."""
     moneda = (moneda or 'USD').upper()
     if moneda not in MONEDAS:
         moneda = 'USD'
@@ -923,45 +906,49 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
         cat = linea['category']
         por_categoria.setdefault(cat, _bucket_vacio())
         for m in MONEDAS:
-            por_categoria[cat][m] += linea['buckets'].get(m, Decimal('0.00'))
+            # El equivalente contable conserva la valoración histórica de la
+            # tabla por categoría; la columna Bs del consolidado usa 'buckets'.
+            por_categoria[cat][m] += linea['buckets_equivalentes'].get(
+                m, Decimal('0.00'))
     compras_monto = (_compras_en_moneda(desde_dt, hasta_dt, moneda)
                      if incluir_compras else Decimal('0.00'))
 
-    perdidas = _bucket_vacio()
-    perdidas_buckets_reales = _bucket_vacio()
-    perdidas_por_sede = {}
-    for extra in _detalles_extravio(location_ids, desde_dt, hasta_dt):
-        perdidas['USD'] += extra['costo']
-        for m in MONEDAS:
-            perdidas_buckets_reales[m] += extra['buckets'].get(
-                m, Decimal('0.00'))
-        sede = extra['location_name']
-        perdidas_por_sede.setdefault(sede, _bucket_vacio())
-        perdidas_por_sede[sede]['USD'] += extra['costo']
+    total_consumo = convertir(consumo['total'])
+    total_mermas = convertir(mermas['total'])
+    total_operativo = _redondear(total_consumo + total_mermas)
+    total_registrado = _redondear(compras_monto + total_operativo)
 
     por_concepto = []
     if incluir_compras:
-        por_concepto.append({'concepto': 'Compras', 'tipo': 'egreso',
+        por_concepto.append({'concepto': 'Compras', 'tipo': 'abastecimiento',
                              'monto': compras_monto,
                              'buckets': compras_totales})
     por_concepto.extend([
-        {'concepto': 'Consumo de cocina', 'tipo': 'egreso',
-         'monto': convertir(consumo['total']),
+        {'concepto': 'Gastos de cocina', 'tipo': 'operativo',
+         'monto': total_consumo,
          'buckets': {m: _redondear(consumo['total'].get(m, Decimal('0.00')))
                      for m in MONEDAS}},
-        {'concepto': 'Mermas', 'tipo': 'egreso',
-         'monto': convertir(mermas['total']),
+        {'concepto': 'Mermas', 'tipo': 'operativo',
+         'monto': total_mermas,
          'buckets': {m: _redondear(mermas['total'].get(m, Decimal('0.00')))
                      for m in MONEDAS}},
-        {'concepto': 'Pérdidas en traslados', 'tipo': 'egreso',
-         'monto': convertir(perdidas),
-         'buckets': {m: _redondear(v) for m, v in
-                     perdidas_buckets_reales.items()}},
     ])
 
-    egresos = sum(fila['monto'] for fila in por_concepto
-                  if fila['concepto'] != 'Compras')
-    resultado = compras_monto - egresos
+    # Traslados: bloque puramente informativo. Se mide la mercancía despachada
+    # (volumen) y su valorización a costo. No se suma ni se resta en el
+    # consolidado; las pérdidas se muestran aquí como dato de control.
+    direccional = obtener_traslados_direccional(
+        location_ids, desde_dt, hasta_dt, moneda,
+        orientacion_id=_orientacion_efectiva(location_ids, incluir_compras))
+    despachado = direccional['total_despachado']
+    traslados = {
+        'moneda': moneda,
+        'conteo': despachado['conteo'],
+        'quantity': _redondear(despachado['quantity']),
+        'costo': _redondear(despachado['cost']),
+        'perdidas_costo': _redondear(direccional['perdidas']),
+        'perdidas_quantity': _redondear(direccional['extravios_quantity']),
+    }
 
     por_categoria_filas = [
         {'category': cat, 'monto': _monto_en_moneda(b, moneda, hasta_dt)}
@@ -970,7 +957,7 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
     por_categoria_filas.sort(key=lambda f: -float(f['monto']))
 
     por_sede_map = {}
-    for fuente in (mermas['por_sede'], consumo['por_sede'], perdidas_por_sede):
+    for fuente in (mermas['por_sede'], consumo['por_sede']):
         for sede, valores in fuente.items():
             por_sede_map.setdefault(sede, _bucket_vacio())
             for m in MONEDAS:
@@ -990,7 +977,10 @@ def consolidado_financiero(location_ids, desde, hasta, moneda='USD',
                        if incluir_compras else {'moneda': moneda,
                                                 'filas': [],
                                                 'total': Decimal('0.00')}),
-        'resultado': _redondear(resultado),
+        'total_compras': _redondear(compras_monto),
+        'total_operativo': total_operativo,
+        'total_registrado': total_registrado,
+        'traslados': traslados,
     }
 
 
@@ -1421,12 +1411,12 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
                  moneda='USD', incluir_compras=True, desde=None, hasta=None):
     """KPIs del período con dinero REAL de las tablas del sistema (purchase_details,
     auditoría de consumo, mermas aprobadas y extravíos valorizados): Compras,
-    Consumo, Mermas, Traslados y Costo operativo, cada uno con su variación
-    contra el período anterior. Las compras se valoran con la tasa del día de
-    cada compra (price_bs registrado); lo demás con la última tasa BCV del rango.
-    Con incluir_compras=False (sedes que no gestionan la Central) el KPI de
-    compras se omite y el costo operativo se mide por el flujo de traslados:
-    −(Consumo + Mermas + Pérdidas en traslados)."""
+    Gastos de cocina, Mermas y Traslados, cada uno con su variación contra el
+    período anterior. Las compras se valoran con la tasa del día de cada compra
+    (price_bs registrado); lo demás con la última tasa BCV del rango. No se
+    calcula un 'costo operativo' residual: cada rubro se presenta transparente
+    y los traslados son un indicador logístico independiente. Con
+    incluir_compras=False el KPI de compras se omite."""
     period_type = (period_type or 'MONTHLY').upper()
     moneda = (moneda or 'USD').upper()
     if moneda not in MONEDAS:
@@ -1487,30 +1477,6 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
             'direccion': ('up' if act > ant else ('down' if act < ant else 'flat')),
         }
 
-    if incluir_compras:
-        costo = consolidado_financiero(location_ids, inicio, fin, moneda)['resultado']
-        costo_anterior = consolidado_financiero(
-            location_ids, marco['previous_start'], marco['previous_end'], moneda
-        )['resultado']
-    else:
-        # Costo operativo de sedes no centrales: el egreso propio (consumo,
-        # mermas y pérdidas en traslados) se mide contra el flujo de traslados
-        # recibido, sin compras de por medio.
-        costo = -(actual['consumo'] + actual['mermas'] + actual['perdidas'])
-        costo_anterior = -(anterior['consumo'] + anterior['mermas']
-                           + anterior['perdidas'])
-    costo_operativo = {
-        'actual': _redondear(costo),
-        'anterior': _redondear(costo_anterior),
-        'diferencia': _redondear(costo - costo_anterior),
-        'pct': (_redondear(((costo - costo_anterior) / costo_anterior) * 100)
-                if costo_anterior != 0 else None),
-        'direccion': ('down' if costo < costo_anterior
-                      else ('up' if costo > costo_anterior else 'flat')),
-        'incluye_perdidas_traslado': actual['perdidas'],
-        'medido_por_compras': incluir_compras,
-    }
-
     if orientacion == SEDE_CENTRAL_ID:
         clave_flujo = 'enviados'
         flujo_actual = actual['direccional'][clave_flujo]
@@ -1543,9 +1509,6 @@ def obtener_kpis(location_ids, period_type='MONTHLY', period_start=None,
                                     else ('down' if f_act < f_ant else 'flat')),
                       'conteo': flujo_actual['conteo'],
                       'quantity': flujo_actual['quantity']},
-        'costo_operativo': {'label': 'Costo operativo',
-                            'metric': 'OPERATING_COST',
-                            **costo_operativo},
     }
     if incluir_compras:
         kpis['compras'] = {'label': 'Compras', 'metric': 'PURCHASES',

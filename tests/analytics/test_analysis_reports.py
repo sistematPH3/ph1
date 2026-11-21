@@ -261,10 +261,8 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(kpi['consumo_cocina']['actual'], _redondo('0.00'))
         self.assertEqual(kpi['mermas']['actual'], _redondo('15.00'))
         self.assertEqual(kpi['traslados']['actual'], _redondo('0.00'))
-        # 1000 − 0 − 15 − 0 = 985
-        self.assertEqual(kpi['costo_operativo']['actual'], _redondo('985.00'))
-        self.assertEqual(kpi['costo_operativo']['incluye_perdidas_traslado'],
-                         _redondo('0.00'))
+        # El residual "costo operativo" ya no existe: cada rubro va aparte.
+        self.assertNotIn('costo_operativo', kpi)
 
     def test_rango_desde_hasta_recorta_los_kpis_y_el_periodo(self):
         compra = Purchase(
@@ -357,7 +355,8 @@ class AnalysisReportsTest(unittest.TestCase):
         consolidado = svc.consolidado_financiero(
             [self.sede_a.id], datetime(2026, 9, 1), datetime(2026, 9, 30, 23, 59, 59),
             'BS')
-        self.assertEqual(consolidado['resultado'], _redondo('814690.80'))
+        self.assertEqual(consolidado['total_registrado'],
+                         _redondo('814690.80'))
         self.assertEqual(consolidado['por_concepto'][0]['monto'],
                          _redondo('814690.80'))
 
@@ -388,7 +387,7 @@ class AnalysisReportsTest(unittest.TestCase):
         # 100×814,6908 + 200×827,7371 = 81.469,08 + 165.547,42
         self.assertEqual(cons['por_concepto'][0]['monto'],
                          _redondo('247016.50'))
-        self.assertEqual(cons['resultado'], _redondo('247016.50'))
+        self.assertEqual(cons['total_registrado'], _redondo('247016.50'))
         por_moneda = cons['por_moneda']
         self.assertEqual(por_moneda['total'], _redondo('247016.50'))
         self.assertEqual(len(por_moneda['filas']), 1)
@@ -398,6 +397,43 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(fila['compras'], 2)
         self.assertEqual(fila['equivalente'], _redondo('247016.50'))
         self.assertEqual(fila['pct'], _redondo('100.00'))
+
+    def test_compras_en_divisa_usan_el_total_de_cabecera(self):
+        # Factura real: 160 unidades por 100,00 EUR a 1.009,0717 Bs/EUR. El
+        # detalle solo guarda 0,63 por unidad (0,625 redondeado), así que
+        # multiplicar 160 × 0,63 daría 100,80 EUR y 101.715,20 Bs.
+        compra = Purchase(
+            supplier_id=self.proveedor.id,
+            purchase_date=datetime(2026, 9, 15),
+            total_amount=Decimal('100.00'), currency='EUR',
+            exchange_rate=Decimal('1009.0717'),
+            invoice_url='https://img/factura-eur.png', status='COMPLETADO',
+            user_id=self.admin.id)
+        db.session.add(compra)
+        db.session.flush()
+        db.session.add(PurchaseDetail(
+            purchase_id=compra.id, product_id=self.harina.id,
+            lot_number='L-EUR', quantity=Decimal('160.00'),
+            foreign_price=Decimal('0.63'), price_bs=Decimal('635.72')))
+        db.session.commit()
+
+        cons_eur = svc.consolidado_financiero(
+            [self.sede_a.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'EUR')
+        compras = cons_eur['por_concepto'][0]
+        self.assertEqual(compras['concepto'], 'Compras')
+        self.assertEqual(compras['buckets']['EUR'], _redondo('100.00'))
+        self.assertEqual(compras['monto'], _redondo('100.00'))
+        self.assertEqual(cons_eur['total_registrado'], _redondo('100.00'))
+
+        cons_bs = svc.consolidado_financiero(
+            [self.sede_a.id], datetime(2026, 9, 1),
+            datetime(2026, 9, 30, 23, 59, 59), 'BS')
+        # 100,00 EUR × 1.009,0717 Bs/EUR = 100.907,17 Bs (cabecera).
+        self.assertEqual(cons_bs['por_concepto'][0]['monto'],
+                         _redondo('100907.17'))
+        self.assertEqual(cons_bs['por_moneda']['filas'][0]['monto'],
+                         _redondo('100.00'))
 
     # ------------------------------------------------------- ranking ------
     def test_ranking_ordena_por_monto_descendente_y_trae_variacion(self):
@@ -771,7 +807,8 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertIn('name="period_type"', html)
         self.assertIn(self.sede_a.name, html)
         self.assertIn(self.sede_b.name, html)
-        self.assertIn('Costo operativo', html)
+        self.assertIn('Gastos de cocina', html)
+        self.assertNotIn('Costo operativo', html)
         self.assertIn('Ranking entre sedes', html)
         self.assertIn(self.sede_a.name, html)
         self.assertIn(self.sede_b.name, html)
@@ -1061,13 +1098,12 @@ class AnalysisReportsTest(unittest.TestCase):
                                 date(2026, 9, 15), 'USD',
                                 incluir_compras=False)
         self.assertNotIn('compras', kpis['kpis'])
-        self.assertEqual(kpis['kpis']['costo_operativo']['actual'], _redondo('0'))
-        self.assertFalse(kpis['kpis']['costo_operativo']['medido_por_compras'])
+        self.assertNotIn('costo_operativo', kpis['kpis'])
         cons = svc.consolidado_financiero(
             [self.sede_a.id], date(2026, 9, 1), date(2026, 9, 30), 'USD',
             incluir_compras=False)
         self.assertEqual([c['concepto'] for c in cons['por_concepto']],
-                         ['Consumo de cocina', 'Mermas', 'Pérdidas en traslados'])
+                         ['Gastos de cocina', 'Mermas'])
         self.assertNotIn('Compras', [c['concepto'] for c in cons['por_concepto']])
         self.assertEqual(cons['por_categoria'], [])
         self.assertEqual(cons['por_moneda']['filas'], [])
@@ -1075,7 +1111,6 @@ class AnalysisReportsTest(unittest.TestCase):
                                       date(2026, 9, 15), 'USD',
                                       incluir_compras=True)
         self.assertEqual(kpis_admin['kpis']['compras']['actual'], _redondo('1500'))
-        self.assertTrue(kpis_admin['kpis']['costo_operativo']['medido_por_compras'])
 
     def test_traslado_direccional_valora_recibidos_y_enviados_por_costo_real(self):
         compra = Purchase(
@@ -1426,8 +1461,6 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(tr['actual'], _redondo('1000.00'))
         self.assertEqual(tr['conteo'], 1)
         self.assertEqual(tr['quantity'], _redondo('10.00'))
-        self.assertEqual(kpis['kpis']['costo_operativo']['medido_por_compras'],
-                         False)
 
         kpis_admin = svc.obtener_kpis([self.central.id], 'MONTHLY',
                                       date(2026, 9, 15), 'USD',
@@ -1525,11 +1558,14 @@ class AnalysisReportsTest(unittest.TestCase):
         cons = reporte['detail']['consolidado']
         conceptos = [c['concepto'] for c in cons['por_concepto']]
         self.assertEqual(conceptos,
-                         ['Compras', 'Consumo de cocina', 'Mermas',
-                          'Pérdidas en traslados'])
-        # 1000 − 0 − 15 − 0 = 985 USD exactos
-        self.assertEqual(reporte['current']['amount_usd'], _redondo('985.00'))
-        self.assertEqual(cons['resultado'], _redondo('985.00'))
+                         ['Compras', 'Gastos de cocina', 'Mermas'])
+        # Suma limpia: 1000 (compras) + 15 (mermas) = 1015 USD exactos.
+        self.assertEqual(cons['total_operativo'], _redondo('15.00'))
+        self.assertEqual(cons['total_registrado'], _redondo('1015.00'))
+        self.assertEqual(reporte['current']['amount_usd'], _redondo('1015.00'))
+        # Los traslados viven en su propio bloque informativo.
+        self.assertIn('traslados', cons)
+        self.assertNotIn('resultado', cons)
         sedes = [s['sede'] for s in cons['por_sede']]
         self.assertIn('Compras Central', sedes)
         self.assertIn('Sede La Candelaria', sedes)
@@ -1544,7 +1580,8 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
         self.assertIn('Consolidado financiero', html)
-        self.assertIn('Resultado del período', html)
+        self.assertIn('Total registrado', html)
+        self.assertIn('Traslados del período', html)
 
     # ---------------------------------------------------- gráficos --------
     def test_evolucion_alinea_periodos_y_montos_del_cajon(self):

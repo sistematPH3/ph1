@@ -8,10 +8,12 @@ servicio (snapshots_service) usando el motor de costos y las tasas BCV.
 import json
 import logging
 from datetime import datetime, time
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models.logistics_model import Location, Movement, MovementDetail, Purchase, PurchaseDetail
+from app.models.logistics_model import Location, Movement, MovementDetail, Purchase
 from app.models.waste_model import AuditLog, Waste, WasteDetail
 from app.models.statistics_model import StatisticsSnapshot
 
@@ -29,14 +31,20 @@ def sede_central():
 
 
 def filas_compras(inicio, fin):
-    """Detalles de compras en el período (todas pertenecen a la sede central).
+    """Compras del período agregadas por FACTURA (todas van a la sede central).
 
-    Devuelve [{location_id, product_id, quantity, currency, unit_foreign,
-    price_bs, date}] ordenados por fecha.
+    El importe sale de la cabecera: `Purchase.total_amount` en la divisa de la
+    compra y `total_amount × Purchase.exchange_rate` en bolívares. No se
+    reconstruye con cantidad × precio unitario porque el detalle solo conserva
+    dos decimales por unidad (100,00 / 160 = 0,625 → 0,63) y esa reconstrucción
+    inflaba las alarmas (160 × 0,63 = 100,80 EUR en vez de 100,00).
+
+    Devuelve [{location_id, quantity, currency, total_foreign, total_bs,
+    exchange_rate, date}] ordenados por fecha.
     """
     loc = sede_central()
-    filas = PurchaseDetail.query \
-        .join(Purchase, PurchaseDetail.purchase_id == Purchase.id) \
+    compras = Purchase.query \
+        .options(selectinload(Purchase.details)) \
         .filter(
             Purchase.status.in_(['COMPLETED', 'COMPLETADO']),
             Purchase.purchase_date >= datetime.combine(inicio, time.min),
@@ -44,19 +52,45 @@ def filas_compras(inicio, fin):
         ) \
         .order_by(Purchase.purchase_date.asc()) \
         .all()
-    return [
-        {
+    filas = []
+    for p in compras:
+        moneda = (p.currency or 'USD').upper()
+        if moneda not in ('USD', 'EUR', 'BS'):
+            continue
+        cantidad = sum((Decimal(str(d.quantity or 0)) for d in p.details),
+                       Decimal('0.00'))
+        total = Decimal(str(p.total_amount or 0))
+        if not total:
+            # Respaldo solo para registros antiguos sin total de cabecera.
+            if moneda == 'BS':
+                total = sum((Decimal(str(d.quantity or 0))
+                             * Decimal(str(d.price_bs or 0))
+                             for d in p.details), Decimal('0.00'))
+            else:
+                total = sum((Decimal(str(d.quantity or 0))
+                             * Decimal(str(d.foreign_price or 0))
+                             for d in p.details), Decimal('0.00'))
+        tasa = Decimal(str(p.exchange_rate or 0))
+        if moneda == 'BS':
+            total_bs = total
+        elif tasa:
+            total_bs = (total * tasa).quantize(Decimal('0.01'),
+                                               rounding=ROUND_HALF_UP)
+        else:
+            total_bs = sum((Decimal(str(d.quantity or 0))
+                            * Decimal(str(d.price_bs or 0))
+                            for d in p.details), Decimal('0.00'))
+        filas.append({
             'location_id': loc,
-            'product_id': d.product_id,
-            'quantity': Decimal(str(d.quantity or 0)),
-            'currency': (p.currency or 'USD').upper(),
-            'unit_foreign': Decimal(str(d.foreign_price or 0)),
-            'price_bs': Decimal(str(d.price_bs or 0)),
+            'quantity': cantidad,
+            'currency': moneda,
+            'total_foreign': total,
+            'total_bs': total_bs.quantize(Decimal('0.01'),
+                                          rounding=ROUND_HALF_UP),
+            'exchange_rate': tasa,
             'date': p.purchase_date,
-        }
-        for d in filas for p in [d.purchase]
-        if (p.currency or 'USD').upper() in ('USD', 'EUR', 'BS')
-    ]
+        })
+    return filas
 
 
 def filas_consumo_cocina(inicio, fin):
@@ -123,6 +157,8 @@ def filas_mermas(inicio, fin):
             'product_id': d.product_id,
             'quantity': Decimal(str(d.quantity or 0)),
             'unit_cost_usd': Decimal(str(d.unit_cost or 0)),
+            # Importe exacto guardado en la línea (misma base que total_cost).
+            'subtotal_cost': Decimal(str(d.subtotal_cost or 0)),
             'date': d.waste.date,
         }
         for d in filas

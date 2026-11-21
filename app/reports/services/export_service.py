@@ -211,10 +211,24 @@ def _tablas_detalle(reporte):
              formatear_monto(fila['monto'])]
             for fila in cons.get('por_concepto', [])
         ]
-        filas.append(['Resultado del período',
-                      formatear_monto(cons.get('resultado', Decimal('0.00')))])
+        filas.append(['Total gasto operativo (cocina + mermas)', '', '', '',
+                      formatear_monto(cons.get('total_operativo',
+                                               Decimal('0.00')))])
+        filas.append(['Total registrado (compras + operativo)', '', '', '',
+                      formatear_monto(cons.get('total_registrado',
+                                               Decimal('0.00')))])
         tablas.append(('Consolidado financiero (qué y en qué)', columnas,
                        filas))
+        traslados = cons.get('traslados') or {}
+        columnas_traslados = ['Traslados', 'Cantidad movilizada',
+                              f'Costo ({moneda})']
+        tablas.append((
+            'Traslados del período (informativo, no suma al consolidado)',
+            columnas_traslados,
+            [[traslados.get('conteo', 0),
+              traslados.get('quantity', Decimal('0.00')),
+              formatear_monto(traslados.get('costo', Decimal('0.00')))]]
+        ))
         columnas_sede = ['Ubicación', f'Monto ({moneda})']
         filas_sede = [
             [fila['sede'], formatear_monto(fila['monto'])]
