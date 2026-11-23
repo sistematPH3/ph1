@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.time_utils import current_ve_time
 from app.analytics.repositories.analysis_reports_repository import (
     ESTADOS_TRASLADO_EN_TRANSITO,
     fechas_con_registros,
@@ -224,6 +225,13 @@ def _convertir_compra_a_moneda(fila, moneda):
     monto = fila.get('total_' + c.lower(), Decimal('0.00')) or Decimal('0.00')
     if not monto or c == moneda:
         return monto
+    if c == 'BS' and moneda == 'EUR':
+        # El monto está en Bs: se divide por la tasa BCV del EURO del día de
+        # la compra, no por la tasa Bs/USD guardada en la compra. No depende
+        # de exchange_rate: si falta, la tasa EUR del día sigue siendo válida.
+        fecha = fila.get('purchase_date') or datetime.now()
+        tasa_eur = obtener_tasa_historica('EUR', fecha)
+        return monto / tasa_eur if tasa_eur else None
     tasa = Decimal(str(fila.get('exchange_rate') or 0))
     if not tasa:
         return None
@@ -233,8 +241,6 @@ def _convertir_compra_a_moneda(fila, moneda):
         return monto / tasa
     if c == 'EUR' and moneda == 'BS':
         return monto * tasa
-    if c == 'BS' and moneda == 'EUR':
-        return monto / tasa
     fecha = fila.get('purchase_date') or datetime.now()
     if c == 'USD' and moneda == 'EUR':
         # Triangulado vía Bs: la tasa guardada es Bs/USD; se divide por Bs/EUR.
@@ -319,7 +325,7 @@ def _add_months(fecha, meses):
 def calcular_periodo(period_type, ref_date=None):
     """Rango [inicio, fin] del período que contiene a ref_date y el equivalente
     anterior, según el tipo de período."""
-    ref = ref_date or date.today()
+    ref = ref_date or current_ve_time().date()
     alias = {'SEMANAL': 'WEEKLY', 'MENSUAL': 'MONTHLY', 'TRIMESTRE': 'QUARTERLY',
              'ANUAL': 'ANNUAL'}
     ptype = alias.get((period_type or 'MONTHLY').upper(),
@@ -380,6 +386,11 @@ def _sumar_rango(location_ids, metric, period_type, desde, hasta,
     las tablas reales: un snapshot es el resumen de un período completo y
     sumarlo para un rango parcial mostraría montos fuera del intervalo."""
     metric = (metric or 'PURCHASES').upper()
+    # El snapshot TRANSFERS guarda SOLO pérdidas (extravíos) para Egresos
+    # operativos; no es el volumen logístico. Para el reporte se lee siempre
+    # la mercancía realmente movida/recibida de las tablas operativas.
+    if metric == 'TRANSFERS':
+        return obtener_totales_reales(location_ids, metric, desde, hasta)
     if not usar_snapshots or not hay_snapshots_metrico(location_ids, metric,
                                                        period_type):
         return obtener_totales_reales(location_ids, metric, desde, hasta)
@@ -547,8 +558,8 @@ def _limites_rango(desde, hasta, location_ids, metric):
     if desde and hasta:
         return (desde, hasta) if desde <= hasta else (hasta, desde)
     fechas = fechas_con_registros(location_ids, metric)
-    inicio = desde or (fechas[0] if fechas else (hasta or date.today()))
-    fin = hasta or (fechas[-1] if fechas else (desde or date.today()))
+    inicio = desde or (fechas[0] if fechas else (hasta or current_ve_time().date()))
+    fin = hasta or (fechas[-1] if fechas else (desde or current_ve_time().date()))
     if fin < inicio:
         inicio, fin = fin, inicio
     return inicio, fin
@@ -1390,6 +1401,18 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
         if metric == 'CONSOLIDATED':
             # El consolidado ya viene expresado en la moneda del reporte.
             total_base = totales['amount_usd']
+        elif metric == 'TRANSFERS':
+            # Flujo homogéneo por sede: mercancía RECIBIDA en cada destino.
+            # La Central no acumula aquí las pérdidas del snapshot.
+            recibido = obtener_traslados_direccional(
+                [loc_id], desde_dt, hasta_dt, moneda)['recibidos']
+            total_base = _redondear(recibido['cost'])
+            totales = {'amount_usd': Decimal('0.00'),
+                       'amount_bs': Decimal('0.00'),
+                       'amount_eur': Decimal('0.00'),
+                       'quantity': recibido['quantity'],
+                       'record_count': recibido['conteo']}
+            totales[f'amount_{moneda.lower()}'] = total_base
         elif usar_snapshots and hay_snapshots_metrico([loc_id], metric,
                                                        period_type):
             # Los snapshots traen las tres valoraciones: se elige la pedida y,
@@ -1398,13 +1421,30 @@ def obtener_metrica_por_sede(location_ids, metric, period_type, inicio, fin,
                 [loc_id], metric, period_type, inicio, fin, moneda, totales)
         elif metric == 'PURCHASES' and moneda == 'BS':
             # El BS registrado (price_bs) es el valor exacto del día de compra.
-            total_base = totales.get('amount_bs', Decimal('0.00'))
+            # Las compras son de la Central: una sucursal sin snapshot propio
+            # no hereda el total global.
+            total_base = (totales.get('amount_bs', Decimal('0.00'))
+                          if loc_id == SEDE_CENTRAL_ID else Decimal('0.00'))
         elif metric == 'PURCHASES':
-            if compras_base is None:
-                compras_base = _compras_en_moneda(desde_dt, hasta_dt, moneda)
-            total_base = compras_base
+            if loc_id == SEDE_CENTRAL_ID:
+                if compras_base is None:
+                    compras_base = _compras_en_moneda(desde_dt, hasta_dt, moneda)
+                total_base = compras_base
+            else:
+                # La sucursal no tiene compras propias: 0, nunca el global.
+                total_base = Decimal('0.00')
         else:
             total_base = _total_moneda(totales, moneda, hasta_dt)
+        # Compras: una sucursal sin snapshot propio no debe exponer el total
+        # global en amount_usd/amount_bs/amount_eur del renglón.
+        if (metric == 'PURCHASES' and loc_id != SEDE_CENTRAL_ID
+                and not (usar_snapshots and hay_snapshots_metrico(
+                    [loc_id], metric, period_type))):
+            totales = {'amount_usd': Decimal('0.00'),
+                       'amount_bs': Decimal('0.00'),
+                       'amount_eur': Decimal('0.00'),
+                       'quantity': Decimal('0.00'),
+                       'record_count': 0}
         nombre_sede = nombres.get(loc_id) or f'Sede #{loc_id}'
         renglones.append({
             'location_id': loc_id,
@@ -1458,16 +1498,24 @@ def obtener_ranking(location_ids, metric, period_start=None, period_type='MONTHL
                                   period_type.upper(), previo_inicio,
                                   previo_fin,
                                   usar_snapshots=usar_snapshots)
-            if usar_snapshots and hay_snapshots_metrico([loc_id], metric,
+            if metric == 'TRANSFERS':
+                anterior_m = obtener_traslados_direccional(
+                    [loc_id], previo_desde, previo_hasta, moneda
+                )['recibidos']['cost']
+            elif usar_snapshots and hay_snapshots_metrico([loc_id], metric,
                                                         period_type):
                 anterior_m = _valor_con_respaldo(
                     [loc_id], metric, period_type.upper(), previo_inicio,
                     previo_fin, moneda, previo)
             elif metric == 'PURCHASES' and moneda == 'BS':
-                anterior_m = previo.get('amount_bs', Decimal('0.00'))
+                anterior_m = (previo.get('amount_bs', Decimal('0.00'))
+                              if loc_id == SEDE_CENTRAL_ID
+                              else Decimal('0.00'))
             elif metric == 'PURCHASES':
-                anterior_m = _compras_en_moneda(previo_desde, previo_hasta,
-                                                moneda)
+                anterior_m = (_compras_en_moneda(previo_desde, previo_hasta,
+                                                 moneda)
+                              if loc_id == SEDE_CENTRAL_ID
+                              else Decimal('0.00'))
             else:
                 anterior_m = _total_moneda(previo, moneda, previo_hasta)
         actual_m = renglon['total_base']
@@ -1692,7 +1740,7 @@ def obtener_gasto_categorias(period_type='MONTHLY', period_start=None,
     if moneda not in MONEDAS:
         moneda = 'USD'
     ancla = calcular_periodo(period_type,
-                             period_start or date.today())['period_start']
+                             period_start or current_ve_time().date())['period_start']
 
     columnas = []
     if desde and hasta:
@@ -1754,7 +1802,7 @@ def obtener_evolucion_gasto(period_type='MONTHLY', period_start=None,
     if moneda not in MONEDAS:
         moneda = 'USD'
     ancla = calcular_periodo(period_type,
-                             period_start or date.today())['period_start']
+                             period_start or current_ve_time().date())['period_start']
 
     if desde and hasta:
         puntos = []

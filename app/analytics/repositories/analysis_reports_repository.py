@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 
 from app.extensions import db
 from app.models.security_model import User
@@ -170,7 +170,7 @@ def obtener_totales_reales(location_ids, metric, desde, hasta):
             func.count(Waste.id)
         ).filter(
             Waste.location_id.in_(location_ids),
-            Waste.status == 'APROBADO',
+            Waste.status.in_(['APROBADO', 'APROBADO_PARCIAL']),
             Waste.cancelled_at.is_(None),
             Waste.date >= desde,
             Waste.date <= hasta,
@@ -246,7 +246,7 @@ def fechas_con_registros(location_ids, metric):
     if metric in ('WASTE', 'CONSOLIDATED'):
         filas = db.session.query(Waste.date).filter(
             Waste.location_id.in_(location_ids),
-            Waste.status == 'APROBADO',
+            Waste.status.in_(['APROBADO', 'APROBADO_PARCIAL']),
             Waste.cancelled_at.is_(None),
         ).distinct().all()
         fechas.update(fila[0].date() if hasattr(fila[0], 'date') else fila[0]
@@ -353,7 +353,7 @@ def obtener_mermas_detalle(location_ids, desde, hasta):
     la cabecera del registro (sin agregar ni convertir)."""
     if not location_ids:
         return []
-    filas_brutas = db.session.query(
+    filas_aprobadas = db.session.query(
         Waste.id,
         Waste.date,
         Location.name.label('sede'),
@@ -370,7 +370,35 @@ def obtener_mermas_detalle(location_ids, desde, hasta):
         Waste.cancelled_at.is_(None),
         Waste.date >= desde,
         Waste.date <= hasta,
-    ).order_by(Waste.date.asc(), Waste.id.asc()).all()
+    ).all()
+
+    filas_parciales = db.session.query(
+        Waste.id,
+        Waste.date,
+        Location.name.label('sede'),
+        WasteType.name.label('tipo'),
+        Waste.notes,
+        func.coalesce(func.sum(WasteDetail.quantity), 0),
+        func.coalesce(func.sum(WasteDetail.subtotal_cost), 0),
+        Waste.currency,
+    ).join(WasteDetail, WasteDetail.waste_id == Waste.id).join(
+        Location, Location.id == Waste.location_id
+    ).outerjoin(
+        WasteType, WasteType.id == Waste.waste_type_id
+    ).filter(
+        Waste.location_id.in_(location_ids),
+        Waste.status == 'APROBADO_PARCIAL',
+        WasteDetail.status == 'APROBADO',
+        Waste.cancelled_at.is_(None),
+        Waste.date >= desde,
+        Waste.date <= hasta,
+    ).group_by(
+        Waste.id, Waste.date, Location.name, WasteType.name, Waste.notes,
+        Waste.currency,
+    ).all()
+
+    filas_brutas = sorted(list(filas_aprobadas) + list(filas_parciales),
+                          key=lambda f: (f[1], f[0]))
 
     return [{
         'id': fid,
@@ -402,7 +430,11 @@ def obtener_mermas_top_producto(location_ids, desde, hasta):
         Product, Product.id == WasteDetail.product_id
     ).filter(
         Waste.location_id.in_(location_ids),
-        Waste.status == 'APROBADO',
+        or_(
+            Waste.status == 'APROBADO',
+            and_(Waste.status == 'APROBADO_PARCIAL',
+                 WasteDetail.status == 'APROBADO'),
+        ),
         Waste.cancelled_at.is_(None),
         Waste.date >= desde,
         Waste.date <= hasta,
@@ -438,7 +470,7 @@ def obtener_mermas_resumen(location_ids, desde, hasta):
     """Totales REALES por moneda y por sede de las mermas aprobadas del rango."""
     if not location_ids:
         return {'total': {}, 'por_sede': {}}
-    filas = db.session.query(
+    filas_aprobadas = db.session.query(
         Location.name.label('sede'),
         Waste.currency,
         func.coalesce(func.sum(Waste.total_cost), 0),
@@ -450,10 +482,27 @@ def obtener_mermas_resumen(location_ids, desde, hasta):
         Waste.date <= hasta,
     ).group_by(Location.name, Waste.currency).all()
 
+    filas_parciales = db.session.query(
+        Location.name.label('sede'),
+        Waste.currency,
+        func.coalesce(func.sum(WasteDetail.subtotal_cost), 0),
+    ).join(WasteDetail, WasteDetail.waste_id == Waste.id).join(
+        Location, Location.id == Waste.location_id
+    ).filter(
+        Waste.location_id.in_(location_ids),
+        Waste.status == 'APROBADO_PARCIAL',
+        WasteDetail.status == 'APROBADO',
+        Waste.cancelled_at.is_(None),
+        Waste.date >= desde,
+        Waste.date <= hasta,
+    ).group_by(Location.name, Waste.currency).all()
+
     total = {'USD': Decimal('0.00'), 'BS': Decimal('0.00'), 'EUR': Decimal('0.00')}
     por_sede = {}
-    for sede, moneda, costo in filas:
+    for sede, moneda, costo in list(filas_aprobadas) + list(filas_parciales):
         moneda = (moneda or 'USD').upper()
+        if moneda in ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES'):
+            moneda = 'BS'
         monto = Decimal(str(costo or 0))
         if moneda not in total:
             total[moneda] = Decimal('0.00')

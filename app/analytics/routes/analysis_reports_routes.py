@@ -5,6 +5,7 @@ from flask import (Blueprint, current_app, jsonify, render_template, request,
                     url_for)
 from flask_login import current_user, login_required
 
+from app.time_utils import current_ve_time
 from app.decorators.roles import require_roles
 from app.analytics.requests.analysis_reports_validators import validate_report_filters
 from app.analytics.services import analysis_reports_service as report_svc
@@ -52,7 +53,7 @@ def _asegurar_tasas_del_dia(timeout=3):
 
     if current_app.config.get('TESTING'):
         return
-    ahora = datetime.now()
+    ahora = current_ve_time()
     ultima = _ULTIMA_CONSULTA_TASAS.get('momento')
     if ultima is not None and ahora - ultima < timedelta(minutes=10):
         return
