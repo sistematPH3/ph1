@@ -73,7 +73,7 @@ def create_category():
 
         try:
             CategoryService.create_category(request.form)
-            flash('Categoría registrada exitosamente.', 'success')
+            flash('Categoría registrada exitosamente.', 'categoria-success')
             return redirect(url_for('inventory.list_categories'))
 
         except IntegrityError:
@@ -103,7 +103,7 @@ def create_category():
 def edit_category(type_id):
     product_type = CategoryService.get_product_type_by_id(type_id)
     if not product_type:
-        flash('Categoría no encontrada.', 'danger')
+        flash('Categoría no encontrada.', 'categoria-danger')
         return redirect(url_for('inventory.list_categories'))
 
     all_types = CategoryService.get_all_product_types()
@@ -145,7 +145,7 @@ def edit_category(type_id):
 
         try:
             CategoryService.update_category(type_id, request.form)
-            flash('Categoría actualizada exitosamente.', 'success')
+            flash('Categoría actualizada exitosamente.', 'categoria-success')
             return redirect(url_for('inventory.list_categories'))
 
         except IntegrityError:

@@ -12,7 +12,7 @@
     <div class="form-container">
         <h2>{% if product_type %}Editar Categoría{% else %}Nueva Categoría{% endif %}</h2>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% with messages = get_flashed_messages(with_categories=true, category_filter=['categoria-success', 'categoria-danger']) %}
             {% if messages %}
                 {% for class_alert, message in messages %}
                     <div style="background-color: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #fecaca; font-weight: 600; font-size: 0.9rem;">

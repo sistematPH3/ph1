@@ -10,7 +10,7 @@ class CategoryService:
 
     @staticmethod
     def get_product_type_by_id(type_id):
-        return ProductType.query.get_or_404(type_id)
+        return db.session.get(ProductType, type_id)
 
     @staticmethod
     def create_category(form_data):
