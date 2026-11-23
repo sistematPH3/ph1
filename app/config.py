@@ -60,8 +60,16 @@ class Config:
     MAIL_PORT = int(os.environ.get('MAIL_PORT', '465'))
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'true').strip().lower() in ('1', 'true', 'yes', 'si')
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'false').strip().lower() in ('1', 'true', 'yes', 'si')
+    # El puerto define el protocolo si no se indica explicitamente: 465 es SSL
+    # implicito y 587 exige STARTTLS. Antes SSL valia True por defecto y un
+    # .env con MAIL_PORT=587 sin MAIL_USE_SSL intentaba SMTP_SSL contra el
+    # puerto de STARTTLS, fallando con "[SSL: WRONG_VERSION_NUMBER]".
+    MAIL_USE_SSL = os.environ.get(
+        'MAIL_USE_SSL', 'true' if MAIL_PORT == 465 else 'false'
+    ).strip().lower() in ('1', 'true', 'yes', 'si')
+    MAIL_USE_TLS = os.environ.get(
+        'MAIL_USE_TLS', 'false' if MAIL_USE_SSL else 'true'
+    ).strip().lower() in ('1', 'true', 'yes', 'si')
     MAIL_TIMEOUT = int(os.environ.get('MAIL_TIMEOUT', '15'))
 
     # --- Enlaces de recuperacion -----------------------------------------
