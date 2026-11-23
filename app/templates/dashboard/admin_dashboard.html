@@ -31,7 +31,7 @@
             <i class="bi bi-calendar3"></i>
             <div class="dash-banner-badge-copy">
                 <span class="dash-banner-badge-t">Período vigente</span>
-                <span class="dash-banner-badge-v">{{ etiquetas_periodo[period_type] }}</span>
+                <span class="dash-banner-badge-v">{{ kpis.period.label if kpis else etiquetas_periodo[period_type] }}</span>
             </div>
         </div>
     </div>
@@ -51,44 +51,44 @@
 } %}
 
 {% set simbolo = {'USD': '$', 'EUR': '€', 'BS': 'Bs. '}.get(moneda, '$') %}
+{% set kpi_keys = {'PURCHASES': 'compras', 'KITCHEN_CONSUMPTION': 'consumo_cocina', 'WASTE': 'mermas', 'TRANSFERS': 'traslados'} %}
 
 <div class="dash-seccion-head">
     <h2 class="dash-seccion-titulo">
         <span class="dash-seccion-ico"><i class="bi bi-speedometer2"></i></span>
         Indicadores del período
     </h2>
-    <span class="dash-seccion-leyenda"><i class="bi bi-circle-fill dash-leyenda-dot"></i>{{ simbolo }} · {{ etiquetas_periodo[period_type] }}</span>
+    <span class="dash-seccion-leyenda"><i class="bi bi-circle-fill dash-leyenda-dot"></i>{{ simbolo }} · {{ kpis.period.label if kpis else etiquetas_periodo[period_type] }}</span>
 </div>
 
 <div class="dash-kpi-grid">
     {% for key, cfg in cols_kpi.items() %}
-    {% if key == 'TRANSFERS' and flujo_traslados %}
-    {% set serie = flujo_traslados.serie.cost or [0] %}
-    {% set comp = flujo_traslados.comparativo %}
-    {% set detalle_traslado = flujo_traslados.serie.conteo[-1] ~ ' traslados · ' ~ flujo_traslados.serie.quantity[-1]|ph_qty ~ ' uds. movidas' %}
-    {% else %}
+    {% set kpi = (kpis.kpis.get(kpi_keys[key], {}) if kpis else {}) %}
     {% set serie = datos_grafico.metrics.get(key) or [0] %}
-    {% set comp = comparativo['metricas'].get(key, {}) %}
-    {% set detalle_traslado = none %}
-    {% endif %}
+    {% set valor = kpi.actual if kpi else serie[-1] %}
+    {% set comp = kpi %}
+    {% set detalle_traslado = (flujo_traslados.serie.conteo[-1] ~ ' traslados · ' ~ flujo_traslados.serie.quantity[-1]|ph_qty ~ ' uds. movidas') if key == 'TRANSFERS' and flujo_traslados else none %}
     {% set metric_class = key.lower() %}
     <div class="dash-kpi-card dash-kpi-card--{{ metric_class }}">
         <div class="dash-kpi-ico dash-kpi-ico--{{ metric_class }}"><i class="bi {{ cfg.icono }}"></i></div>
         <div class="dash-kpi-label">{{ cfg.label }}</div>
-        <div class="dash-kpi-value" title="{% if key == 'TRANSFERS' %}Costo de la mercancía trasladada ({{ moneda }}){% else %}{{ serie[-1]|ph_amount }} {{ moneda }}{% endif %}">{{ simbolo }}{{ serie[-1]|ph_amount }}</div>
+        <div class="dash-kpi-value" title="{% if key == 'TRANSFERS' %}Costo de la mercancía trasladada ({{ moneda }}){% else %}{{ valor|ph_amount }} {{ moneda }}{% endif %}">{{ simbolo }}{{ valor|ph_amount }}</div>
         <div class="dash-kpi-comp">
             {% if detalle_traslado %}
             <span class="kpi-comp-badge flat"><i class="bi bi-box-seam"></i>{{ detalle_traslado }}</span>
             {% endif %}
-            {% if comp %}
-            {% set dir = 'up' if comp.diff > 0 else ('down' if comp.diff < 0 else 'flat') %}
+            {% if comp and comp.pct is not none %}
+            {% set dir = comp.direccion %}
             {% if dir == 'flat' %}{% set sem = 'flat' %}{% else %}{% set sem = 'up' if dir == 'down' else 'down' %}{% endif %}
             <span class="kpi-comp-badge {{ sem }}" title="Anterior: {{ comp.anterior|ph_amount }} {{ moneda }}">
                 {% if dir == 'flat' %}<i class="bi bi-dash-lg"></i>
                 {% else %}<i class="bi {{ 'bi-arrow-up-right' if dir == 'up' else 'bi-arrow-down-right' }}"></i>
                 {% endif %}
-                {{ simbolo }}{{ comp.diff|ph_amount }} ({{ comp.variacion_pct }} %)
+                {{ simbolo }}{{ comp.diferencia|ph_amount }} ({{ comp.pct }} %)
             </span>
+            <span class="kpi-comp-label">vs {{ kpis.period.previous_label }}</span>
+            {% elif comp %}
+            <span class="kpi-comp-badge flat" title="Sin período anterior con base para comparar"><i class="bi bi-dash-lg"></i>—</span>
             <span class="kpi-comp-label">vs período anterior</span>
             {% else %}
             <span class="dash-stat-hint">&nbsp;</span>
@@ -96,12 +96,14 @@
         </div>
     </div>
     {% endfor %}
+    {% if consolidado %}
     <div class="dash-kpi-card dash-kpi-card--costo-operativo">
-        <div class="dash-kpi-ico dash-kpi-ico--costo-operativo"><i class="bi bi-bar-chart-line"></i></div>
-        <div class="dash-kpi-label">Costo operativo</div>
-        <div class="dash-kpi-value" title="Compras − consumo − mermas − pérdidas ({{ moneda }})">{{ simbolo }}{{ costo_operativo.total|ph_amount }}</div>
-        <div class="dash-kpi-comp"><span class="dash-stat-hint">Compras − consumo − mermas − pérdidas</span></div>
+        <div class="dash-kpi-ico dash-kpi-ico--costo-operativo"><i class="bi bi-wallet2"></i></div>
+        <div class="dash-kpi-label">Egresos operativos</div>
+        <div class="dash-kpi-value" title="Gastos de cocina + Mermas y pérdidas ({{ moneda }})">{{ simbolo }}{{ consolidado.total_operativo|ph_amount }}</div>
+        <div class="dash-kpi-comp"><span class="dash-stat-hint">Gastos de cocina + Mermas y pérdidas ({{ moneda }})</span></div>
     </div>
+    {% endif %}
 </div>
 
 <div class="dash-filtros">
@@ -191,7 +193,7 @@
                     Mermas por tipo
                 </h2>
             </div>
-            <p class="dash-subtitle">Costo en USD de las mermas aprobadas/pendientes de {{ mermas_por_tipo.period_label }}, por tipo.</p>
+            <p class="dash-subtitle">Costo en {{ moneda }} de las mermas aprobadas de {{ mermas_por_tipo.period_label }}, por tipo.</p>
             {% if mermas_por_tipo.tipos %}
             <div class="dash-chart">
                 <canvas id="mermasTipoChart"></canvas>

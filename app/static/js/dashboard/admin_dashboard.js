@@ -166,19 +166,20 @@
         if (!ctx || !panel || !datos.tipos || !datos.tipos.length) return;
 
         const labels = datos.tipos.map(function (t) { return t.tipo; });
-        const valores = datos.tipos.map(function (t) { return Number(t.monto_usd) || 0; });
+        const monedaMermas = datos.moneda || moneda;
+        const valores = datos.tipos.map(function (t) { return Number(t.monto !== undefined ? t.monto : t.monto_usd) || 0; });
         const colores = datos.tipos.map(function (_, i) { return COLORES_TIPOS[i % COLORES_TIPOS.length]; });
 
         new Chart(ctx.getContext('2d'), {
             type: 'bar',
-            data: {labels: labels, datasets: [{label: 'Costo (USD)', data: valores, backgroundColor: colores, borderRadius: 6, barThickness: 22}]},
+            data: {labels: labels, datasets: [{label: 'Costo (' + monedaMermas + ')', data: valores, backgroundColor: colores, borderRadius: 6, barThickness: 22}]},
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {legend: {display: false}, tooltip: {callbacks: {label: function (item) { return '$' + formatoMonto(item.parsed.x, 2); }}}},
+                plugins: {legend: {display: false}, tooltip: {callbacks: {label: function (item) { return simbolo + formatoMonto(item.parsed.x, 2); }}}},
                 scales: {
-                    x: {beginAtZero: true, grid: {color: 'rgba(226,232,240,.6)'}, border: {display: false}, ticks: {color: '#64748b', callback: function (v) { return '$' + formatoMonto(v, 0); }}},
+                    x: {beginAtZero: true, grid: {color: 'rgba(226,232,240,.6)'}, border: {display: false}, ticks: {color: '#64748b', callback: function (v) { return simbolo + formatoMonto(v, 0); }}},
                     y: {grid: {display: false}, border: {display: false}, ticks: {color: '#334155'}}
                 }
             }
@@ -187,7 +188,7 @@
         const leyenda = document.getElementById('mermasTiposLegend');
         if (leyenda) {
             leyenda.innerHTML = datos.tipos.map(function (t) {
-                return '<span class="merma-tipo-chip"><strong>' + t.tipo + '</strong>: ' + Number(t.cantidad || 0) + ' und · $' + formatoMonto(t.monto_usd, 2) + '</span>';
+                return '<span class="merma-tipo-chip"><strong>' + t.tipo + '</strong>: ' + Number(t.cantidad || 0) + ' und · ' + simbolo + formatoMonto(t.monto !== undefined ? t.monto : t.monto_usd, 2) + '</span>';
             }).join('');
         }
     }

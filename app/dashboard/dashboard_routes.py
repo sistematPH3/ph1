@@ -16,12 +16,13 @@ from app.analytics.requests.statistics_validators import (
     validate_period_type,
     validate_moneda,
 )
+from app.analytics.services import analysis_reports_service as report_svc
+from app.time_utils import current_ve_time
 from app.analytics.services.snapshots_service import (
     leer_configuracion,
     evaluar_alarmas,
     obtener_grafico_evolucion,
     obtener_comparativo,
-    obtener_costo_operativo,
     obtener_mermas_por_tipo,
     obtener_pendientes,
     asegurar_ventana_alarmas,
@@ -69,7 +70,8 @@ def _asegurar_snapshots(period_type, user_id=None, location_ids=None):
     irregularidades queda vacío. Un fallo aquí no debe tumbar el panel.
     """
     try:
-        asegurar_ventana_alarmas(period_type, user_id=user_id)
+        asegurar_ventana_alarmas(period_type, user_id=user_id,
+                                 location_ids=location_ids)
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
@@ -220,14 +222,16 @@ def admin_dashboard():
             "No se pudieron obtener los lotes por vencer del panel admin: %s", exc,
         )
         expiring_lots = []
-    period_type = validate_period_type(request.args.get('period'))
+    period_type = validate_period_type(request.args.get('period'),
+                                       default='MONTHLY')
     default_moneda = leer_configuracion().get('ESTADISTICAS_MONEDA', 'USD')
     moneda = validate_moneda(request.args.get('moneda'), default=default_moneda)
     sedes = Location.query.filter_by(is_active=True).order_by(Location.name).all()
     sede_id = request.args.get('sede', type=int)
     if sede_id is not None and not any(s.id == sede_id for s in sedes):
         sede_id = None
-    location_ids = [sede_id] if sede_id is not None else None
+    location_ids = ([sede_id] if sede_id is not None
+                    else [s.id for s in sedes])
     _asegurar_snapshots(period_type, user_id=current_user.id, location_ids=location_ids)
     alertas_estadisticas, datos_grafico = _contexto_estadisticas(
         period_type, moneda=moneda, location_ids=location_ids,
@@ -252,16 +256,25 @@ def admin_dashboard():
             "No se pudieron obtener los pendientes del panel admin: %s", exc,
         )
         pendientes = {'mermas_pendientes': 0, 'traslados_en_transito': 0, 'disputas_pendientes': 0}
+    kpis = None
+    consolidado = None
     try:
-        costo_operativo = obtener_costo_operativo(
-            period_type, moneda=moneda, location_ids=location_ids,
-        )
+        if location_ids:
+            kpis = report_svc.obtener_kpis(
+                location_ids, period_type, current_ve_time().date(), moneda,
+                incluir_compras=True,
+            )
+            consolidado = report_svc.consolidado_financiero(
+                location_ids, kpis['period']['start'], kpis['period']['end'],
+                moneda, incluir_compras=True,
+            )
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
-            "No se pudo obtener el costo operativo del panel admin: %s", exc,
+            "No se pudieron obtener los KPI reales del panel admin: %s", exc,
         )
-        costo_operativo = {'total': '0.00', 'moneda': moneda}
+        kpis = None
+        consolidado = None
     try:
         comparativo = obtener_comparativo(
             period_type, moneda=moneda, location_ids=location_ids,
@@ -273,7 +286,9 @@ def admin_dashboard():
         )
         comparativo = {'metricas': {}}
     try:
-        mermas_por_tipo = obtener_mermas_por_tipo(period_type, location_ids=location_ids)
+        mermas_por_tipo = obtener_mermas_por_tipo(
+            period_type, location_ids=location_ids, moneda=moneda,
+        )
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
@@ -285,7 +300,8 @@ def admin_dashboard():
         alarmas=alarmas,
         alertas_estadisticas=alertas_estadisticas,
         datos_grafico=datos_grafico,
-        costo_operativo=costo_operativo,
+        kpis=kpis,
+        consolidado=consolidado,
         comparativo=comparativo,
         mermas_por_tipo=mermas_por_tipo,
         period_type=period_type,

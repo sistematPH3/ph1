@@ -1,6 +1,7 @@
 from datetime import date as date_cls, datetime as datetime_cls, time as time_cls, timedelta
 
 from app.extensions import db
+from app.time_utils import current_ve_time
 from app.models import Movement, MovementDetail, Product, Location
 from app.logistics.services.movement_list_service import get_movement_list_context
 from app.inventory.repositories.inventory_alert_repository import obtener_alarmas_para_dashboard
@@ -83,7 +84,7 @@ def get_expiring_lots(current_user, limit=5, horizon_days=90):
     if not sedes:
         return []
 
-    today = date_cls.today()
+    today = current_ve_time().date()
     limit_date = today + timedelta(days=horizon_days)
 
     rows = (
@@ -160,7 +161,7 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
             "se usa la ventana por defecto: %s", exc,
         )
         anc_fechas = [
-            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+            _sumar_meses(current_ve_time().date().replace(day=1), -i) for i in range(0, 6)
         ]
     periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
 
@@ -168,7 +169,7 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
         periodo_inicio = period_start
         periodo_fin = _sumar_meses(period_start, 1)
     else:
-        periodo_inicio = date_cls.today()
+        periodo_inicio = current_ve_time().date()
         periodo_fin = None
 
     # 2. Stock agregado (unidades en inventario)
@@ -182,42 +183,56 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
         import logging
         logging.getLogger(__name__).error("Error calculando stock subgerente: %s", exc)
 
-    # 3. Consumo en unidades (hoy o período) – misma lógica que gerencia
+    # 3. Consumo de cocina en unidades (misma lógica que gerencia y dirección)
     consumo_unidades = 0
     try:
         if target_location_ids:
+            from app.models.waste_model import AuditLog
+            import json
+            from sqlalchemy import func as sa_func
+
             condi_consumo = [
-                Movement.origin_location_id.in_(target_location_ids),
-                Movement.status == 'COMPLETADO',
-                Movement.date >= periodo_inicio,
+                AuditLog.location_id.in_(target_location_ids),
+                AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA']),
+                sa_func.date(AuditLog.timestamp) >= periodo_inicio,
             ]
             if periodo_fin:
-                condi_consumo.append(Movement.date < periodo_fin)
+                condi_consumo.append(sa_func.date(AuditLog.timestamp) < periodo_fin)
 
-            cant_movs = db.session.query(db.func.sum(MovementDetail.quantity))\
-                .join(Movement, MovementDetail.movement_id == Movement.id)\
-                .filter(*condi_consumo)\
-                .scalar()
+            audits = db.session.query(AuditLog.changed_data).filter(*condi_consumo).all()
 
-            consumo_unidades = int(cant_movs or 0)
+            total = 0.0
+            for row in audits:
+                c_data = row[0] if row else None
+                if not c_data:
+                    continue
+                if isinstance(c_data, str):
+                    try:
+                        c_data = json.loads(c_data)
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "Registro de auditoría con JSON inválido; se omite la fila: %s",
+                            exc,
+                        )
+                        continue
+                if isinstance(c_data, dict):
+                    try:
+                        # Consumo efectivo: si el gasto fue editado, el log
+                        # original conserva 'edited_quantity'. Se prioriza esa
+                        # magnitud para no mostrar la cantidad previa.
+                        if c_data.get('edited_quantity') is not None:
+                            qty = float(c_data.get('edited_quantity'))
+                        else:
+                            qty = float(c_data.get('quantity_changed', 0) or 0)
+                        total += abs(qty)
+                    except (TypeError, ValueError):
+                        continue
 
-            # Si no hay movimientos, buscar en mermas del período
-            if consumo_unidades == 0:
-                condi_waste = [
-                    Waste.location_id.in_(target_location_ids),
-                    Waste.date >= periodo_inicio,
-                ]
-                if periodo_fin:
-                    condi_waste.append(Waste.date < periodo_fin)
-
-                cant_wastes = db.session.query(db.func.sum(WasteDetail.quantity))\
-                    .join(Waste, WasteDetail.waste_id == Waste.id)\
-                    .filter(*condi_waste)\
-                    .scalar()
-                consumo_unidades = int(cant_wastes or 0)
+            consumo_unidades = int(total)
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).error("Error calculando consumo unidades subgerente: %s", exc)
+        logging.getLogger(__name__).error("Error calculando consumo cocina subgerente: %s", exc)
         consumo_unidades = 0
 
     # 4. Alarmas y movimientos
@@ -249,7 +264,7 @@ def get_subgerente_context(current_user, location_id=None, period_start=None):
         'periodo_actual': period_start,
         'periodo_etiqueta': (
             _etiqueta_ancla(period_start) if period_start
-            else _etiqueta_ancla(date_cls.today().replace(day=1))
+            else _etiqueta_ancla(current_ve_time().date().replace(day=1))
         ),
     }
 
@@ -299,7 +314,7 @@ def get_manager_context(current_user, location_id=None, period_start=None):
             "se usa la ventana por defecto: %s", exc,
         )
         anc_fechas = [
-            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+            _sumar_meses(current_ve_time().date().replace(day=1), -i) for i in range(0, 6)
         ]
     periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
 
@@ -308,7 +323,7 @@ def get_manager_context(current_user, location_id=None, period_start=None):
         periodo_inicio = period_start
         periodo_fin = _sumar_meses(period_start, 1)
     else:
-        periodo_inicio = date_cls.today()
+        periodo_inicio = current_ve_time().date()
         periodo_fin = None
 
     # 2. CÁLCULO DE STOCK AGREGADO
@@ -378,8 +393,16 @@ def get_manager_context(current_user, location_id=None, period_start=None):
     expiring_lots = []
 
     try:
-        if 'obtener_alarmas_para_dashboard' in g and callable(g['obtener_alarmas_para_dashboard']):
-            alarmas_stock = g['obtener_alarmas_para_dashboard']()
+        if target_location_ids:
+            alarmas_stock = [
+                a for a in obtener_alarmas_para_dashboard()
+                if (isinstance(a, dict)
+                    and a.get('location_id') in target_location_ids)
+                or (hasattr(a, 'location_id')
+                    and getattr(a, 'location_id') in target_location_ids)
+            ]
+        else:
+            alarmas_stock = []
         if 'obtener_vencidos_para_dashboard' in g and callable(g['obtener_vencidos_para_dashboard']):
             vencidos = g['obtener_vencidos_para_dashboard'](current_user)
 
@@ -473,7 +496,13 @@ def get_manager_context(current_user, location_id=None, period_start=None):
                         continue
                 if isinstance(c_data, dict):
                     try:
-                        qty = float(c_data.get('quantity_changed', 0) or 0)
+                        # Consumo efectivo: si el gasto fue editado, el log
+                        # original conserva 'edited_quantity'. Se prioriza esa
+                        # magnitud para no mostrar la cantidad previa.
+                        if c_data.get('edited_quantity') is not None:
+                            qty = float(c_data.get('edited_quantity'))
+                        else:
+                            qty = float(c_data.get('quantity_changed', 0) or 0)
                         total += abs(qty)
                     except (TypeError, ValueError):
                         continue
@@ -509,7 +538,7 @@ def get_manager_context(current_user, location_id=None, period_start=None):
         'periodo_actual': period_start,
         'periodo_etiqueta': (
             _etiqueta_ancla(period_start) if period_start
-            else _etiqueta_ancla(date_cls.today().replace(day=1))
+            else _etiqueta_ancla(current_ve_time().date().replace(day=1))
         ),
         'resumen': {
             'stock_agregado': stock_agregado,
@@ -549,7 +578,7 @@ def get_finance_dashboard_context(current_user, sede_id=None, period_start=None,
     moneda = (moneda or 'USD').upper()
     if moneda not in reports_svc.MONEDAS:
         moneda = 'USD'
-    hoy = period_start or date_cls.today()
+    hoy = period_start or current_ve_time().date()
     ver_compras = reports_svc.usuario_administra_central(current_user.id)
     metric_panel = 'PURCHASES' if ver_compras else 'TRANSFERS'
     kpis = reports_svc.obtener_kpis(sede_ids, 'MONTHLY', hoy, moneda,
@@ -617,9 +646,10 @@ def _anclas_reales(sede_ids, ver_compras, limite=12):
 
 
 def _egresos_del_periodo(sede_ids, inicio, fin, ver_compras, moneda='USD'):
-    """Total gastado del rango según datos reales (incluye compras solo si se
-    administra la Central): Compras + Consumo + Mermas + Pérdidas, convertido a
-    la moneda del panel."""
+    """Suma positiva de los egresos del rango (incluye compras solo si se
+    administra la Central): Compras + Consumo + Mermas + Pérdidas, convertida a
+    la moneda del panel. Es un agregado de conceptos, no un residual: compras y
+    consumos salen de la misma mercancía, por lo que no se restan entre sí."""
     from app.analytics.services import analysis_reports_service as reports_svc
     cons = reports_svc.consolidado_financiero(
         sede_ids, inicio, fin, moneda, incluir_compras=ver_compras)
@@ -723,7 +753,7 @@ def get_management_context(current_user, location_id=None, period_start=None):
             "se usa la ventana por defecto: %s", exc,
         )
         anc_fechas = [
-            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+            _sumar_meses(current_ve_time().date().replace(day=1), -i) for i in range(0, 6)
         ]
     periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
 
@@ -731,7 +761,7 @@ def get_management_context(current_user, location_id=None, period_start=None):
         periodo_inicio = period_start
         periodo_fin = _sumar_meses(period_start, 1)
     else:
-        periodo_inicio = date_cls.today()
+        periodo_inicio = current_ve_time().date()
         periodo_fin = None
 
     stock_agregado = 0
@@ -807,7 +837,13 @@ def get_management_context(current_user, location_id=None, period_start=None):
                         continue
                 if isinstance(c_data, dict):
                     try:
-                        qty = float(c_data.get('quantity_changed', 0) or 0)
+                        # Consumo efectivo: si el gasto fue editado, el log
+                        # original conserva 'edited_quantity'. Se prioriza esa
+                        # magnitud para no mostrar la cantidad previa.
+                        if c_data.get('edited_quantity') is not None:
+                            qty = float(c_data.get('edited_quantity'))
+                        else:
+                            qty = float(c_data.get('quantity_changed', 0) or 0)
                         total += abs(qty)
                     except (TypeError, ValueError):
                         continue
@@ -898,7 +934,7 @@ def get_management_context(current_user, location_id=None, period_start=None):
         'periodo_actual': period_start,
         'periodo_etiqueta': (
             _etiqueta_ancla(period_start) if period_start
-            else _etiqueta_ancla(date_cls.today().replace(day=1))
+            else _etiqueta_ancla(current_ve_time().date().replace(day=1))
         ),
         'resumen': {
             'stock_agregado': stock_agregado,
@@ -929,6 +965,11 @@ def get_operations_context(current_user, location_id=None, period_start=None):
     sedes_asignadas = getattr(current_user, 'locations', [])
     allowed_location_ids = [s.id for s in sedes_asignadas]
 
+    if not allowed_location_ids:
+        u_loc_id = getattr(current_user, 'location_id', None) or getattr(current_user, 'branch_id', None)
+        if u_loc_id:
+            allowed_location_ids = [u_loc_id]
+
     if location_id and location_id in allowed_location_ids:
         target_location_ids = [location_id]
     else:
@@ -948,7 +989,7 @@ def get_operations_context(current_user, location_id=None, period_start=None):
             "se usa la ventana por defecto: %s", exc,
         )
         anc_fechas = [
-            _sumar_meses(date_cls.today().replace(day=1), -i) for i in range(0, 6)
+            _sumar_meses(current_ve_time().date().replace(day=1), -i) for i in range(0, 6)
         ]
     periodos_mes = [{'valor': a, 'etiqueta': _etiqueta_ancla(a)} for a in anc_fechas]
 
@@ -956,7 +997,7 @@ def get_operations_context(current_user, location_id=None, period_start=None):
         periodo_inicio = period_start
         periodo_fin = _sumar_meses(period_start, 1)
     else:
-        periodo_inicio = date_cls.today()
+        periodo_inicio = current_ve_time().date()
         periodo_fin = None
 
     # 1. TRASLADOS EN TRÁNSITO GENERALES (Origen o Destino en mis sedes)
@@ -970,7 +1011,10 @@ def get_operations_context(current_user, location_id=None, period_start=None):
     movimientos_en_transito = query_base.filter(Movement.status == 'EN_TRANSITO').all()
 
     # 2. CONTEO DE TRASLADOS RECIBIDOS (COMPLETADOS EN DESTINO, con corte por período)
-    query_recibidos = Movement.query.filter(Movement.status == 'COMPLETADO')
+    query_recibidos = Movement.query.filter(
+        Movement.status == 'COMPLETADO',
+        Movement.type == 'TRASLADO',
+    )
     if target_location_ids:
         query_recibidos = query_recibidos.filter(
             Movement.destination_location_id.in_(target_location_ids)
@@ -1041,6 +1085,7 @@ def get_operations_context(current_user, location_id=None, period_start=None):
             'recibidos_count': traslados_recibidos_count,
             'disputas_count': len(disputas_pendientes),
             'mermas_count': len(vencidos),
+            'vencidos_count': len(vencidos),
             'cant_recepciones_pendientes': len(recepciones_pendientes)
         },
         'recepciones_pendientes': recepciones_pendientes[:5],
@@ -1051,6 +1096,6 @@ def get_operations_context(current_user, location_id=None, period_start=None):
         'periodo_actual': period_start,
         'periodo_etiqueta': (
             _etiqueta_ancla(period_start) if period_start
-            else _etiqueta_ancla(date_cls.today().replace(day=1))
+            else _etiqueta_ancla(current_ve_time().date().replace(day=1))
         ),
     }
