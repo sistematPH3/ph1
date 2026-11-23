@@ -50,7 +50,7 @@ def create_product():
                 db.session.rollback()
                 errors['general'] = str(exc)
             else:
-                flash('Insumo registrado exitosamente.', 'success')
+                flash('Insumo registrado exitosamente.', 'insumo-success')
                 return redirect(url_for('inventory.list_products'))
 
         return render_template('inventory/product_form.html',
@@ -68,7 +68,7 @@ def edit_product(product_id):
     product_types = ProductType.query.all()
 
     if not product:
-        flash('El insumo que intenta editar no existe.', 'danger')
+        flash('El insumo que intenta editar no existe.', 'insumo-danger')
         return redirect(url_for('inventory.list_products'))
 
     if request.method == 'POST':
@@ -84,7 +84,7 @@ def edit_product(product_id):
                 db.session.rollback()
                 errors['general'] = str(exc)
             else:
-                flash('Insumo actualizado correctamente.', 'success')
+                flash('Insumo actualizado correctamente.', 'insumo-success')
                 return redirect(url_for('inventory.list_products'))
 
         return render_template('inventory/product_form.html',

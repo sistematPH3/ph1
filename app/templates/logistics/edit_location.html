@@ -18,6 +18,12 @@
             
             <h2>Editar Sede Registrada</h2>
 
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages if category != 'success' %}
+                    <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            {% endwith %}
+
             {% if location_id == 1 %}
             <div class="alert alert-info small py-2 mb-4 text-center d-flex align-items-center justify-content-center" style="background-color: #e2f0fb; border-color: #b6d4fe; color: #052c65; border-radius: 12px;">
                 <i class="bi bi-shield-lock-fill me-2 fs-5"></i>
