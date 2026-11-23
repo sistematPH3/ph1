@@ -191,19 +191,21 @@ class AnalysisReportsTest(unittest.TestCase):
 
     # ----------------------------------------------------- reporte --------
     def test_reporte_lee_del_cajon_y_compara_con_periodo_anterior(self):
-        # Sede no central: no hay compras, PURCHASES se convierte en TRANSFERS y
-        # se lee el cajón de traslados con comparativo contra el período anterior.
+        # Sede no central: no hay compras, PURCHASES se convierte en TRANSFERS.
+        # El snapshot TRANSFERS solo contiene pérdidas, no volumen logístico;
+        # sin movimientos reales en el rango el total es 0, no los 200/150 del
+        # snapshot.
         reporte = svc.construir_reporte(
             svc.ReportFilters(location_id=self.sede_a.id, metric='PURCHASES',
                               period_type='MONTHLY', moneda='USD'),
             self.admin.id)
         self.assertEqual(reporte['filters']['metric'], 'TRANSFERS')
-        self.assertEqual(reporte['current']['amount_usd'], _redondo('200.00'))
-        self.assertEqual(reporte['previous']['amount_usd'], _redondo('150.00'))
+        self.assertEqual(reporte['current']['amount_usd'], _redondo('0.00'))
+        self.assertEqual(reporte['previous']['amount_usd'], _redondo('0.00'))
         comp = reporte['comparative']['USD']
-        self.assertEqual(comp['diferencia'], _redondo('50.00'))
-        self.assertEqual(comp['pct'], _redondo('33.33'))
-        self.assertEqual(comp['direccion'], 'up')
+        self.assertEqual(comp['diferencia'], _redondo('0.00'))
+        self.assertIsNone(comp['pct'])
+        self.assertEqual(comp['direccion'], 'flat')
         self.assertEqual(reporte['period']['label'], 'Septiembre 2026')
 
     def test_reporte_sin_snapshots_devuelve_ceros(self):
@@ -783,7 +785,7 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertTrue(cuerpo['success'])
         self.assertEqual(cuerpo['report']['filters']['metric'], 'TRANSFERS')
         self.assertEqual(cuerpo['report']['comparative']['USD']['diferencia'],
-                         _redondo('50.00'))
+                         _redondo('0.00'))
 
     def test_api_kpis_devuelve_las_cinco_tarjetas(self):
         client = self.app.test_client()
@@ -1654,10 +1656,12 @@ class AnalysisReportsTest(unittest.TestCase):
         self.assertEqual(evol[-2]['value'], _redondo('800.00'))
 
     def test_evolucion_traslados_grafica_conteo_de_registros(self):
+        # El snapshot TRANSFERS solo guarda pérdidas; no es el volumen ni el
+        # conteo de movimientos. Sin movimientos reales, la evolución es 0.
         evol = svc.obtener_evolucion([self.sede_a.id], 'TRANSFERS', 'MONTHLY',
                                      date(2026, 9, 15), 'USD', limite=2)
         self.assertEqual([p['value'] for p in evol],
-                         [_redondo('1.00'), _redondo('1.00')])
+                         [_redondo('0.00'), _redondo('0.00')])
 
     def test_evolucion_suma_la_empresa_completa(self):
         evol = svc.obtener_evolucion([self.central.id, self.sede_a.id,

@@ -267,9 +267,8 @@ class RegistroSnapshotsTest(unittest.TestCase):
         self.assertEqual(snap.amount_usd, Decimal("50.00"))
 
     def test_merma_pendiente_quedar_en_la_metrica_documentado(self):
-        # Comportamiento ACTUAL (documentado): la métrica WASTE anticipa las
-        # mermas PENDIENTE (misma fuente que filas_mermas), aunque el stock
-        # físico aún no se descuenta. Lo fijamos para que no cambie por sorpresa.
+        # La métrica WASTE solo cuenta mermas aprobadas (y líneas aprobadas de
+        # una cabecera parcial). Una merma PENDIENTE aún no impacta el cajón.
         tipo = WasteType(name="Ruptura cadena de frio", code="TEMPERATURA",
                          severity="CRITICA", requires_approval=True,
                          applies_central=True, is_active=True)
@@ -294,10 +293,7 @@ class RegistroSnapshotsTest(unittest.TestCase):
         from app.analytics.services.snapshots_service import generar_snapshots
         self.assertTrue(generar_snapshots(
             SnapshotPeriodType.MONTHLY, user_id=self.user.id)["success"])
-        snap = self._misma_consulta_snapshot(SnapshotMetric.WASTE)
-        self.assertIsNotNone(snap)
-        self.assertEqual(snap.quantity, Decimal("5.00"))
-        self.assertEqual(snap.amount_usd, Decimal("50.00"))
+        self.assertIsNone(self._misma_consulta_snapshot(SnapshotMetric.WASTE))
 
     # ==================================================================
     # 3) TRASLADOS -> TRANSFERS (solo pérdidas reales)
@@ -401,11 +397,11 @@ class RegistroSnapshotsTest(unittest.TestCase):
         db.session.commit()
 
         from app.analytics.services.snapshots_service import generar_snapshots
-        w = Waste(status="PENDIENTE", date=datetime.now(),
+        w = Waste(status="APROBADO", date=datetime.now(),
                   location_id=self.sede.id, user_id=self.user.id,
                   notes="cancelar",
                   details=[WasteDetail(product_id=self.product.id, quantity=5,
-                                       status="PENDIENTE",
+                                       status="APROBADO",
                                        unit_cost=Decimal("10"),
                                        lot_number="L-CAN")])
         db.session.add(w)
@@ -476,10 +472,7 @@ class RegistroSnapshotsTest(unittest.TestCase):
         self.assertEqual(detail.missing_quantity, Decimal("0.00"))
 
         generar_snapshots(SnapshotPeriodType.MONTHLY)
-        snap = self._misma_consulta_snapshot(SnapshotMetric.TRANSFERS)
-        self.assertIsNotNone(snap)
-        self.assertEqual(snap.quantity, Decimal("0.00"))
-        self.assertEqual(snap.amount_usd, Decimal("0.00"))
+        self.assertIsNone(self._misma_consulta_snapshot(SnapshotMetric.TRANSFERS))
 
     def test_resolver_baja_extraviado_mantiene_perdida_real(self):
         # La baja/extravío SÍ es pérdida: debe seguir contando tras resolver.

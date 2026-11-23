@@ -555,32 +555,30 @@ class SnapshotsTest(unittest.TestCase):
 
     def test_costo_operativo_formula_literal(self):
         from app.analytics.services.snapshots_service import (
-            calcular_periodo, obtener_costo_operativo,
+            obtener_costo_operativo,
         )
-        inicio, fin = calcular_periodo(SnapshotPeriodType.MONTHLY)
-        self._snapshot(SnapshotMetric.PURCHASES, inicio, fin, Decimal("1000.00"))
-        self._snapshot(SnapshotMetric.KITCHEN_CONSUMPTION, inicio, fin, Decimal("300.00"))
-        self._snapshot(SnapshotMetric.WASTE, inicio, fin, Decimal("150.00"))
-        self._snapshot(SnapshotMetric.TRANSFERS, inicio, fin, Decimal("50.00"))
-        resultado = obtener_costo_operativo(SnapshotPeriodType.MONTHLY)
-        self.assertEqual(resultado["compras"], Decimal("1000.00"))
-        self.assertEqual(resultado["consumo"], Decimal("300.00"))
-        self.assertEqual(resultado["mermas"], Decimal("150.00"))
-        self.assertEqual(resultado["perdidas"], Decimal("50.00"))
-        self.assertEqual(resultado["total"], Decimal("500.00"))
+        self._merma('APROBADO', Decimal('2.00'), unit_cost=Decimal('10.00'))
+        resultado = obtener_costo_operativo(
+            SnapshotPeriodType.MONTHLY, location_ids=[self.loc_a.id])
+        self.assertEqual(resultado["compras"], Decimal("0.00"))
+        self.assertEqual(resultado["consumo"], Decimal("0.00"))
+        self.assertEqual(resultado["mermas"], Decimal("20.00"))
+        self.assertEqual(resultado["perdidas"], Decimal("0.00"))
+        self.assertEqual(resultado["total"], Decimal("20.00"))
+        self.assertEqual(resultado["total"], resultado["consumo"]
+                         + resultado["mermas"] + resultado["perdidas"])
 
     def test_costo_operativo_filtra_por_sede(self):
         from app.analytics.services.snapshots_service import (
-            calcular_periodo, obtener_costo_operativo,
+            obtener_costo_operativo,
         )
-        inicio, fin = calcular_periodo(SnapshotPeriodType.MONTHLY)
-        self._snapshot(SnapshotMetric.PURCHASES, inicio, fin, Decimal("1000.00"),
-                       loc=self.loc_a)
-        self._snapshot(SnapshotMetric.PURCHASES, inicio, fin, Decimal("9999.00"),
-                       loc=self.loc_b)
-        resultado = obtener_costo_operativo(
+        self._merma('APROBADO', Decimal('2.00'), unit_cost=Decimal('10.00'))
+        en_a = obtener_costo_operativo(
             SnapshotPeriodType.MONTHLY, location_ids=[self.loc_a.id])
-        self.assertEqual(resultado["compras"], Decimal("1000.00"))
+        en_b = obtener_costo_operativo(
+            SnapshotPeriodType.MONTHLY, location_ids=[self.loc_b.id])
+        self.assertEqual(en_a["mermas"], Decimal("20.00"))
+        self.assertEqual(en_b["mermas"], Decimal("0.00"))
 
     def test_comparativo_contra_periodo_anterior(self):
         from app.analytics.services.snapshots_service import (
@@ -632,9 +630,9 @@ class SnapshotsTest(unittest.TestCase):
         self.assertEqual(len(ranking["sedes"]), 2)
         self.assertEqual(ranking["sedes"][0]["location_name"], "Sede A")
         self.assertEqual(ranking["sedes"][0]["mermas_qty"], Decimal("0.00"))
-        # Costo operativo = compras - consumo - mermas - pérdidas.
+        # Costo operativo = consumo + mermas + pérdidas (egresos positivos).
         self.assertEqual(ranking["sedes"][0]["costo_operativo"], Decimal("500.00"))
-        self.assertEqual(ranking["sedes"][1]["costo_operativo"], Decimal("400.00"))
+        self.assertEqual(ranking["sedes"][1]["costo_operativo"], Decimal("100.00"))
 
     def test_genera_alarmas_medios_son_null_comparativo_ok(self):
         from app.analytics.services.snapshots_service import (
@@ -825,8 +823,8 @@ class SnapshotsTest(unittest.TestCase):
         ).first()
         self.assertIsNone(snap)
 
-    def test_traslados_completado_sin_perdida_registra_cero(self):
-        """Recibido conforme (missing=0) genera registro de $0, no del envío."""
+    def test_traslados_completado_sin_perdida_no_genera_registro(self):
+        """Recibido conforme (missing=0) no es pérdida y no crea snapshot."""
         self._compra()
         self._traslado(missing=Decimal("0.00"), status="COMPLETADO")
         from app.analytics.services.snapshots_service import generar_snapshots
@@ -838,9 +836,7 @@ class SnapshotsTest(unittest.TestCase):
             period_type=SnapshotPeriodType.MONTHLY,
             period_start=inicio,
         ).first()
-        self.assertIsNotNone(snap)
-        self.assertEqual(snap.amount_usd, Decimal("0.00"))
-        self.assertEqual(snap.quantity, Decimal("0.00"))
+        self.assertIsNone(snap)
 
     def test_calcular_periodo_por_defecto_usa_reloj_ve(self):
         """Los límites de período siguen la fecha de Venezuela (UTC-4).
