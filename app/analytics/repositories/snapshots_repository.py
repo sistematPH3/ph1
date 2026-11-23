@@ -55,6 +55,8 @@ def filas_compras(inicio, fin):
     filas = []
     for p in compras:
         moneda = (p.currency or 'USD').upper()
+        if moneda in ('VES', 'BS.', 'BSS', 'BOLIVARES', 'BOLÍVARES'):
+            moneda = 'BS'
         if moneda not in ('USD', 'EUR', 'BS'):
             continue
         cantidad = sum((Decimal(str(d.quantity or 0)) for d in p.details),
@@ -115,8 +117,15 @@ def filas_consumo_cocina(inicio, fin):
                 )
                 data = {}
         data = data if isinstance(data, dict) else {}
+        # Cantidad efectiva: si el gasto fue editado, el movimiento
+        # compensatorio deja 'edited_quantity' en el log original. Se usa esa
+        # magnitud (mismo criterio que analysis_reports_repository.py) para
+        # que snapshot, paneles y vista en vivo reporten el consumo REAL.
         try:
-            cantidad = abs(Decimal(str(data.get('quantity_changed', 0) or 0)))
+            if data.get('edited_quantity') is not None:
+                cantidad = abs(Decimal(str(data.get('edited_quantity'))))
+            else:
+                cantidad = abs(Decimal(str(data.get('quantity_changed', 0) or 0)))
         except Exception as exc:
             logger.warning(
                 "No se pudo interpretar la cantidad del AuditLog %s: %s",
@@ -136,7 +145,7 @@ def filas_consumo_cocina(inicio, fin):
 
 
 def filas_mermas(inicio, fin):
-    """Líneas de mermas APROBADO + PENDIENTE + APROBADO_PARCIAL (sin canceladas).
+    """Líneas de mermas APROBADO + APROBADO_PARCIAL (sin canceladas).
 
     En una cabecera APROBADO_PARCIAL solo cuentan las líneas con estado
     'APROBADO' (las pendientes aún no impactan el cajón), replicando el criterio
@@ -145,7 +154,7 @@ def filas_mermas(inicio, fin):
     filas = WasteDetail.query \
         .join(Waste, WasteDetail.waste_id == Waste.id) \
         .filter(
-            Waste.status.in_(['APROBADO', 'PENDIENTE', 'APROBADO_PARCIAL']),
+            Waste.status.in_(['APROBADO', 'APROBADO_PARCIAL']),
             Waste.cancelled_at.is_(None),
             Waste.date >= datetime.combine(inicio, time.min),
             Waste.date <= datetime.combine(fin, time.max),
@@ -172,8 +181,8 @@ def filas_traslados(inicio, fin):
     cancelados/anulados/rechazados (CANCELADO, CANCELADO_EMISOR, ANULADO,
     RECHAZADO): un traslado que nunca salió no es una pérdida.
 
-    Se valoran las PÉRDIDAS (missing_quantity; si es nulo, la cantidad enviada)
-    usando el costo del LOTE EXACTO que se envió.
+    Se valoran SOLO las PÉRDIDAS reales (missing_quantity > 0) usando el costo
+    del LOTE EXACTO que se envió; un despacho conforme no es una pérdida.
     """
     filas = MovementDetail.query \
         .join(Movement, MovementDetail.movement_id == Movement.id) \
@@ -189,8 +198,8 @@ def filas_traslados(inicio, fin):
         mov = d.movement
         if not mov.origin_location_id:
             continue
-        perdida = d.missing_quantity if d.missing_quantity is not None else d.quantity
-        if perdida is None:
+        perdida = d.missing_quantity
+        if perdida is None or perdida <= 0:
             continue
         resultado.append({
             'location_id': mov.origin_location_id,

@@ -300,7 +300,7 @@ def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, locatio
 
 
 def asegurar_ventana_alarmas(period_type=SnapshotPeriodType.MONTHLY,
-                            corte=None, user_id=None):
+                            corte=None, user_id=None, location_ids=None):
     """Garantiza los snapshots que necesita la evaluación de alarmas.
 
     La alarma compara el período actual contra los 3 anteriores. El dashboard
@@ -318,12 +318,14 @@ def asegurar_ventana_alarmas(period_type=SnapshotPeriodType.MONTHLY,
         period_type = SnapshotPeriodType.MONTHLY
     ventana = periodos_historia(period_type, limite=4, corte=corte)
     inicios = [p[0] for p in ventana]
-    existentes = {
-        s.period_start for s in StatisticsSnapshot.query.filter(
-            StatisticsSnapshot.period_type == period_type,
-            StatisticsSnapshot.period_start.in_(inicios),
-        ).all()
-    }
+    consulta = StatisticsSnapshot.query.filter(
+        StatisticsSnapshot.period_type == period_type,
+        StatisticsSnapshot.period_start.in_(inicios),
+    )
+    if location_ids:
+        consulta = consulta.filter(
+            StatisticsSnapshot.location_id.in_(location_ids))
+    existentes = {s.period_start for s in consulta.all()}
     actual = ventana[-1][0]
     hay_antecedente = any(p[0] in existentes for p in ventana[:-1])
     if actual in existentes and hay_antecedente:
@@ -614,40 +616,55 @@ def obtener_ultimo_periodo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
 
 def obtener_costo_operativo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
                             moneda='USD', location_ids=None):
-    """Costo operativo del período más reciente, fórmula literal de la propuesta:
+    """Egresos operativos del período (siempre en positivo).
 
-        Compras − consumo cocina − mermas − pérdidas en traslado
-
-    Devuelve el desglose por métrica y el total, en la moneda pedida.
+    Delega en `consolidado_financiero` para usar la misma fórmula que
+    Estadísticas y Finanzas: gastos de cocina + mermas + pérdidas de traslado.
+    Las compras se informan aparte (`total_registrado`); no se restan.
     """
-    campo = 'amount_bs' if moneda.upper() == 'BS' else (
-        'amount_eur' if moneda.upper() == 'EUR' else 'amount_usd')
-    inicio, _ = calcular_periodo(period_type, corte)
-    consulta = StatisticsSnapshot.query.filter_by(
-        period_type=period_type, period_start=inicio,
+    from app.analytics.services.analysis_reports_service import (
+        consolidado_financiero,
     )
-    if location_ids:
-        consulta = consulta.filter(StatisticsSnapshot.location_id.in_(location_ids))
-    totales = {'PURCHASES': Decimal('0.00'), 'KITCHEN_CONSUMPTION': Decimal('0.00'),
-               'WASTE': Decimal('0.00'), 'TRANSFERS': Decimal('0.00')}
-    for s in consulta.all():
-        if s.metric in totales:
-            totales[s.metric] += Decimal(str(getattr(s, campo) or 0))
-    operativo = (
-        totales['PURCHASES'] - totales['KITCHEN_CONSUMPTION']
-        - totales['WASTE'] - totales['TRANSFERS']
-    )
+
+    inicio, fin = calcular_periodo(period_type, corte)
+    ids = location_ids or [loc.id for loc in Location.query.filter_by(
+        is_active=True).all()]
+    cero = Decimal('0.00')
+    if not ids:
+        return {
+            'moneda': moneda.upper(), 'period_type': period_type,
+            'period_start': inicio.isoformat(),
+            'period_label': _etiqueta_periodo(period_type, inicio),
+            'metricas': {m: cero for m in METRICAS},
+            'compras': cero, 'consumo': cero, 'mermas': cero,
+            'perdidas': cero, 'total': cero, 'total_registrado': cero,
+            'por_concepto': [],
+        }
+    consolidado = consolidado_financiero(ids, inicio, fin, moneda,
+                                          incluir_compras=True)
+    conceptos = {f['concepto']: f['monto']
+                 for f in consolidado['por_concepto']}
+    consumo = conceptos.get('Gastos de cocina', cero)
+    mermas = consolidado['mermas']
+    perdidas = consolidado['perdidas_traslado']
     return {
-        'moneda': moneda.upper(),
+        'moneda': consolidado['moneda'],
         'period_type': period_type,
         'period_start': inicio.isoformat(),
         'period_label': _etiqueta_periodo(period_type, inicio),
-        'metricas': totales,
-        'compras': totales['PURCHASES'],
-        'consumo': totales['KITCHEN_CONSUMPTION'],
-        'mermas': totales['WASTE'],
-        'perdidas': totales['TRANSFERS'],
-        'total': operativo,
+        'metricas': {
+            SnapshotMetric.PURCHASES: consolidado['total_compras'],
+            SnapshotMetric.KITCHEN_CONSUMPTION: consumo,
+            SnapshotMetric.WASTE: mermas,
+            SnapshotMetric.TRANSFERS: perdidas,
+        },
+        'compras': consolidado['total_compras'],
+        'consumo': consumo,
+        'mermas': mermas,
+        'perdidas': perdidas,
+        'total': consolidado['total_operativo'],
+        'total_registrado': consolidado['total_registrado'],
+        'por_concepto': consolidado['por_concepto'],
     }
 
 
@@ -690,12 +707,13 @@ def obtener_comparativo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
         valor_anterior = montos[anterior[0]]
         diff = valor_actual - valor_anterior
         variacion = (((valor_actual / valor_anterior) - 1) * 100
-                     if valor_anterior else Decimal('0.00'))
+                     if valor_anterior else None)
         metricas[metric] = {
             'actual': valor_actual,
             'anterior': valor_anterior,
             'diff': diff,
-            'variacion_pct': _redondear(variacion),
+            'variacion_pct': (_redondear(variacion)
+                              if variacion is not None else None),
         }
     return {
         'moneda': str(moneda).upper(),
@@ -716,7 +734,8 @@ def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
     - mermas_cantidad: cantidad de mermas
     - traslados: valor de traslados (quién genera más traslados)
     - perdidas_traslado: pérdidas en traslado (quién pierde más en traslados)
-    - costo_operativo: compras - consumo - mermas - traslados
+    - perdidas_traslado: pérdidas reales en traslado
+    - costo_operativo: consumo + mermas + pérdidas (egresos positivos)
 
     Cada ranking incluye location_id, location_name, valor y posición.
     """
@@ -749,8 +768,9 @@ def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
     nombres = {loc.id: loc.name for loc in Location.query.all()}
     sedes = []
     for loc_id, datos in por_sede.items():
+        datos['perdidas_traslado'] = datos['traslados']
         datos['costo_operativo'] = (
-            datos['compras'] - datos['consumo'] - datos['mermas'] - datos['traslados'])
+            datos['consumo'] + datos['mermas'] + datos['perdidas_traslado'])
         datos['gasto_total'] = datos['compras'] + datos['consumo']
         sedes.append({
             'location_id': loc_id,
@@ -772,7 +792,7 @@ def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
         'mermas_costo': _ranking(sedes, 'mermas'),
         'mermas_cantidad': _ranking(sedes, 'mermas_qty'),
         'traslados': _ranking(sedes, 'traslados'),
-        'perdidas_traslado': _ranking(sedes, 'traslados'),
+        'perdidas_traslado': _ranking(sedes, 'perdidas_traslado'),
         'costo_operativo': _ranking(sedes, 'costo_operativo'),
         'compras': _ranking(sedes, 'compras'),
     }
@@ -788,8 +808,8 @@ def obtener_ranking_sedes(period_type=SnapshotPeriodType.MONTHLY, corte=None,
 
 
 def obtener_mermas_por_tipo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
-                            location_ids=None):
-    """Costo y cantidad de mermas del período por tipo, en USD (base del cajón).
+                            location_ids=None, moneda='USD'):
+    """Costo y cantidad de mermas del período por tipo, en la moneda pedida.
 
     Misma fuente y criterios que el snapshot WASTE (filas_mermas): cabeceras
     APROBADO/PENDIENTE/APROBADO_PARCIAL (solo líneas APROBADO en las parciales),
@@ -807,6 +827,10 @@ def obtener_mermas_por_tipo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
 
     from app.models.waste_model import Waste, WasteDetail, WasteType
 
+    moneda = (moneda or 'USD').upper()
+    if moneda not in ('USD', 'BS', 'EUR'):
+        moneda = 'USD'
+
     inicio, fin = calcular_periodo(period_type, corte)
     consulta = WasteDetail.query \
         .join(Waste, WasteDetail.waste_id == Waste.id) \
@@ -820,6 +844,18 @@ def obtener_mermas_por_tipo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
     if location_ids:
         consulta = consulta.filter(Waste.location_id.in_(location_ids))
 
+    def convertir(usd, fecha, cache):
+        if moneda == 'USD':
+            return usd
+        tasas = _tasas_en(fecha, cache=cache)
+        rate_usd = tasas.get('USD')
+        rate_eur = tasas.get('EUR')
+        if moneda == 'BS':
+            return _redondear(usd * rate_usd) if rate_usd else Decimal('0.00')
+        return (_redondear(usd * rate_usd / rate_eur)
+                if rate_usd and rate_eur else Decimal('0.00'))
+
+    cache_tasas = {}
     grupos = collections.OrderedDict()
     for detalle in consulta.all():
         if not detalle.waste.location_id:
@@ -833,14 +869,18 @@ def obtener_mermas_por_tipo(period_type=SnapshotPeriodType.MONTHLY, corte=None,
                 'tipo': (detalle.waste_type.name if detalle.waste_type else 'Sin tipo'),
                 'cantidad': Decimal('0.00'),
                 'monto_usd': Decimal('0.00'),
+                'monto': Decimal('0.00'),
             }
-        grupos[clave]['cantidad'] += Decimal(str(detalle.quantity or 0))
-        grupos[clave]['monto_usd'] += _redondear(
+        usd = _redondear(
             Decimal(str(detalle.unit_cost or 0)) * Decimal(str(detalle.quantity or 0)))
+        grupos[clave]['cantidad'] += Decimal(str(detalle.quantity or 0))
+        grupos[clave]['monto_usd'] += usd
+        grupos[clave]['monto'] += convertir(usd, detalle.waste.date, cache_tasas)
 
     por_tipo = sorted(grupos.values(),
-                      key=lambda g: g['monto_usd'], reverse=True)
+                      key=lambda g: g['monto'], reverse=True)
     return {
+        'moneda': moneda,
         'period_type': period_type,
         'period_start': inicio.isoformat(),
         'period_label': _etiqueta_periodo(period_type, inicio),
