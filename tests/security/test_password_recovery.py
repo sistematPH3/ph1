@@ -13,6 +13,7 @@ import unittest
 from datetime import timedelta
 
 from sqlalchemy import create_engine, text
+from werkzeug.security import check_password_hash
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -86,12 +87,21 @@ class BaseRecuperacion(unittest.TestCase):
     def _enviar_falso(self, email, token):
         return self._envio_ok
 
-    def _crear_usuario(self, email=EMAIL_PRUEBA, activo=True):
+    def _crear_usuario(self, email=EMAIL_PRUEBA, activo=True, role_id=0):
         usuario = User(email=email, name='Prueba Rec',
-                       password_hash='x', is_active=activo, role_id=0)
+                       password_hash='x', is_active=activo, role_id=role_id)
         db.session.add(usuario)
         db.session.commit()
         return usuario
+
+    def _rol_no_invitado(self):
+        """Rol asignado para probar cuentas inactivas que no son invitados."""
+        rol = db.session.get(Role, 90)
+        if rol is None:
+            rol = Role(id=90, name='Operations')
+            db.session.add(rol)
+            db.session.commit()
+        return rol
 
     def _limpiar(self):
         db.session.rollback()
@@ -221,6 +231,34 @@ class TestSolicitud(BaseRecuperacion):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(self._tokens()), 1)
 
+    def test_invitado_pendiente_puede_recuperar_y_cambiar_su_clave(self):
+        """Un invitado tiene is_active=False (pendiente) y aun asi debe poder."""
+        invitado = self._crear_usuario('invitado.pendiente@prueba.test',
+                                       activo=False, role_id=0)
+        try:
+            r = self.client.post('/auth/forgot-password',
+                                 json={'email': invitado.email})
+            self.assertEqual(r.status_code, 200, r.get_json())
+
+            token = PasswordRecovery.query.filter_by(
+                user_id=invitado.id, used=False).one()
+
+            r = self.client.post(f'/auth/reset-password/{token.token}',
+                                 json={'new_password': 'Invitado1!'})
+            self.assertEqual(r.status_code, 200, r.get_json())
+
+            db.session.refresh(invitado)
+            self.assertTrue(check_password_hash(invitado.password_hash,
+                                                'Invitado1!'))
+            self.assertTrue(token.used, 'el token debe consumirse')
+        finally:
+            LoginAudit.query.filter_by(user_id=invitado.id).delete(
+                synchronize_session=False)
+            PasswordRecovery.query.filter_by(user_id=invitado.id).delete(
+                synchronize_session=False)
+            db.session.delete(invitado)
+            db.session.commit()
+
     def test_error_de_bd_al_guardar_responde_500(self):
         """Si la BD falla no se puede responder como si el correo salio."""
         original = svc.guardar_token
@@ -264,7 +302,10 @@ class TestSolicitud(BaseRecuperacion):
                          'el token se elimina si el usuario nunca lo recibio')
 
     def test_usuario_inactivo_responde_403_y_no_crea_token(self):
-        inactivo = self._crear_usuario('inactivo@prueba.test', activo=False)
+        inactivo = self._crear_usuario(
+            'inactivo@prueba.test', activo=False,
+            role_id=self._rol_no_invitado().id,
+        )
         try:
             r = self.client.post('/auth/forgot-password',
                                  json={'email': 'inactivo@prueba.test'})
@@ -313,9 +354,24 @@ class TestConsultaCorreoEnVivo(BaseRecuperacion):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json(), {'existe': False, 'activa': False})
 
+    def test_invitado_pendiente_se_reporta_como_activo(self):
+        """El formulario no debe bloquear al invitado con "cuenta no activa"."""
+        invitado = self._crear_usuario('invitado.consulta@prueba.test',
+                                       activo=False, role_id=0)
+        try:
+            r = self.client.post('/auth/forgot-password/check-email',
+                                 json={'email': invitado.email})
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json(), {'existe': True, 'activa': True})
+        finally:
+            db.session.delete(invitado)
+            db.session.commit()
+
     def test_correo_existente_pero_inactivo(self):
-        inactivo = self._crear_usuario('inactivo-consulta@prueba.test',
-                                       activo=False)
+        inactivo = self._crear_usuario(
+            'inactivo-consulta@prueba.test', activo=False,
+            role_id=self._rol_no_invitado().id,
+        )
         try:
             r = self.client.post('/auth/forgot-password/check-email',
                                  json={'email': 'inactivo-consulta@prueba.test'})

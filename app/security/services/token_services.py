@@ -119,7 +119,10 @@ def solicitar_recuperacion(email):
         )
         return "email_no_existe"
 
-    if not usuario.is_active:
+    # Los invitados son cuentas pendientes (is_active=False) y aun asi deben
+    # poder recuperar su clave: el bloqueo por inactividad aplica solo a
+    # usuarios con rol asignado, igual que en el login.
+    if not usuario.is_active and not usuario.is_guest:
         current_app.logger.info(
             "Recuperacion: solicitud para una cuenta inactiva (user_id=%s)",
             usuario.id,
@@ -174,7 +177,9 @@ def estado_correo_recuperacion(email):
     usuario = buscar_usuario_por_email(email)
     if usuario is None:
         return {"existe": False, "activa": False}
-    return {"existe": True, "activa": bool(usuario.is_active)}
+    # Un invitado pendiente puede recuperar su clave: para el formulario cuenta
+    # como activo y no se le muestra el aviso de "cuenta no activa".
+    return {"existe": True, "activa": bool(usuario.is_active or usuario.is_guest)}
 
 
 def purgar_tokens_vencidos():

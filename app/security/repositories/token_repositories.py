@@ -4,7 +4,7 @@ import logging
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models.security_model import User, PasswordRecovery
+from app.models.security_model import PasswordRecovery, Role, User
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +21,22 @@ def ahora():
 
 
 def obtener_usuario_por_email(email):
-    """Devuelve un usuario activo o None. No filtra por rol (0 = invitado)."""
+    """
+    Devuelve un usuario que puede recuperar su contrasena o None.
+
+    Incluye a los invitados aunque tengan is_active=False: en este sistema ese
+    valor significa "registro pendiente de aprobacion", no una cuenta
+    deshabilitada por el administrador (ver LoginService.autenticar).
+    """
     if not email:
         return None
     return User.query.filter(
         User.email == email.strip(),
-        User.is_active.is_(True),
+        db.or_(
+            User.is_active.is_(True),
+            User.role_id == 0,
+            User.role.has(db.func.lower(Role.name) == 'guest'),
+        ),
     ).first()
 
 
