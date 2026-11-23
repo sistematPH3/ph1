@@ -7,8 +7,8 @@ class LayoutValidators:
     @staticmethod
     def validate_characters(form, field):
         """Evita que metan símbolos raros en nombres de sedes o usuarios"""
-        if field.data and not re.match(r"^[a-zA-Z0-9 áéíóúÁÉÍÓÚñÑüÜ.]*$", field.data):
-            raise ValidationError("El campo contine caracteres invalidos. Use solo letras y numeros.")
+        if field.data and not re.match(r"^[a-zA-Z0-9 áéíóúÁÉÍÓÚñÑüÜ.()\-]*$", field.data):
+            raise ValidationError("El campo contiene caracteres inválidos. Use solo letras, números, espacios, paréntesis y guiones.")
 
     @staticmethod
     def validate_phone(form, field):

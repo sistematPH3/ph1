@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(nameTimeout);
             const val = this.value.trim();
             
-            const regex = /^[a-zA-Z0-9 áéíóúÁÉÍÓÚñÑüÜ.]*$/;
+            const regex = /^[a-zA-Z0-9 áéíóúÁÉÍÓÚñÑüÜ.()\-]*$/;
             if (val && !regex.test(val)) {
                 marcarError(this, "El nombre contiene caracteres inválidos.");
                 return; 
