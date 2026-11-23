@@ -95,6 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 showFieldError(unitCustomInput, 'Especifique la nueva unidad de medida.');
                 return false;
             }
+            if (unitCustomInput.value.trim().length > 100) {
+                showFieldError(unitCustomInput, 'La unidad no puede exceder los 100 caracteres.');
+                return false;
+            }
             clearFieldError(unitCustomInput);
         }
         return true;

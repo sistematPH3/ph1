@@ -8,7 +8,7 @@
 <div class="form-container">
     <h2>{% if product %}Editar Producto{% else %}Nuevo Producto{% endif %}</h2>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% with messages = get_flashed_messages(with_categories=true, category_filter=['insumo-success', 'insumo-danger']) %}
         {% if messages %}
             {% for class_alert, message in messages %}
                 <div class="alert-error" style="background-color: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #fecaca; font-weight: 600; font-size: 0.9rem;">
@@ -59,7 +59,7 @@
             <input type="text" id="unit_of_measure_custom" name="unit_of_measure_custom" 
                    value="{{ data.get('unit_of_measure', '') }}" 
                    placeholder="Especifique la nueva unidad" 
-                   maxlength="20"
+                   maxlength="100"
                    style="display: none; margin-top: 0.5rem;">
                    
             {% if errors and errors.get('unit_of_measure') %}<span class="error-text">{{ errors.unit_of_measure }}</span>{% endif %}

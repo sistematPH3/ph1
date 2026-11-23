@@ -51,7 +51,7 @@ class Product(db.Model):
     # RELACIÓN ÚNICA: Conectado al Tipo Operativo para heredar sus reglas
     product_type_id = db.Column(db.Integer, db.ForeignKey('product_types.id'), nullable=True)
     
-    unit_of_measure = db.Column(db.String(20))
+    unit_of_measure = db.Column(db.String(100))
     # CAMPO AÑADIDO: Límite de merma en la unidad del producto (se configura en product_form)
     waste_limit = db.Column(db.Numeric(10, 2))
     # Mínimo de stock en la unidad del producto (obligatorio en el formulario).

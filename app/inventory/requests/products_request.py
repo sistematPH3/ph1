@@ -63,8 +63,8 @@ def validate_product_form(data, current_product_id=None):
     elif unit_select == 'OTHER':
         if not unit_custom:
             errors['unit_of_measure'] = 'Debe especificar la nueva unidad de medida.'
-        elif len(unit_custom) > 20:
-            errors['unit_of_measure'] = 'La unidad no puede exceder los 20 caracteres.'
+        elif len(unit_custom) > 100:
+            errors['unit_of_measure'] = 'La unidad no puede exceder los 100 caracteres.'
         else:
             unit_of_measure = unit_custom
     else:
