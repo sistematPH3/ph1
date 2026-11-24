@@ -45,7 +45,10 @@ class Product(db.Model):
     """
     __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    # El nombre identifica al insumo en todo el catálogo: no se permiten
+    # duplicados (ni siquiera variando mayúsculas/minúsculas, lo cual valida
+    # la capa de aplicación).
+    name = db.Column(db.String(100), nullable=False, unique=True)
     sku = db.Column(db.String(50), unique=True, nullable=False)
     
     # RELACIÓN ÚNICA: Conectado al Tipo Operativo para heredar sus reglas

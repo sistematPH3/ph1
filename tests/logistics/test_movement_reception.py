@@ -1164,7 +1164,7 @@ class MovementReceptionTest(unittest.TestCase):
     # =========================================================================
     def test_mismo_producto_erroneo_con_dos_lotes_diferentes(self):
         env = self._seed(dispatched=10)
-        extra_product = Product(name="Tomate", sku="TOM-EXT", unit_of_measure="kg", min_stock=20)
+        extra_product = Product(name="Tomate Extra", sku="TOM-EXT", unit_of_measure="kg", min_stock=20)
         db.session.add(extra_product)
         db.session.flush()
         items = [{

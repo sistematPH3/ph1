@@ -12,6 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const skuInput = document.getElementById('sku');
     const wasteLimitInput = document.getElementById('waste_limit');
     const minStockInput = document.getElementById('min_stock');
+    const submitBtn = document.getElementById('btn-submit');
+    const nameRealtimeError = document.getElementById('name-realtime-error');
+    const checkNameUrl = mainForm ? mainForm.dataset.checkNameUrl : '';
+    const currentProductId = mainForm ? mainForm.dataset.productId : '';
+    let nameAlreadyExists = false;
+    let nameCheckTimer = null;
+    let nameCheckRequestId = 0;
 
     // Elementos del Modal de Categoría
     const modalOverlay = document.getElementById('categoryModalOverlay');
@@ -110,6 +117,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         clearFieldError(skuInput);
         return true;
+    }
+
+    // ---------------------------------------------------------------------
+    // VALIDACIÓN EN TIEMPO REAL DEL NOMBRE (DUPLICADOS)
+    // ---------------------------------------------------------------------
+    function setNameExists(exists) {
+        nameAlreadyExists = exists;
+        if (nameRealtimeError) {
+            nameRealtimeError.style.display = exists ? 'block' : 'none';
+        }
+        if (nameInput) {
+            nameInput.style.borderColor = exists ? '#d62300' : '';
+            nameInput.setAttribute('aria-invalid', exists ? 'true' : 'false');
+        }
+        if (submitBtn) {
+            submitBtn.disabled = exists;
+            submitBtn.setAttribute('aria-disabled', exists ? 'true' : 'false');
+        }
+    }
+
+    async function checkNameAvailability() {
+        if (!nameInput || !checkNameUrl) return;
+
+        const name = nameInput.value.trim();
+        if (!name) {
+            setNameExists(false);
+            return;
+        }
+
+        const requestId = ++nameCheckRequestId;
+        const params = new URLSearchParams({ name });
+        // En edición el propio insumo no debe contarse como duplicado.
+        if (currentProductId) params.set('exclude_id', currentProductId);
+
+        try {
+            const response = await fetch(checkNameUrl + '?' + params.toString(), {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) return;
+
+            const result = await response.json();
+            // Descarta respuestas antiguas si el usuario siguió escribiendo.
+            if (requestId !== nameCheckRequestId) return;
+            setNameExists(Boolean(result.exists));
+        } catch (err) {
+            // Un fallo de red no bloquea el guardado: el backend vuelve a
+            // validar el duplicado al enviar el formulario.
+            console.error('No se pudo verificar el nombre del insumo:', err);
+        }
+    }
+
+    function scheduleNameCheck() {
+        if (nameCheckTimer) clearTimeout(nameCheckTimer);
+        nameCheckTimer = setTimeout(checkNameAvailability, 350);
     }
 
     // Límite real de una columna NUMERIC(10, 2) en la base de datos.
@@ -263,7 +324,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (nameInput) {
         nameInput.addEventListener('blur', validateName);
-        nameInput.addEventListener('input', () => { if (nameInput.value.trim()) clearFieldError(nameInput); });
+        nameInput.addEventListener('blur', checkNameAvailability);
+        nameInput.addEventListener('input', () => {
+            if (nameInput.value.trim()) clearFieldError(nameInput);
+            // Al cambiar el texto se libera el botón y se revalida con debounce.
+            if (nameAlreadyExists) setNameExists(false);
+            scheduleNameCheck();
+        });
     }
     if (productTypeSelect) productTypeSelect.addEventListener('change', validateProductType);
     if (unitSelect) unitSelect.addEventListener('change', validateUnit);
@@ -294,6 +361,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (mainForm) {
         mainForm.addEventListener('submit', (e) => {
+            if (nameAlreadyExists) {
+                e.preventDefault();
+                setNameExists(true);
+                nameInput.focus();
+                nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
             const isNameValid = validateName();
             const isTypeValid = validateProductType();
             const isUnitValid = validateUnit();

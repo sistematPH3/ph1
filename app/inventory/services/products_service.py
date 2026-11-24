@@ -66,9 +66,13 @@ class ProductService:
         if existing_product:
             raise ValueError(f"El SKU '{cleaned_sku}' ya está registrado.")
 
+        name = data.get('name', '').strip()
+        if ProductRepository.find_by_name(name):
+            raise ValueError('Ya existe un insumo registrado con este nombre.')
+
         # CAMBIO AQUÍ: Se instancia con product_type_id
         new_product = Product(
-            name=data.get('name', '').strip(),
+            name=name,
             sku=cleaned_sku,
             product_type_id=data.get('product_type_id'),
             unit_of_measure=data.get('unit_of_measure', '').strip(),
@@ -97,6 +101,10 @@ class ProductService:
             existing_product = ProductRepository.find_by_sku(cleaned_sku)
             if existing_product:
                 raise ValueError(f"El SKU '{cleaned_sku}' ya está registrado por otro insumo.")
+
+        existing_by_name = ProductRepository.find_by_name(name)
+        if existing_by_name and existing_by_name.id != product.id:
+            raise ValueError('Ya existe un insumo registrado con este nombre.')
 
         product.name = name
         # CAMBIO AQUÍ: Se actualiza product_type_id

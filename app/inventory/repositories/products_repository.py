@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from app.models.inventory_model import Product  
 from app import db
 
@@ -21,6 +22,14 @@ class ProductRepository:
     @staticmethod
     def find_by_sku(sku):
         return Product.query.filter_by(sku=sku).first()
+
+    @staticmethod
+    def find_by_name(name):
+        """Busca un insumo por nombre sin distinguir mayúsculas/minúsculas."""
+        normalized = (name or '').strip().lower()
+        if not normalized:
+            return None
+        return Product.query.filter(func.lower(Product.name) == normalized).first()
 
     @staticmethod
     def save(product):

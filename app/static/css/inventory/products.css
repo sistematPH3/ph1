@@ -208,6 +208,13 @@
     transform: translateY(-2px);
 }
 
+.btn:disabled,
+.btn:disabled:hover {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-secondary {
     background-color: #d62300;
     color: #ffffff;

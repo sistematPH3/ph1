@@ -1,5 +1,5 @@
 import re
-from sqlalchemy.exc import DataError
+from sqlalchemy.exc import DataError, IntegrityError
 from flask import render_template, request, redirect, url_for, flash, jsonify
 from app.extensions import db
 from app.inventory.services.products_service import ProductService
@@ -46,6 +46,12 @@ def create_product():
             except DataError:
                 db.session.rollback()
                 errors['general'] = _range_error_message()
+            except IntegrityError:
+                # Salvaguarda ante una carrera entre la validación y el guardado:
+                # el índice único de la base de datos impide el duplicado.
+                db.session.rollback()
+                errors['general'] = ('Ya existe un insumo registrado con este '
+                                     'nombre o SKU.')
             except ValueError as exc:
                 db.session.rollback()
                 errors['general'] = str(exc)
@@ -80,6 +86,12 @@ def edit_product(product_id):
             except DataError:
                 db.session.rollback()
                 errors['general'] = _range_error_message()
+            except IntegrityError:
+                # Salvaguarda ante una carrera entre la validación y el guardado:
+                # el índice único de la base de datos impide el duplicado.
+                db.session.rollback()
+                errors['general'] = ('Ya existe un insumo registrado con este '
+                                     'nombre o SKU.')
             except ValueError as exc:
                 db.session.rollback()
                 errors['general'] = str(exc)
@@ -106,6 +118,23 @@ def edit_product(product_id):
     return render_template('inventory/product_form.html',
                            **_form_context(product=product, data=data, errors={},
                                            product_types=product_types))
+
+
+@inventory_bp.route('/products/check-name', methods=['GET'])
+@require_roles('admin', 'management', 'manager', 'assistant_manager', 'operations')
+def check_name():
+    """Consulta ligera para la validación en tiempo real del nombre."""
+    name = request.args.get('name', '')
+    exclude_id = request.args.get('exclude_id')
+
+    existing_product = ProductRepository.find_by_name(name)
+    exists = bool(existing_product)
+
+    # Al editar, el propio insumo no debe marcarse como duplicado.
+    if exists and exclude_id and str(existing_product.id) == str(exclude_id):
+        exists = False
+
+    return jsonify({'exists': exists})
 
 
 @inventory_bp.route('/products/check_sku', methods=['POST'])

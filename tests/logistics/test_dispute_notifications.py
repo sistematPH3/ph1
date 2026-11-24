@@ -81,7 +81,8 @@ class DisputeNotificationsTest(unittest.TestCase):
     def _seed_dispute(self, status="FALTANTE_CONTEO", movement_id_bias=0):
         loc_origin = Location(name="Sede Origen", state="Caracas")
         loc_dest = Location(name="Sede Destino", state="Caracas")
-        product = Product(name="Tomate", sku="TOM-%s%s" % (status, movement_id_bias))
+        product = Product(name="Tomate %s%s" % (status, movement_id_bias),
+                          sku="TOM-%s%s" % (status, movement_id_bias))
         role = Role(name="Administrator")
         db.session.add(role)
         db.session.flush()

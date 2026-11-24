@@ -38,6 +38,10 @@ def validate_product_form(data, current_product_id=None):
         errors['name'] = 'El nombre del producto es obligatorio.'
     elif len(name) > 100:
         errors['name'] = 'El nombre no puede exceder los 100 caracteres.'
+    else:
+        existing_by_name = ProductRepository.find_by_name(name)
+        if existing_by_name and str(existing_by_name.id) != str(current_product_id):
+            errors['name'] = 'Ya existe un insumo registrado con este nombre.'
 
     raw_sku = data.get('sku', '').strip()
     cleaned_sku = re.sub(r'[^A-Z0-9-]', '', raw_sku.upper())

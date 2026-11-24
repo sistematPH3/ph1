@@ -179,10 +179,10 @@ class UnitOfMeasureLimitTest(unittest.TestCase):
             str(Path(__file__).resolve().parents[2] / "migrations"),
         )
         script = ScriptDirectory.from_config(config)
-        self.assertEqual(script.get_heads(), ["b3e8f1a72c94"])
+        self.assertEqual(script.get_heads(), ["a4c9f2e61b7d"])
         self.assertEqual(script.get_bases(), ["7c0cb8c45047"])
-        revision = script.get_revision("b3e8f1a72c94")
-        self.assertEqual(revision.down_revision, "9f3a1c2d4e5b")
+        revision = script.get_revision("a4c9f2e61b7d")
+        self.assertEqual(revision.down_revision, "e7a1b3c95d02")
 
 
 if __name__ == "__main__":
