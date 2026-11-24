@@ -39,7 +39,7 @@
         </div>
     </div>
 
-    {% if purchase.status == 'ANNULLED' and audit_log %}
+    {% if purchase.status == 'ANNULLED' and audit_log and audit_timestamp_local %}
     <div class="alert alert-danger d-flex flex-column flex-md-row align-items-md-center shadow-sm mb-4" style="border-radius: 12px; border-left: 6px solid #842029; background-color: #f8d7da;">
         <i class="bi bi-exclamation-triangle-fill fs-2 me-3 mb-2 mb-md-0" style="color: #842029;"></i>
         <div>
@@ -72,15 +72,15 @@
                             <label class="form-label text-muted small text-uppercase fw-bold mb-2 d-block">Comprobante Físico</label>
                             <div>
                                 {# invoice_url vale "En proceso..." mientras la
-                                   subida a ImgBB corre y si esa subida falla se
-                                   queda en ese valor para siempre. En ambos
-                                   casos NO es una URL: enlazarla producia un
-                                   boton que llevaba a una pagina inexistente. #}
+                                   subida a ImgBB corre y pasa a "Comprobante no
+                                   guardado" si la subida falla. En ambos casos
+                                   NO es una URL: enlazarla producia un boton que
+                                   llevaba a una pagina inexistente. #}
                                 {% if purchase.invoice_url and purchase.invoice_url.startswith('http') %}
                                 <a href="{{ purchase.invoice_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-medium w-100 w-md-auto">
                                     <i class="bi bi-link-45deg fs-6 align-middle"></i> Ver Evidencia Fotográfica
                                 </a>
-                                {% elif purchase.invoice_url == 'En proceso...' %}
+                                {% elif purchase.invoice_url in ['En proceso...', 'Comprobante no guardado'] %}
                                 <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-0 small">
                                     <i class="bi bi-exclamation-triangle-fill mt-1"></i>
                                     <span>

@@ -231,14 +231,14 @@ class RegisterPurchaseBsTest(unittest.TestCase):
             "detalle": "simulado para la prueba",
         }
 
-        # El OCR tarda decenas de segundos por foto y la subida a ImgBB va en
-        # un hilo: lo que se prueba aqui es la regla de fechas de la ruta.
+        # El OCR tarda decenas de segundos por foto y la subida a ImgBB sale a
+        # la red: lo que se prueba aqui es la regla de fechas de la ruta.
         with mock.patch.object(rutas, "leer_texto",
                                lambda archivo: (["FACTURA"], None)), \
                 mock.patch.object(rutas, "evaluar_comprobante",
                                   lambda lineas, umbral=60: dict(veredicto)), \
-                mock.patch.object(rutas, "bg_upload_invoice",
-                                  lambda *args, **kwargs: None):
+                mock.patch.object(rutas, "upload_invoice_image",
+                                  lambda memoria: "https://i.ibb.co/bs/f.jpg"):
             return cliente.post(
                 "/logistics/purchases",
                 data={

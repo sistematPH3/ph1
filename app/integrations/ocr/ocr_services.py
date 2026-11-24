@@ -8,13 +8,28 @@ PyGoogle. El modelo se descarga una sola vez al instalar y queda en
 Se expone solo texto. La decision de si esa foto es una factura no se toma
 aqui, sino en PurchaseValidator, que son reglas puras y testeables.
 """
+import io
 import logging
 import re
 import threading
+import time
 import unicodedata
 
-_motor = None
+from PIL import Image, ImageOps
+
+MAX_LADO_OCR = 800
+
+_PARAMS_MOTOR = {
+    'EngineConfig.onnxruntime.intra_op_num_threads': 2,
+    'EngineConfig.onnxruntime.inter_op_num_threads': 1,
+    'Det.limit_type': 'max',
+    'Det.limit_side_len': MAX_LADO_OCR,
+}
+
+_motores = {}
 _candado = threading.Lock()
+_semaforo_ocr = threading.Semaphore(1)
+_log = logging.getLogger('app')
 
 # RapidOCR escribe un INFO por cada modelo que carga. En un servidor con
 # peticiones concurrentes eso llena el log de ruido.
@@ -25,7 +40,7 @@ class OCRNoDisponible(RuntimeError):
     """El motor de OCR no se pudo cargar. El flujo debe continuar sin el."""
 
 
-def _construir_motor():
+def _construir_motor(usar_orientacion=False):
     try:
         from rapidocr import RapidOCR
     except ImportError as error:
@@ -33,8 +48,11 @@ def _construir_motor():
             "RapidOCR no esta instalado. Instale con 'pip install rapidocr onnxruntime'."
         ) from error
 
+    params = dict(_PARAMS_MOTOR)
+    params['Global.use_cls'] = bool(usar_orientacion)
+
     try:
-        return RapidOCR()
+        return RapidOCR(params=params)
     except ImportError as error:
         # rapidocr no declara onnxruntime como dependencia: es un extra, y sin
         # el la inicializacion falla con un ImportError poco descriptivo.
@@ -46,25 +64,43 @@ def _construir_motor():
         raise OCRNoDisponible(f"No se pudo iniciar el motor de OCR: {error}") from error
 
 
-def obtener_motor():
+def obtener_motor(usar_orientacion=False):
     """
     Devuelve el motor ya inicializado, creandolo en la primera llamada.
 
     Cargar los modelos cuesta unos segundos; hacerlo en cada peticion volveria
     lento cada registro de compra. El candado evita que dos peticiones
-    simultaneas construyan dos motores.
+    simultaneas construyan dos motores. El motor con clasificacion de angulo
+    solo se construye si alguna foto ilegible obliga a reintentar, asi que la
+    mayoria de las peticiones nunca paga su carga.
     """
-    global _motor
-    if _motor is not None:
-        return _motor
+    motor = _motores.get(usar_orientacion)
+    if motor is not None:
+        return motor
 
     with _candado:
-        if _motor is None:
-            _motor = _construir_motor()
-    return _motor
+        if usar_orientacion not in _motores:
+            _motores[usar_orientacion] = _construir_motor(usar_orientacion)
+        return _motores[usar_orientacion]
 
 
-def leer_texto(contenido: bytes):
+def preparar_imagen_para_ocr(imagen, max_lado=MAX_LADO_OCR):
+    """Endereza por EXIF y reduce la foto antes del OCR sin perder texto."""
+    imagen = ImageOps.exif_transpose(imagen)
+    if imagen.mode != 'RGB':
+        imagen = imagen.convert('RGB')
+    if max(imagen.size) > max_lado:
+        imagen.thumbnail((max_lado, max_lado), Image.LANCZOS)
+    return ImageOps.autocontrast(imagen, cutoff=1)
+
+
+def _imagen_desde_bytes(contenido):
+    with Image.open(io.BytesIO(contenido)) as imagen:
+        imagen.load()
+        return preparar_imagen_para_ocr(imagen)
+
+
+def leer_texto(contenido, usar_orientacion=False):
     """
     Extrae el texto de una imagen.
 
@@ -73,17 +109,39 @@ def leer_texto(contenido: bytes):
     estricto RECHAZA la foto si no se pudo leer: no se acepta ninguna imagen
     solo porque el motor este caido, porque eso abriria la puerta a guardar
     compras sin evidencia verificada.
+
+    usar_orientacion activa la clasificacion de angulo, que cuesta tiempo pero
+    endereza fotos tomadas al reves. Solo se pide en el reintento de las fotos
+    que salieron ilegibles.
     """
+    inicio = time.perf_counter()
     try:
-        motor = obtener_motor()
+        if isinstance(contenido, Image.Image):
+            imagen = preparar_imagen_para_ocr(contenido)
+        else:
+            imagen = _imagen_desde_bytes(contenido)
+    except Exception as error:
+        return [], f"No se pudo preparar la imagen para el lector de texto: {error}"
+    ms_preparacion = (time.perf_counter() - inicio) * 1000
+
+    try:
+        motor = obtener_motor(usar_orientacion)
     except OCRNoDisponible as error:
         return [], str(error)
 
-    # RapidOCR acepta bytes, ndarray, ruta o PIL.Image; un BytesIO lo rechaza.
     try:
-        salida = motor(contenido)
+        with _semaforo_ocr:
+            inicio_ocr = time.perf_counter()
+            salida = motor(imagen)
+            ms_ocr = (time.perf_counter() - inicio_ocr) * 1000
     except Exception as error:
         return [], f"El lector de texto fallo: {error}"
+
+    _log.info(
+        "OCR: preparacion %.0f ms, inferencia %.0f ms, imagen %sx%s, orientacion %s",
+        ms_preparacion, ms_ocr, imagen.width, imagen.height,
+        'si' if usar_orientacion else 'no',
+    )
     # RapidOCR 3.x devuelve un objeto con .txts; las versiones previas
     # devolvian una tupla. Se cubren las dos.
     lineas = getattr(salida, 'txts', None)

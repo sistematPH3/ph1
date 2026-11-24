@@ -31,27 +31,60 @@ from app.decorators.roles import require_roles
 
 purchase_bp = Blueprint('purchase_routes', __name__)
 
-def bg_upload_invoice(app_instance, purchase_id, file_bytes, filename):
-    with app_instance.app_context():
+_REINTENTOS_SUBIDA = 3
+_ESPERA_REINTENTO_SUBIDA = 2
+_MARCA_FALLO_SUBIDA = 'Comprobante no guardado'
+
+
+def _subir_con_reintentos(app_instance, file_bytes, filename):
+    """
+    Sube la foto a ImgBB reintentando los fallos transitorios.
+
+    Un timeout o un 5xx de ImgBB en el unico intento dejaba la compra sin
+    evidencia para siempre. Aqui se reintenta con una espera corta y, si aun
+    asi falla, se propaga el ultimo error para que quien llama decida: en el
+    registro de una compra, la compra no se guarda.
+    """
+    ultimo_error = None
+    for intento in range(1, _REINTENTOS_SUBIDA + 1):
         try:
             foto_factura_memoria = io.BytesIO(file_bytes)
             foto_factura_memoria.filename = filename
-            
-            url_generada = upload_invoice_image(foto_factura_memoria)
-            
-            purchase = db.session.get(Purchase, purchase_id)
-            if purchase:
-                purchase.invoice_url = url_generada
-                db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            # Antes se hacia rollback y ya: la excepcion se perdia y la compra
-            # se quedaba con invoice_url = "En proceso..." para siempre, sin
-            # que nadie supiera por que.
-            app_instance.logger.error(
-                "No se pudo subir la foto de la factura de la compra %s a ImgBB: %s",
-                purchase_id, e, exc_info=True,
+            return upload_invoice_image(foto_factura_memoria)
+        except Exception as error:
+            ultimo_error = error
+            if intento >= _REINTENTOS_SUBIDA:
+                break
+            app_instance.logger.warning(
+                "Intento %s de %s para subir la foto de la factura falló: %s",
+                intento, _REINTENTOS_SUBIDA, error,
             )
+            time.sleep(_ESPERA_REINTENTO_SUBIDA)
+    raise ultimo_error
+
+
+def _url_de_factura_valida(url):
+    """Una factura solo esta guardada si hay una URL http(s) real de respaldo."""
+    return isinstance(url, str) and url.strip().lower().startswith('http')
+
+
+def _subir_factura(file_bytes, filename):
+    """
+    Sube la foto a ImgBB antes de tocar la base de datos.
+
+    La compra y su evidencia se guardan juntas o no se guardan: si la foto no
+    llega a ImgBB se lanza excepcion y create_purchase responde error sin crear
+    compra, sin mover stock y sin escribir auditoria.
+    """
+    if not file_bytes:
+        raise ValueError("La foto de la factura llegó sin contenido.")
+
+    url = _subir_con_reintentos(
+        current_app._get_current_object(), file_bytes, filename)
+    if not _url_de_factura_valida(url):
+        raise ValueError(
+            f"ImgBB no devolvió una URL válida para la factura: {url!r}")
+    return url.strip()
 
 
 def bg_archive_eur_rate(app_instance, user_id):
@@ -271,7 +304,7 @@ def export_purchase_detail(purchase_id):
                      download_name=nombre, mimetype=mimetype)
 
 
-def _validar_comprobante(file_bytes):
+def _validar_comprobante(file_bytes, imagen_ocr=None):
     """
     Lee la foto y decide que tipo de comprobante es.
 
@@ -284,7 +317,8 @@ def _validar_comprobante(file_bytes):
     """
     umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
 
-    lineas, error = leer_texto(file_bytes)
+    fuente = imagen_ocr if imagen_ocr is not None else file_bytes
+    lineas, error = leer_texto(fuente)
     if error:
         current_app.logger.error(
             "OCR no disponible, la foto NO se puede verificar: %s", error)
@@ -296,27 +330,50 @@ def _validar_comprobante(file_bytes):
         }
 
     evaluacion = evaluar_comprobante(limpiar_para_evaluar(lineas), umbral=umbral)
+
+    if evaluacion.get('veredicto') == 'ilegible':
+        lineas_giradas, error_giro = leer_texto(fuente, usar_orientacion=True)
+        if error_giro:
+            current_app.logger.warning(
+                "Reintento con orientacion sin resultado: %s", error_giro)
+        else:
+            evaluacion_girada = evaluar_comprobante(
+                limpiar_para_evaluar(lineas_giradas), umbral=umbral)
+            if evaluacion_girada.get('puntaje', 0) > evaluacion.get('puntaje', 0):
+                current_app.logger.info(
+                    "El reintento con orientacion mejoro la lectura: %s puntos.",
+                    evaluacion_girada.get('puntaje'))
+                lineas = lineas_giradas
+                evaluacion = evaluacion_girada
+
     evaluacion['texto'] = ' | '.join(str(linea) for linea in lineas)
     return evaluacion
 
 
-# Caché en memoria del veredicto del OCR, indexada por el hash SHA-256 de los
-# bytes de la imagen. El preview (/validar-foto) y el submit (/purchases)
-# reciben la MISMA foto; sin caché el motor OCR se ejecuta dos veces por cada
-# compra (decenas de segundos cada vez). El TTL corto evita que un veredicto
-# viejo se reutilice si la imagen cambia o si el proceso vive mucho tiempo.
-_OCR_CACHE_TTL = 300  # segundos
+# Caché en memoria del veredicto del OCR, indexada por hash SHA-256 de los
+# bytes, umbral, modo y versión de reglas. El preview (/validar-foto) y el
+# submit (/purchases) reciben la MISMA foto; sin caché el motor OCR se ejecuta
+# dos veces por cada compra (decenas de segundos cada vez). El TTL acota la
+# reutilización de un veredicto viejo si cambia la configuración.
+_OCR_CACHE_TTL = 1800  # segundos
 _OCR_CACHE = {}
+_VERSION_REGLAS = '2026-11-24.1'
 
 
-def _validar_comprobante_cached(file_bytes):
-    clave = hashlib.sha256(file_bytes or b'').hexdigest()
+def _validar_comprobante_cached(file_bytes, imagen_ocr=None):
+    if current_app.config.get('TESTING'):
+        return _validar_comprobante(file_bytes, imagen_ocr)
+
+    umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
+    modo = current_app.config.get('INVOICE_VALIDATION_MODE', 'strict')
+    huella = hashlib.sha256(file_bytes or b'').hexdigest()
+    clave = (huella, umbral, modo, _VERSION_REGLAS)
     ahora = time.monotonic()
     entrada = _OCR_CACHE.get(clave)
     if entrada is not None and (ahora - entrada[0]) < _OCR_CACHE_TTL:
         return entrada[1]
 
-    resultado = _validar_comprobante(file_bytes)
+    resultado = _validar_comprobante(file_bytes, imagen_ocr)
     _OCR_CACHE[clave] = (ahora, resultado)
 
     # Limpieza perezosa para que el diccionario no crezca sin limite en un
@@ -326,6 +383,46 @@ def _validar_comprobante_cached(file_bytes):
         for k in [k for k, v in _OCR_CACHE.items() if v[0] < limite]:
             _OCR_CACHE.pop(k, None)
     return resultado
+
+
+_TOKENOS_TTL = 3600  # segundos
+_TOKENOS = {}
+_TOKENOS_EN_CURSO = set()
+_TOKENOS_LOCK = threading.Lock()
+
+
+def _token_previo(clave):
+    with _TOKENOS_LOCK:
+        entrada = _TOKENOS.get(clave)
+        if entrada is None:
+            return None
+        if time.monotonic() - entrada[0] >= _TOKENOS_TTL:
+            _TOKENOS.pop(clave, None)
+            return None
+        return {'status': entrada[1], 'body': entrada[2]}
+
+
+def _token_reclamar(clave):
+    with _TOKENOS_LOCK:
+        if clave in _TOKENOS_EN_CURSO:
+            return False
+        _TOKENOS_EN_CURSO.add(clave)
+        return True
+
+
+def _token_liberar(clave):
+    with _TOKENOS_LOCK:
+        _TOKENOS_EN_CURSO.discard(clave)
+
+
+def _token_recordar(clave, status, body):
+    with _TOKENOS_LOCK:
+        _TOKENOS[clave] = (time.monotonic(), status, body)
+        _TOKENOS_EN_CURSO.discard(clave)
+        if len(_TOKENOS) > 128:
+            limite = time.monotonic() - _TOKENOS_TTL
+            for k in [k for k, v in _TOKENOS.items() if v[0] < limite]:
+                _TOKENOS.pop(k, None)
 
 
 def _mensaje_factura(validacion):
@@ -469,7 +566,8 @@ def validar_foto_comprobante():
                 "campo": "invoice_photo",
             }), 400
 
-        validacion = _validar_comprobante_cached(info_imagen['bytes'])
+        validacion = _validar_comprobante_cached(
+            info_imagen['bytes'], info_imagen.get('imagen_ocr'))
         modo = current_app.config.get('INVOICE_VALIDATION_MODE', 'strict')
         umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
 
@@ -485,7 +583,6 @@ def validar_foto_comprobante():
             "puntaje": validacion.get('puntaje'),
             "umbral": umbral,
             "modo": modo,
-            "diagnostico": validacion.get('detalle'),
             "mensaje": _mensaje_rechazo_preview(validacion)
                        if not validacion['puede_aceptar'] else None,
         }), 200
@@ -520,7 +617,6 @@ def create_purchase():
         # que el archivo REAL tiene, no la que el dice la extension enviada.
         nombre_seguro = secure_filename(foto_factura.filename or '')
         nombre_seguro = f"{os.path.splitext(nombre_seguro)[0] or 'factura'}{info_imagen['extension']}"
-        url_generada = "En proceso..."
 
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('quantity[]')
@@ -639,7 +735,7 @@ def create_purchase():
             # sola vez, en normalizar_numero().
             'exchange_rate': request.form.get('exchange_rate'),
             'user_id': current_user.id if current_user.is_authenticated else (request.form.get('user_id', type=int) or 1),
-            'invoice_url': url_generada,
+            'invoice_url': None,
             'items': items
         }
     except Exception:
@@ -677,7 +773,8 @@ def create_purchase():
     # --- La foto tiene que parecer un comprobante -----------------------------
     # Va ANTES de registrar la compra: si se rechazara despues, el stock ya se
     # habria descontado y habria que revertirlo.
-    validacion_factura = _validar_comprobante_cached(file_bytes)
+    validacion_factura = _validar_comprobante_cached(
+        file_bytes, info_imagen.get('imagen_ocr'))
     modo = current_app.config.get('INVOICE_VALIDATION_MODE', 'strict')
     umbral = current_app.config.get('INVOICE_UMBRAL_ACEPTACION', 60)
 
@@ -716,10 +813,56 @@ def create_purchase():
             "details": _mensaje_rechazo_factura(validacion_factura),
             "campo": "invoice_photo",
             "motivo": validacion_factura['veredicto'],
-            "diagnostico": validacion_factura['detalle'],
         }), 400
 
-    result = PurchaseService.register_purchase(data)
+    token_envio = (request.form.get('submit_token') or '').strip()[:120]
+    clave_token = None
+    if token_envio:
+        autor = current_user.id if current_user.is_authenticated else data['user_id']
+        clave_token = (autor, token_envio)
+        previo = _token_previo(clave_token)
+        if previo is not None:
+            return jsonify(previo['body']), previo['status']
+        if not _token_reclamar(clave_token):
+            return jsonify({
+                "error": "Esta compra ya se está registrando.",
+                "details": (
+                    'Espera la confirmación antes de volver a enviar el '
+                    'formulario: un segundo envío no duplica la compra.'
+                ),
+            }), 409
+
+    # La foto se sube ANTES de crear la compra: la evidencia fotografica es
+    # parte de la compra, no un adorno posterior. Si ImgBB no devuelve una URL
+    # real, aqui se corta todo y el usuario reintenta con el mismo formulario.
+    try:
+        data['invoice_url'] = _subir_factura(file_bytes, nombre_seguro)
+    except Exception:
+        if clave_token:
+            _token_liberar(clave_token)
+        current_app.logger.exception(
+            "Compra DETENIDA: no se pudo subir la foto de la factura a ImgBB. "
+            "No se registro ninguna compra.")
+        return jsonify({
+            "error": (
+                "No se pudo subir la imagen de la factura al servidor. "
+                "La compra no fue registrada; verifica tu conexión e intenta "
+                "nuevamente."
+            ),
+            "details": (
+                "No se pudo subir la imagen de la factura al servidor. "
+                "La compra no fue registrada; verifica tu conexión e intenta "
+                "nuevamente."
+            ),
+            "campo": "invoice_photo",
+        }), 502
+
+    try:
+        result = PurchaseService.register_purchase(data)
+    except Exception:
+        if clave_token:
+            _token_liberar(clave_token)
+        raise
 
     if result.get("success"):
         purchase_id = result.get("purchase_id")
@@ -774,16 +917,7 @@ def create_purchase():
                 "No se pudo archivar la tasa aplicada en la compra %s. "
                 "La compra SI quedo registrada.", purchase_id)
             
-        app_instance = current_app._get_current_object()
-        
-        if purchase_id:
-            thread = threading.Thread(
-                target=bg_upload_invoice,
-                args=(app_instance, purchase_id, file_bytes, nombre_seguro)
-            )
-            thread.start()
-
-        return jsonify({
+        cuerpo = {
             **result,
             # El veredicto viaja en la respuesta para que la pantalla pueda
             # avisar al usuario. Sin esto el usuario solo ve "compra registrada"
@@ -795,6 +929,11 @@ def create_purchase():
                 'aceptada': bool(validacion_factura.get('puede_aceptar')),
                 'mensaje': _mensaje_factura(validacion_factura),
             },
-        }), 201
+        }
+        if clave_token:
+            _token_recordar(clave_token, 201, cuerpo)
+        return jsonify(cuerpo), 201
     else:
+        if clave_token:
+            _token_liberar(clave_token)
         return jsonify(result), 500

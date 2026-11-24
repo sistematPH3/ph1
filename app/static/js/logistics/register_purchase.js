@@ -141,7 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const controller = new AbortController();
         rateController = controller;
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        // Un abort por tiempo agotado no es lo mismo que cancelar la peticion
+        // porque el usuario cambio de moneda: el primero tiene que avisarle y
+        // liberar el campo, el segundo se descarta en silencio.
+        let abortadoPorTiempo = false;
+        const timeoutId = setTimeout(() => {
+            abortadoPorTiempo = true;
+            controller.abort();
+        }, 3000);
 
         try {
             const response = await fetch(`/bcv/api/get-rate?currency=${selectedCurrency}`, { 
@@ -172,16 +179,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Error en la API BCV");
             }
         } catch (error) {
-            // Un abort de nuestra propia cancelacion no es un fallo a mostrar.
-            if (error.name === 'AbortError' || requestSeq !== rateRequestSeq) {
+            clearTimeout(timeoutId);
+            // La cancelacion de una consulta vieja no es un fallo a mostrar.
+            if (requestSeq !== rateRequestSeq) {
                 return;
             }
+            if (error.name === 'AbortError' && !abortadoPorTiempo) {
+                return;
+            }
+            rateController = null;
             rateInput.value = '';
             rateInput.removeAttribute('readonly');
             rateInput.setAttribute('placeholder', 'Ingrese tasa manual');
             rateInput.classList.replace('text-muted', 'text-dark');
             
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'warning',
                 title: 'Conexión BCV Fallida',
                 text: 'No se pudo obtener la tasa automáticamente. Por favor, ingrese la tasa de cambio manualmente.',
@@ -365,7 +377,8 @@ document.addEventListener('visibilitychange', function () {
 });
 
 /**
- * Estado de la foto: 'vacia' | 'revisando' | 'aceptada' | 'rechazada'
+ * Estado de la foto: 'vacia' | 'revisando' | 'aceptada' | 'rechazada' |
+ * 'error_revision'
  *
  * Antes, al montar cualquier archivo se pintaba el dropzone de verde con un
  * check, como si ya estuviera aprobado, y la imagen no se miraba hasta que se
@@ -374,6 +387,9 @@ document.addEventListener('visibilitychange', function () {
  */
 let estadoFoto = 'vacia';
 let revisionFotoEnCurso = 0;
+let controladorRevision = null;
+let motivoFoto = '';
+const MENSAJE_ERROR_REVISION = 'No se pudo completar la validación de la imagen (tiempo de espera agotado o error de conexión). Haz clic en reintentar o sube una foto más nítida.';
 
 function pintarEstadoFoto(estado, mensaje) {
     const display = document.getElementById('photoFileName');
@@ -388,7 +404,8 @@ function pintarEstadoFoto(estado, mensaje) {
 
     display.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
     icon.classList.remove('bi-camera', 'bi-check-circle-fill',
-                          'bi-x-circle-fill', 'bi-hourglass-split');
+                          'bi-x-circle-fill', 'bi-hourglass-split',
+                          'bi-exclamation-triangle-fill');
     icon.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
     dropzone.style.setProperty('border-style', 'dashed', 'important');
 
@@ -410,6 +427,12 @@ function pintarEstadoFoto(estado, mensaje) {
         icon.classList.add('bi-x-circle-fill', 'text-danger');
         dropzone.style.setProperty('border-color', '#dc3545', 'important');
         dropzone.style.setProperty('border-style', 'solid', 'important');
+    } else if (estado === 'error_revision') {
+        display.innerText = nombre;
+        display.classList.add('text-danger');
+        icon.classList.add('bi-exclamation-triangle-fill', 'text-danger');
+        dropzone.style.setProperty('border-color', '#b8860b', 'important');
+        dropzone.style.setProperty('border-style', 'solid', 'important');
     } else {
         display.innerText = nombre;
         display.classList.add('text-muted');
@@ -427,16 +450,24 @@ function pintarEstadoFoto(estado, mensaje) {
 async function revisarFoto(archivo) {
     if (!archivo) return;
 
+    if (controladorRevision) {
+        controladorRevision.abort();
+    }
+
     const token = ++revisionFotoEnCurso;
     estadoFoto = 'revisando';
+    motivoFoto = '';
     clearPhotoError();
     pintarEstadoFoto('revisando');
+    const retryBtn = document.getElementById('retryPhotoBtn');
+    if (retryBtn) retryBtn.classList.add('d-none');
 
     const formData = new FormData();
     formData.append('invoice_photo', archivo);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    controladorRevision = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
 
     try {
         const response = await fetch('/logistics/purchases/validar-foto', {
@@ -450,6 +481,7 @@ async function revisarFoto(archivo) {
         // Si el usuario quito la foto o monto otra mientras se revisaba, este
         // resultado ya es viejo y no debe pintar nada.
         if (token !== revisionFotoEnCurso) return;
+        controladorRevision = null;
 
         if (response.ok && data.puede_aceptar) {
             estadoFoto = 'aceptada';
@@ -457,18 +489,18 @@ async function revisarFoto(archivo) {
         } else {
             estadoFoto = 'rechazada';
             pintarEstadoFoto('rechazada');
-            const motivo = data.mensaje || data.error
+            motivoFoto = data.mensaje || data.error
                 || 'La foto no se pudo confirmar como factura o comprobante.';
-            setPhotoError(motivo);
+            setPhotoError(motivoFoto);
         }
     } catch (error) {
         clearTimeout(timeoutId);
         if (token !== revisionFotoEnCurso) return;
-        // Si no hay conexion con el servidor (o se agoto el timeout) no se
-        // marca la foto como buena: se deja en revision y el submit vuelve a
-        // validarla.
-        estadoFoto = 'vacia';
-        pintarEstadoFoto('vacia');
+        controladorRevision = null;
+        estadoFoto = 'error_revision';
+        pintarEstadoFoto('error_revision');
+        setPhotoError(MENSAJE_ERROR_REVISION);
+        if (retryBtn) retryBtn.classList.remove('d-none');
     }
 }
 
@@ -477,17 +509,37 @@ document.getElementById('invoice_photo').addEventListener('change', function(e) 
     if (display) display.dataset.nombre = this.files[0] ? this.files[0].name : '';
 
     clearPhotoError();
+    motivoFoto = '';
+    const retryBtn = document.getElementById('retryPhotoBtn');
+    if (retryBtn) retryBtn.classList.add('d-none');
+    const alerta = document.getElementById('alertaGlobalCompra');
+    if (alerta) alerta.classList.add('d-none');
 
     if (this.files && this.files.length > 0) {
         revisarFoto(this.files[0]);
     } else {
         revisionFotoEnCurso++;
+        if (controladorRevision) {
+            controladorRevision.abort();
+            controladorRevision = null;
+        }
         estadoFoto = 'vacia';
         pintarEstadoFoto('vacia');
         const removeBtn = document.getElementById('removePhotoBtn');
         if (removeBtn) removeBtn.classList.add('d-none');
     }
 });
+
+const retryPhotoBtn = document.getElementById('retryPhotoBtn');
+if (retryPhotoBtn) {
+    retryPhotoBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const input = document.getElementById('invoice_photo');
+        if (input && input.files && input.files[0]) {
+            revisarFoto(input.files[0]);
+        }
+    });
+}
 
 
 const removePhotoBtn = document.getElementById('removePhotoBtn');
@@ -551,6 +603,24 @@ function escapeHtml(value) {
     const div = document.createElement('div');
     div.textContent = String(value);
     return div.innerHTML;
+}
+
+function mostrarAlerta(opciones) {
+    const {icon = 'info', title = '', text = '', html = '', ...resto} = opciones;
+    if (typeof Swal !== 'undefined') {
+        return Swal.fire(Object.assign({icon, title, text, html}, resto));
+    }
+    const contenedor = document.getElementById('alertaGlobalCompra');
+    if (contenedor) {
+        const clase = {error: 'danger', warning: 'warning', info: 'info', success: 'success'}[icon] || 'info';
+        contenedor.className = `alert alert-${clase}`;
+        contenedor.innerHTML = `<strong>${escapeHtml(title)}</strong>` +
+            (html ? `<div>${html}</div>` : (text ? `<div>${escapeHtml(text)}</div>` : ''));
+        contenedor.classList.remove('d-none');
+        contenedor.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+    window.alert([title, text].filter(Boolean).join('\n'));
+    return Promise.resolve({isConfirmed: true});
 }
 
 // Normaliza 'details' a una lista de cadenas. Acepta string, array o el
@@ -785,8 +855,8 @@ function attachRowValidationListeners(row) {
                 setFieldError(prodPrice, 'El precio es obligatorio.');
             } else if (val < 0.01) {
                 setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.');
-            } else if (val > 999999999.99) {
-                setFieldError(prodPrice, 'Máximo 999,999,999.99');
+            } else if (val > 9999999.99) {
+                setFieldError(prodPrice, 'Máximo 9,999,999.99');
             } else {
                 clearFieldError(prodPrice);
             }
@@ -881,7 +951,7 @@ function validateFormBeforeSubmit() {
     }
 
     if (!invoicePhoto.files || invoicePhoto.files.length === 0) {
-        Swal.fire({
+        mostrarAlerta({
             icon: 'warning',
             title: 'Evidencia Requerida',
             text: 'Debes adjuntar la foto de la factura.',
@@ -893,21 +963,49 @@ function validateFormBeforeSubmit() {
         // Ya sabemos que esa foto no es un comprobante: no tiene caso enviar
         // todo el formulario para que el servidor lo rechace. Se avisa aqui y
         // se manda a retomar la foto. El servidor igual la vuelve a validar.
-        Swal.fire({
+        isValid = false;
+        const detalle = motivoFoto
+            || 'Vuelve a tomar la foto del comprobante. Tiene que verse completa, con el emisor, el RIF y los importes legibles.';
+        setPhotoError(detalle);
+        mostrarAlerta({
             icon: 'warning',
             title: 'La foto no es una factura',
-            text: 'Vuelve a tomar la foto del comprobante. Tiene que verse completa, con el emisor, el RIF y los importes legibles.',
+            text: detalle,
             confirmButtonColor: '#B31F24',
             confirmButtonText: 'Volver a tomar la foto'
         });
-        isValid = false;
     } else if (estadoFoto === 'revisando') {
         // La revision sigue en curso: todavia no se sabe si la foto sirve, y
         // mandarla ahora seria tirar el trabajo del usuario a la basura.
-        Swal.fire({
+        isValid = false;
+        const mensaje = 'La factura aún se está analizando. Espera a que termine la revisión antes de registrar la compra.';
+        setPhotoError(mensaje);
+        mostrarAlerta({
             icon: 'info',
             title: 'Un momento',
-            text: 'Todavía se está revisando la foto de la factura. Espera a que termine e inténtalo de nuevo.',
+            text: mensaje,
+            confirmButtonColor: '#B31F24',
+            confirmButtonText: 'Entendido'
+        });
+    } else if (estadoFoto === 'error_revision') {
+        setPhotoError(MENSAJE_ERROR_REVISION);
+        const retry = document.getElementById('retryPhotoBtn');
+        if (retry) retry.classList.remove('d-none');
+        mostrarAlerta({
+            icon: 'warning',
+            title: 'No se pudo validar la foto',
+            text: MENSAJE_ERROR_REVISION,
+            confirmButtonColor: '#B31F24',
+            confirmButtonText: 'Reintentar la validación'
+        });
+        isValid = false;
+    } else if (estadoFoto === 'vacia') {
+        const mensaje = 'La foto de la factura todavía no se ha validado. Espera a que termine la revisión antes de registrar la compra.';
+        setPhotoError(mensaje);
+        mostrarAlerta({
+            icon: 'warning',
+            title: 'Foto sin validar',
+            text: mensaje,
             confirmButtonColor: '#B31F24',
             confirmButtonText: 'Entendido'
         });
@@ -916,7 +1014,7 @@ function validateFormBeforeSubmit() {
 
     const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
     if (rows.length === 0) {
-        Swal.fire({
+        mostrarAlerta({
             icon: 'warning',
             title: 'Carrito Vacío',
             text: 'Debes registrar al menos un producto en la compra.',
@@ -978,8 +1076,8 @@ function validateFormBeforeSubmit() {
         } else if (priceVal < 0.01) { 
             setFieldError(prodPrice, 'Debe ser mayor o igual a 0.01.'); 
             isValid = false; 
-        } else if (priceVal > 999999999.99) {
-            setFieldError(prodPrice, 'Máximo 999,999,999.99');
+        } else if (priceVal > 9999999.99) {
+            setFieldError(prodPrice, 'Máximo 9,999,999.99');
             isValid = false;
         }
     });
@@ -991,6 +1089,15 @@ function validateFormBeforeSubmit() {
 // mientras la peticion esta en vuelo y se desbloquea si algo falla, para que
 // el usuario pueda reintentar sin recargar la pagina.
 let envioEnCurso = false;
+
+function nuevoTokenEnvio() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+    }
+    return `t${Date.now()}-${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
+}
+
+let tokenEnvio = nuevoTokenEnvio();
 
 document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
     e.preventDefault(); 
@@ -1026,6 +1133,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     // aplica una sola vez, en el servidor, sobre lo que el usuario escribio.
     formData.append('exchange_rate', document.getElementById('exchange_rate').value);
     formData.append('user_id', document.getElementById('user_id').value);
+    formData.append('submit_token', tokenEnvio);
 
     const photoFile = document.getElementById('invoice_photo').files[0];
     formData.append('invoice_photo', photoFile);
@@ -1048,7 +1156,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     });
 
     const submitController = new AbortController();
-    const submitTimeoutId = setTimeout(() => submitController.abort(), 30000);
+    const submitTimeoutId = setTimeout(() => submitController.abort(), 120000);
 
     try {
         const response = await fetch('/logistics/purchases', {
@@ -1073,7 +1181,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
 
         // Sesion vencida o sin permisos: un HTML de login no es JSON.
         if (response.redirected || response.status === 401 || response.status === 403) {
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'warning',
                 title: 'Sesión no válida',
                 text: 'Tu sesión expiró o no tienes permiso para registrar compras. Vuelve a iniciar sesión; no se guardó nada.',
@@ -1085,7 +1193,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
 
         if (response.status === 413) {
             setPhotoError('La foto es demasiado pesada para el servidor. Usa una imagen más pequeña.');
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'warning',
                 title: 'Foto demasiado grande',
                 text: 'La imagen supera el tamaño permitido. Vuelve a tomarla con menos resolución y subela de nuevo.',
@@ -1095,8 +1203,32 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
             return;
         }
 
+        // La compra y su foto se guardan juntas: si el servidor no pudo subir
+        // la imagen, no se registro nada. Se avisa con el mensaje del backend y
+        // el formulario queda intacto (misma foto, mismos insumos) para que el
+        // usuario solo vuelva a pulsar registrar.
+        if (result.campo === 'invoice_photo' && response.status !== 400) {
+            const mensajeFoto = plainErrorText(result.details) || result.error || '';
+            setPhotoError(mensajeFoto);
+            mostrarAlerta({
+                icon: 'warning',
+                title: 'No se pudo guardar la factura',
+                text: mensajeFoto,
+                confirmButtonColor: '#B31F24',
+                confirmButtonText: 'Reintentar',
+                customClass: { popup: 'rounded-4' }
+            }).then(() => {
+                const boton = document.querySelector(
+                    '#purchaseForm button[type="submit"], #purchaseForm .submit-btn, #btnRegistrar');
+                if (boton) {
+                    boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+            return;
+        }
+
         if (response.status >= 500) {
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'error',
                 title: 'Error del servidor',
                 text: 'El sistema falló al guardar la compra. No se registró nada: inténtalo de nuevo en un momento.',
@@ -1108,6 +1240,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
 
         if (response.ok) {
             clearDraft();
+            tokenEnvio = nuevoTokenEnvio();
 
             // Aviso sobre la foto: si el backend no la pudo confirmar como
             // factura o comprobante, el boton de exito no alcanza. Se cambia el
@@ -1121,7 +1254,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                 ? 'Compra realizada con éxito'
                 : (foto.mensaje || 'La foto adjunta no pudo verificarse.');
 
-            Swal.fire({
+            mostrarAlerta({
                 icon: facturaOk ? 'success' : 'warning',
                 title: titulo,
                 text: texto,
@@ -1158,7 +1291,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                 setPhotoError(plainErrorText(result.details) || result.error || '');
             }
 
-            Swal.fire({
+            mostrarAlerta({
                 icon: esFoto ? 'warning' : 'error',
                 title: result.error || 'No se pudo registrar la compra.',
                 html: listaErrores || 'Revisa los datos del formulario e intentalo de nuevo.',
@@ -1185,15 +1318,15 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
         if (error && error.name === 'AbortError') {
             // Timeout de red: se conserva el borrador para que el usuario
             // pueda reintentar sin perder lo escrito.
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'warning',
                 title: 'Tiempo de espera agotado',
-                text: 'La operación tardó demasiado. El borrador se conservó; vuelve a intentarlo.',
+                text: 'La operación tardó demasiado. El borrador se conservó; vuelve a intentarlo. Si la compra ya se registró, el sistema no la duplicará.',
                 confirmButtonColor: '#B31F24',
                 confirmButtonText: 'Cerrar'
             });
         } else {
-            Swal.fire({
+            mostrarAlerta({
                 icon: 'error',
                 title: 'Fallo de Conexión',
                 text: 'No se pudo conectar con el servidor backend.',

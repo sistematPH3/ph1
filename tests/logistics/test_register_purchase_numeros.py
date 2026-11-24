@@ -56,7 +56,8 @@ _asegurar_bd_pruebas()
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app import create_app, db  # noqa: E402
-from app.logistics.requests.purchase_validators import normalizar_numero  # noqa: E402
+from app.logistics.requests.purchase_validators import (  # noqa: E402
+    PurchaseValidator, normalizar_numero)
 
 
 def parse_num_como_el_navegador(valor):
@@ -120,6 +121,22 @@ class TestSimetriaNavegadorServidor(unittest.TestCase):
     def test_caso_original_reportado(self):
         # El valor concreto que delato el bug: 10,335 llegaba como 10.335.
         self.assertAlmostEqual(float(normalizar_numero("10,335")), 10.335)
+
+    def test_el_maximo_de_precio_del_navegador_coincide_con_el_servidor(self):
+        import os
+        ruta = os.path.join(
+            os.path.dirname(__file__), '..', '..',
+            'app', 'static', 'js', 'logistics', 'register_purchase.js')
+        with open(ruta, encoding='utf-8') as fh:
+            codigo = fh.read()
+
+        self.assertNotIn('999999999.99', codigo,
+                         'El navegador permite importes que el backend rechaza')
+        self.assertGreaterEqual(codigo.count('9999999.99'), 2)
+
+        errores = PurchaseValidator.validate_items([
+            {'product_id': 1, 'quantity': '1', 'foreign_price': '10000000'}])
+        self.assertIn('item_0_foreign_price', errores)
 
     def test_el_formulario_no_reinterpreta_antes_de_enviar(self):
         """

@@ -161,7 +161,7 @@
                                             <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
                                                 <i class="bi bi-image me-1"></i> Ver Factura Original (Evidencia)
                                             </a>
-                                            {% elif purchase.invoice_url == 'En proceso...' %}
+                                            {% elif purchase.invoice_url in ['En proceso...', 'Comprobante no guardado'] %}
                                             <span class="badge bg-warning text-dark border" data-bs-toggle="tooltip" title="La foto del comprobante no se pudo guardar en el servidor y no hay forma de volver a subirla.">
                                                 <i class="bi bi-exclamation-triangle me-1"></i> Comprobante no guardado
                                             </span>
@@ -290,7 +290,7 @@
                                 <a href="{{ purchase.invoice_url }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
                                     <i class="bi bi-image me-1"></i> Ver Factura Original
                                 </a>
-                                {% elif purchase.invoice_url == 'En proceso...' %}
+                                {% elif purchase.invoice_url in ['En proceso...', 'Comprobante no guardado'] %}
                                 <span class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-0 w-100 small">
                                     <i class="bi bi-exclamation-triangle-fill mt-1"></i>
                                     <span>Comprobante no guardado en el servidor.</span>

@@ -1,9 +1,12 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 import io
 import re
 
 from PIL import Image, UnidentifiedImageError
+
+from app.integrations.ocr.ocr_services import preparar_imagen_para_ocr
 
 
 # --- Factura: que la foto sea realmente una foto ---------------------------
@@ -23,26 +26,23 @@ MARCADOR_FIN_JPEG = b'\xff\xd9'
 MARCADOR_FIN_PNG = b'IEND'
 
 
-def _decodifica_completa(contenido, formato):
+def _decodifica_y_prepara(contenido, formato):
     """
-    Fuerza la decodificacion completa y revisa el marcador de fin.
-
-    Image.verify() alcanza con la cabecera, asi que un JPEG al que le falta la
-    mitad de abajo lo aprueba. Decodificar de verdad si lo detecta, y el
-    marcador de cierre avisa de una subida interrumpida aunque los ultimos
-    pixeles si decodifiquen.
+    Fuerza la decodificacion completa, revisa el marcador de fin y deja la
+    imagen ya reducida para el OCR. Asi la foto se decodifica una sola vez.
     """
     try:
         with Image.open(io.BytesIO(contenido)) as imagen:
             imagen.load()
+            preparada = preparar_imagen_para_ocr(imagen)
     except Exception:
-        return False
+        return None
 
     if formato == 'JPEG' and MARCADOR_FIN_JPEG not in contenido[-64:]:
-        return False
+        return None
     if formato == 'PNG' and MARCADOR_FIN_PNG not in contenido[-32:]:
-        return False
-    return True
+        return None
+    return preparada
 
 
 # --- Factura: reconocer el tipo de comprobante ----------------------------
@@ -63,8 +63,14 @@ def _decodifica_completa(contenido, formato):
 # hasta 9 digitos. El patron que se habia considerado antes
 # ([JVEG]-[0-9]{8}-[0-9], con guion obligatorio antes del ultimo digito) NO
 # reconocia el RIF de la foto de prueba (V-186754804, que no lleva ese guion).
-PATRON_RIF = re.compile(r'(?<![A-Za-z0-9])[JVEG][\s.\-]{0,2}\d{7,9}(?!\d)')
+PATRON_RIF = re.compile(
+    r'(?<![A-Za-z0-9])[JVEG][\s.\-]{0,2}\d{7,9}(?!\d)', re.IGNORECASE
+)
 PATRON_TARJETA_ENMASCARADA = re.compile(r'\d{4,6}\s?\*{2,}\s?\d{2,4}')
+PATRON_NUMERO_DOCUMENTO = re.compile(
+    r'\b(?:nro|n[°º]|no\.|num(?:ero)?|factura|control|documento|nota)\b'
+    r'[^\d\n]{0,8}\d{2,}'
+)
 PATRON_MONTOS = re.compile(r'\b\d{1,3}(?:[.\s]\d{3})+(?:[.,]\d{2})?\b|\b\d+[.,]\d{2}\b')
 PATRON_FECHA = re.compile(
     r'\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b'   # 27/09/2026
@@ -74,11 +80,12 @@ PATRON_FECHA = re.compile(
 
 # Comprobante de tarjeta / pago con POS.
 MARCAS_TARJETA = {
-    'recibo_compra': ('recibo de compra', 'recibo de compra', 'nota de consumo'),
+    'recibo_compra': ('recibo de compra', 'nota de consumo'),
     'banco': ('banco de venezuela', 'ban mercantil', 'banesco', 'bancamiga',
               'banco union', 'bancamiga', 'provinciabank', 'bancrecer'),
-    'tarjeta': ('master debito', 'mastercard', 'master credito', 'debito',
-                'credito', 'tarjeta', 'visa', 'american express'),
+    'tarjeta': ('master debito', 'mastercard', 'master credito', 'tarjeta',
+                'american express', 'visa electron', 'visa debito',
+                'visa credito'),
     'terminal': ('terminal', 'term:', 'term ', 'afiliad', 'afil:'),
     'lote_trace': ('lote no', 'lote n', 'lote:', 'trace', 'traza', 'aprob:',
                    'autorizad', 'aprobada', 'aprobado'),
@@ -87,18 +94,38 @@ MARCAS_TARJETA = {
     'sin_firma': ('no requiere firma', 'no reuqiere firma', 'firma del cliente'),
 }
 
-# Factura formal de proveedor.
 MARCAS_FACTURA = {
     'factura': ('factura', 'n de factura', 'nro factura', 'nota de venta',
                 'nota de debito', 'comprobante de venta'),
     'control': ('n de control', 'nro de control', 'n control', 'numero de control',
                 'control:', 'orden de compra'),
-    'subtotal_iva': ('subtotal', 'sub total', 'sub-total', 'iva', 'igtf',
-                     'base imponible', 'impuesto', 'alicuota'),
+    'subtotal_iva': ('subtotal', 'sub total', 'sub-total', 'iva 16', 'iva 8',
+                     'iva 5', 'igtf', 'base imponible', 'impuesto', 'alicuota'),
     'total': ('total', 'importe total', 'monto total', 'gran total'),
     'proveedor': ('proveedor', 'razon social', 'nombre o razon social', 'emisor'),
     'moneda_fiscal': ('bolivares', 'bs.', 'bs ', 'usd', 'dolares', 'moneda'),
+    'fiscal': ('seniat', 'punto de venta'),
 }
+
+MARCAS_FUERTES_FACTURA = {'factura', 'control', 'subtotal_iva', 'proveedor', 'fiscal'}
+MARCAS_FUERTES_TARJETA = {'recibo_compra', 'banco', 'tarjeta', 'terminal', 'lote_trace'}
+
+ANCLAS_TIPO_FACTURA = {'factura', 'control', 'fiscal'}
+
+SENALES_DOCUMENTO_IDENTIDAD = (
+    'cedula de identidad',
+    'republica bolivariana',
+    'fecha de nacimiento',
+    'nacionalidad',
+    'estado civil',
+    'firma del titular',
+    'carnet',
+)
+
+DETALLE_DOCUMENTO_IDENTIDAD = (
+    'La imagen parece un documento de identidad y no una factura o '
+    'comprobante de compra'
+)
 
 # Sin esto no hay nada que decidir: una foto de producto no llega ni a 15.
 MIN_CARACTERES_UTIL = 60
@@ -114,9 +141,23 @@ VEREDICTO_ILEGIBLE = 'ilegible'
 VEREDICTO_RECHAZADO = 'rechazado'
 
 
+@lru_cache(maxsize=256)
+def _patron_marca(needle):
+    izquierda = r'(?<![0-9a-z])' if needle[0].isalnum() else ''
+    derecha = r'(?![0-9a-z])' if needle[-1].isalnum() else ''
+    return re.compile(izquierda + re.escape(needle) + derecha)
+
+
 def _cuantas_marcas_encuentra(texto, marcas):
     return [nombre for nombre, needles in marcas.items()
-            if any(needle in texto for needle in needles)]
+            if any(_patron_marca(needle).search(texto) for needle in needles)]
+
+
+def _documento_identidad_detectado(texto):
+    for senal in SENALES_DOCUMENTO_IDENTIDAD:
+        if _patron_marca(senal).search(texto):
+            return senal
+    return None
 
 
 def evaluar_comprobante(texto, umbral=60):
@@ -128,13 +169,25 @@ def evaluar_comprobante(texto, umbral=60):
 
     Devuelve dict con:
         veredicto   : aceptado | dudoso | ilegible | rechazado
-        tipo        : factura_proveedor | comprobante_tarjeta | desconocido
+        tipo        : factura_proveedor | comprobante_tarjeta | desconocido |
+                      documento_identidad
         puntaje     : 0-100
         marcas      : que señales se encontraron
         puede_aceptar: True si se supero el umbral
     """
     texto = (texto or '').lower()
     largo = len(texto)
+
+    senal_identidad = _documento_identidad_detectado(texto)
+    if senal_identidad:
+        return {
+            'veredicto': VEREDICTO_RECHAZADO,
+            'tipo': 'documento_identidad',
+            'puntaje': 0,
+            'marcas': [f'identidad:{senal_identidad}'],
+            'puede_aceptar': False,
+            'detalle': DETALLE_DOCUMENTO_IDENTIDAD,
+        }
 
     if largo < MIN_CARACTERES_ACEPTABLE:
         return {
@@ -154,6 +207,7 @@ def evaluar_comprobante(texto, umbral=60):
 
     tiene_rif = bool(PATRON_RIF.search(texto))
     tiene_tarjeta = bool(PATRON_TARJETA_ENMASCARADA.search(texto))
+    tiene_numero_documento = bool(PATRON_NUMERO_DOCUMENTO.search(texto))
     tiene_montos = bool(PATRON_MONTOS.search(texto))
     tiene_fecha = bool(PATRON_FECHA.search(texto))
 
@@ -163,14 +217,22 @@ def evaluar_comprobante(texto, umbral=60):
     # Se elige el tipo con mas señales. La foto real de prueba tiene 5 marcas
     # de tarjeta y 0 de factura, asi que el orden importa: un comprobante de
     # tarjeta dice "recibo de compra", no "factura".
-    if len(marcas_tarjeta) > len(marcas_factura) and marcas_tarjeta:
+    tarjeta_fuerte = any(m in MARCAS_FUERTES_TARJETA for m in marcas_tarjeta)
+    factura_fuerte = any(m in MARCAS_FUERTES_FACTURA for m in marcas_factura)
+    factura_anclada = (tiene_numero_documento
+                       or bool(ANCLAS_TIPO_FACTURA & set(marcas_factura)))
+
+    if (len(marcas_tarjeta) >= 2 and tarjeta_fuerte
+            and len(marcas_tarjeta) > len(marcas_factura)):
         tipo = TIPO_TARJETA
         puntaje += 35 + 7 * len(marcas_tarjeta)
         marcas += [f'tarjeta:{m}' for m in marcas_tarjeta]
-    elif marcas_factura:
+    elif len(marcas_factura) >= 2 and factura_fuerte and factura_anclada:
         tipo = TIPO_FACTURA
         puntaje += 35 + 7 * len(marcas_factura)
         marcas += [f'factura:{m}' for m in marcas_factura]
+        if tiene_numero_documento:
+            marcas.append('numero_documento')
     else:
         tipo = TIPO_DESCONOCIDO
 
@@ -190,7 +252,6 @@ def evaluar_comprobante(texto, umbral=60):
         puntaje += 5
         marcas.append('texto_suficiente')
 
-    # Un documento legible pero sin ninguna señal conocida no es una factura.
     if tipo == TIPO_DESCONOCIDO:
         puntaje = min(puntaje, 20)
 
@@ -538,7 +599,8 @@ class PurchaseValidator:
         # verify() es tolerante: un JPEG cortado a la mitad lo aprueba. Se
         # fuerza ademas la decodificacion completa y se comprueba el marcador
         # de fin de imagen, que es lo que delata una subida interrumpida.
-        if not _decodifica_completa(contenido, formato):
+        imagen_ocr = _decodifica_y_prepara(contenido, formato)
+        if imagen_ocr is None:
             return False, (
                 "La imagen está incompleta o dañada. "
                 "Vuelve a subirla para que no se corte la descarga."
@@ -553,6 +615,7 @@ class PurchaseValidator:
         info = {
 
             'formato': formato,
+            'imagen_ocr': imagen_ocr,
             'extension': EXTENSION_POR_FORMATO.get(formato, '.jpg'),
             'bytes': contenido,
             'total_bytes': total_bytes,
