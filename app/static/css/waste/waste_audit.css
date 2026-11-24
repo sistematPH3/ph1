@@ -85,8 +85,9 @@
     text-transform: uppercase;
     font-size: 0.82rem;
     letter-spacing: 0.6px;
-    padding: 14px 18px !important;
+    padding: 14px 14px !important;
     border: none !important;
+    white-space: nowrap;
 }
 
 .ph-table thead th:first-child {
@@ -112,7 +113,7 @@
 }
 
 .ph-table tbody td {
-    padding: 18px 18px !important; /* Fila ligeramente más grande */
+    padding: 16px 14px !important; /* Relleno horizontal ajustado para escritorio */
     vertical-align: middle;
     border-top: 1px solid #f0f0f0;
     border-bottom: 1px solid #f0f0f0;
@@ -227,6 +228,8 @@
     transition: all 0.25s ease-in-out;
     cursor: pointer;
     text-decoration: none;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .ph-btn-detail-text:hover {
@@ -388,10 +391,63 @@ tr.audit-details-row > td,
 tr.audit-details-row:hover > td {
     background-color: #f8f9fa !important; /* Mantiene el color bg-light neutro */
 }
-/* Desactivar barra de desplazamiento horizontal */
-.table-responsive,
-.ph-table-container {
-    overflow-x: hidden !important;
+/* ==========================================================================
+   Scroll horizontal limpio de la tabla de auditoría
+   La tabla conserva un ancho mínimo legible y se desplaza dentro de la
+   tarjeta, evitando recortar la columna Acciones y el botón "Ver detalles".
+   ========================================================================== */
+.ph-audit-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #c8102e #eef1f4;
+    padding-bottom: 6px;
+}
+
+.ph-audit-table-scroll .ph-table {
+    width: 100%;
+    min-width: 960px;
+}
+
+/* Barra de desplazamiento sutil acorde al tema corporativo */
+.ph-audit-table-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.ph-audit-table-scroll::-webkit-scrollbar-track {
+    background: #eef1f4;
+    border-radius: 999px;
+}
+
+.ph-audit-table-scroll::-webkit-scrollbar-thumb {
+    background: #c8102e;
+    border-radius: 999px;
+}
+
+.ph-audit-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #8B0000;
+}
+
+/* Escritorio estándar (>= 992px): anchos equilibrados para que la tabla
+   quepa completa en 1366px/1440px sin desplazamiento. */
+@media (min-width: 992px) {
+    .ph-table th:nth-child(1), .ph-table td:nth-child(1) { width: 20%; } /* Responsable */
+    .ph-table th:nth-child(2), .ph-table td:nth-child(2) { width: 13%; } /* Sede */
+    .ph-table th:nth-child(3), .ph-table td:nth-child(3) { width: 18%; } /* Producto */
+    .ph-table th:nth-child(4), .ph-table td:nth-child(4) { width: 14%; } /* Tipo de Merma */
+    .ph-table th:nth-child(5), .ph-table td:nth-child(5) { width: 11%; } /* Estado */
+    .ph-table th:nth-child(6), .ph-table td:nth-child(6) { width: 10%; } /* Gravedad */
+    .ph-table th:nth-child(7), .ph-table td:nth-child(7) { width: 14%; } /* Acciones */
+
+    .ph-table td:nth-child(7) {
+        min-width: 130px;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        white-space: nowrap;
+    }
 }
 /* ==========================================================================
    Responsividad: Adaptación para Tablets y Teléfonos
@@ -447,14 +503,14 @@ tr.audit-details-row:hover > td {
         font-size: 0.95rem;
     }
 
-    /* Desactivar scroll horizontal en tabletas */
-    .table-responsive,
-    .ph-table-container {
-        overflow-x: hidden !important;
+    /* En tabletas se mantiene el scroll horizontal limpio */
+    .ph-audit-table-scroll {
+        overflow-x: auto;
     }
 
     .ph-table {
         width: 100% !important;
+        min-width: 900px;
     }
 }
 
@@ -469,6 +525,15 @@ tr.audit-details-row:hover > td {
     .ph-table tr.audit-row {
         display: block;
         width: 100%;
+    }
+
+    /* En móvil la tabla se convierte en tarjetas: no requiere ancho mínimo */
+    .ph-audit-table-scroll {
+        overflow-x: visible;
+    }
+
+    .ph-table {
+        min-width: 0 !important;
     }
 
     .ph-table tr.audit-row {

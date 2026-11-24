@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_panel.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_list.css') }}?v=7">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_audit.css') }}?v=1">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_audit.css') }}?v=3">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/waste/waste_audit.css') }}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -79,7 +79,7 @@
 
     <!-- Tabla de Eventos -->
     <div class="ph-table-container mt-3">
-        <div class="table-responsive">
+        <div class="table-responsive ph-audit-table-scroll">
             <table class="table ph-table table-hover align-middle mb-0">
                 <thead>
                     <tr>
