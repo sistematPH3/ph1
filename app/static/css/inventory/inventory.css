@@ -357,3 +357,58 @@
         font-size: 0.78rem;
     }
 }
+/* ==========================================================================
+   SCROLL HORIZONTAL - MENÚ DE INSUMOS
+   Evita que la tabla se aplaste y recorte las acciones en laptops pequeñas.
+   ========================================================================== */
+.inventory-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #b01212 #eef1f4;
+    padding-bottom: 6px;
+}
+
+/* Barra de desplazamiento sutil con el rojo corporativo */
+.inventory-table-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.inventory-table-scroll::-webkit-scrollbar-track {
+    background: #eef1f4;
+    border-radius: 999px;
+}
+
+.inventory-table-scroll::-webkit-scrollbar-thumb {
+    background: #b01212;
+    border-radius: 999px;
+}
+
+.inventory-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #8B0000;
+}
+
+/* Ancho mínimo: por debajo de esto aparece el scroll en lugar de recortar */
+.inventory-table-scroll #genericTable {
+    width: 100%;
+    min-width: 1000px;
+}
+
+.inventory-table-scroll #genericTable .content-table-header th {
+    white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+    /* En móvil la tabla ya se transforma en tarjetas: sin ancho mínimo */
+    .inventory-table-scroll {
+        overflow-x: visible !important;
+        padding-bottom: 0;
+    }
+
+    .inventory-table-scroll #genericTable {
+        min-width: 0;
+    }
+}

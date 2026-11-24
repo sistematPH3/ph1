@@ -5,8 +5,10 @@
 {% block extra_css %}
     {{ super() }}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/brand/logo_ph.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=3.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory/inventory.css') }}?v=4.0">
 {% endblock %}
+
+{% block table_wrapper_class %}inventory-table-scroll{% endblock %}
 
 {% block search_input_id %}searchInput{% endblock %}
 {% block search_placeholder %}Buscar por nombre o SKU...{% endblock %}
