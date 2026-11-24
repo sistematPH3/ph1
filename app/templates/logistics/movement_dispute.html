@@ -199,7 +199,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for item in mov.details %}
+                                        {% for item in mov.dispute_details %}
                                         {% set diff = (item.received_quantity | default(0, true) | float) - (item.quantity | float) %}
                                         <tr>
                                             <td class="fw-bold text-dark">{{ item.product.name if item.product else 'Producto #' ~ item.product_id }}</td>
@@ -291,7 +291,7 @@
 
                                         <!-- Ítems del manifestado original -->
                                         <h6 class="ph-section-title mb-3"><i class="bi bi-box-seam me-1 text-danger"></i> Ítems del Manifestado Original</h6>
-                                        {% for item in mov.details %}
+                                        {% for item in mov.dispute_details %}
                                         <div class="ph-item-decision">
                                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                                                 <span class="fw-bold text-dark d-flex align-items-center gap-2">
@@ -425,7 +425,7 @@
 
                                         <!-- BOTÓN Y ALERTA DE ACCESO DIRECTO A REPOSICIÓN DENTRO DEL MODAL (RESTABLECIDO) -->
                                         {% set ns_modal = namespace(total=0) %}
-                                        {% for item in mov.details %}
+                                        {% for item in mov.dispute_details %}
                                             {% set missing = (item.missing_quantity | default(0, true) | float) %}
                                             {% if missing > 0 %}
                                                 {% set ns_modal.total = ns_modal.total + missing %}

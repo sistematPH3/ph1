@@ -1420,6 +1420,101 @@ class MovementReceptionTest(unittest.TestCase):
         db.session.refresh(env["mov"])
         self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
 
+    def test_recepcion_mixta_acredita_conformes_y_solo_disputa_discrepancias(self):
+        # Guía de 3 renglones: A completo, B faltante y C sobrante. Solo A debe
+        # ingresar al inventario en la recepción; B y C quedan en arbitraje.
+        env = self._seed_two_items()
+        product_c = Product(name="Perejil", sku="PER-REC", unit_of_measure="kg", min_stock=20)
+        db.session.add(product_c)
+        db.session.flush()
+        detail_c = MovementDetail(
+            movement_id=env["mov"].id,
+            product_id=product_c.id,
+            lot_number="L-003",
+            quantity=10,
+            received_quantity=None,
+            missing_quantity=0.00,
+        )
+        db.session.add(detail_c)
+        # El usuario queda asignado a la sede destino para poder arbitrar.
+        env["user"].locations.append(env["dest"])
+        db.session.commit()
+
+        items = [
+            {
+                "detail_id": env["detail"].id,
+                "received_quantity": 10.0,
+                "item_condition": "CONFORME",
+                "observed_physical_lot": None,
+            },
+            {
+                "detail_id": env["detail_b"].id,
+                "received_quantity": 8.0,
+                "item_condition": "FALTANTE_CONTEO",
+                "observed_physical_lot": None,
+            },
+            {
+                "detail_id": detail_c.id,
+                "received_quantity": 12.0,
+                "item_condition": "SOBRANTE_EXCEDENTE",
+                "observed_physical_lot": None,
+                "surplus_lots": [{"lot": "L-003", "quantity": 2.0}],
+            },
+        ]
+        ok, msg = self._process(
+            env, novelty_type="INCIDENCIA_MIXTA",
+            notes="Un insumo completo, uno faltante y otro sobrante",
+            items_override=items,
+        )
+        self.assertTrue(ok, msg)
+        db.session.refresh(env["mov"])
+        self.assertEqual(env["mov"].status, "INCIDENCIA_MIXTA")
+
+        def _dest_stock(product_id):
+            inv = Inventory.query.filter_by(
+                location_id=env["dest"].id, product_id=product_id
+            ).first()
+            return float(inv.current_quantity) if inv else 0.0
+
+        # Solo el renglón conforme entró al stock de la sede receptora.
+        self.assertEqual(_dest_stock(env["product"].id), 10.0)
+        self.assertEqual(_dest_stock(env["product_b"].id), 0.0)
+        self.assertEqual(_dest_stock(product_c.id), 0.0)
+
+        detail_a = db.session.get(MovementDetail, env["detail"].id)
+        detail_b = db.session.get(MovementDetail, env["detail_b"].id)
+        self.assertTrue(detail_a.conforming_credited)
+        self.assertFalse(detail_b.conforming_credited)
+        self.assertFalse(detail_c.conforming_credited)
+
+        # La bandeja de disputas solo expone las líneas con novedad.
+        from app.logistics.services.movement_dispute_service import (
+            get_disputes_context,
+            resolve_dispute,
+        )
+        disputes, _ = get_disputes_context()
+        mov = next(m for m in disputes if m.id == env["mov"].id)
+        self.assertEqual(
+            {d.id for d in mov.dispute_details},
+            {env["detail_b"].id, detail_c.id},
+        )
+
+        # Al resolver solo se procesan las pendientes; aunque se envíe una acción
+        # para el renglón conforme, no debe volver a acreditarse.
+        resolve_dispute(
+            env["mov"].id,
+            {
+                f"item_{env['detail'].id}_action": "ACEPTAR_RECEPCION",
+                f"item_{env['detail_b'].id}_action": "ACEPTAR_RECEPCION",
+                f"item_{detail_c.id}_action": "ACEPTAR_RECEPCION",
+                "general_notes": "Resolución de prueba para guía mixta",
+            },
+            user_id=env["user"].id,
+        )
+        self.assertEqual(_dest_stock(env["product"].id), 10.0)
+        self.assertEqual(_dest_stock(env["product_b"].id), 8.0)
+        self.assertEqual(_dest_stock(product_c.id), 12.0)
+
     def test_incidencia_mixta_sin_notas_da_error(self):
         env = self._seed_two_items()
         items = [
@@ -2736,9 +2831,13 @@ class MovementReceptionTest(unittest.TestCase):
         mov = db.session.get(Movement, env["mov"].id)
         self.assertEqual(mov.status, "PRODUCTO_ERRONEO")
 
+        # El renglón de la guía llegó completo: se acredita de inmediato aunque el
+        # traslado quede en arbitraje por el insumo entregado por error.
         inv_dest = db.session.query(Inventory).filter_by(
             location_id=env["dest"].id, product_id=env["product"].id).first()
-        self.assertEqual(float(inv_dest.current_quantity), 0.0)
+        self.assertEqual(float(inv_dest.current_quantity), 10.0)
+        detail = db.session.get(MovementDetail, env["detail"].id)
+        self.assertTrue(detail.conforming_credited)
 
         # El producto erróneo NO se acredita en destino ni crea inventario fantasma:
         # se queda en custodia (auditoría) hasta que el arbitraje dicte su retorno.

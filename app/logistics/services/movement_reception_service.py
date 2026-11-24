@@ -40,6 +40,20 @@ def _derive_auto_novelty(processed_items):
     return "CONFORME"
 
 
+def _is_conforming_line(item):
+    """True si el renglón llegó exactamente como se despachó y sin condición.
+
+    Se evalúa por renglón (no por el estado global del traslado): en una guía
+    mixta los ítems completos deben ingresar de inmediato aunque otro ítem
+    tenga faltante/sobrante y quede en arbitraje.
+    """
+    return (
+        item.get("item_condition", "CONFORME") == "CONFORME"
+        and not item.get("secondary_item_condition")
+        and Decimal(str(item["received_quantity"])) == Decimal(str(item["quantity"]))
+    )
+
+
 def _as_date(value):
     """Normaliza a date los distintos tipos que puede devolver la BD."""
     if value is None or value == "":
@@ -533,13 +547,14 @@ class MovementReceptionService:
                 else:
                     extra_units = 0.0
 
-                # LÓGICA DIFERENCIADA:
-                # Si el traslado es COMPLETADO (sin novedades), liberamos el tránsito y acreditamos
-                # en destino la cantidad conforme (min(recibido, autorizado)).
-                # Si hay discrepancia/novedad, NO se acredita nada en destino todavía (eso lo decide
-                # el administrador en la bandeja de disputas). Solo se libera el tránsito que
-                # resguardaba la salida, para no dejar stock bloqueado en el origen.
-                if final_status == "COMPLETADO":
+                # LÓGICA DIFERENCIADA POR RENGLÓN:
+                # Los ítems sin novedad (recibido == despachado y sin condición)
+                # se acreditan de inmediato en destino, incluso si el traslado
+                # global queda en disputa por OTRO ítem. Solo los renglones con
+                # discrepancia esperan al arbitraje; su tránsito se resguarda
+                # para que el stock no desaparezca mientras se resuelve.
+                line_is_conforming = _is_conforming_line(item)
+                if final_status == "COMPLETADO" or line_is_conforming:
                     effective_stock_qty = min(rec_qty, dispatched_qty)
                     if effective_stock_qty > Decimal("0.00"):
                         MovementReceptionRepository.update_origin_transit(
@@ -559,6 +574,9 @@ class MovementReceptionService:
                             MovementReceptionRepository.increment_destination_stock(
                                 movement["destination_location_id"], product_id, creditable_qty
                             )
+                    # La línea ya quedó completada y acreditada: el arbitraje no
+                    # debe volver a procesarla al resolver las demás novedades.
+                    MovementReceptionRepository.mark_detail_conforming_credited(detail_id)
                 else:
                     # En caso de novedad/disputa liberamos del tránsito SOLO la porción
                     # que físicamente llegó (min(recibido, despachado)). El faltante

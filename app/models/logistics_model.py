@@ -115,6 +115,11 @@ class MovementDetail(db.Model):
     received_quantity = db.Column(db.Numeric(10, 2), nullable=True, default=None)
     missing_quantity = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     expiration_date = db.Column(db.Date, nullable=True)
+    # Renglón que llegó exactamente como se despachó: en una recepción mixta se
+    # acredita de inmediato en destino y se marca aquí para que la bandeja de
+    # disputas y la resolución NO lo vuelvan a procesar (evita doble asiento).
+    conforming_credited = db.Column(db.Boolean, nullable=False, default=False,
+                                    server_default=db.text('false'))
     
     # RELACIÓN AGREGADA: Para acceder al nombre del producto en Jinja2
     # Permite que Jinja2 acceda a item.product.name en lugar de solo item.product_id

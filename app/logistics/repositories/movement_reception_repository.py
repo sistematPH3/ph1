@@ -161,6 +161,19 @@ class MovementReceptionRepository:
         })
 
     @staticmethod
+    def mark_detail_conforming_credited(detail_id):
+        """Marca el renglón como acreditado en destino durante la recepción.
+
+        Lo usan las recepciones mixtas: solo las líneas sin novedad se marcan,
+        para que el arbitraje no las vuelva a asentar.
+        """
+        db.session.execute(text("""
+            UPDATE movement_details
+            SET conforming_credited = TRUE
+            WHERE id = :detail_id
+        """), {"detail_id": detail_id})
+
+    @staticmethod
     def get_or_create_inventory(location_id, product_id):
         with _inventory_lock:
             select_sql = text("""

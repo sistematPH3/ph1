@@ -288,6 +288,13 @@ def get_disputes_context(start_date=None, end_date=None):
                 detail.item_condition, detail.secondary_item_condition
             )
 
+        # La bandeja solo arbitra los renglones con novedad. Los ítems que
+        # llegaron completos en una recepción mixta ya fueron acreditados al
+        # inventario de destino y no deben reaparecer aquí ni resolverse otra vez.
+        mov.dispute_details = [
+            detail for detail in mov.details if not detail.conforming_credited
+        ]
+
     return disputes, locations
 
 
@@ -482,6 +489,11 @@ def resolve_dispute(movement_id, payload, user_id):
 
     # 1. Procesar resoluciones para los ítems del manifestado original
     for detail in movement.details:
+        # Renglón conforme ya acreditado durante la recepción mixta: no forma
+        # parte de la disputa y no debe volver a moverse el inventario.
+        if detail.conforming_credited:
+            continue
+
         action = payload.get(f"item_{detail.id}_action")
         new_lot = payload.get(f"item_{detail.id}_lot")
 
