@@ -46,7 +46,7 @@
 {% set cols_kpi = {
     'PURCHASES':           {'color': '#ce1126', 'icono': 'bi-cart3',     'label': 'Compras'},
     'KITCHEN_CONSUMPTION': {'color': '#2563eb', 'icono': 'bi-egg-fried', 'label': 'Consumo Cocina'},
-    'WASTE':               {'color': '#d97706', 'icono': 'bi-trash3',    'label': 'Mermas'},
+    'WASTE':               {'color': '#d97706', 'icono': 'bi-trash3',    'label': 'Mermas y pérdidas'},
     'TRANSFERS':           {'color': '#7c3aed', 'icono': 'bi-truck',     'label': 'Traslados'},
 } %}
 
@@ -180,7 +180,7 @@
             <canvas id="globalChart"></canvas>
             <div class="dash-empty" id="dashEmpty">
                 <i class="bi bi-inbox"></i>
-                Aún no hay operaciones registradas en el período seleccionado.
+                <span id="dashEmptyText">Aún no hay operaciones registradas en el período seleccionado.</span>
             </div>
         </div>
     </div>

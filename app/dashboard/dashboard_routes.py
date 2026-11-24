@@ -19,6 +19,7 @@ from app.analytics.requests.statistics_validators import (
 from app.analytics.services import analysis_reports_service as report_svc
 from app.time_utils import current_ve_time
 from app.analytics.services.snapshots_service import (
+    PERIODOS_GRAFICO,
     leer_configuracion,
     evaluar_alarmas,
     obtener_grafico_evolucion,
@@ -70,8 +71,13 @@ def _asegurar_snapshots(period_type, user_id=None, location_ids=None):
     irregularidades queda vacío. Un fallo aquí no debe tumbar el panel.
     """
     try:
+        # Se cubre la misma ventana que dibuja el gráfico de evolución (13
+        # períodos) y no solo los 4 de las alarmas: así las cuatro series
+        # (Compras, Consumo Cocina, Mermas y Traslados) tienen montos en todos
+        # los puntos del gráfico y no solo en el tramo de irregularidades.
         asegurar_ventana_alarmas(period_type, user_id=user_id,
-                                 location_ids=location_ids)
+                                 location_ids=location_ids,
+                                 limite=PERIODOS_GRAFICO)
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(

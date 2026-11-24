@@ -8,11 +8,13 @@ import logging
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
+from sqlalchemy import func, or_
+
 from app.extensions import db
-from app.time_utils import current_ve_time
+from app.time_utils import current_ve_time, ve_a_utc
 from app.models.statistics_model import SnapshotMetric, SnapshotPeriodType, StatisticsSnapshot
-from app.models.waste_model import AppParameter, Waste
-from app.models.logistics_model import Location, Movement
+from app.models.waste_model import AppParameter, AuditLog, Waste
+from app.models.logistics_model import Location, Movement, Purchase
 from app.analytics.repositories import snapshots_repository as repo
 from app.analytics.requests.statistics_validators import validate_config_payload
 from app.inventory.services import product_cost_service
@@ -38,6 +40,11 @@ FACTOR_DEFECTO = Decimal('2.0')
 MINIMO_DEFECTO = Decimal('100.00')
 
 CENTESIMA = Decimal('0.01')
+
+# El gráfico de evolución dibuja esta cantidad de períodos. La generación
+# perezosa usa el mismo valor para que las cuatro series (compras, consumo de
+# cocina, mermas y traslados) tengan snapshots en todos los puntos graficados.
+PERIODOS_GRAFICO = 13
 
 
 def _redondear(valor):
@@ -278,6 +285,121 @@ def _generar_snapshots_ventana(ventana, period_type, user_id, chunk_size=50):
         return {'success': False, 'message': 'No se pudieron generar los snapshots. Intenta de nuevo.'}
 
 
+def _actividad_por_metrica(inicio, fin, location_ids=None):
+    """Último instante con hechos del período por (métrica, sede).
+
+    Un snapshot puede existir y aun así estar viejo: el consumo de cocina se
+    registra durante todo el período y las mermas se aprueban días después de
+    registrarse (Waste.approved_at). Comparar la existencia de filas no basta
+    para saber si el resumen refleja lo que ya está en las tablas fuente.
+    """
+    desde = datetime.combine(inicio, time.min)
+    hasta = datetime.combine(fin, time.max)
+    actividad = {}
+
+    central = repo.sede_central()
+    if central and (not location_ids or central in location_ids):
+        ultima_compra = db.session.query(
+            func.max(Purchase.purchase_date),
+        ).filter(
+            Purchase.status.in_(['COMPLETED', 'COMPLETADO']),
+            Purchase.purchase_date >= desde,
+            Purchase.purchase_date <= hasta,
+        ).scalar()
+        if ultima_compra is not None:
+            actividad[(SnapshotMetric.PURCHASES, central)] = ultima_compra
+
+    consulta = db.session.query(
+        AuditLog.location_id, func.max(AuditLog.timestamp),
+    ).filter(
+        AuditLog.action.in_(['GASTO_COCINA', 'CONSUMO_COCINA']),
+        AuditLog.timestamp >= desde,
+        AuditLog.timestamp <= hasta,
+    )
+    if location_ids:
+        consulta = consulta.filter(AuditLog.location_id.in_(location_ids))
+    for loc_id, ultimo in consulta.group_by(AuditLog.location_id).all():
+        if loc_id and ultimo is not None:
+            actividad[(SnapshotMetric.KITCHEN_CONSUMPTION, loc_id)] = ultimo
+
+    # Solo las mermas que impactan el cajón (aprobadas o parciales) y las que
+    # dejaron de impactarlo por cancelación/reversión. Una merma PENDIENTE no
+    # debe forzar una regeneración en cada carga.
+    consulta = db.session.query(
+        Waste.location_id,
+        func.max(Waste.date),
+        func.max(Waste.approved_at),
+        func.max(Waste.cancelled_at),
+        func.max(Waste.reverted_at),
+    ).filter(
+        Waste.date >= desde,
+        Waste.date <= hasta,
+        or_(Waste.status.in_(['APROBADO', 'APROBADO_PARCIAL']),
+            Waste.cancelled_at.isnot(None),
+            Waste.reverted_at.isnot(None)),
+    )
+    if location_ids:
+        consulta = consulta.filter(Waste.location_id.in_(location_ids))
+    for fila in consulta.group_by(Waste.location_id).all():
+        loc_id, *instantes = fila
+        ultimo = max((i for i in instantes if i is not None), default=None)
+        if loc_id and ultimo is not None:
+            actividad[(SnapshotMetric.WASTE, loc_id)] = ultimo
+
+    consulta = db.session.query(
+        Movement.origin_location_id, func.max(Movement.date),
+    ).filter(
+        Movement.type == 'TRASLADO',
+        Movement.status.notin_(['CANCELADO', 'CANCELADO_EMISOR', 'ANULADO',
+                                'RECHAZADO']),
+        Movement.date >= desde,
+        Movement.date <= hasta,
+    )
+    if location_ids:
+        consulta = consulta.filter(Movement.origin_location_id.in_(location_ids))
+    for loc_id, ultimo in consulta.group_by(Movement.origin_location_id).all():
+        if loc_id and ultimo is not None:
+            actividad[(SnapshotMetric.TRANSFERS, loc_id)] = ultimo
+
+    return actividad
+
+
+def _periodo_desactualizado(period_type, inicio, fin, location_ids=None):
+    """¿El período necesita regenerar sus snapshots?
+
+    Sí cuando hay hechos en las tablas fuente para una (métrica, sede) que no
+    tienen snapshot o cuyo snapshot se calculó ANTES del último hecho. Así el
+    consumo y las mermas registrados después de la primera carga del panel no
+    quedan congelados en cero para siempre.
+    """
+    consulta = StatisticsSnapshot.query.filter(
+        StatisticsSnapshot.period_type == period_type,
+        StatisticsSnapshot.period_start == inicio,
+    )
+    if location_ids:
+        consulta = consulta.filter(
+            StatisticsSnapshot.location_id.in_(location_ids))
+
+    # calculated_at se guarda en UTC naive (default del modelo) y las tablas
+    # fuente usan el reloj de Venezuela; se comparan ambos en UTC.
+    calculado = {}
+    for snap in consulta.all():
+        clave = (snap.metric, snap.location_id)
+        instante = snap.calculated_at
+        previo = calculado.get(clave)
+        if previo is None or (instante is not None and instante < previo):
+            calculado[clave] = instante
+
+    for clave, ultima in _actividad_por_metrica(inicio, fin,
+                                                location_ids).items():
+        if ultima is None:
+            continue
+        instante = calculado.get(clave)
+        if instante is None or instante < ve_a_utc(ultima):
+            return True
+    return False
+
+
 def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, location_ids=None):
     """¿Falta el snapshot del período vigente para alguna sede?
 
@@ -300,41 +422,33 @@ def faltan_snapshots(period_type=SnapshotPeriodType.MONTHLY, corte=None, locatio
 
 
 def asegurar_ventana_alarmas(period_type=SnapshotPeriodType.MONTHLY,
-                            corte=None, user_id=None, location_ids=None):
-    """Garantiza los snapshots que necesita la evaluación de alarmas.
+                            corte=None, user_id=None, location_ids=None,
+                            limite=4):
+    """Garantiza snapshots frescos para el gráfico y las alarmas.
 
-    La alarma compara el período actual contra los 3 anteriores. El dashboard
-    solo generaba el período vigente, así que en una base nueva (o tras el
-    primer despliegue) nunca había historia contra la cual comparar y el panel
-    de irregularidades quedaba siempre vacío.
+    La alarma compara el período actual contra los 3 anteriores y el gráfico de
+    evolución dibuja los últimos `PERIODOS_GRAFICO` períodos. El dashboard del
+    Admin llama a esta función en cada carga para que los cuatro indicadores
+    tengan montos por período.
 
-    - Si faltan el período actual o todos los antecedentes, reconstruye los
-      períodos faltantes de la ventana de 4.
-    - Si ya hay actual + al menos un antecedente, no vuelve a recalcular.
-    - Si un período realmente no tiene actividad, no genera fila; se reintenta
-      en la siguiente carga, pero solo mientras no exista ningún antecedente.
+    Antes bastaba con que existiera CUALQUIER fila del período para no volver a
+    calcular. Eso dejaba a «Consumo Cocina» y «Mermas» en cero: se registran
+    consumos y se aprueban mermas después de la primera carga, pero el snapshot
+    del período ya existía (aunque fuera por Compras) y nunca se refrescaba.
+    Ahora se recalcula únicamente cada período que tenga hechos más recientes
+    que su snapshot (o que no tenga snapshot para una métrica con datos).
     """
     if period_type not in PERIOD_TYPES:
         period_type = SnapshotPeriodType.MONTHLY
-    ventana = periodos_historia(period_type, limite=4, corte=corte)
-    inicios = [p[0] for p in ventana]
-    consulta = StatisticsSnapshot.query.filter(
-        StatisticsSnapshot.period_type == period_type,
-        StatisticsSnapshot.period_start.in_(inicios),
-    )
-    if location_ids:
-        consulta = consulta.filter(
-            StatisticsSnapshot.location_id.in_(location_ids))
-    existentes = {s.period_start for s in consulta.all()}
-    actual = ventana[-1][0]
-    hay_antecedente = any(p[0] in existentes for p in ventana[:-1])
-    if actual in existentes and hay_antecedente:
+    ventana = periodos_historia(period_type, limite=limite, corte=corte)
+    pendientes = [
+        (inicio, fin) for inicio, fin in ventana
+        if _periodo_desactualizado(period_type, inicio, fin, location_ids)
+    ]
+    if not pendientes:
         return {'success': True, 'generados': 0}
-    faltantes = [p for p in ventana if p[0] not in existentes]
-    if not faltantes:
-        return {'success': True, 'generados': 0}
-    resultado = _generar_snapshots_ventana(faltantes, period_type, user_id)
-    resultado['generados'] = len(faltantes)
+    resultado = _generar_snapshots_ventana(pendientes, period_type, user_id)
+    resultado['generados'] = len(pendientes)
     return resultado
 
 
@@ -561,7 +675,8 @@ def obtener_grafico_evolucion(period_type=SnapshotPeriodType.MONTHLY, corte=None
     else:
         campo = 'amount_usd'
 
-    periodos = periodos_historia(period_type, corte=corte)
+    periodos = periodos_historia(period_type, limite=PERIODOS_GRAFICO,
+                                 corte=corte)
     claves = [p[0] for p in periodos]
     snapshots = StatisticsSnapshot.query.filter(
         StatisticsSnapshot.period_type == period_type,

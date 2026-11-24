@@ -236,6 +236,9 @@ def guardar_snapshots(metric, period_type, inicio, fin, filas_por_sede, user_id=
         snap.amount_eur = agg.get('monto_eur', Decimal('0.00'))
         snap.quantity = agg.get('cantidad', Decimal('0.00'))
         snap.record_count = agg.get('registros', 0)
+        # Marca de frescura: el dashboard compara este instante con la última
+        # actividad de las tablas fuente para decidir si debe recalcular.
+        snap.calculated_at = datetime.utcnow()
         if user_id:
             snap.calculated_by_user_id = user_id
     # Eliminar los snapshots de este período/métrica que ya no tienen datos

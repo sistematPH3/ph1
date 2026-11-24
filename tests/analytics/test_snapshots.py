@@ -478,6 +478,66 @@ class SnapshotsTest(unittest.TestCase):
         self.assertEqual(snap.amount_usd, Decimal("50.00"))
         self.assertEqual(snap.quantity, Decimal("5.00"))
 
+    def test_dashboard_refresca_consumo_y_mermas_posteriores(self):
+        """El panel Admin generaba el snapshot al abrirse y no lo refrescaba:
+        el consumo y las mermas registrados después de esa primera carga
+        quedaban fuera del gráfico de evolución para siempre."""
+        from app.analytics.services.snapshots_service import (
+            asegurar_ventana_alarmas, obtener_grafico_evolucion,
+        )
+        self._compra()
+        asegurar_ventana_alarmas(SnapshotPeriodType.MONTHLY,
+                                 user_id=self.user.id)
+        # Después de la primera carga del panel se registran consumo y merma.
+        self._consumo()
+        self._merma("APROBADO", 3)
+
+        resultado = asegurar_ventana_alarmas(SnapshotPeriodType.MONTHLY,
+                                             user_id=self.user.id)
+        self.assertTrue(resultado["success"])
+        self.assertGreaterEqual(resultado["generados"], 1)
+
+        grafico = obtener_grafico_evolucion(
+            SnapshotPeriodType.MONTHLY, location_ids=[self.loc_a.id])
+        self.assertEqual(
+            grafico["metrics"][SnapshotMetric.PURCHASES][-1], 100.0)
+        self.assertEqual(
+            grafico["metrics"][SnapshotMetric.KITCHEN_CONSUMPTION][-1], 50.0)
+        self.assertEqual(grafico["metrics"][SnapshotMetric.WASTE][-1], 30.0)
+        for metric in (SnapshotMetric.PURCHASES,
+                       SnapshotMetric.KITCHEN_CONSUMPTION,
+                       SnapshotMetric.WASTE, SnapshotMetric.TRANSFERS):
+            self.assertEqual(len(grafico["metrics"][metric]),
+                             len(grafico["periods"]),
+                             f"La serie {metric} debe cubrir todos los períodos.")
+
+    def test_merma_aprobada_despues_refresca_su_periodo(self):
+        """Una merma registrada como PENDIENTE y aprobada después debe entrar
+        en el snapshot del período en el que se registró."""
+        from app.analytics.services.snapshots_service import (
+            asegurar_ventana_alarmas, obtener_grafico_evolucion,
+        )
+        self._compra()
+        waste = self._merma("PENDIENTE", 3)
+        asegurar_ventana_alarmas(SnapshotPeriodType.MONTHLY,
+                                 user_id=self.user.id)
+        grafico = obtener_grafico_evolucion(
+            SnapshotPeriodType.MONTHLY, location_ids=[self.loc_a.id])
+        self.assertEqual(grafico["metrics"][SnapshotMetric.WASTE][-1], 0.0)
+
+        # Aprobación posterior (solo las aprobadas impactan el cajón).
+        waste.status = "APROBADO"
+        waste.approved_at = datetime.now(timezone.utc)
+        for detalle in waste.details:
+            detalle.status = "APROBADO"
+        db.session.flush()
+
+        asegurar_ventana_alarmas(SnapshotPeriodType.MONTHLY,
+                                 user_id=self.user.id)
+        grafico = obtener_grafico_evolucion(
+            SnapshotPeriodType.MONTHLY, location_ids=[self.loc_a.id])
+        self.assertEqual(grafico["metrics"][SnapshotMetric.WASTE][-1], 30.0)
+
     def test_grafico_evolucion_no_mezcla_period_types(self):
         from datetime import timedelta
         from app.analytics.services.snapshots_service import (

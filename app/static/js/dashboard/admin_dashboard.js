@@ -9,7 +9,7 @@
     const config = {
         'PURCHASES': {label: 'Compras', color: '#ce1126'},
         'KITCHEN_CONSUMPTION': {label: 'Consumo Cocina', color: '#2563eb'},
-        'WASTE': {label: 'Mermas', color: '#d97706'},
+        'WASTE': {label: 'Mermas y pérdidas', color: '#d97706'},
         'TRANSFERS': {label: 'Traslados', color: '#7c3aed'},
     };
     const ALL_CLR = '#334155';
@@ -30,14 +30,20 @@
         return partes.length > 1 ? partes[0] + ',' + partes[1] : partes[0];
     }
 
-    function totalDeTodas() {
-        return orden.reduce(function (acc, m) {
+    function metricasVisibles(esTodo) {
+        return esTodo ? orden : [activa];
+    }
+
+    function totalDe(metricas) {
+        return metricas.reduce(function (acc, m) {
             return acc + (datos.metrics[m] || []).reduce(function (a, v) { return a + (Number(v) || 0); }, 0);
         }, 0);
     }
 
     function datasetsPara(esTodo) {
-        return orden.map(function (m) {
+        return metricasVisibles(esTodo).filter(function (m) {
+            return !!config[m];
+        }).map(function (m) {
             const cfg = config[m];
             return {
                 label: cfg.label + ' (' + moneda + ')',
@@ -63,12 +69,24 @@
         const emptyEl = document.getElementById('dashEmpty');
         const esTodo = activa === 'ALL';
         const labels = (datos.periods || []).map(p => p.label);
+        // Cada pestaña pinta SU serie. Antes se dibujaban siempre las cuatro y
+        // las series en cero (Consumo Cocina / Mermas sin snapshot) quedaban
+        // solapadas sobre el eje, por lo que parecían no renderizarse.
+        const metricas = metricasVisibles(esTodo);
 
         if (grafico) grafico.destroy();
 
-        if (totalDeTodas() === 0) {
+        if (totalDe(metricas) === 0) {
             ctx.style.display = 'none';
-            if (emptyEl) emptyEl.style.display = 'block';
+            if (emptyEl) {
+                emptyEl.style.display = 'block';
+                const texto = document.getElementById('dashEmptyText');
+                if (texto) {
+                    texto.textContent = esTodo
+                        ? 'Aún no hay operaciones registradas en el período seleccionado.'
+                        : 'Sin movimientos de ' + config[activa].label + ' en los períodos graficados.';
+                }
+            }
             return;
         }
         if (emptyEl) emptyEl.style.display = 'none';
