@@ -116,7 +116,7 @@ def seed_waste_types():
          'MEDIA', False, False),
         ('DANADO_FISICO',      'Dañado físico',
          'Caja o producto que se cae y se rompe / danifica',
-         'MEDIA', False, False),
+         'MEDIA', False, True),
         ('ERROR_PREPARACION',  'Error de preparación',
          'Pizza quemada u otro error en hora pico',
          'MEDIA', False, False),

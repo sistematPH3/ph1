@@ -92,13 +92,14 @@ def get_all_locations():
 
 def obtener_tipos_merma_por_sede(location_id: int):
     """
-    Sede Central (location_id = 1) solo maneja mermas de TEMPERATURA y ROBO_SOSPECHA.
+    Sede Central (location_id = 1) solo maneja mermas de TEMPERATURA,
+    ROBO_SOSPECHA y DANADO_FISICO.
     Las demás sedes (con cocina) disponen del catálogo completo.
     """
     if location_id == 1:
         return WasteType.query.filter(
             WasteType.is_active == True,
-            WasteType.code.in_(['TEMPERATURA', 'ROBO_SOSPECHA'])
+            WasteType.code.in_(['TEMPERATURA', 'ROBO_SOSPECHA', 'DANADO_FISICO'])
         ).all()
     
     return WasteType.query.filter(WasteType.is_active == True).all()
