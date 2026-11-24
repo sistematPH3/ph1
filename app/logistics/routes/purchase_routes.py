@@ -96,12 +96,16 @@ def new_purchase_form():
         
     suppliers = Supplier.query.filter(func.upper(Supplier.status).in_(['ACTIVE', 'ACTIVO', 'OPERATIVO', 'OPERATIVA'])).order_by(Supplier.name.asc()).all()
     users = User.query.order_by(User.name.asc()).all()
-    
+
+    # Proveedor recién registrado desde este formulario: se preselecciona.
+    selected_supplier_id = request.args.get('new_supplier_id', type=int)
+
     return render_template(
         'logistics/register_purchase.html', 
         products=products, 
         suppliers=suppliers, 
         users=users,
+        selected_supplier_id=selected_supplier_id,
         vencimiento_manual_min_dias=current_app.config.get('VENCIMIENTO_MANUAL_MIN_DIAS', 15),
     )
 

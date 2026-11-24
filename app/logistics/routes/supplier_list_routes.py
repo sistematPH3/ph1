@@ -37,26 +37,36 @@ def index():
             current_status=validated_data['status'] or ''
         )
     except ValueError as val_err:
-        flash(f"Parámetros de búsqueda inválidos: {str(val_err)}", "warning")
+        flash(f"Parámetros de búsqueda inválidos: {str(val_err)}", "proveedor-warning")
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
     except Exception:
         logger.exception("Error al cargar el listado de proveedores")
-        flash("No se pudo cargar el listado de proveedores. Intenta de nuevo.", "danger")
+        flash("No se pudo cargar el listado de proveedores. Intenta de nuevo.", "proveedor-danger")
         return render_template('logistics/suppliers_list.html', suppliers=[], current_status='')
 
 @supplier_list_bp.route('/suppliers/register', methods=['GET'])
 @require_roles('admin')
 def register_supplier_view():
+    # Origen del registro: 'purchase' devuelve al formulario de compras.
+    next_dest = request.args.get('next')
+    if next_dest != 'purchase':
+        next_dest = None
     try:
-        return render_template('logistics/register-supplier.html', supplier=None)
+        return render_template(
+            'logistics/register-supplier.html',
+            supplier=None,
+            next_dest=next_dest,
+        )
     except Exception:
         logger.exception("Error al abrir el formulario de registro de proveedor")
-        flash("No se pudo abrir el formulario de registro. Intenta de nuevo.", "danger")
+        flash("No se pudo abrir el formulario de registro. Intenta de nuevo.", "proveedor-danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/register', methods=['POST'])
 @require_roles('admin')
 def handle_register_supplier():
+    # Se conserva el origen por formulario o por query string.
+    next_dest = request.form.get('next') or request.args.get('next')
     try:
         name = request.form.get('name')
         tax_id = request.form.get('tax_id')
@@ -76,13 +86,22 @@ def handle_register_supplier():
         db.session.add(new_supplier)
         db.session.commit()
         
-        flash("Proveedor registrado exitosamente.", "success")
-        return redirect(url_for('purchase_routes.new_purchase_form'))
+        flash("Proveedor registrado exitosamente.", "proveedor-success")
+        if next_dest == 'purchase':
+            return redirect(url_for(
+                'purchase_routes.new_purchase_form',
+                new_supplier_id=new_supplier.id,
+            ))
+        return redirect(url_for('supplier_list.index'))
     except Exception:
         db.session.rollback()
         logger.exception("Error al registrar el proveedor")
-        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "danger")
-        return render_template('logistics/register-supplier.html', supplier=None)
+        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "proveedor-danger")
+        return render_template(
+            'logistics/register-supplier.html',
+            supplier=None,
+            next_dest=next_dest if next_dest == 'purchase' else None,
+        )
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['GET'])
 @require_roles('admin')
@@ -92,13 +111,13 @@ def edit_supplier_view(supplier_id):
         supplier = service.repository.get_by_id(supplier_id)
         
         if not supplier:
-            flash("El proveedor que intenta editar no existe.", "warning")
+            flash("El proveedor que intenta editar no existe.", "proveedor-warning")
             return redirect(url_for('supplier_list.index'))
             
         return render_template('logistics/register-supplier.html', supplier=supplier)
     except Exception:
         logger.exception("Error al cargar el proveedor %s para edición", supplier_id)
-        flash("No se pudo cargar el proveedor para edición. Intenta de nuevo.", "danger")
+        flash("No se pudo cargar el proveedor para edición. Intenta de nuevo.", "proveedor-danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/edit/<int:supplier_id>', methods=['POST'])
@@ -109,7 +128,7 @@ def handle_edit_supplier(supplier_id):
         supplier = service.repository.get_by_id(supplier_id)
         
         if not supplier:
-            flash("El proveedor no existe o fue eliminado.", "warning")
+            flash("El proveedor no existe o fue eliminado.", "proveedor-warning")
             return redirect(url_for('supplier_list.index'))
             
         supplier.name = request.form.get('name')
@@ -121,12 +140,12 @@ def handle_edit_supplier(supplier_id):
         
         db.session.commit()
         
-        flash("Proveedor actualizado exitosamente.", "success")
+        flash("Proveedor actualizado exitosamente.", "proveedor-success")
         return redirect(url_for('supplier_list.index'))
     except Exception:
         db.session.rollback()
         logger.exception("Error al actualizar el proveedor %s", supplier_id)
-        flash("No se pudo actualizar el proveedor. Intenta de nuevo.", "danger")
+        flash("No se pudo actualizar el proveedor. Intenta de nuevo.", "proveedor-danger")
         return redirect(url_for('supplier_list.index'))
 
 @supplier_list_bp.route('/suppliers/list/<int:supplier_id>/toggle', methods=['POST'])
@@ -142,7 +161,7 @@ def toggle_status(supplier_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({"success": True, "new_status": new_status}), 200
             
-        flash("Estado del proveedor actualizado con éxito.", "success")
+        flash("Estado del proveedor actualizado con éxito.", "proveedor-success")
     except Exception:
         logger.exception("Error al cambiar el estado del proveedor %s", supplier_id)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -150,6 +169,6 @@ def toggle_status(supplier_id):
                 "success": False,
                 "error": "No se pudo cambiar el estado del proveedor. Intenta de nuevo.",
             }), 500
-        flash("No se pudo cambiar el estado del proveedor. Intenta de nuevo.", "danger")
+        flash("No se pudo cambiar el estado del proveedor. Intenta de nuevo.", "proveedor-danger")
         
     return redirect(url_for('supplier_list.index'))

@@ -1,5 +1,22 @@
 {% extends "base_list.html" %}
 
+{# El listado de proveedores es el único que consume los flashes de este módulo. #}
+{% block flash_messages %}
+    {% with messages = get_flashed_messages(with_categories=true, category_filter=['proveedor-success', 'proveedor-danger', 'proveedor-warning']) %}
+        {% if messages %}
+            <div class="mt-3">
+                {% for category, message in messages %}
+                    {% set alert_class = 'success' if category == 'proveedor-success' else ('warning' if category == 'proveedor-warning' else 'danger') %}
+                    <div class="alert alert-{{ alert_class }} alert-dismissible fade show rounded-3 shadow-sm mb-2" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+{% endblock %}
+
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/supplier_list.css') }}?v=1.5">
 

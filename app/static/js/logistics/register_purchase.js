@@ -287,7 +287,11 @@ function restoreDraft() {
 
         if (draft.supplier_id && draft.supplier_id !== 'new') {
             const supplierSelect = document.getElementById('supplier_id');
-            if (supplierSelect) supplierSelect.value = draft.supplier_id;
+            // Si se vuelve del registro de proveedor, el proveedor recién
+            // creado (preseleccionado en el HTML) tiene prioridad sobre el borrador.
+            if (supplierSelect && supplierSelect.dataset.preselect !== '1') {
+                supplierSelect.value = draft.supplier_id;
+            }
         }
 
         if (draft.currency) {

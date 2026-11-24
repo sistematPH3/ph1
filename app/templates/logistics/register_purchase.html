@@ -21,6 +21,19 @@
         </a>
     </div>
 
+    {# Confirmación del registro de proveedor hecho desde este formulario. #}
+    {% with messages = get_flashed_messages(with_categories=true, category_filter=['proveedor-success', 'proveedor-danger', 'proveedor-warning']) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                {% set alert_class = 'success' if category == 'proveedor-success' else ('warning' if category == 'proveedor-warning' else 'danger') %}
+                <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <form id="purchaseForm" novalidate enctype="multipart/form-data" data-vencimiento-min-dias="{{ vencimiento_manual_min_dias | default(15) }}">
         <div class="row g-4 align-items-start">
             
@@ -132,10 +145,10 @@
                         <label class="form-label">Proveedor</label>
                         <div class="input-group mariuska-select-group bg-light">
                             <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-1"><i class="bi bi-building"></i></span>
-                            <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" data-new-url="{{ url_for('supplier_list.register_supplier_view') }}" required>
-                                <option value="" disabled selected>Seleccione Proveedor</option>
+                            <select id="supplier_id" class="form-select border-0 py-2 bg-transparent cursor-pointer" data-new-url="{{ url_for('supplier_list.register_supplier_view', next='purchase') }}"{% if selected_supplier_id %} data-preselect="1"{% endif %} required>
+                                <option value="" disabled{% if not selected_supplier_id %} selected{% endif %}>Seleccione Proveedor</option>
                                 {% for s in suppliers %}
-                                    <option value="{{ s.id }}">{{ s.name }} ({{ s.tax_id }})</option>
+                                    <option value="{{ s.id }}"{% if selected_supplier_id and s.id == selected_supplier_id %} selected{% endif %}>{{ s.name }} ({{ s.tax_id }})</option>
                                 {% endfor %}
                                 <option value="new" class="text-danger fw-bold">+ Añadir nuevo proveedor...</option>
                             </select>

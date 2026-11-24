@@ -13,20 +13,22 @@
             {% if supplier %}Editar Proveedor{% else %}Registro de Proveedor{% endif %}
         </h2>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
+        {# Solo mensajes del módulo de proveedores: evita heredar flashes de otros módulos. #}
+        {% with messages = get_flashed_messages(with_categories=true, category_filter=['proveedor-success', 'proveedor-danger', 'proveedor-warning']) %}
             {% if messages %}
                 <div class="flash-messages mb-3">
                     {% for category, message in messages %}
-                        {% set alert_class = 'success' if category == 'success' or 'exitosamente' in message.lower() or 'éxito' in message.lower() else ('danger' if category == 'error' or category == 'danger' else 'info') %}
-                        <div class="alert alert-{{ alert_class }}">
+                        {% set alert_class = 'success' if category == 'proveedor-success' else ('warning' if category == 'proveedor-warning' else 'danger') %}
+                        <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
                             {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
 
-        <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" 
+        <form action="{% if supplier %}{{ url_for('supplier_list.handle_edit_supplier', supplier_id=supplier.id) }}{% elif next_dest %}{{ url_for('supplier_list.handle_register_supplier', next=next_dest) }}{% else %}{{ url_for('supplier_list.handle_register_supplier') }}{% endif %}" 
               method="POST" 
               class="needs-validation" 
               id="supplierForm"
@@ -38,6 +40,8 @@
             
             {% if supplier %}
                 <input type="hidden" name="supplier_id" id="supplier_id" value="{{ supplier.id }}">
+            {% elif next_dest %}
+                <input type="hidden" name="next" value="{{ next_dest }}">
             {% endif %}
 
             <div class="form-group-premium">

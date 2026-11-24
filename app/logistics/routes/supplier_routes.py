@@ -31,17 +31,17 @@ def handle_register():
         
         generated_id = service.register_new_supplier(supplier_request)
         
-        flash(f"¡Proveedor registrado con éxito! ID asignado: {generated_id}", "success")
+        flash(f"¡Proveedor registrado con éxito! ID asignado: {generated_id}", "proveedor-success")
         
     except ValueError as e:
-        flash(str(e), "danger")
+        flash(str(e), "proveedor-danger")
     except IntegrityError:
         db.session.rollback()
-        flash("No se pudo registrar: El RIF, Nombre o Correo ingresado ya pertenece a otro proveedor.", "danger")
+        flash("No se pudo registrar: El RIF, Nombre o Correo ingresado ya pertenece a otro proveedor.", "proveedor-danger")
     except Exception:
         db.session.rollback()
         logger.exception("Error inesperado al registrar el proveedor")
-        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "danger")
+        flash("No se pudo registrar el proveedor. Intenta de nuevo.", "proveedor-danger")
         
     return redirect(url_for('logistics.suppliers.show_register_form'))
 
