@@ -112,9 +112,13 @@ MARCAS_FUERTES_TARJETA = {'recibo_compra', 'banco', 'tarjeta', 'terminal', 'lote
 
 ANCLAS_TIPO_FACTURA = {'factura', 'control', 'fiscal'}
 
+# El membrete "Republica Bolivariana de Venezuela" NO va aqui: lo llevan las
+# facturas fiscales y los comprobantes SENIAT legitimos, y como el veto es
+# absoluto (0 puntos) tumbaba compras reales. Una cedula se reconoce por los
+# datos del titular ('cedula de identidad', 'fecha de nacimiento', etc.), no
+# por la linea del pais.
 SENALES_DOCUMENTO_IDENTIDAD = (
     'cedula de identidad',
-    'republica bolivariana',
     'fecha de nacimiento',
     'nacionalidad',
     'estado civil',

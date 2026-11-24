@@ -242,6 +242,45 @@ class TestReglasDeComprobante(unittest.TestCase):
         self.assertEqual(r['tipo'], 'factura_proveedor')
         self.assertTrue(r['puede_aceptar'], f"debio aceptarse, dio {r}")
 
+    def test_factura_con_membrete_republica_bolivariana_se_acepta(self):
+        """El membrete del pais lo llevan TODAS las facturas fiscales.
+
+        Estaba en la lista de veto de identidad y devolvia 0 puntos a los
+        comprobantes SENIAT legitimos.
+        """
+        texto = limpiar_para_evaluar([
+            'REPUBLICA BOLIVARIANA DE VENEZUELA',
+            'MINISTERIO DEL PODER POPULAR PARA LA ALIMENTACION',
+            'COMERCIALIZADORA DE ALIMENTOS C.A.',
+            'RIF: J-31245678-9',
+            'FACTURA',
+            'NRO. DE FACTURA: 000123',
+            'N CONTROL: 00045678',
+            'PROVEEDOR: COMERCIALIZADORA DE ALIMENTOS C.A.',
+            'FECHA: 27/09/2026',
+            'HARINA 000 x 50kg  10  25,00  250,00',
+            'BASE IMPONIBLE  250,00',
+            'IVA 16%  40,00',
+            'TOTAL  292,18',
+            'Bs. 292,18',
+        ])
+        r = evaluar_comprobante(texto)
+        self.assertEqual(r['tipo'], 'factura_proveedor', r)
+        self.assertTrue(r['puede_aceptar'],
+                        f"una factura fiscal real no puede vetarse: {r}")
+        self.assertFalse(any(m.startswith('identidad:') for m in r['marcas']))
+
+    def test_el_membrete_del_pais_no_marca_documento_de_identidad(self):
+        from app.logistics.requests.purchase_validators import (
+            _documento_identidad_detectado,
+        )
+        self.assertIsNone(_documento_identidad_detectado(
+            'republica bolivariana de venezuela'))
+        # La cedula se sigue reconociendo por los datos del titular.
+        self.assertEqual(
+            _documento_identidad_detectado('cedula de identidad v-18675480'),
+            'cedula de identidad')
+
     def test_foto_de_producto_no_se_acepta(self):
         texto = "wholesale product premium quality best price contact us high quality for your store"
         r = evaluar_comprobante(texto)
@@ -424,9 +463,29 @@ class TestElClienteTambienFrena(unittest.TestCase):
 
     def test_no_envia_mientras_la_foto_se_esta_revisando(self):
         self.assertIn("estadoFoto === 'revisando'", self.codigo)
-        inicio = self.codigo.index("estadoFoto === 'revisando'")
-        bloque = self.codigo[inicio:inicio + 500]
+        # Se busca dentro de la validacion del formulario: el estado tambien se
+        # consulta al pintar el boton, y ahi no aplica 'isValid'.
+        inicio_fn = self.codigo.index('function validateFormBeforeSubmit()')
+        bloque_fn = self.codigo[inicio_fn:]
+        inicio = bloque_fn.index("estadoFoto === 'revisando'")
+        bloque = bloque_fn[inicio:inicio + 500]
         self.assertIn('isValid = false', bloque)
+
+    def test_la_foto_se_comprime_antes_de_salir_a_la_red(self):
+        self.assertIn('MAX_LADO_CLIENTE = 1600', self.codigo)
+        self.assertIn('CALIDAD_JPEG_CLIENTE = 0.85', self.codigo)
+        self.assertIn("toBlob(resolve, 'image/jpeg'", self.codigo)
+        # El submit debe mandar la comprimida, no la original del input.
+        self.assertIn('archivoComprobante', self.codigo)
+
+    def test_el_boton_se_bloquea_mientras_se_revisa_la_foto(self):
+        """Bloquear solo el envio no basta: el boton debe verse deshabilitado."""
+        inicio = self.codigo.index('function actualizarBotonRegistro()')
+        bloque = self.codigo[inicio:inicio + 900]
+        self.assertIn("estadoFoto === 'revisando'", bloque)
+        self.assertIn('boton.disabled = ocupado', bloque)
+        self.assertIn('Verificando factura...', self.codigo)
+        self.assertIn("'btnRegistrar'", self.codigo)
 
     def test_el_rechazo_limpia_la_foto_para_poder_reintentarla(self):
         # Si la foto mala se queda en el campo, el usuario no puede corregirla
@@ -1216,7 +1275,7 @@ class TestEntregaSinDuplicados(unittest.TestCase):
         self.assertIn('tokenEnvio = nuevoTokenEnvio()', self.codigo)
 
     def test_el_html_no_sirve_una_version_vieja_del_js(self):
-        self.assertIn("?v=9.17", self.html)
+        self.assertIn("?v=9.18", self.html)
 
     def test_las_alertas_funcionan_sin_cdn(self):
         self.assertIn('js/vendor/sweetalert2.min.js', self.html)

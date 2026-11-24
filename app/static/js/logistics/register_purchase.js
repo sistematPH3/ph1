@@ -391,11 +391,179 @@ let controladorRevision = null;
 let motivoFoto = '';
 const MENSAJE_ERROR_REVISION = 'No se pudo completar la validación de la imagen (tiempo de espera agotado o error de conexión). Haz clic en reintentar o sube una foto más nítida.';
 
+// --- Boton de registro: un solo dueno del estado visual ------------------
+// Antes el boton solo se bloqueaba al enviar el formulario: durante los
+// segundos de OCR seguia rojo y clickeable, y el usuario solo se enteraba por
+// el modal "Un momento". Ahora el propio boton refleja lo que pasa con la foto.
+const HTML_BOTON_REGISTRO = '<i class="bi bi-check2-circle me-1"></i> Procesar y Guardar Compra';
+const HTML_BOTON_VERIFICANDO = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verificando factura...';
+const HTML_BOTON_ENVIANDO = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Registrando...';
+
+let envioEnCurso = false;
+
+function actualizarBotonRegistro() {
+    const boton = document.getElementById('btnRegistrar');
+    if (!boton) return;
+
+    const ocupado = envioEnCurso || estadoFoto === 'revisando';
+    boton.disabled = ocupado;
+    boton.classList.toggle('disabled', ocupado);
+    if (ocupado) {
+        boton.setAttribute('aria-busy', 'true');
+    } else {
+        boton.removeAttribute('aria-busy');
+    }
+
+    if (envioEnCurso) {
+        boton.innerHTML = HTML_BOTON_ENVIANDO;
+    } else if (estadoFoto === 'revisando') {
+        boton.innerHTML = HTML_BOTON_VERIFICANDO;
+    } else {
+        boton.innerHTML = HTML_BOTON_REGISTRO;
+    }
+}
+
+/**
+ * Aviso flotante breve, sin modal: cuando la foto queda aceptada el usuario
+ * sigue decidiendo el mismo cuando registrar la compra.
+ */
+let _toastFotoTimer = null;
+function ocultarToastFoto() {
+    const toast = document.getElementById('toastFotoVerificada');
+    if (toast) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(12px)';
+    }
+    if (_toastFotoTimer) {
+        clearTimeout(_toastFotoTimer);
+        _toastFotoTimer = null;
+    }
+}
+
+function mostrarToastFoto(mensaje) {
+    let toast = document.getElementById('toastFotoVerificada');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toastFotoVerificada';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.style.cssText = [
+            'position: fixed', 'right: 1rem', 'bottom: 1rem', 'z-index: 2000',
+            'max-width: 320px', 'padding: 0.75rem 1rem', 'border-radius: 0.75rem',
+            'background: #198754', 'color: #fff', 'font-size: 0.9rem',
+            'font-weight: 600', 'box-shadow: 0 6px 18px rgba(0,0,0,0.2)',
+            'opacity: 0', 'transform: translateY(12px)',
+            'transition: opacity 0.25s ease, transform 0.25s ease',
+            'pointer-events: none'
+        ].join(';');
+        document.body.appendChild(toast);
+    }
+
+    toast.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>' + escapeHtml(mensaje);
+    // Dos frames para que la transicion se vea con el elemento ya montado: si
+    // se cambia opacity en el mismo frame, el navegador agrupa los estilos.
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+    });
+
+    if (_toastFotoTimer) clearTimeout(_toastFotoTimer);
+    _toastFotoTimer = setTimeout(ocultarToastFoto, 4000);
+}
+
+// --- Compresion en el cliente --------------------------------------------
+// Una foto de celular pesa 5-10 MB y se enviaba dos veces (preview y submit).
+// Se reduce a 1600 px de lado mayor y JPEG 85% antes de tocar la red. El OCR
+// del servidor ya trabaja sobre una copia de 800 px, asi que no se pierde
+// nada de lo que el motor alcanza a leer.
+const MAX_LADO_CLIENTE = 1600;
+const CALIDAD_JPEG_CLIENTE = 0.85;
+const PESO_SIN_RECOMPRIMIR = 600 * 1024;
+
+// La version comprimida que se manda al preview y, despues, al submit.
+let archivoComprobante = null;
+
+function cargarBitmap(archivo) {
+    if (window.createImageBitmap) {
+        return window.createImageBitmap(archivo);
+    }
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(archivo);
+        const imagen = new Image();
+        imagen.onload = () => { URL.revokeObjectURL(url); resolve(imagen); };
+        imagen.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('No se pudo decodificar la imagen'));
+        };
+        imagen.src = url;
+    });
+}
+
+async function comprimirImagen(archivo) {
+    if (!archivo) return archivo;
+
+    let origen;
+    try {
+        origen = await cargarBitmap(archivo);
+    } catch (error) {
+        // Formato que el navegador no decodifica (HEIC, etc.): el servidor
+        // decide; no se bloquea al usuario aqui.
+        return archivo;
+    }
+
+    const ancho = origen.width || origen.naturalWidth || 0;
+    const alto = origen.height || origen.naturalHeight || 0;
+    if (!ancho || !alto) return archivo;
+
+    const escala = Math.min(1, MAX_LADO_CLIENTE / Math.max(ancho, alto));
+    // Ya es pequena y ligera: reencodarla solo le quitaria nitidez al OCR.
+    if (escala === 1 && archivo.size <= PESO_SIN_RECOMPRIMIR) {
+        if (typeof origen.close === 'function') origen.close();
+        return archivo;
+    }
+
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.max(1, Math.round(ancho * escala));
+    lienzo.height = Math.max(1, Math.round(alto * escala));
+    const ctx = lienzo.getContext('2d');
+    if (!ctx) return archivo;
+
+    // Fondo blanco: un PNG con transparencia quedaria con zonas negras al
+    // pasar a JPEG y el OCR no leeria nada.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(origen, 0, 0, lienzo.width, lienzo.height);
+    if (typeof origen.close === 'function') origen.close();
+
+    const blob = await new Promise((resolve) => {
+        try {
+            lienzo.toBlob(resolve, 'image/jpeg', CALIDAD_JPEG_CLIENTE);
+        } catch (error) {
+            resolve(null);
+        }
+    });
+
+    // Sin blob (canvas demasiado grande en iOS) o sin ganancia real: se manda
+    // la original y el servidor sigue siendo la autoridad.
+    if (!blob || (blob.size >= archivo.size && escala === 1)) return archivo;
+
+    const nombre = (archivo.name || 'comprobante').replace(/\.[^.]+$/, '') + '.jpg';
+    return new File([blob], nombre, { type: 'image/jpeg', lastModified: Date.now() });
+}
+
 function pintarEstadoFoto(estado, mensaje) {
     const display = document.getElementById('photoFileName');
     const icon = document.getElementById('cameraIcon');
     const dropzone = document.getElementById('dropzoneArea');
     const removeBtn = document.getElementById('removePhotoBtn');
+
+    // El boton sigue el mismo estado que el dropzone, aunque falte algun nodo.
+    if (estado !== 'aceptada') ocultarToastFoto();
+    actualizarBotonRegistro();
+
     if (!display || !icon || !dropzone) return;
 
     const nombre = (estado === 'vacia')
@@ -486,6 +654,16 @@ async function revisarFoto(archivo) {
         if (response.ok && data.puede_aceptar) {
             estadoFoto = 'aceptada';
             pintarEstadoFoto('aceptada');
+            // Aviso fluido, no modal: el usuario decide cuando registrar.
+            mostrarToastFoto('Factura verificada. Ya puedes registrar la compra.');
+        } else if (!response.ok && response.status >= 500) {
+            // Un 500 no dice que la foto sea mala: fallo el servidor o el OCR.
+            // Se trata como revision fallida (reintentable), no como imagen
+            // invalida, para no mandar al usuario a retomar la foto en vano.
+            estadoFoto = 'error_revision';
+            pintarEstadoFoto('error_revision');
+            setPhotoError(MENSAJE_ERROR_REVISION);
+            if (retryBtn) retryBtn.classList.remove('d-none');
         } else {
             estadoFoto = 'rechazada';
             pintarEstadoFoto('rechazada');
@@ -504,7 +682,12 @@ async function revisarFoto(archivo) {
     }
 }
 
-document.getElementById('invoice_photo').addEventListener('change', function(e) {
+// Cada seleccion de archivo lleva su numero: si el usuario cambia la foto
+// mientras la anterior se comprime, ese resultado viejo ya no debe usarse.
+let secuenciaFoto = 0;
+
+document.getElementById('invoice_photo').addEventListener('change', async function(e) {
+    const miSecuencia = ++secuenciaFoto;
     const display = document.getElementById('photoFileName');
     if (display) display.dataset.nombre = this.files[0] ? this.files[0].name : '';
 
@@ -515,9 +698,29 @@ document.getElementById('invoice_photo').addEventListener('change', function(e) 
     const alerta = document.getElementById('alertaGlobalCompra');
     if (alerta) alerta.classList.add('d-none');
 
-    if (this.files && this.files.length > 0) {
-        revisarFoto(this.files[0]);
+    const entrada = this;
+    if (entrada.files && entrada.files.length > 0) {
+        archivoComprobante = null;
+        // Adelanta el estado: comprimir tarda un instante y el boton ya debe
+        // reflejar que hay una revision en camino.
+        estadoFoto = 'revisando';
+        pintarEstadoFoto('revisando');
+
+        let archivo = entrada.files[0];
+        try {
+            archivo = await comprimirImagen(archivo);
+        } catch (error) {
+            // Sin canvas disponible: se manda la original y el servidor valida.
+            archivo = entrada.files[0];
+        }
+
+        if (miSecuencia !== secuenciaFoto) return;
+        if (!entrada.files || !entrada.files.length) return;
+
+        archivoComprobante = archivo;
+        revisarFoto(archivo);
     } else {
+        archivoComprobante = null;
         revisionFotoEnCurso++;
         if (controladorRevision) {
             controladorRevision.abort();
@@ -1087,8 +1290,8 @@ function validateFormBeforeSubmit() {
 
 // Evita que un doble clic registre DOS compras. El formulario se bloquea
 // mientras la peticion esta en vuelo y se desbloquea si algo falla, para que
-// el usuario pueda reintentar sin recargar la pagina.
-let envioEnCurso = false;
+// el usuario pueda reintentar sin recargar la pagina. (envioEnCurso se declara
+// arriba, junto a actualizarBotonRegistro().)
 
 function nuevoTokenEnvio() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -1115,13 +1318,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     }
 
     envioEnCurso = true;
-    const botonEnviar = document.querySelector(
-        '#purchaseForm button[type="submit"], #purchaseForm .submit-btn, #btnRegistrar');
-    const textoOriginalBoton = botonEnviar ? botonEnviar.innerHTML : null;
-    if (botonEnviar) {
-        botonEnviar.disabled = true;
-        botonEnviar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Registrando...';
-    }
+    actualizarBotonRegistro();
 
     const formData = new FormData();
     formData.append('supplier_id', document.getElementById('supplier_id').value);
@@ -1135,7 +1332,12 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
     formData.append('user_id', document.getElementById('user_id').value);
     formData.append('submit_token', tokenEnvio);
 
-    const photoFile = document.getElementById('invoice_photo').files[0];
+    // Se manda la version ya comprimida (la misma que paso el preview). Si el
+    // navegador no pudo comprimir, archivoComprobante queda null y va la
+    // original: el servidor vuelve a validar de todos modos.
+    const inputFoto = document.getElementById('invoice_photo');
+    const photoFile = archivoComprobante
+        || (inputFoto.files ? inputFoto.files[0] : null);
     formData.append('invoice_photo', photoFile);
 
     const rows = document.querySelectorAll('#itemsContainer tr.main-product-row');
@@ -1218,8 +1420,7 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
                 confirmButtonText: 'Reintentar',
                 customClass: { popup: 'rounded-4' }
             }).then(() => {
-                const boton = document.querySelector(
-                    '#purchaseForm button[type="submit"], #purchaseForm .submit-btn, #btnRegistrar');
+                const boton = document.getElementById('btnRegistrar');
                 if (boton) {
                     boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
@@ -1335,15 +1536,10 @@ document.getElementById('purchaseForm').addEventListener('submit', async (e) => 
             });
         }
     } finally {
-        // El boton se desbloquea siempre. En el exito no molesta porque el
-        // formulario se limpia y se rearma; si no, el usuario se quedaria con
-        // un boton morto y sin poder reintentar tras un fallo.
+        // El boton se recalcula siempre desde el estado real: si la foto sigue
+        // en revision se queda bloqueado, si no, vuelve a estar disponible.
+        // Asi un fallo no deja al usuario con un boton morto.
         envioEnCurso = false;
-        if (botonEnviar) {
-            botonEnviar.disabled = false;
-            if (textoOriginalBoton !== null) {
-                botonEnviar.innerHTML = textoOriginalBoton;
-            }
-        }
+        actualizarBotonRegistro();
     }
 });

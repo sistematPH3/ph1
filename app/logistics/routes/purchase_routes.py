@@ -357,7 +357,9 @@ def _validar_comprobante(file_bytes, imagen_ocr=None):
 # reutilización de un veredicto viejo si cambia la configuración.
 _OCR_CACHE_TTL = 1800  # segundos
 _OCR_CACHE = {}
-_VERSION_REGLAS = '2026-11-24.1'
+# Se sube al cambiar las reglas de evaluar_comprobante(): las entradas viejas
+# de la cache no deben sobrevivir a un veto corregido (republica bolivariana).
+_VERSION_REGLAS = '2026-11-24.2'
 
 
 def _validar_comprobante_cached(file_bytes, imagen_ocr=None):
