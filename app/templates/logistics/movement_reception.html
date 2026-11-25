@@ -22,7 +22,7 @@
     {'value': 'RECHAZO_POR_ESPACIO', 'label_item': 'Rechazo Parcial por Espacio', 'label_general': 'Rechazo Parcial por Falta de Espacio', 'item': true, 'rechazo': true},
     {'value': 'INCIDENCIA_MIXTA', 'label_item': 'Incidencia Mixta (Múltiples Novedades)', 'label_general': 'Incidencia Mixta (Múltiples Novedades)', 'item': false, 'rechazo': false}
 ] %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=94">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logistics/movement_reception.css') }}?v=96">
 
 <div class="reception-page-wrapper">
     <div class="ph-card">
@@ -153,7 +153,14 @@
                                         {% endif %}
                                         {% endfor %}
                                     </select>
-                                    <div class="secondary-condition-field hidden mt-1">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="item-detail-row hidden" data-detail-row-id="{{ item.id }}">
+                            <td colspan="6" class="item-detail-cell">
+                                <div class="item-detail-panel">
+                                    <div class="item-detail-fields">
+                                    <div class="secondary-condition-field hidden">
                                         <span class="lot-exp-label">Segunda condición (opcional):</span>
                                         <select class="form-select form-select-sm select-secondary-condition" aria-label="Condición secundaria del insumo">
                                             <option value="">Sin segunda condición</option>
@@ -163,14 +170,15 @@
                                         </select>
                                         <span class="secondary-condition-hint text-muted small"></span>
                                     </div>
-                                    <div class="near-expiry-date-field hidden mt-1">
+                                    <div class="near-expiry-date-field hidden">
                                         <span class="lot-exp-label">Venc. real:</span>
                                         <input type="date" class="form-control form-control-sm input-near-expiry-exp font-monospace"
                                                aria-label="Fecha de vencimiento real del lote"
                                                title="Fecha de vencimiento real del lote; si la guía no la trae, ingrésela para evaluar la novedad">
                                     </div>
-                                    <div class="row-lot-mismatch hidden mt-1">
+                                    <div class="row-lot-mismatch hidden">
                                         <div class="single-lot-field">
+                                            <span class="lot-exp-label d-block">Lote físico real del insumo</span>
                                             <input type="text" class="form-control form-control-sm input-row-lot font-monospace" placeholder="Lote físico real del insumo que se queda...">
                                             <div class="lot-exp-lookup hidden mt-1">
                                                 <span class="lot-exp-label">Venc. del lote:</span>
@@ -197,6 +205,8 @@
                                                 </button>
                                             </div>
                                         </div>
+                                    </div>
+                                    <div class="item-detail-hints"></div>
                                     </div>
                                 </div>
                             </td>
@@ -332,5 +342,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=102"></script>
+<script src="{{ url_for('static', filename='js/logistics/movement_reception.js') }}?v=104"></script>
 {% endblock %}

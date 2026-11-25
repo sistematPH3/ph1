@@ -4,6 +4,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const destinationName = form ? form.dataset.destinationName : "Destino";
     
     const rows = document.querySelectorAll(".item-row");
+
+    // Los paneles de incidencias/lotes viven ahora en una fila de detalle debajo
+    // del insumo (a todo el ancho), no dentro de la celda de condición. Estos
+    // helpers conservan el alcance por renglón para que el JS existente siga
+    // encontrando los mismos campos sin duplicar lógica.
+    const detailRowFor = (row) => {
+        const detailId = row ? row.dataset.detailId : "";
+        if (!detailId) return null;
+        return document.querySelector(`.item-detail-row[data-detail-row-id="${detailId}"]`);
+    };
+    const detailScope = (row) => detailRowFor(row) || row;
     const noveltySelect = document.getElementById("noveltyType");
     const noveltyHelpText = document.getElementById("noveltyHelpText");
     const notesRequiredFlag = document.getElementById("notesRequiredFlag");
@@ -97,8 +108,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // deshabilita las duplas no aprobadas y limpia una secundaria que dejó de ser
     // válida al cambiar la condición principal.
     function updateSecondaryConditionField(row, primaryCondition) {
-        const select = row.querySelector(".select-secondary-condition");
-        const wrapper = row.querySelector(".secondary-condition-field");
+        const select = detailScope(row).querySelector(".select-secondary-condition");
+        const wrapper = detailScope(row).querySelector(".secondary-condition-field");
         if (!select || !wrapper) return "";
 
         if (!isQualitativeCondition(primaryCondition)) {
@@ -119,6 +130,21 @@ document.addEventListener("DOMContentLoaded", () => {
             select.value = "";
         }
         return select.value || "";
+    }
+
+    // La fila de detalle solo ocupa espacio cuando el renglón tiene algo que
+    // mostrar (segunda condición, vencimiento real o lote/sobrante). Así la
+    // tabla permanece compacta y el panel se despliega justo debajo del insumo.
+    function syncDetailRowVisibility(row) {
+        const detailRow = detailRowFor(row);
+        if (!detailRow) return;
+        const fields = detailRow.querySelector(".item-detail-fields");
+        if (!fields) return;
+        const hasVisibleField = Array.from(fields.children).some(child =>
+            !child.classList.contains("item-detail-hints") &&
+            !child.classList.contains("hidden")
+        );
+        detailRow.classList.toggle("hidden", !hasVisibleField);
     }
 
     // Las fechas ISO ('AAAA-MM-DD') se interpretan en hora LOCAL: new Date('2026-01-01')
@@ -395,20 +421,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // motivo debajo del lote y lanza el toast solo al entrar en contradicción
     // (no en cada tecla). No borra otras clases de estado del renglón.
     function setLotContradictionFeedback(row, isContradiction) {
-        const lotInput = row.querySelector(".input-row-lot");
+        const detail = detailScope(row);
+        const lotInput = detail.querySelector(".input-row-lot");
         if (lotInput) {
             lotInput.classList.toggle("is-invalid", isContradiction);
             lotInput.setAttribute("aria-invalid", isContradiction ? "true" : "false");
         }
 
-        let hint = row.querySelector(".lot-contradiction-hint");
+        let hint = detail.querySelector(".lot-contradiction-hint");
         if (isContradiction) {
             if (!hint) {
                 hint = document.createElement("div");
                 hint.className = "lot-contradiction-hint";
                 hint.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>' +
                     'El lote físico ingresado coincide con el de la guía; no puedes reportar esta novedad.';
-                const anchor = row.querySelector(".single-lot-field");
+                const anchor = detail.querySelector(".single-lot-field");
                 if (anchor) anchor.appendChild(hint);
             }
             hint.classList.remove("hidden");
@@ -436,7 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // y se avanza con un toast; el envío queda bloqueado hasta corregir.
     function setNearExpiryFeedback(row, isContradiction, diasRestantes, sinFechaReal = false) {
         const primarySelect = row.querySelector(".select-item-condition");
-        const secondarySelect = row.querySelector(".select-secondary-condition");
+        const detail = detailScope(row);
+        const secondarySelect = detail.querySelector(".select-secondary-condition");
         // Si la novedad viene de la condición secundaria, se resalta ESA lista,
         // no la principal (que puede ser, por ejemplo, temperatura).
         const condSelect = (primarySelect && primarySelect.value === "VENCIMIENTO_PROXIMO")
@@ -447,12 +475,12 @@ document.addEventListener("DOMContentLoaded", () => {
             condSelect.setAttribute("aria-invalid", isContradiction ? "true" : "false");
         }
 
-        let hint = row.querySelector(".near-expiry-hint");
+        let hint = detail.querySelector(".near-expiry-hint");
         if (isContradiction) {
             if (!hint) {
                 hint = document.createElement("div");
                 hint.className = "near-expiry-hint";
-                const anchor = row.querySelector(".item-condition-wrapper");
+                const anchor = detail.querySelector(".item-detail-hints");
                 if (anchor) anchor.appendChild(hint);
             }
             const detalleDias = Number.isFinite(diasRestantes) ? ` (vence en ${diasRestantes} días)` : "";
@@ -779,34 +807,33 @@ document.addEventListener("DOMContentLoaded", () => {
     // vencimiento (igual que el insumo erróneo). El operario no define el vencimiento:
     // lo saca el sistema del lote ya registrado.
     function addSurplusLotRow(row, index) {
-        const list = row.querySelector(".surplus-lot-list");
+        const list = detailScope(row).querySelector(".surplus-lot-list");
         if (!list) return;
         const lotRow = document.createElement("div");
         lotRow.className = "surplus-lot-row w-100";
+        // Una sola línea por lote: Lote · Vencimiento · Cantidad · Quitar.
+        // El número se conserva oculto porque renumberSurplusRows lo actualiza.
         lotRow.innerHTML = `
-            <div class="surplus-lot-head">
-                <span class="surplus-lot-num" data-surplus-index=""></span>
-                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-surplus-lot" title="Quitar lote">
-                    <i class="bi bi-trash3"></i>
-                </button>
-            </div>
-            <label class="surplus-field">
+            <span class="surplus-lot-num d-none" data-surplus-index=""></span>
+            <label class="surplus-field surplus-field-lot">
                 <span>Lote</span>
                 <input type="text" class="form-control form-control-sm input-surplus-lot font-monospace"
                        placeholder="Lote real del sobrante...">
             </label>
-            <div class="surplus-field-row">
-                <label class="surplus-field">
-                    <span>Vencimiento (lo pone el sistema)</span>
-                    <input type="date" class="form-control form-control-sm input-surplus-exp font-monospace" readonly>
-                </label>
-                <label class="surplus-field">
-                    <span>Cantidad</span>
-                    <input type="number" step="0.01" min="0" class="form-control form-control-sm input-surplus-qty font-monospace"
-                           placeholder="0.00" aria-label="Cantidad del lote">
-                </label>
-            </div>
-            <div class="surplus-lot-hint mt-1"></div>
+            <label class="surplus-field">
+                <span>Vencimiento</span>
+                <input type="date" class="form-control form-control-sm input-surplus-exp font-monospace"
+                       readonly title="Lo completa el sistema al reconocer el lote">
+            </label>
+            <label class="surplus-field">
+                <span>Cantidad</span>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm input-surplus-qty font-monospace"
+                       placeholder="0.00" aria-label="Cantidad del lote">
+            </label>
+            <button type="button" class="btn btn-outline-danger btn-sm btn-remove-surplus-lot" title="Quitar lote" aria-label="Quitar lote">
+                <i class="bi bi-trash3"></i>
+            </button>
+            <div class="surplus-lot-hint"></div>
         `;
         const numEl = lotRow.querySelector(".surplus-lot-num");
         numEl.textContent = `Lote del sobrante ${(index || 0) + 1}`;
@@ -836,7 +863,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Renumera las filas de lote del sobrante ("Lote 1", "Lote 2"...).
     function renumberSurplusRows(row) {
-        const list = row.querySelector(".surplus-lot-list");
+        const list = detailScope(row).querySelector(".surplus-lot-list");
         if (!list) return;
         list.querySelectorAll(".surplus-lot-row").forEach((lr, i) => {
             const num = lr.querySelector(".surplus-lot-num");
@@ -852,7 +879,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // con el sobrante total (recibido - despachado). Esto evita la confusión de
     // "escribo 60 pero pone cualquier número y me marca error".
     function updateSurplusSummary(row) {
-        const summaryEl = row.querySelector(".surplus-summary");
+        const detail = detailScope(row);
+        const summaryEl = detail.querySelector(".surplus-summary");
         if (!summaryEl) return;
 
         const unit = row.dataset.unit || "UN";
@@ -862,14 +890,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isNaN(received) || received < 0) received = 0;
 
         const target = received - dispatched;
-        const surplusBox = row.querySelector(".surplus-lots");
+        const surplusBox = detail.querySelector(".surplus-lots");
         if (!(target > 0.001) || (surplusBox && surplusBox.classList.contains("hidden"))) {
             summaryEl.innerHTML = "";
             return;
         }
 
         let sum = 0;
-        row.querySelectorAll(".input-surplus-qty").forEach(q => {
+        detail.querySelectorAll(".input-surplus-qty").forEach(q => {
             const v = parseFloat(q.value);
             if (!isNaN(v) && v > 0) sum += v;
         });
@@ -1142,10 +1170,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateLotExpiration(row, expiration, exists) {
-        const expBox = row.querySelector(".lot-exp-lookup");
-        const expInput = row.querySelector(".input-row-exp");
-        const hint = row.querySelector(".lot-exp-hint");
-        const lotInput = row.querySelector(".input-row-lot");
+        const detail = detailScope(row);
+        const expBox = detail.querySelector(".lot-exp-lookup");
+        const expInput = detail.querySelector(".input-row-exp");
+        const hint = detail.querySelector(".lot-exp-hint");
+        const lotInput = detail.querySelector(".input-row-lot");
 
         if (!expBox || !expInput) return;
 
@@ -1193,7 +1222,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function handleLotLookup(row) {
         const productId = row.dataset.productId;
-        const lotInput = row.querySelector(".input-row-lot");
+        const lotInput = detailScope(row).querySelector(".input-row-lot");
         const lot = lotInput ? lotInput.value.trim() : "";
 
         if (!productId || !lot) {
@@ -1217,18 +1246,19 @@ document.addEventListener("DOMContentLoaded", () => {
         let firstAffectedInfo = null;
 
         rows.forEach(row => {
+            const detail = detailScope(row);
             const dispatched = parseFloat(row.dataset.dispatched) || 0;
             const input = row.querySelector(".input-received");
             const diffBadge = row.querySelector(".diff-badge");
             const condSelect = row.querySelector(".select-item-condition");
-            const lotBox = row.querySelector(".row-lot-mismatch");
-            const lotExpBox = row.querySelector(".lot-exp-lookup");
-            const singleLotField = row.querySelector(".single-lot-field");
-            const expInput = row.querySelector(".input-row-exp");
-            const nearExpiryField = row.querySelector(".near-expiry-date-field");
-            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
-            const surplusLotsBox = row.querySelector(".surplus-lots");
-            const surplusLotList = row.querySelector(".surplus-lot-list");
+            const lotBox = detail.querySelector(".row-lot-mismatch");
+            const lotExpBox = detail.querySelector(".lot-exp-lookup");
+            const singleLotField = detail.querySelector(".single-lot-field");
+            const expInput = detail.querySelector(".input-row-exp");
+            const nearExpiryField = detail.querySelector(".near-expiry-date-field");
+            const nearExpiryExpInput = detail.querySelector(".input-near-expiry-exp");
+            const surplusLotsBox = detail.querySelector(".surplus-lots");
+            const surplusLotList = detail.querySelector(".surplus-lot-list");
 
             let received = parseFloat(input.value);
             if (isNaN(received) || received < 0) received = 0;
@@ -1296,7 +1326,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let condition = declaredCondition;
             let lotContradiction = false;
             if (effectiveConditions.has("LOTE_NO_COINCIDE")) {
-                const lotRealInput = row.querySelector(".input-row-lot");
+                const lotRealInput = detail.querySelector(".input-row-lot");
                 const observedLot = lotRealInput ? normalizarLote(lotRealInput.value) : "";
                 const guideLot = normalizarLote(row.dataset.lotNumber);
                 lotContradiction = Boolean(observedLot) && Boolean(guideLot) && observedLot === guideLot;
@@ -1359,9 +1389,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         // mantiene abierto (auto); luego respeta el colapso manual.
                         if (surplusLotsBox) surplusLotsBox.classList.remove("hidden");
                         if (surplusLotList && surplusLotList.children.length === 0) {
-                            const sb = row.querySelector(".surplus-lot-body");
+                            const sb = detail.querySelector(".surplus-lot-body");
                             if (sb) sb.classList.remove("hidden");
-                            const caret = row.querySelector(".surplus-caret");
+                            const caret = detail.querySelector(".surplus-caret");
                             if (caret) caret.classList.add("open");
                             addSurplusLotRow(row);
                         }
@@ -1377,6 +1407,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Refrescar el resumen en vivo del panel "Lote(s) del sobrante" cuando
             // cambia la cantidad recibida (y por tanto el excedente total a repartir).
             updateSurplusSummary(row);
+            syncDetailRowVisibility(row);
 
             diffBadge.className = "diff-badge";
             row.classList.remove("row-ok", "row-missing", "row-surplus", "row-warning");
@@ -1509,13 +1540,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     rows.forEach(row => {
+        const detail = detailScope(row);
         const input = row.querySelector(".input-received");
         const condSelect = row.querySelector(".select-item-condition");
 
         // RETORNO: el vencimiento real heredado del lote original se muestra
         // bloqueado desde que se abre el formulario (no se puede reescribir).
         if (esVencimientoBloqueado(row)) {
-            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
+            const nearExpiryExpInput = detail.querySelector(".input-near-expiry-exp");
             if (nearExpiryExpInput) {
                 nearExpiryExpInput.readOnly = true;
                 nearExpiryExpInput.value = String(row.dataset.expiration || "").trim();
@@ -1566,7 +1598,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        const secondaryConditionSelect = row.querySelector(".select-secondary-condition");
+        const secondaryConditionSelect = detail.querySelector(".select-secondary-condition");
         if (secondaryConditionSelect) {
             secondaryConditionSelect.addEventListener("change", () => {
                 row.dataset.condManual = "1";
@@ -1575,7 +1607,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
+        const nearExpiryExpInput = detail.querySelector(".input-near-expiry-exp");
         if (nearExpiryExpInput) {
             // La fecha real es el dato que sostiene (o desmiente) la novedad: al
             // cambiarla se reevalúa el renglón en el acto.
@@ -1585,7 +1617,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        const lotInput = row.querySelector(".input-row-lot");
+        const lotInput = detail.querySelector(".input-row-lot");
         if (lotInput) {
             // Debounce: al escribir el lote (insumo o excedente del sobrante) no se
             // lanza un fetch por cada tecla, solo tras 300 ms de pausa. Evita saturar
@@ -1602,7 +1634,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        const btnAddSurplus = row.querySelector(".btn-add-surplus-lot");
+        const btnAddSurplus = detail.querySelector(".btn-add-surplus-lot");
         if (btnAddSurplus) {
             btnAddSurplus.addEventListener("click", () => addSurplusLotRow(row));
         }
@@ -1610,9 +1642,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Toggle del panel "Lote(s) del sobrante": colapsa/expande el cuerpo. El
         // panel existe para que el usuario sepa que el sobrante exige declarar su
         // lote; al marcarlo como sobrante se abre solo (ver checkAndAutoCategorize).
-        const btnToggleSurplus = row.querySelector(".btn-toggle-surplus-lots");
-        const surplusBody = row.querySelector(".surplus-lot-body");
-        const surplusCaret = row.querySelector(".surplus-caret");
+        const btnToggleSurplus = detail.querySelector(".btn-toggle-surplus-lots");
+        const surplusBody = detail.querySelector(".surplus-lot-body");
+        const surplusCaret = detail.querySelector(".surplus-caret");
         if (btnToggleSurplus && surplusBody) {
             btnToggleSurplus.addEventListener("click", () => {
                 const willOpen = surplusBody.classList.contains("hidden");
@@ -1632,18 +1664,19 @@ document.addEventListener("DOMContentLoaded", () => {
         rows.forEach(row => {
             const detailId = parseInt(row.dataset.detailId, 10);
             if (!Number.isFinite(detailId)) return;
+            const detail = detailScope(row);
             const dispatched = parseFloat(row.dataset.dispatched) || 0;
             const input = row.querySelector(".input-received");
             const condSelect = row.querySelector(".select-item-condition");
-            const lotInput = row.querySelector(".input-row-lot");
-            const expInput = row.querySelector(".input-row-exp");
-            const nearExpiryExpInput = row.querySelector(".input-near-expiry-exp");
+            const lotInput = detail.querySelector(".input-row-lot");
+            const expInput = detail.querySelector(".input-row-exp");
+            const nearExpiryExpInput = detail.querySelector(".input-near-expiry-exp");
 
             let receivedQty = parseFloat(input.value);
             if (isNaN(receivedQty) || receivedQty < 0) receivedQty = 0;
 
             const declaredCondition = condSelect ? condSelect.value : "CONFORME";
-            const secondarySelect = row.querySelector(".select-secondary-condition");
+            const secondarySelect = detail.querySelector(".select-secondary-condition");
             const secondaryCondition = secondarySelect ? secondarySelect.value : "";
             const effectiveConditions = new Set(
                 [declaredCondition, secondaryCondition].filter(Boolean)
@@ -1709,7 +1742,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let hasQtyWithoutLot = false;
             let surplusHasAnyLot = false;
             let surplusHasUnrecognizedLot = false;
-            row.querySelectorAll(".surplus-lot-row").forEach(sr => {
+            detail.querySelectorAll(".surplus-lot-row").forEach(sr => {
                 const sLot = sr.querySelector(".input-surplus-lot");
                 const sExp = sr.querySelector(".input-surplus-exp");
                 const sQty = sr.querySelector(".input-surplus-qty");

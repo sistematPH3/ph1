@@ -396,20 +396,29 @@
 
 .lot-exp-lookup {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    margin-top: 4px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 3px 6px;
+    margin-top: 2px;
     min-width: 0;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
 }
 
+.lot-exp-lookup .lot-exp-label {
+    font-size: 10px;
+}
+
 .lot-exp-lookup .input-row-exp {
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    flex: 1 1 120px;
+    max-width: 170px;
     min-width: 0;
+    height: 28px;
+    padding: 2px 6px;
+    font-size: 11px;
     box-sizing: border-box;
 }
 
@@ -447,11 +456,12 @@
 }
 
 .surplus-lot-hint {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 3px;
-    flex-wrap: nowrap;
+    margin-top: 0;
+    flex-wrap: wrap;
     min-width: 0;
 }
 
@@ -464,8 +474,10 @@
 /* Panel "Lote(s) del sobrante" (expansible, opción A). El body arranca abierto
    al declarar sobrante y se puede colapsar/expandir con el botón superior. */
 .btn-toggle-surplus-lots {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
+    line-height: 1.2;
+    padding: 3px 8px;
     background: #eef2ff;
     border-color: #c7d2fe;
     color: #4338ca;
@@ -486,24 +498,25 @@
 }
 
 .surplus-lot-guide {
-    font-size: 11px;
-    line-height: 1.3;
-    padding: 4px 6px;
-    border-left: 3px solid #c7d2fe;
+    font-size: 10px;
+    line-height: 1.25;
+    padding: 2px 6px;
+    margin-bottom: 2px;
+    border-left: 2px solid #c7d2fe;
     background: #f8fafc;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 /* Resumen en vivo del sobrante: cuánto hay que repartir y cuánto falta. */
 .surplus-summary {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    line-height: 1.4;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.3;
     border: 1px solid;
 }
 
@@ -567,13 +580,14 @@
 .surplus-lot-row {
     width: 100%;
     max-width: 100%;
-    background: #f8fafc;
+    background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    border-radius: 6px;
+    padding: 5px 6px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.8fr) auto;
+    align-items: end;
+    gap: 4px 6px;
     white-space: normal;
 }
 
@@ -596,9 +610,10 @@
 }
 
 .surplus-lot-row .btn-remove-surplus-lot {
-    padding: 2px 8px;
-    line-height: 1.2;
-    font-size: 12px;
+    height: 28px;
+    padding: 1px 7px;
+    line-height: 1.1;
+    font-size: 11px;
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -606,17 +621,18 @@
 .surplus-field {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 1px;
     width: 100%;
     min-width: 0;
 }
 
 .surplus-field > span {
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 9px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.3px;
     color: #64748b;
+    line-height: 1.2;
 }
 
 .surplus-field-row {
@@ -627,11 +643,12 @@
 }
 
 .surplus-field .form-control {
-    font-size: 12px;
+    font-size: 11px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding: 4px 8px;
+    height: 28px;
+    padding: 2px 6px;
 }
 
 .surplus-field input[readonly] {
@@ -673,6 +690,114 @@
     font-size: 10px !important;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+/* ==========================================================================
+   FILA DE DETALLE DEL INSUMO (incidencias, lotes y vencimientos)
+   Se despliega a todo el ancho justo debajo de su fila, en lugar de crecer
+   dentro de la estrecha columna "Condición". Solo se muestra cuando hay
+   campos activos (el JS sincroniza su visibilidad).
+   ========================================================================== */
+.ph-table tbody tr.item-detail-row {
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.ph-table tbody tr.item-detail-row:last-child {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ph-table td.item-detail-cell {
+    padding: 0 10px 8px 10px;
+    background: #ffffff;
+    white-space: normal;
+    vertical-align: top;
+}
+
+/* Bloque integrado y compacto: sin tarjetas internas ni títulos redundantes. */
+.item-detail-panel {
+    background: #f8fafc;
+    border-left: 3px solid #991b1b;
+    border-radius: 0 0 8px 0;
+    padding: 8px 10px;
+    box-sizing: border-box;
+}
+
+.item-detail-fields {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: end;
+    gap: 8px 10px;
+}
+
+.item-detail-fields > .secondary-condition-field {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.item-detail-fields > .secondary-condition-field .form-select {
+    font-size: 12px;
+    padding: 3px 8px;
+    min-height: 30px;
+}
+
+.item-detail-fields > .near-expiry-date-field {
+    grid-column: span 3;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    min-width: 0;
+    max-width: none;
+}
+
+.item-detail-fields > .near-expiry-date-field .input-near-expiry-exp {
+    height: 30px;
+    padding: 2px 6px;
+    font-size: 12px;
+    max-width: 150px;
+}
+
+.item-detail-fields > .row-lot-mismatch {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: start;
+    gap: 6px 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+.item-detail-fields .single-lot-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    max-width: 440px;
+}
+
+.item-detail-fields .single-lot-field .lot-exp-label {
+    font-size: 10px;
+}
+
+.item-detail-fields .single-lot-field > .input-row-lot {
+    height: 30px;
+    padding: 3px 7px;
+    font-size: 11px !important;
+}
+
+.item-detail-fields .surplus-lots {
+    min-width: 0;
+}
+
+.item-detail-hints {
+    grid-column: 1 / -1;
+    min-width: 0;
 }
 
 .novelty-interactive-panel {
@@ -1316,6 +1441,52 @@
         grid-column: 1 / -1;
     }
 
+    /* --- Fila de detalle: apilada a todo el ancho --- */
+    .ph-table tbody tr.item-detail-row {
+        padding: 0;
+        margin: -6px 0 14px;
+        border: none;
+        box-shadow: none;
+        background: transparent;
+    }
+
+    .ph-table td.item-detail-cell {
+        display: block;
+        padding: 0 0 4px 0;
+        background: transparent;
+        text-align: left;
+    }
+
+    .ph-table td.item-detail-cell::before {
+        display: none;
+    }
+
+    .item-detail-panel {
+        border-radius: 0 0 10px 10px;
+        border-left-width: 3px;
+        padding: 8px;
+    }
+
+    .item-detail-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 8px;
+    }
+
+    .item-detail-fields > .secondary-condition-field,
+    .item-detail-fields > .near-expiry-date-field {
+        grid-column: span 1;
+        max-width: none;
+    }
+
+    .item-detail-fields > .row-lot-mismatch {
+        grid-column: 1 / -1;
+        grid-template-columns: 1fr;
+    }
+
+    .item-detail-fields .single-lot-field {
+        max-width: none;
+    }
+
     /* --- Lotes sobrante: campos apilados --- */
     .surplus-field-row {
         grid-template-columns: 1fr 1fr;
@@ -1490,9 +1661,29 @@
         font-size: 13px;
     }
 
-    /* --- Lotes sobrante --- */
+    /* --- Fila de detalle: una columna --- */
+    .item-detail-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .item-detail-fields > .secondary-condition-field,
+    .item-detail-fields > .near-expiry-date-field {
+        grid-column: 1 / -1;
+    }
+
+    /* --- Lotes sobrante: campos apilados en dos columnas --- */
     .surplus-lot-row {
-        padding: 10px;
+        grid-template-columns: 1fr 1fr;
+        padding: 6px;
+    }
+
+    .surplus-lot-row .surplus-field-lot {
+        grid-column: 1 / -1;
+    }
+
+    .surplus-lot-row .btn-remove-surplus-lot {
+        grid-column: 1 / -1;
+        justify-self: end;
     }
 
     .surplus-field-row {
