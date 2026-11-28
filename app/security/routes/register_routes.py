@@ -1,27 +1,43 @@
-from flask import flash, jsonify, redirect, render_template, request, url_for
+import time
+
+from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 
 from .. import security_bp
 from ..requests.auth_validators import REGLAS_PASSWORD, validar_email
 from ..repositories.register_repository import RegisterRepository
 from ..services.register_service import RegisterService
 
-# Freno al registro masivo de cuentas automatizadas.
+# Freno al registro masivo de cuentas automatizadas. Es un dict de modulo (en
+# memoria del proceso, sin Flask-Limiter ni Redis).
 _INTENTOS_REGISTRO = {}
-MAX_INTENTOS_REGISTRO = 5
-VENTANA_REGISTRO_SEGUNDOS = 900
+
+
+def _limite_registro():
+    """Tope de intentos y ventana efectiva, configurables por entorno.
+
+    `REGISTRO_MAX_INTENTOS <= 0` significa DESACTIVADO: la ruta no cuenta
+    intentos ni bloquea. Es el valor por defecto en desarrollo para no frenar
+    las pruebas continuas; en produccion se define 5 en el entorno.
+    """
+    maximo = int(current_app.config.get('REGISTRO_MAX_INTENTOS', 0) or 0)
+    ventana = int(current_app.config.get('REGISTRO_VENTANA_SEGUNDOS', 900) or 900)
+    return maximo, ventana
 
 
 def _excede_tope_registro(identificador):
-    import time
+    maximo, ventana = _limite_registro()
+    if maximo <= 0:
+        return False
+
     ahora = time.time()
     registro = _INTENTOS_REGISTRO.get(identificador)
 
-    if not registro or ahora - registro['inicio'] > VENTANA_REGISTRO_SEGUNDOS:
+    if not registro or ahora - registro['inicio'] > ventana:
         _INTENTOS_REGISTRO[identificador] = {'inicio': ahora, 'intentos': 1}
         return False
 
     registro['intentos'] += 1
-    return registro['intentos'] > MAX_INTENTOS_REGISTRO
+    return registro['intentos'] > maximo
 
 
 @security_bp.route('/check-email', methods=['POST'])

@@ -323,6 +323,12 @@ class TestVistaRegistro(BaseRegistro):
         self.assertIsNotNone(User.query.filter_by(email=CORREO).first())
 
     def test_limite_de_registro_se_activa(self):
+        # El freno queda desactivado por defecto (REGISTRO_MAX_INTENTOS=0) para
+        # no bloquear las pruebas manuales. Aqui se activa explicitamente para
+        # seguir cubriendo el mecanismo cuando alguien lo configura en produccion.
+        self.app.config['REGISTRO_MAX_INTENTOS'] = 5
+        register_routes._INTENTOS_REGISTRO.clear()
+
         for _ in range(5):
             self.client.post(
                 '/auth/register',

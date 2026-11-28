@@ -82,6 +82,16 @@ class Config:
     RECUPERACION_MAX_INTENTOS = int(os.environ.get('RECUPERACION_MAX_INTENTOS', '5'))
     RECUPERACION_VENTANA_SEGUNDOS = int(os.environ.get('RECUPERACION_VENTANA_SEGUNDOS', '900'))
 
+    # --- Limites del registro de usuarios --------------------------------
+    # Freno a la creacion masiva de cuentas automatizadas. Vive en un dict de
+    # memoria dentro de la ruta de registro (no hay Flask-Limiter en el
+    # proyecto). En 0 o menos queda DESACTIVADO, que es lo que conviene en
+    # desarrollo/pruebas: con 5 el sexto intento desde la misma IP devolvia
+    # "Demasiados intentos de registro" y frenaba las pruebas continuas.
+    # En produccion, definir REGISTRO_MAX_INTENTOS=5 en el entorno.
+    REGISTRO_MAX_INTENTOS = int(os.environ.get('REGISTRO_MAX_INTENTOS', '0'))
+    REGISTRO_VENTANA_SEGUNDOS = int(os.environ.get('REGISTRO_VENTANA_SEGUNDOS', '900'))
+
     # --- Limites de las fotos de evidencia --------------------------------
     # Tope de la peticion completa. Antes no existia ninguno y las rutas hacian
     # archivo.read(): un adjunto grande tumbaba el servidor por falta de memoria.
