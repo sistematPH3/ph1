@@ -55,7 +55,7 @@
             <div class="form-group-premium">
                 <label for="tax_id">RIF / Identificación Fiscal</label>
                 <input type="text" class="form-control" id="tax_id" name="tax_id" maxlength="20" 
-                       placeholder="Ej. J-12345678-9" 
+                       placeholder="Ingrese el RIF" 
                        value="{{ supplier.tax_id if supplier else '' }}" required>
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
@@ -63,7 +63,7 @@
             <div class="form-group-premium">
                 <label for="contact_name">Persona de Contacto</label>
                 <input type="text" class="form-control" id="contact_name" name="contact_name" maxlength="100" 
-                       placeholder="Ej. María Pérez" 
+                       placeholder="Ingrese el Nombre" 
                        value="{{ supplier.contact_name if supplier else '' }}" required>
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
@@ -79,7 +79,7 @@
             <div class="form-group-premium">
                 <label for="email">Correo Electrónico</label>
                 <input type="email" class="form-control" id="email" name="email" maxlength="100" 
-                       placeholder="ejemplo@correo.com" 
+                       placeholder="Ingrese el correo" 
                        value="{{ supplier.email if supplier else '' }}" required>
                 <div class="error-feedback-premium invalid-feedback d-block text-danger"></div>
             </div>
